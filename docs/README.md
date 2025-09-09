@@ -11,3 +11,4 @@ This directory should be used as central note repository and links to materials 
 - **Digital Image Processing (Image Processing)**, Gonzalez, R and Woods, R., Prentice Hall
 - **Optics (Optics)**, Hecht, E., Addison-Wesley
 - **Eye and Brain (Human Vision)**, Gregory, R., Princeton University Press
+- **Animal Eyes (Biological Vision)**, Land, M. and Nilsson, D., Oxford University Press
