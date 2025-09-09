@@ -5,7 +5,7 @@ This directory should be used as central note repository and links to materials 
 ## Reference books
 
 - **Computer Vision: Algorithms and Applications (Vision)**, Szeliski, R., Springer
-- \*_Computer Vision: A Modern Approach (Vision)_, Forsyth, D and Ponce, J., Prentice Hall
+- **Computer Vision: A Modern Approach (Vision)**, Forsyth, D and Ponce, J., Prentice Hall
 - **Robot Vision (Vision)**, Horn, B. K. P., MIT Press
 - **A Guided Tour of Computer Vision (Vision)**, Nalwa, V., Addison-Wesley
 - **Digital Image Processing (Image Processing)**, Gonzalez, R and Woods, R., Prentice Hall
