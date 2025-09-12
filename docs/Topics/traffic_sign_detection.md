@@ -129,3 +129,8 @@ Deep learning algorithms utilize neural networks to model _intricate relationshi
   - Introduced a novel _data augmentation technique_ to improve the model's generalization capabilities
   - Evaluations on both the [DFG](https://service.tib.eu/ldmservice/dataset/dfg-traf-c-sign-dataset) and the [Swedish traffic sign datasets](https://www.cvl.isy.liu.se/research/datasets/traffic-signs-dataset/) demonstrated significant performance gains, with the refined **Mask R-CNN** model achieving metrics such as **_mAP50 up to 95.5%_**
 
+- ["A cascaded R-CNN with multiscale attention and imbalanced samples from traffic sign detection" by Zhang et al.](https://ieeexplore.ieee.org/document/8986614)
+  - Cascaded R-CNN model with **multiscale attention**
+    - Improves detection accuracy by focusing on **multiscale feature extraction** and **balancing imbalanced datasets**
+    - Enhance the model's performance in detecting _small-sized_ traffic signs
+
