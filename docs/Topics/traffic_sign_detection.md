@@ -149,3 +149,7 @@ Deep learning algorithms utilize neural networks to model _intricate relationshi
 > [!NOTE]
 > Machine learning techniques can automate feature extraction from images, but their detection performance is generally inferior. In contrast, deep learning approaches achieve high accuracy rates; however, they struggle with detecting small targets effectively.
 
+Deep learning can be used to:
+
+- Enhance the accuracy of traffic sign detection
+- Improve the robustness and real-time performance of detection algorithms
