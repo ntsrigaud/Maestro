@@ -86,3 +86,6 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
   - Classification was performed with an SVM
   - Enhanced traffic sign detection process
 
+> [!IMPORTANT]
+> Color features and shape features are prone to interference from external objects of similar color and shape in _complex road conditions_, resulting in **poor generalization**.
+
