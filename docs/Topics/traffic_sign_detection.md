@@ -111,3 +111,9 @@ Deep learning algorithms utilize neural networks to model _intricate relationshi
 - Streamline the feature extraction process
 - Enhance the effectiveness of recognition systems
 
+### Related Researches
+
+- ["Speed Limit": high-accuracy US traffic sign recognition with convolutional neural networks (CNN) by Li et al.](https://ieeexplore.ieee.org/document/7585032)
+  - Utilized CNN to specifically target the detection and recognition of traffic signs in the USA, concentrating particularly on speed limit signs.
+  - Impressive detection performance on the [LISA-TS dataset](https://git-disl.github.io/GTDLBench/datasets/lisa_traffic_sign_dataset/)
+  - Effective in identifying critical signs
