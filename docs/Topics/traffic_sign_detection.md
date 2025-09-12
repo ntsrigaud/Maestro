@@ -97,7 +97,7 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
   - Balance between computational efficiency and recognition accuracy
   - Enhanced version of the HOG for feature extraction with the ELM classifier
   - High recognition accuracy both on the [GTSRB dataset](https://www.kaggle.com/datasets/meowmeowmeowmeowmeow/gtsrb-german-traffic-sign) and the [Belgium traffic sign classification dataset (BTSC)](https://btsd.ethz.ch/shareddata/) while maintaining very high computational efficiency
-- ["Traffic sign detection and recognition based on random forests" by Ellahyani et al.](url)
+- ["Traffic sign detection and recognition based on random forests" by Ellahyani et al.](https://www.sciencedirect.com/science/article/abs/pii/S0957417417303702)
   - Employ the HSI color space for threshold segmentation to pinpoint potential traffic sign regions
   - Augmented with the use of _SVM_ and _Random Forest classifiers_ for enhanced accuracy
   - Utilized HOG features to recognize the traffic signs effectively
