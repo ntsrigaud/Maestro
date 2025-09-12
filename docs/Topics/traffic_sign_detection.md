@@ -48,3 +48,13 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
 - Recognition and classification of signs
   - Interprets the detected signs to determine their **types**, such as _stops signs_ and _speed limits_.
 
+## Traditional Methods and Related Works
+
+- Image processing and machine learning
+- Detection algorithms:
+  - Histogram of Orientation Gradients (HOG)
+  - Scale-Invariant Feature Transformations (SIFT)
+- Classification algorithms:
+  - Support Vector Machines (SVM)
+  - Random Forest (RF)
+
