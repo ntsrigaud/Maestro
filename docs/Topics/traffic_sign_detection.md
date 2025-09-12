@@ -176,3 +176,22 @@ Three main parts:
   - and classification information
 
   of the detection boxes at each scale.
+
+### Small Object Detection Layer
+
+> [!NOTE]
+> This algorithm adds a _small object detection layer_ to the YOLO architecture to enhance its ability to detect small targets.
+
+- Traffic signs are categorized in three (3) groups in datasets:
+  - Large
+  - Medium
+  - Small
+
+  based on their apparent sizes from varying distances.
+
+- Introduced mainly by adding **_higher-resolution feature maps_**
+  - Allow the retention of more spatial detail information, thus _increasing the network's sensitivity to small targets_
+- Simultaneously engage _multiple-scale feature maps_ for detection
+- Obtention of _scale feature rich_ in small target fusion
+- Detection of _fused multiscale features_ by the detection head
+
