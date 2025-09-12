@@ -140,3 +140,8 @@ Deep learning algorithms utilize neural networks to model _intricate relationshi
   - Significant improvement of **detection recall** and **target localization precision**
   - Achieved a mean Average Precision (mAP) at **_0.5 of 52.07%_** on the [TT100K dataset](https://www.kaggle.com/datasets/braunge/tt100k)
   - Demonstrated enhanced real-time performance
+
+- ["Robust detection method for improving small traffic sign recognition based on spatial pyramid pooling (SPP)" by Dewi et al.](https://www.researchgate.net/publication/356401539_Robust_detection_method_for_improving_small_traffic_sign_recognition_based_on_spatial_pyramid_pooling)
+  - Combination of **YOLOv3** and **_[Densenets models](https://arxiv.org/abs/1608.06993)_**
+  - Incorporate [Spatial Pyramid Pooling (SPP)](https://arxiv.org/abs/1406.4729) to optimize feature extraction
+  - Significant boost the _recognition accuracy_ of small traffic signs
