@@ -244,3 +244,7 @@ Three main parts:
 > [!IMPORTANT]
 > Future works on the **_YOLO-BS_** algorithm will focus on further optimizing the balance between speed and accuracy, potentially through **_hardware acceleration techniques_** or more **_efficient network architectures_**.
 
+## Research Paper References
+
+- [YOLO-BS: A traffic sign detection algorithm based on YOLOv8](https://www.nature.com/articles/s41598-025-88184-0)
+- [Datasets](https://cg.cs.tsinghua.edu.cn/traffic-sign/)
