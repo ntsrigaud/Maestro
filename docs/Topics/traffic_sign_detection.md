@@ -12,7 +12,7 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
 - Helps drivers adhere to traffic regulations
 - Reduces traffic accidents
 - Improves traffic flow management
-- Ensure road safety
+- Ensures road safety
 
 ## Challenges faced in Traffic Sign Detection
 
