@@ -117,3 +117,10 @@ Deep learning algorithms utilize neural networks to model _intricate relationshi
   - Utilized CNN to specifically target the detection and recognition of traffic signs in the USA, concentrating particularly on speed limit signs.
   - Impressive detection performance on the [LISA-TS dataset](https://git-disl.github.io/GTDLBench/datasets/lisa_traffic_sign_dataset/)
   - Effective in identifying critical signs
+- ["Real-time traffic sign recognition based on efficient CNNs in the wild" by Li & Wang](https://ieeexplore.ieee.org/document/8392744)
+  - Combination of **Faster R-CNN** with **MobileNets** to precisely locate and classify small traffic signs.
+  - Leverage the strengths of:
+    - **Faster R-CNN** for its efficient and accurate detection capabilities
+    - **MobileNets** for its lightweight, mobile-friendly architecture
+  - Resulted in enhanced performance in recognizing small traffic signs
+
