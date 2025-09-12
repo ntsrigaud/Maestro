@@ -46,7 +46,7 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
 - Localization
   - Identification of the **presence** and **exact location** of traffic signs within complex road environments.
 - Recognition and classification of signs
-  - Interprets the detected signs to determine their **types**, such as _stops signs_ and _speed limits_.
+  - Interprets the detected signs to determine their **types**, such as _stop signs_ and _speed limits_.
 
 ## Traditional Methods and Related Works
 
