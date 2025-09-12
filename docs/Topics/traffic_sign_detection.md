@@ -221,7 +221,7 @@ Three main parts:
 
 - Precision (P)
   - Ratio of correctly predicted positive samples (TP) to all predicted positive samples (TP + FP)
-  - Depends on whether the prediction results are accurate or not; Its fromula: $$P = \frac{TP}{TP + FP}$$
+  - Depends on whether the prediction results are accurate or not; Its formula: $$P = \frac{TP}{TP + FP}$$
 - Recall (R)
   - Ratio of correctly predicted as positive samples (TP) to all true cases as positive samples (TP + FN)
   - Depends on whether the prediction results are comprehensive or not; Its formula: $$R = \frac{TP}{TP + FN}$$
