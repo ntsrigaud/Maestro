@@ -134,3 +134,9 @@ Deep learning algorithms utilize neural networks to model _intricate relationshi
     - Improves detection accuracy by focusing on **multiscale feature extraction** and **balancing imbalanced datasets**
     - Enhance the model's performance in detecting _small-sized_ traffic signs
 
+- ["An improved light-weight traffic sign recognition based on YOLOv4-Tiny" by Wang et al.](https://ieeexplore.ieee.org/abstract/document/9527223)
+  - Enhanced lightweight traffic sign recognition algorithm based on **YOLOv4-Tiny**
+  - Refines the **_K-means clustering method_** to generate anchor frames tailored to the traffic sign dataset.
+  - Significant improvement of **detection recall** and **target localization precision**
+  - Achieved a mean Average Precision (mAP) at **_0.5 of 52.07%_** on the [TT100K dataset](https://www.kaggle.com/datasets/braunge/tt100k)
+  - Demonstrated enhanced real-time performance
