@@ -93,3 +93,7 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
   - Combination of HOG for feature extraction with an Extreme Learning Machine (ELM) classifier for rapid classification
   - High recognition accuracy in the [GTSRB dataset](https://www.kaggle.com/datasets/meowmeowmeowmeowmeow/gtsrb-german-traffic-sign)
   - Exhibits significant advantages in _computational efficiency_
+- ["An efficient method for traffic sign recognition based on extreme machine learning (ELM)" by Huang et al.](https://pubmed.ncbi.nlm.nih.gov/26992185/)
+  - Balance between computational efficiency and recognition accuracy
+  - Enhanced version of the HOG for feature extraction with the ELM classifier
+  - High recognition accuracy both on the [GTSRB dataset](https://www.kaggle.com/datasets/meowmeowmeowmeowmeow/gtsrb-german-traffic-sign) and the [Belgium traffic sign classification dataset (BTSC)](https://btsd.ethz.ch/shareddata/) while maintaining very high computational efficiency
