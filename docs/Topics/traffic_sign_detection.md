@@ -58,3 +58,11 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
   - Support Vector Machines (SVM)
   - Random Forest (RF)
 
+### Traditional Approach
+
+- Relies on _distinctive features_ of traffic signs
+  - Specific colors
+  - Prominent shapes
+- Extraction of those features for detection
+- Classification with a **_trained classifier_**
+
