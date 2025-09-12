@@ -153,3 +153,26 @@ Deep learning can be used to:
 
 - Enhance the accuracy of traffic sign detection
 - Improve the robustness and real-time performance of detection algorithms
+
+## **_YOLO-BS_** Traffic Sign Detection Algorithm
+
+![The framework of YOLO-BS](./imgs/YOLO-BS_framework.png)
+
+Three main parts:
+
+- Backbone
+- Neck
+- Head
+
+### Procedure Steps
+
+- Preprocessing of images through input part **data augmentation**
+- Feed the images into the _backbone network_
+- Feature extraction from images in the _backbone network_
+- Production of **feature maps** by the _backbone network_
+- Processing of the **feature maps** by the _neck network_ for prediction, which outputs:
+  - the position
+  - confidence
+  - and classification information
+
+  of the detection boxes at each scale.
