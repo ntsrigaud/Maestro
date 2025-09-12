@@ -195,3 +195,6 @@ Three main parts:
 - Obtention of _scale feature rich_ in small target fusion
 - Detection of _fused multiscale features_ by the detection head
 
+> [!NOTE]
+> **YOLOv8** introduces **_mesoscale_** and **_small-scale feature maps_** in addition to the original scale, enabling multilevel detection across these varying scales.
+
