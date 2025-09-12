@@ -210,3 +210,33 @@ Three main parts:
   - Enables _fuller fusion of features_ from different scales
   - Improves the network's ability to detect multi-scale targets
 - Employs a **_fast normalized fusion method_** that improves upon the traditional feature fusion methods used in **_[FPN](https://www.sciencedirect.com/science/article/abs/pii/S0168169924000036)_**
+
+### YOLO Algorithm Evaluation Indicators
+
+|                  |       | Prediction   |              |
+| ---------------- | ----- | ------------ | ------------ |
+|                  |       | **Positive** | **Negative** |
+| **Ground truth** | True  | TP           | TN           |
+|                  | False | FP           | FN           |
+
+- Precision (P)
+  - Ratio of correctly predicted positive samples (TP) to all predicted positive samples (TP + FP)
+  - Depends on whether the prediction results are accurate or not; Its fromula: $$P = \frac{TP}{TP + FP}$$
+- Recall (R)
+  - Ratio of correctly predicted as positive samples (TP) to all true cases as positive samples (TP + FN)
+  - Depends on whether the prediction results are comprehensive or not; Its formula: $$R = \frac{TP}{TP + FN}$$
+- mean Average Precision (mAP)
+  - AP refers to the _area of the region below the PR curve plotted with recall_ as the horizontal coordinate and _precision_ as the vertical coordinate.
+  - Used to measure the _performance of the algorithm_ in recognizing each category.
+  - Its formula: $$AP = \int_0^1 PdR$$
+  - mAP is taken equal to the average value of Ap over all categories such as:
+    - YOLOv8
+    - YOLOv8-Small object
+    - YOLOv8-Small object-BiFPN (YOLO-BS)
+
+#### Results of ablation experiments
+
+![Results of ablation experiments of YOLO-BS](./imgs/YOLO-BS_ablation_experiments_results.png)
+
+> [!NOTE]
+> _YOLOv8_ and _YOLOv8 with small object detection layer_ were used as **_baselines_** in this experiment.
