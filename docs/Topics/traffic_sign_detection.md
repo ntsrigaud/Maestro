@@ -89,3 +89,7 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
 > [!IMPORTANT]
 > Color features and shape features are prone to interference from external objects of similar color and shape in _complex road conditions_, resulting in **poor generalization**.
 
+- ["Application of BW-ELM model on traffic sign recognition" by Sun et al.](https://www.sciencedirect.com/science/article/abs/pii/S0925231213009934)
+  - Combination of HOG for feature extraction with an Extreme Learning Machine (ELM) classifier for rapid classification
+  - High recognition accuracy in the [GTSRB dataset](https://www.kaggle.com/datasets/meowmeowmeowmeowmeow/gtsrb-german-traffic-sign)
+  - Exhibits significant advantages in _computational efficiency_
