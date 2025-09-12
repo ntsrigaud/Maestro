@@ -80,3 +80,9 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
 
   which significantly increasing the efficiency of sign detection.
 
+- ["On circular traffic sign detection and recognition" by Berkaya et al.](https://www.sciencedirect.com/science/article/abs/pii/S0957417415007848)
+  - EDCircles circle detection algorithm combined with an RGB-based color thresholding technique to detect traffic signs
+  - Integrates GABOR, LBP, and HOG techniques
+  - Classification was performed with an SVM
+  - Enhanced traffic sign detection process
+
