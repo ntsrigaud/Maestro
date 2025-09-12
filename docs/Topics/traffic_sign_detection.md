@@ -145,3 +145,7 @@ Deep learning algorithms utilize neural networks to model _intricate relationshi
   - Combination of **YOLOv3** and **_[Densenets models](https://arxiv.org/abs/1608.06993)_**
   - Incorporate [Spatial Pyramid Pooling (SPP)](https://arxiv.org/abs/1406.4729) to optimize feature extraction
   - Significant boost the _recognition accuracy_ of small traffic signs
+
+> [!NOTE]
+> Machine learning techniques can automate feature extraction from images, but their detection performance is generally inferior. In contrast, deep learning approaches achieve high accuracy rates; however, they struggle with detecting small targets effectively.
+
