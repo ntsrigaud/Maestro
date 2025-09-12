@@ -198,3 +198,15 @@ Three main parts:
 > [!NOTE]
 > **YOLOv8** introduces **_mesoscale_** and **_small-scale feature maps_** in addition to the original scale, enabling multilevel detection across these varying scales.
 
+### **_Bidirectional Feature Pyramid Network (BiFPN)_**
+
+- Aimed at bolstering the multi-scale feature fusion capabilities of CNN for target detection tasks
+- Key component in detection frameworks such as **_[EfficientDet](https://arxiv.org/abs/1911.09070)_** and **_[YOLO](https://arxiv.org/html/2304.00501v6)_**
+- Introduce a bidirectional information flow
+  - Significant optimization of feature utilization and representation through a _weighted feature fusion mechanism_
+  - Improves the overall efficacy of target detection
+- Helps realize a top-down and bottom-up bidirectional information flow
+  - Enhance the _information transfer_ between different layers of features
+  - Enables _fuller fusion of features_ from different scales
+  - Improves the network's ability to detect multi-scale targets
+- Employs a **_fast normalized fusion method_** that improves upon the traditional feature fusion methods used in **_[FPN](https://www.sciencedirect.com/science/article/abs/pii/S0168169924000036)_**
