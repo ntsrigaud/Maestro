@@ -25,3 +25,9 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
 > [!NOTE]
 > Deep-learning based traffic sign recognition algorithms have prominence in helping overcoming those challenges.
 
+## Related Concepts
+
+- Principles of small object detection layers
+- YOLOv12
+- BiFPN network
+
