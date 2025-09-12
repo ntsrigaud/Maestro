@@ -31,3 +31,13 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
 - YOLOv12
 - BiFPN network
 
+## Essential Key Benefits
+
+- Vehicle-mounted traffic sign recognition systems:
+  - Effectively guide and regulate driver behavior
+  - Ensure safe driving
+  - Reduce traffic accidents
+- Detecting and recognizing traffic signs:
+  - Further enhances autonomous driving techonology
+  - Improves road commuting efficiency
+
