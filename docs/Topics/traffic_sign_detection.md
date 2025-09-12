@@ -14,3 +14,14 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
 - Improves traffic flow management
 - Ensure road safety
 
+## Challenges faced in Traffic Sign Detection
+
+- Growing variety and complexity of urban traffic signs
+- Dynamic and complex traffic conditions
+- Lighting variations
+- Occlusions
+- Similarities among different types of signs
+
+> [!NOTE]
+> Deep-learning based traffic sign recognition algorithms have prominence in helping overcoming those challenges.
+
