@@ -72,3 +72,11 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
   - Traffic signs extraction from their environment using the color and shape of the sign's corners along with classification of identified signs using neural networks.
 - ["Goal evaluation of segmentation algorithm for traffic sign recognition" by Gomez-Moreno et al.](https://ieeexplore.ieee.org/document/4220659)
   - Color segmentation method using SVM and speed increase using Look-Up Table (LUT)
+- ["Robust traffic sign recognition based on color global and Local Oriented Edge Magnitude Patterns (LOEMP)" by Yuan et al.](https://ieeexplore.ieee.org/document/6810168)
+  - Integrates:
+    - color
+    - global spatial structure
+    - local shape information
+
+  which significantly increasing the efficiency of sign detection.
+
