@@ -41,3 +41,10 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
   - Further enhances autonomous driving techonology
   - Improves road commuting efficiency
 
+### Main Steps of Traffic Sign Detection
+
+- Localization
+  - Identification of the **presence** and **exact location** of traffic signs within complex road environments.
+- Recognition and classification of signs
+  - Interprets the detected signs to determine their **types**, such as _stops signs_ and _speed limits_.
+
