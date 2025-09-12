@@ -124,3 +124,8 @@ Deep learning algorithms utilize neural networks to model _intricate relationshi
     - **MobileNets** for its lightweight, mobile-friendly architecture
   - Resulted in enhanced performance in recognizing small traffic signs
 
+- ["Deep learning for large-scale traffic-sign detection and recognition" by Tabernik & Skocaj](https://arxiv.org/pdf/1904.00649)
+  - Enhanced **Mask R-CNN** framework to better recognize small traffic signs
+  - Introduced a novel _data augmentation technique_ to improve the model's generalization capabilities
+  - Evaluations on both the [DFG](https://service.tib.eu/ldmservice/dataset/dfg-traf-c-sign-dataset) and the [Swedish traffic sign datasets](https://www.cvl.isy.liu.se/research/datasets/traffic-signs-dataset/) demonstrated significant performance gains, with the refined **Mask R-CNN** model achieving metrics such as **_mAP50 up to 95.5%_**
+
