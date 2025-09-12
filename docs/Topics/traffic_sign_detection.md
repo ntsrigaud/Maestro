@@ -102,3 +102,12 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
   - Augmented with the use of _SVM_ and _Random Forest classifiers_ for enhanced accuracy
   - Utilized HOG features to recognize the traffic signs effectively
 
+## Improvements due to Deep Learning Algorithms
+
+Deep learning algorithms utilize neural networks to model _intricate relationships_ between inputs and outputs.
+
+- Ability to autonomously learn high-level features directly from raw data
+- Diminish the necessity for manual feature extraction
+- Streamline the feature extraction process
+- Enhance the effectiveness of recognition systems
+
