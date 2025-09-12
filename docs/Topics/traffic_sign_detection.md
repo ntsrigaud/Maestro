@@ -38,7 +38,7 @@ Traffic sign detection utilizes _computer vision_ and _artificial intelligence_ 
   - Ensure safe driving
   - Reduce traffic accidents
 - Detecting and recognizing traffic signs:
-  - Further enhances autonomous driving techonology
+  - Further enhances autonomous driving technology
   - Improves road commuting efficiency
 
 ### Main Steps of Traffic Sign Detection
