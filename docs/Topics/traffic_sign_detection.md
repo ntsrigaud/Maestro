@@ -240,3 +240,7 @@ Three main parts:
 
 > [!NOTE]
 > _YOLOv8_ and _YOLOv8 with small object detection layer_ were used as **_baselines_** in this experiment.
+
+> [!IMPORTANT]
+> Future works on the **_YOLO-BS_** algorithm will focus on further optimizing the balance between speed and accuracy, potentially through **_hardware acceleration techniques_** or more **_efficient network architectures_**.
+
