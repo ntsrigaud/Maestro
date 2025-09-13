@@ -65,3 +65,7 @@
 
 > [!NOTE]
 > **ASODCAE-SLR**: Atom Search Optimization with Deep Learning Enabled Arabic Sign Language Recognition
+
+- [Liu et al.](https://doi.org/10.3390/healthcare10091779) achieved **high-accuracy gesture recognition** using the **YOLOv5 algorithm**, but:
+  - it _only_ applies to **predefined simple gestures sets**
+  - lacks the ability to **understand complex interaction intentions**
