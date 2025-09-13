@@ -42,3 +42,4 @@
 ## Literature Review
 
 - [Alyami et al.](https://www.sciencedirect.com/science/article/abs/pii/S0306457324001341?via%3Dihub) pointed out that existing research overly focuses on _sign language recognition_, with insufficient application research in **_universal interaction scenarios_**
+- Han et al. in their proposed method fails to consider **environmental interference issues** in practical scenarios.
