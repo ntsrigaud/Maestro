@@ -87,3 +87,9 @@
 
   but pointed out that:
   - current research still shows **insufficient robustness in complex environments**.
+
+- [Jeong et al.](https://www.tandfonline.com/doi/full/10.1080/10447318.2024.2348837) explored **non-verbal sound interaction** based on tapping and touching, and:
+  - achieved good recognition results
+
+  but:
+  - this **_single-modal solution_** struggles to meet the **_diverse interaction needs_**
