@@ -69,3 +69,6 @@
 - [Liu et al.](https://doi.org/10.3390/healthcare10091779) achieved **high-accuracy gesture recognition** using the **YOLOv5 algorithm**, but:
   - it _only_ applies to **predefined simple gestures sets**
   - lacks the ability to **understand complex interaction intentions**
+- [Zhou et al.](https://www.tandfonline.com/doi/full/10.1080/15230406.2023.2183900) while studying **user-defined gestures** for multi-scale GIS interfaces:
+  - found that **gesture features** vary with **_spatial scale_**
+  - did not _deeply_ explore **_semantic-level adaptability issues_**
