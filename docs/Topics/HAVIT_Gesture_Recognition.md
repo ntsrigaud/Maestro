@@ -22,3 +22,19 @@
 
 > [!NOTE]
 > **Vision Transformer** (ViT) is a transformer adapted for computer vision tasks. An image is split into smaller fixed-sized patches which are treated as a sequence of tokens, similar to words for NLP tasks. ViT requires less resources to pretrain compared to convolutional architectures and its performance on large datasets can be transferred to smaller downstream tasks.
+
+## Research Background
+
+- Transformation of human lifestyles and production modes by the rapid development of information technologies
+- Global smart furniture market reached $146.6 million in 2020
+- Human quality of life improvement
+- Key challenge in interaction methods
+- Struggle in the adaptation of human-computer interaction to diverse usage scenarios
+- Traditional control methods no longer meet user demands
+- **Gesture recognition** demonstrates significant **application potential**
+- Demand for _contactless_ interaction in the post-pandemic era
+- Significant challenge faced in actual application environments due to:
+  - **limited data resources**
+  - **scence complexity**
+
+![Gesture Recognition for Smart Furniture](./imgs/gesture_recognition_for_smart_furniture.png)
