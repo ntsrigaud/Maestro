@@ -53,3 +53,5 @@
   - showed advantages in **cost** and **portability**,
   - but the contact-based solution **_limited user experience_**.
 - [Wang et al.](https://doi.org/10.1080/10447318.2024.2352226) found that **_gesture simplicity_** and **_directionality_** are key factors, but the research was **limited** to specific user groups and lacked **_universal verification_**.
+- [Yu et al.](https://www.nature.com/articles/s41598-022-08133-z) proposed a **_dynamic gesture recognition_** method based on **_2D CNNs_** and **_[feature fusion](https://arxiv.org/abs/1712.00960)_** which achieved **improved recognition accuracy** but their method:
+  - faces challenges in real-time applications with **_varying lighting conditions_**
