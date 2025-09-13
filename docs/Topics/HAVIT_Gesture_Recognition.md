@@ -135,3 +135,92 @@
 
 > [!NOTE]
 > ViT has the ability to capture **global spatial relationships**.
+
+## Methods
+
+### Problem description
+
+- Three-dimensional space
+- Accurate mapping of the captured gesture sequences to control commands
+- Definition of gesture image sequence at a time $t$:
+  $$I_t = \{i_1, i_2, \dots, i_n\} \in \mathbb{R}^{H \times W \times C}$$
+- Gesture image represented as three-dimensional tensor $i_k \in \mathbb{R}^{H \times W \times C}$ where:
+  - H: height of the image
+  - W: width of the image
+  - C: **_number of image channels_**
+- Each frame contains:
+  - rich spatial information
+  - visual features for gestures
+- Introduction of a **transformation matrix** on the **[special Euclidean group SE(3)](https://lavalle.pl/planning/node147.html)** to precisely characterize:
+  - the position
+  - and posture information of gestures
+    $$T=\begin{bmatrix}R&p\cr0&1\end{bmatrix} \in SE(3)$$
+    where:
+  - $R \in SO(3)$ describes the **spatial orientation** of the gesture
+  - $SO(3)$ represents the **three-dimensional [special orthogonal group](https://mathworld.wolfram.com/SpecialOrthogonalGroup.html)**
+  - $p \in \mathbb{R}^3$ is the **translation vector** which characterizes the **spatial position of the gesture**.
+- Definition of all executable control commands as a finite set:
+  $$\mathcal{C} = \{c_1, c_2, \dots, c_m\}, \quad c_i \in \mathcal{A}$$
+  where:
+  - $\mathcal{A}$ is the **_action space_** of the control commands
+  - Each command $c_i$ corresponds to a **specific operation**
+- Construction of a mapping from **image space** to **control command space**:
+  $$\mathcal{f} : \mathbb{R}^{H \times W \times C} \to \mathcal{C}, \quad \mathcal{f}(I_t) = c_i$$
+- Definition of the **environment state space** to handle the **complexity** of practical application scenarios:
+  $$
+  \mathcal{E} = \{e_1, e_2, \dots, e_k\}, \quad e_i \in \mathcal{S}
+  $$
+  where:
+  - $\mathcal{S}$ is the set of **environmental states** including various factors affecting **_recognition effectiveness_** such as:
+    - lighting changes $e_1 \in \mathbb{R}^{+}$
+    - occlusion degree $e_2 \in [0,1]$
+- Expression of the **_optimization objective_** of gesture recognition as a **[conditional probability maximization problem](https://arxiv.org/pdf/1708.02406)**:
+
+  $$
+  \min_{\theta} \mathcal{L}(f_{\theta}(I_t \mid \mathcal{E}), y), \quad \theta \in \Theta
+  $$
+
+  where:
+  - $\Theta$: **parameter space** which contains all possible parameter configurations
+  - $y$: true label
+  - $\mathcal{L}$: [loss function](https://www.datarobot.com/blog/introduction-to-loss-functions/) which measures the **difference** between the predicted and true values
+
+- Design of an _objective function_ containing **regularization terms** to enhance the robustness and generalization ability of the model:
+  $$
+  \mathcal{L_{total}} = \mathcal{L_{rec}} + \lambda \mathcal{L_{reg}}, \quad \lambda \gt 0
+  $$
+  where:
+  - $\mathcal{L_{rec}}$: **recognition loss** which measures the accuracy of model predictions
+  - $\mathcal{L_{reg}}$: **regularization term** which controls the model complexity
+  - $\lambda$: **balance factor** weighing the importance of both terms
+- Output of the control command with **maximum posterior probability**:
+  $$
+  \mathcal{c^*} = arg \max_{c \in \mathcal{C}}{P(c \mid I_t, \mathcal{E})}
+  $$
+
+> [!NOTE]
+> An **image channel** refers to the category of color types (RGB, CMYK, HSV) in an image.
+
+> [!NOTE]
+> The separation of the channels is used for component analysis of colors in an image.
+
+> [!NOTE]
+> A **transformation matrix** is a square matrix used in linear algebra to perform geometric operations such as rotation, scaling, and translation on vectors or geometric objects by mapping their coordinates from an original system to a new one.
+
+> [!NOTE]
+> A **translation vector** is a mathematical representation of a shift in position, indicating both the direction and distance an object or figure is moved without rotation or change in size.
+
+- Consideration of uncertain factors such as:
+  - lighting changes
+  - occlusion in the environment
+  - data acquisition
+
+  to formally represent the problem as:
+
+  $$
+  arg_{\theta} \min{\mathbb{E}_{I_t \sim D} [\mathcal{L}_{rec} (f_{\theta}(I_t \mid \mathcal{E}), y) + \lambda \mathcal{L}_{reg}(\theta)]}, \quad \text{s.t.} \quad |D| \ll N
+  $$
+
+  where $\mathcal{E}$ is the interference factor brought by the environment.
+  - In other words, _find the parameters $\theta$ that minimizes the expectation of the loss subject to $|D| \ll N$_
+  - Describes how to achieve **accurate understanding** of user gesture intentions under the constraint of limited annotated data ($|D| \ll N$)
