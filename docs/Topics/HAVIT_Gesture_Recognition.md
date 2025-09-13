@@ -52,3 +52,4 @@
 - [Ji et al.](https://www.tandfonline.com/doi/full/10.1080/10447318.2023.2212232) conducted a review of _flexible strain sensor gloves_, which:
   - showed advantages in **cost** and **portability**,
   - but the contact-based solution **_limited user experience_**.
+- [Wang et al.](https://doi.org/10.1080/10447318.2024.2352226) found that **_gesture simplicity_** and **_directionality_** are key factors, but the research was **limited** to specific user groups and lacked **_universal verification_**.
