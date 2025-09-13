@@ -72,3 +72,10 @@
 - [Zhou et al.](https://www.tandfonline.com/doi/full/10.1080/15230406.2023.2183900) while studying **user-defined gestures** for multi-scale GIS interfaces:
   - found that **gesture features** vary with **_spatial scale_**
   - did not _deeply_ explore **_semantic-level adaptability issues_**
+- [Dey et al.](https://www.sciencedirect.com/science/article/pii/S1877050924009554) developed an **attention-driven** C3D-biLSTM network which:
+  - recognizes question sign gestures in video streams
+  - demonstrates the effectiveness of **attention mechanism** in capturing **_temporal dynamic gestures_**
+
+  however their approach:
+  - primarily focuses on **specific sign language gestures**
+  - rather than **_general interaction gestures_**
