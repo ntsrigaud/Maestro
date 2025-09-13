@@ -43,3 +43,6 @@
 
 - [Alyami et al.](https://www.sciencedirect.com/science/article/abs/pii/S0306457324001341?via%3Dihub) pointed out that existing research overly focuses on _sign language recognition_, with insufficient application research in **_universal interaction scenarios_**
 - Han et al. in their proposed method fails to consider **environmental interference issues** in practical scenarios.
+- [Ma et al.](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2021.769509/full) designed a multimodal network based on motion energy, that improved recognition performance, but their method heavily relies on [Kinect camera](https://manual.notch.one/0.9.23/en/docs/nodes/video-processing/input-output/depth-camera-kinect-source/) depth information, which:
+  - Increases deployment cost
+  - Lacks gesture semantic understanding
