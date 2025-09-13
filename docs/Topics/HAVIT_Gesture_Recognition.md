@@ -79,3 +79,11 @@
   however their approach:
   - primarily focuses on **specific sign language gestures**
   - rather than **_general interaction gestures_**
+
+- [Joksimoski et al.](https://ieeexplore.ieee.org/document/9739689) review emphasized the importance of:
+  - data collection
+  - feature extraction
+  - recognition technologies
+
+  but pointed out that:
+  - current research still shows **insufficient robustness in complex environments**.
