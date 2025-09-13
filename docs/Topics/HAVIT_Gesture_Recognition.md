@@ -11,11 +11,11 @@
   - Enhances the **performance** of gesture recognition systems under **data-scarce conditions**
   - Achieves:
     - efficient **feature extraction**
-    - and accurate **recognition of gesture characteristics**
+    - accurate **recognition of gesture characteristics**
 
-  through the organic integration of:
-  - [Vision Tranformer](https://huggingface.co/docs/transformers/model_doc/vit)'s feature extraction capabilities
-  - and [ALBEF](https://arxiv.org/abs/2107.07651)
+    through the organic integration of:
+    - [Vision Tranformer](https://huggingface.co/docs/transformers/model_doc/vit)'s feature extraction capabilities
+    - and [ALBEF](https://arxiv.org/abs/2107.07651)
 
 - New solution for the development of **smart furniture interaction technology**
 - Significant implications for advancing practical applications in this field
@@ -35,7 +35,7 @@
 - Demand for _contactless_ interaction in the post-pandemic era
 - Significant challenge faced in actual application environments due to:
   - **limited data resources**
-  - **scence complexity**
+  - **scene complexity**
 
 ![Gesture Recognition for Smart Furniture](./imgs/gesture_recognition_for_smart_furniture.png)
 
