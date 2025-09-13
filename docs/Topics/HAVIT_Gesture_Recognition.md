@@ -49,3 +49,6 @@
 - [Zhou et al.](https://www.sciencedirect.com/science/article/abs/pii/S1071581924000867?via%3Dihub) proposed the DigCode encoding method, converting continuous actions into _discrete string encodings_ to improve the **standardization** of gesture expression, but:
   - failed to solve the problem of **_insufficient data volume_**
   - ignored the **_personalized needs_** of different users
+- [Ji et al.](https://www.tandfonline.com/doi/full/10.1080/10447318.2023.2212232) conducted a review of _flexible strain sensor gloves_, which:
+  - showed advantages in **cost** and **portability**,
+  - but the contact-based solution **_limited user experience_**.
