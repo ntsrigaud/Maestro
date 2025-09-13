@@ -117,3 +117,21 @@
 
 > [!NOTE]
 > ALBEF provides advantages in [cross-modal alignment](https://arxiv.org/abs/2208.01744) learning, enabling better semantic understanding of gestures with **_limited annotated samples_**.
+
+## Current HAVIT model contribution results
+
+- 86.89% accuracy with 80% annotated data
+- AUC value of 0.92
+  - Significant improvement compared to using ALBEF (0.71) or ViT alone (0.76)
+- Ability to achieve **high true positive rates in low false positive rate regions**
+- Addresses key limitation in existing methods that focuses on:
+  - visual features
+  - semantic context
+
+  but rarely both simultaneously.
+
+> [!NOTE]
+> AUC: Area Under the Curve
+
+> [!NOTE]
+> ViT has the ability to capture **global spatial relationships**.
