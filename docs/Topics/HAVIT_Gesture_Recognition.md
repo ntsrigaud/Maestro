@@ -55,3 +55,13 @@
 - [Wang et al.](https://doi.org/10.1080/10447318.2024.2352226) found that **_gesture simplicity_** and **_directionality_** are key factors, but the research was **limited** to specific user groups and lacked **_universal verification_**.
 - [Yu et al.](https://www.nature.com/articles/s41598-022-08133-z) proposed a **_dynamic gesture recognition_** method based on **_2D CNNs_** and **_[feature fusion](https://arxiv.org/abs/1712.00960)_** which achieved **improved recognition accuracy** but their method:
   - faces challenges in real-time applications with **_varying lighting conditions_**
+- [Marzouk et al.](https://www.mdpi.com/2227-9032/10/9/1606) proposed the **ASODCAE-SLR** model combining:
+  - atomic search optimization
+  - deep convolutional autoencoders
+
+  but the model:
+  - requires **_large amounts of training data_**
+  - has **_limited feature extraction capabilities_**
+
+> [!NOTE]
+> **ASODCAE-SLR**: Atom Search Optimization with Deep Learning Enabled Arabic Sign Language Recognition
