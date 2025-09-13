@@ -46,3 +46,6 @@
 - [Ma et al.](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2021.769509/full) designed a multimodal network based on motion energy, that improved recognition performance, but their method heavily relies on [Kinect camera](https://manual.notch.one/0.9.23/en/docs/nodes/video-processing/input-output/depth-camera-kinect-source/) depth information, which:
   - Increases deployment cost
   - Lacks gesture semantic understanding
+- [Zhou et al.](https://www.sciencedirect.com/science/article/abs/pii/S1071581924000867?via%3Dihub) proposed the DigCode encoding method, converting continuous actions into _discrete string encodings_ to improve the **standardization** of gesture expression, but:
+  - failed to solve the problem of **_insufficient data volume_**
+  - ignored the **_personalized needs_** of different users
