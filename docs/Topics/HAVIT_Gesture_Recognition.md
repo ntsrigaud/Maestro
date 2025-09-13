@@ -93,3 +93,27 @@
 
   but:
   - this **_single-modal solution_** struggles to meet the **_diverse interaction needs_**
+
+### Key Challenges and Solutions
+
+#### Challenges
+
+- Data scarcity
+- Semantic understanding
+- Substantial annotated data support
+
+#### Solutions
+
+- Exploration of more effective methods
+- Combination of:
+  - Vision Transformer (ViT)
+  - Aligned Language Image BERT for Enhanced Vision-language Understanding (ALBEF)
+
+> [!NOTE]
+> The Vision Transformer architecture offers **powerful feature extraction capabilities** through **self-attention mechanisms** that capture _long-range dependencies_ in visual data.
+
+> [!NOTE]
+> The **self-attention mechanism** in Transformers allows each word in a sentence to dynamically weigh the importance of every other word in the same sentence to understand context and relationships.
+
+> [!NOTE]
+> ALBEF provides advantages in [cross-modal alignment](https://arxiv.org/abs/2208.01744) learning, enabling better semantic understanding of gestures with **_limited annotated samples_**.
