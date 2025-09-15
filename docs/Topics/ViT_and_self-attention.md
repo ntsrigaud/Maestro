@@ -6,7 +6,7 @@
 2. Normalization of the image channels of each patch from the 2D array
 3. Processing of the input image by the transformer
 4. **Flattening** of all normalized channels into one dimensional arrays of each patch in the image to obtain a **linear vector** for each patch
-5. Conversion of the obtained pixel values into **embbeding vectors** for each patch
+5. Conversion of the obtained pixel values into **embedding vectors** for each patch
    - Takes each input and pass it through a neural network
    - Allow them to be treated as **_word embeddings_**
 6. Make three copies of each **embedding vector** to feed into:
