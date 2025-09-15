@@ -8,6 +8,7 @@
 
 ## Main Topic Researches
 
+- [Project Proposal](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/B1Aj0PSsgl)
 - [HAVIT: Gesture Recognition](https://www.nature.com/articles/s41598-025-10758-9)
   - [GitHub Repository](https://github.com/hukenovs/hagrid)
   - [Summary notes](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/S1fFgErsgg)
