@@ -53,4 +53,4 @@
 
 ## References
 
-- [Vision Tranformer](https://youtu.be/vJF3TBI8esQ?si=5P4VTtOqqwuNXAjk)
+- [Vision Transformer](https://youtu.be/vJF3TBI8esQ?si=5P4VTtOqqwuNXAjk)
