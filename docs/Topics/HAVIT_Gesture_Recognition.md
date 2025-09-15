@@ -224,3 +224,16 @@
   where $\mathcal{E}$ is the interference factor brought by the environment.
   - In other words, _find the parameters $\theta$ that minimizes the expectation of the loss subject to $|D| \ll N$_
   - Describes how to achieve **accurate understanding** of user gesture intentions under the constraint of limited annotated data ($|D| \ll N$)
+
+### Vision Transformer: Gesture Recognition
+
+#### Advantages of ViT
+
+- Reliance of traditional methods on CNNs with obvious limitations
+- Superiority of [ViT through its _self-attention_ mechanism](https://arxiv.org/abs/1706.03762)
+  - Directly model feature correlations at any position in the sequence
+    - Solving the **[long-range dependency problem](https://www.wikiwand.com/en/articles/Long-range_dependence)**
+  - Learn features from different representation subspaces through **multi-head attention mechanism**
+    - Enhance recognition ability of subtle differences in gesture actions
+    - Improvement of model performance in complex scenarios
+
