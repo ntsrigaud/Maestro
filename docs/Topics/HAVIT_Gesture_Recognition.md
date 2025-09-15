@@ -237,3 +237,17 @@
     - Enhance recognition ability of subtle differences in gesture actions
     - Improvement of model performance in complex scenarios
 
+![Vision transformer: gesture recognition](./imgs/ViT_gesture_recognition.png)
+
+#### ViT Processing Steps:
+
+1. Division of of the input gesture image into **patches**
+2. Performs _linear projection_
+3. Adds positional encoding information
+4. Processing of the features through mutliple layers of Transformer encoders containing:
+   - Multi-head attention mechanism
+   - MLP structure
+5. Complete **classification prediction** through the MLP head
+
+> [!NOTE]
+> **Multilayer Perceptron (MLP)** has three or more layers of nodes: an _input layer_ for data entry, one or more _hidden layer_ for processing and an _output layer_ for the final result.
