@@ -51,6 +51,8 @@ class InputManager:
 
 # Example Usage:
 if __name__ == '__main__':
+    input_manager = None
+
     try:
         input_manager = InputManager()
         while True:
