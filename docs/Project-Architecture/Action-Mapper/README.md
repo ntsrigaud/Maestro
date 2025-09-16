@@ -22,14 +22,14 @@ To handle the context-sensitive nature of gestures (e.g., a "fist" means "click 
     -   **Trigger:** `POINTER` gesture is detected.
     -   **Action:** Begin mapping hand position to cursor movement.
 -   `CURSOR_MOVE` -> `IDLE`
-    -   **Trigger:** `OPEN_PALM` gesture is detected.
-    -   **Action:** Stop mapping hand position.
+    -   **Trigger:** `OPEN_PALM` gesture is detected. This now exclusively acts as the "stop" signal.
+    -   **Action:** Stop all cursor control and return to the idle state.
 -   `CURSOR_MOVE` -> `DRAGGING`
     -   **Trigger:** `FIST` gesture is detected.
-    -   **Action:** Issue a `LEFT_CLICK_DOWN` command.
+    -   **Action:** Issue a `LEFT_CLICK_DOWN` command to the Action Queue.
 -   `DRAGGING` -> `CURSOR_MOVE`
-    -   **Trigger:** `OPEN_PALM` gesture is detected.
-    -   **Action:** Issue a `LEFT_CLICK_UP` command.
+    -   **Trigger:** The gesture changes from `FIST` back to `POINTER`. (The user "unclenches" their fist back into a pointing gesture).
+    -   **Action:** Issue a `LEFT_CLICK_UP` command. This provides an intuitive way to end a drag and immediately continue positioning the cursor.
 
 ## 3. Cursor Movement Logic
 
@@ -58,16 +58,27 @@ To ensure flexibility, the mapping between gestures, states, and actions should 
 **Example `config.yaml`:**
 ```yaml
 gesture_mappings:
+  # Transition from IDLE to CURSOR_MOVE
   - gesture: POINTER
-    action: SET_STATE
-    target_state: CURSOR_MOVE
-  - gesture: FIST
-    state: CURSOR_MOVE
-    action: LEFT_CLICK_DOWN
+    current_state: IDLE
+    next_state: CURSOR_MOVE
+
+  # Transition from CURSOR_MOVE to IDLE (Stop)
   - gesture: OPEN_PALM
-    state: [CURSOR_MOVE, DRAGGING]
-    action: SET_STATE
-    target_state: IDLE
+    current_state: CURSOR_MOVE
+    next_state: IDLE
+
+  # Transition from CURSOR_MOVE to DRAGGING (Start drag)
+  - gesture: FIST
+    current_state: CURSOR_MOVE
+    next_state: DRAGGING
+    action: LEFT_CLICK_DOWN
+
+  # Transition from DRAGGING to CURSOR_MOVE (End drag)
+  - gesture: POINTER
+    current_state: DRAGGING
+    next_state: CURSOR_MOVE
+    action: LEFT_CLICK_UP
 ```
 
 ## 6. Requirements & Dependencies
