@@ -6,7 +6,7 @@ The Recognition Engine is the core of the project, responsible for performing ha
 
 The Recognition Engine's design is based on the **HAVIT (Hybrid Attention-based Vision-language Interaction Transformer)** model, a state-of-the-art architecture for gesture-based interaction. This approach integrates a **Vision Transformer (ViT)** for robust visual feature extraction and **ALBEF (Align before Fuse)** for cross-modal semantic understanding, linking visual gestures to their intended textual commands.
 
-### Key-components
+### Key Components
 
 *   **Feature Extraction with a Vision Transformer (ViT):**
     *   Instead of relying only on landmark coordinates, we will use a pre-trained Vision Transformer (ViT) to extract rich features from the entire hand image. The ViT's ability to capture global context in an image makes it ideal for understanding the nuances of hand shapes and orientations.
