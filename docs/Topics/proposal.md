@@ -26,7 +26,7 @@ Unlike a traditional mouse, gesture based input:
 
 - Removes the need for constant hand repositioning
 - Reduces strains from repetitive movements
-- Making it more confortable for long term use
+- Making it more comfortable for long term use
 - Enables touch free control:
   - Cleaner in shared or sterile environments
 - Opens accessibility for people for mobility limitations
