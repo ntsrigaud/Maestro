@@ -11,7 +11,12 @@ The system consists of four main modules:
 3.  **Action Mapper:** Translates gestures into commands.
 4.  **OS Controller:** Executes commands on the host OS.
 
-![System Diagram](https://i.imgur.com/9A7f3gN.png)
+```
++-------------------+      +----------------------+      +---------------------+      +--------------------+
+| 1. Input Manager  |----->| 2. Recognition       |----->| 3. Action Mapper    |----->| 4. OS Controller   |
+| (Webcam Capture)  |      |    Engine (AI/ML)    |      | (Gesture-to-Action) |      | (Virtual Mouse)    |
++-------------------+      +----------------------+      +---------------------+      +--------------------+
+```
 
 ## Technical Direction
 
