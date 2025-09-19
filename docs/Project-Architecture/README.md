@@ -1,10 +1,15 @@
-# Modular Architecture for Gesture-Based Mouse Control
+# Project Architecture
 
-This document outlines a proposed high-level structure for a seamless, OS-integrated gesture control system. The system is designed to be modular, allowing for independent development and testing of each component.
+This document outlines the software architecture for the Hand Gesture Recognition project. The system is designed as a modular pipeline, with each component responsible for a specific part of the gesture recognition and control process.
 
-## High-Level System Architecture
+## System Overview
 
-The system can be broken down into four main, independent modules that run as a background service:
+The system consists of four main modules:
+
+1.  **Input Manager:** Captures video from the camera.
+2.  **Recognition Engine:** Performs hand gesture recognition.
+3.  **Action Mapper:** Translates gestures into commands.
+4.  **OS Controller:** Executes commands on the host OS.
 
 ```
 +-------------------+      +----------------------+      +---------------------+      +--------------------+
@@ -13,39 +18,16 @@ The system can be broken down into four main, independent modules that run as a 
 +-------------------+      +----------------------+      +---------------------+      +--------------------+
 ```
 
----
+## Technical Direction
 
-### 1. Input Manager (Camera Capture)
-This module's sole responsibility is to connect to the designated webcam and capture video frames at a consistent rate.
--   **Function:** Access the camera, capture images, and pass them to the next module.
--   **Technology:** Libraries like **OpenCV** are standard for this task, providing a simple and efficient API for camera interactions.
+The core of this project is the **Recognition Engine**, which will be developed using a state-of-the-art deep learning approach. Our research has shown that traditional methods relying solely on hand landmark coordinates can be limited. Therefore, we will be leveraging a **Vision Transformer (ViT)** based architecture for more robust and accurate gesture recognition.
 
-### 2. Recognition Engine (The AI Core)
-This is the heart of the system, where the "magic" happens. It receives an image from the Input Manager and identifies the gesture. This process, based on the HAVIT paper, would likely involve a two-step pipeline:
--   **A. Hand Detection:** First, locate the hand(s) within the image frame. This is a classic object detection task.
--   **B. Gesture Classification:** Once the hand is located, a second model classifies the gesture (e.g., open palm, fist, pointing finger). This classifier would be the custom model trained for this project.
--   **Output:** The engine outputs a simple, recognized pattern, such as `POINTER`, `FIST`, or `FIVE_FINGERS`.
+Furthermore, to create a truly intuitive and extensible system, we will be implementing a semantic understanding layer inspired by the **ALBEF (Align Before Fuse)** framework. This will allow the system to learn the _meaning_ of gestures by associating them with natural language descriptions of commands, moving beyond hardcoded gesture-to-action mappings.
 
-### 3. Action Mapper (Stateful Logic)
-This module acts as the "brain" that translates the recognized gesture into a concrete mouse command. It needs to be stateful to handle sequences of actions.
--   **Function:** It receives the pattern from the Recognition Engine (e.g., `POINTER`) and decides what to do.
--   **Example Logic:**
-    -   **IF** current gesture is `POINTER` **AND** it was also `POINTER` in the last frame, **THEN** calculate the change in hand position and map it to cursor movement.
-    -   **IF** gesture changes from `POINTER` to `FIST`, **THEN** issue a "left mouse button down" command.
-    -   **IF** gesture changes from `FIST` to `OPEN_PALM`, **THEN** issue a "left mouse button up" command.
--   **Output:** A specific command, like `MOVE_CURSOR_TO(x, y)`, `LEFT_CLICK`, or `SCROLL_DOWN`.
+This approach offers several key benefits:
 
-### 4. OS Controller (Virtual Mouse)
-This is the final layer that directly interacts with the operating system to perform the action.
--   **Function:** It takes the command from the Action Mapper and executes it.
--   **OS Integration (Linux Example):** To achieve seamless integration, this module would create a **virtual input device** using the kernel's `uinput` module. This makes the system think a real physical mouse is connected, ensuring compatibility with all applications without any special configuration. Libraries like `python-libinput` or direct interaction with `/dev/uinput` can be used.
+- **Higher Accuracy and Robustness:** By analyzing the entire hand image, the ViT can capture more nuanced features than landmark-based methods alone.
+- **Semantic Understanding:** The system will be able to understand what gestures _mean_, making it more flexible and easier to customize.
+- **Extensibility:** Adding new gestures and commands will be a matter of providing new training data, not rewriting code.
 
----
-
-### Packaging and Deployment
-
-To make this system easily installable as a single package (`sudo apt install gesture-mouse`), the package would need to:
-1.  **Bundle Dependencies:** Specify dependencies like Python, OpenCV, PyTorch/TensorFlow, and any OS-level libraries.
-2.  **Include the AI Model:** The trained hand detection and gesture classification models must be packaged with the application.
-3.  **Run as a Service:** The installer would set up a **systemd service** (or an equivalent for other init systems). This ensures the gesture recognition process starts automatically on boot and runs silently in the background.
-4.  **Handle Permissions:** The installer would configure the necessary user permissions to access camera devices (`/dev/video*`) and create virtual input devices (`/dev/uinput`).
+For more detailed information on the technical design and implementation plan for each module, please refer to the `README.md` file within each module's directory.
