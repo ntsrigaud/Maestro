@@ -29,7 +29,7 @@ Unlike a traditional mouse, gesture based input:
 - Making it more comfortable for long term use
 - Enables touch free control:
   - Cleaner in shared or sterile environments
-- Opens accessibility for people for mobility limitations
+- Opens accessibility for people with mobility limitations
 - Unlock faster multitasking and immersive interactions
   - Creative tasks
   - Gaming
