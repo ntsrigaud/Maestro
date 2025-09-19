@@ -244,7 +244,7 @@
 1. Division of of the input gesture image into **patches**
 2. Performs _linear projection_
 3. Adds positional encoding information
-4. Processing of the features through mutliple layers of Transformer encoders containing:
+4. Processing of the features through multiple layers of Transformer encoders containing:
    - Multi-head attention mechanism
    - MLP structure
 5. Complete **classification prediction** through the MLP head
