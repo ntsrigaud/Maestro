@@ -8,22 +8,22 @@ The Input Manager will be implemented as a standalone module with a simple inter
 
 ### Key Responsibilities:
 
-*   **Camera Handling:**
-    *   Utilize OpenCV (`cv2`) to connect to and manage the webcam.
-    *   Implement functions for camera initialization, setting resolution (width/height), reading frames in a continuous loop, and properly releasing the camera resource upon application exit.
-*   **Frame Preparation:**
-    *   Incorporate basic frame preprocessing, including horizontally flipping the image for a more intuitive "mirror" effect for the user.
-*   **Interface:**
-    *   Expose a simple function, like `get_frame()`, that the Recognition Engine can call to retrieve the latest processed frame from the camera.
+- **Camera Handling:**
+  - Utilize OpenCV (`cv2`) to connect to and manage the webcam.
+  - Implement functions for camera initialization, setting resolution (width/height), reading frames in a continuous loop, and properly releasing the camera resource upon application exit.
+- **Frame Preparation:**
+  - Incorporate basic frame preprocessing, including horizontally flipping the image for a more intuitive "mirror" effect for the user.
+- **Interface:**
+  - Expose a simple function, like `get_frame()`, that the Recognition Engine can call to retrieve the latest processed frame from the camera.
 
 ## Implementation Plan
 
 1.  **Camera Access:**
-    *   Use `cv2.VideoCapture` to initialize the camera.
-    *   Allow configuration of camera device ID, frame width, and height.
+    - Use `cv2.VideoCapture` to initialize the camera.
+    - Allow configuration of camera device ID, frame width, and height.
 2.  **Frame Processing Loop:**
-    *   Continuously read frames from the camera.
-    *   Perform horizontal flip (`cv2.flip`).
-    *   Provide a thread-safe way for other modules to access the latest frame.
+    - Continuously read frames from the camera.
+    - Perform horizontal flip (`cv2.flip`).
+    - Provide a thread-safe way for other modules to access the latest frame.
 3.  **Module Interface:**
-    *   Implement a class `InputManager` with methods like `start()`, `stop()`, and `get_frame()`.
+    - Implement a class `InputManager` with methods like `start()`, `stop()`, and `get_frame()`.
