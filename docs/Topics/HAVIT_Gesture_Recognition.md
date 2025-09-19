@@ -5,7 +5,7 @@
 
 - Natural and intuitive interaction method
 - Effectiveness of gesture recognition technology is constrained by:
-  - **Limited data ressources**
+  - **Limited data resources**
   - **Insufficient semantic understanding**
 - HAVIT:
   - Enhances the **performance** of gesture recognition systems under **data-scarce conditions**
