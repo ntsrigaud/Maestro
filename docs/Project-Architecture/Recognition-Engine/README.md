@@ -27,3 +27,8 @@ The Recognition Engine's design is based on the **HAVIT (Hybrid Attention-based 
 *   **Improved Robustness:** By analyzing the whole hand image, the ViT-based approach is expected to be more robust to variations in lighting, hand size, and orientation.
 *   **Semantic Understanding:** The ALBEF-inspired model will allow for a more flexible and powerful way to map gestures to actions, moving beyond a hardcoded mapping to a learned association between what a gesture *looks like* and what it *means*.
 *   **Extensibility:** This architecture is more extensible. Adding new gestures and commands would involve retraining the model with new data, rather than writing new code for gesture-action mapping.
+
+## References
+
+- [HAVIT: research on vision-language gesture interaction mechanism for smart furniture](https://www.nature.com/articles/s41598-025-10758-9) 
+- [Hand gesture recognition with mediapipe](https://github.com/kinivi/hand-gesture-recognition-mediapipe) 
