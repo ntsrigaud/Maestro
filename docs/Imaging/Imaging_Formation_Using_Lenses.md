@@ -7,7 +7,7 @@ Lenses provides the same kind of projection as _pinholes_, but they gather more 
 
 ## Gaussian Lens (Thin Lens) Law
 
-![Gaussian Lens (Thin Lens) Law](./img/gaussian_lens_law.png)
+![Gaussian Lens (Thin Lens) Law](./imgs/gaussian_lens_law.png)
 
 > [!NOTE]
 > When using a point that is far away in the scene such that $o$ tends to infinity, then the distance between the focused image and the lens is the **focal length**.
