@@ -24,27 +24,54 @@ Most existing gesture recognition systems, particularly those built on libraries
 Our design directly addresses these shortcomings by introducing a deep learning pipeline that focuses on learning the **semantic meaning** behind a gesture.
 
 ```mermaid
-graph TD
-    A[Input Image] --> B{MediaPipe Hand Detection};
-    B --> C[Cropped Hand Image];
-    C --> D[Vision Transformer ViT];
-    D --> E[Feature Vector per Frame];
-    subgraph Dynamic Gestures
-        E --> F[LSTM Network];
-        F --> G[Gesture Embedding Vector V_gesture];
+flowchart TD
+    subgraph Precomputation [Precomputation at System Start]
+        direction LR
+        N[Pre-defined Text Command List] --> O[SentenceTransformer<br>Text Embedding Model]
+        O --> P[Precomputed Text Embedding Vectors<br>T_command1, T_command2, ...]
     end
-    subgraph Static Gestures
-        E --> G;
-    end
-    subgraph Text Processing
-        H[Text Command List] --> I[SentenceTransformer/BERT];
-        I --> J[Text Embedding Vector T_command];
-    end
-    G --> K{Semantic Matching};
-    J --> K;
-    K --> L[Execute Closest Command];
 
+    subgraph RealtimeInference [Real-time Inference Pipeline]
+        A[Input Image/Video] --> B(MediaPipe Hand Detection)
+        B --> C{Crop Hand Region/s}
+        C --> D[Static Gesture?]
+        C --> E[Dynamic Gesture?]
+
+        subgraph StaticPath [Static Gesture Processing]
+            D --> F[Extract Single Frame]
+            F --> G[Vision Transformer<br>ViT Feature Extraction]
+            G --> H[Static Feature Vector]
+        end
+
+        subgraph DynamicPath [Dynamic Gesture Processing]
+            E --> I[Extract Frame Sequence]
+            I --> J[Vision Transformer<br>ViT Feature Extraction per Frame]
+            J --> K[LSTM Temporal Processing]
+            K --> L[Dynamic Feature Vector]
+        end
+
+        H --> M[Visual Embedding Vector<br>V_gesture]
+        L --> M
+    end
+
+    M --> Q{Semantic Matching<br>Cosine Similarity}
+    P --> Q
+
+    Q --> R[Identify Closest Match]
+    R --> S[Execute Corresponding Command]
 ```
+
+### Understanding the Architecture: Why Text Processing Has No Parent
+
+A key insight into our architecture is that the text processing branch operates independently from the visual pipeline. This is a deliberate design choice that reflects a fundamental aspect of how the system works:
+
+- **Precomputation vs. Real-time Processing**: The text command processing occurs during system initialization, not during real-time inference. When the application starts, it processes all possible text commands (e.g., "volume up," "next slide," "like") through the text encoder exactly once, generating their semantic embeddings ahead of time.
+
+- **Static Nature of Commands**: The set of available commands is typically fixed and known in advance. There is no need to recompute these text embeddings for each frame or gesture recognition event, as they remain constant unless the command set changes.
+
+- **Efficiency Optimization**: This separation ensures maximum efficiency during real-time operation. The computationally intensive text processing happens once at startup, while the real-time path only handles the visual processing and the efficient cosine similarity comparison between the gesture embedding and precomputed text embeddings.
+
+- **Asynchronous Design**: The text and visual pipelines are conceptually parallel components that meet only at the semantic matching stage. The text branch provides a static set of possible semantic targets, while the visual branch generates a single semantic vector for the observed gesture that is compared against these precomputed targets.
 
 ### Stage 1: Robust Visual Feature Extraction with Vision Transformer (ViT)
 
