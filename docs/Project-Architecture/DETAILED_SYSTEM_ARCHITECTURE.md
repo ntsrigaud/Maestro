@@ -73,7 +73,7 @@ graph TB
 
             CV_CAPTURE["OpenCV VideoCapture<br/>• cv2.VideoCapture device_id<br/>• Resolution config width/height<br/>• Frame rate optimization"]:::inputModule
 
-            FRAME_PROC["Frame Processing<br/>• Continuous frame reading<br/>• Horizontal flip mirror effect<br/>• Thread-safe frame access<br/>• Frame buffering"]:::inputModule
+            FRAME_PROC["Frame Processing<br/>• Continuous frame reading<br/>• Smart mirroring detection/correction<br/>• Thread-safe frame access<br/>• Frame buffering"]:::inputModule
 
             INPUT_API["Input Manager Interface<br/>• start - Initialize camera<br/>• get_frame - Latest frame<br/>• stop - Release resources"]:::inputModule
 
@@ -490,7 +490,3 @@ graph TB
 - **Framework**: OpenCV for video processing, PyTorch/TensorFlow for AI models
 
 This architecture represents a significant advancement in gesture recognition technology, moving from simple pattern matching to true semantic understanding of user intent.
-
-```
-
-```
