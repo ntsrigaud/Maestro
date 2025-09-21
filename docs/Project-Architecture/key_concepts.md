@@ -165,7 +165,7 @@ Technique of creating fixed-length segments of time series data, which are used 
   - Result ranges from -1 (completely opposite) to +1 (identical direction)
 - **Why Cosine Instead of Euclidean Distance?**:
   - **Direction Focus**: Measures angular similarity, not absolute distance
-  - **Magnitude Independence**: Two vectors can have different magnitudes but same direction (high cosine similarity)
+  - **Magnitude Independence**: Two vectors can have different magnitudes but the same direction (high cosine similarity)
   - **Normalized Comparison**: Automatically handles vectors of different scales
 - **In High-Dimensional Spaces**:
   - Euclidean distance becomes less meaningful in high dimensions (curse of dimensionality)
