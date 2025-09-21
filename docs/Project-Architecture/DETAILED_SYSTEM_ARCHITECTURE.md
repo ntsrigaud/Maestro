@@ -10,30 +10,30 @@ This project implements a **Semantic Gesture Recognition Engine** that moves bey
 
 ```mermaid
 flowchart LR
-    %% Styling
-    classDef inputModule fill:#e1f5fe,stroke:#0277bd,stroke-width:3px
-    classDef recognitionModule fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px
-    classDef actionModule fill:#e8f5e8,stroke:#2e7d32,stroke-width:3px
-    classDef osModule fill:#fff3e0,stroke:#ef6c00,stroke-width:3px
+    %% Styling with better contrast and readability
+    classDef inputModule fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000000
+    classDef recognitionModule fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#000000
+    classDef actionModule fill:#e8f5e8,stroke:#388e3c,stroke-width:3px,color:#000000
+    classDef osModule fill:#fff3e0,stroke:#f57c00,stroke-width:3px,color:#000000
     classDef dataArrow fill:none,stroke:#424242,stroke-width:2px
 
     %% Main Modules
-    INPUT["📹 INPUT MANAGER<br/>• Camera capture<br/>• Frame preprocessing<br/>• OpenCV integration"]:::inputModule
+    INPUT["INPUT MANAGER<br/>• Camera capture<br/>• Frame preprocessing<br/>• OpenCV integration"]:::inputModule
 
-    RECOGNITION["🤖 RECOGNITION ENGINE<br/>• Hand detection MediaPipe<br/>• Feature extraction ViT<br/>• Semantic understanding ALBEF"]:::recognitionModule
+    RECOGNITION["RECOGNITION ENGINE<br/>• Hand detection MediaPipe<br/>• Feature extraction ViT<br/>• Semantic understanding ALBEF"]:::recognitionModule
 
-    ACTION["🎛️ ACTION MAPPER<br/>• Command translation<br/>• State management<br/>• User configuration"]:::actionModule
+    ACTION["ACTION MAPPER<br/>• Command translation<br/>• State management<br/>• User configuration"]:::actionModule
 
-    OS["💻 OS CONTROLLER<br/>• Cross-platform execution<br/>• Keyboard/mouse control<br/>• System integration"]:::osModule
+    OS["OS CONTROLLER<br/>• Cross-platform execution<br/>• Keyboard/mouse control<br/>• System integration"]:::osModule
 
     %% Data Flow
     INPUT -->|"Raw Video Frames"| RECOGNITION
     RECOGNITION -->|"Semantic Commands<br/>volume up, next slide"| ACTION
     ACTION -->|"Standardized Commands<br/>VOLUME_UP, NEXT_SLIDE"| OS
-    OS -->|"System Actions"| OUTPUT["🎯 System Output<br/>User sees results"]
+    OS -->|"System Actions"| OUTPUT["System Output<br/>User sees results"]
 
     %% User Interaction
-    USER["👤 User<br/>Hand Gestures"] -->|"Video Stream"| INPUT
+    USER["User<br/>Hand Gestures"] -->|"Video Stream"| INPUT
     OUTPUT -.->|"Visual/Audio Feedback"| USER
 ```
 
@@ -41,41 +41,41 @@ flowchart LR
 
 ```mermaid
 graph TB
-    %% Styling
-    classDef inputModule fill:#e1f5fe,stroke:#0277bd,stroke-width:3px
-    classDef recognitionModule fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px
-    classDef actionModule fill:#e8f5e8,stroke:#2e7d32,stroke-width:3px
-    classDef osModule fill:#fff3e0,stroke:#ef6c00,stroke-width:3px
-    classDef precompute fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef dataflow fill:#f5f5f5,stroke:#424242,stroke-width:1px
-    classDef semantic fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    %% Styling with better contrast and readability
+    classDef inputModule fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000000
+    classDef recognitionModule fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#000000
+    classDef actionModule fill:#e8f5e8,stroke:#388e3c,stroke-width:3px,color:#000000
+    classDef osModule fill:#fff3e0,stroke:#f57c00,stroke-width:3px,color:#000000
+    classDef precompute fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000000
+    classDef dataflow fill:#f5f5f5,stroke:#424242,stroke-width:1px,color:#000000
+    classDef semantic fill:#e0f2f1,stroke:#00695c,stroke-width:2px,color:#000000
 
     %% Precomputation Phase (System Initialization)
-    subgraph PRECOMP ["🚀 PRECOMPUTATION PHASE System Startup"]
+    subgraph PRECOMP ["PRECOMPUTATION PHASE System Startup"]
         direction TB
-        CMD_LIST["📝 Pre-defined Text Commands<br/>• volume up<br/>• next slide<br/>• like<br/>• scroll down<br/>• mouse click<br/>• etc."]:::precompute
+        CMD_LIST["Pre-defined Text Commands<br/>• volume up<br/>• next slide<br/>• like<br/>• scroll down<br/>• mouse click<br/>• etc."]:::precompute
 
-        SENT_TRANS["🧠 SentenceTransformer<br/>Text Embedding Model<br/>BERT-based: all-MiniLM-L6-v2"]:::precompute
+        SENT_TRANS["SentenceTransformer<br/>Text Embedding Model<br/>BERT-based all-MiniLM-L6-v2"]:::precompute
 
-        TEXT_EMBEDDINGS["🎯 Precomputed Text Embeddings<br/>T_command1, T_command2, ..., T_n<br/>Semantic Vector Space"]:::precompute
+        TEXT_EMBEDDINGS["Precomputed Text Embeddings<br/>T_command1, T_command2, ..., T_n<br/>Semantic Vector Space"]:::precompute
 
         CMD_LIST --> SENT_TRANS
         SENT_TRANS --> TEXT_EMBEDDINGS
     end
 
     %% Real-time Processing Pipeline
-    subgraph REALTIME ["⚡ REAL-TIME PROCESSING PIPELINE"]
+    subgraph REALTIME ["REAL-TIME PROCESSING PIPELINE"]
 
         %% INPUT MANAGER MODULE
-        subgraph INPUT_MGR ["📹 1. INPUT MANAGER MODULE"]
+        subgraph INPUT_MGR ["1. INPUT MANAGER MODULE"]
             direction TB
-            CAMERA["🎥 Camera Hardware<br/>Webcam/Built-in Camera"]:::inputModule
+            CAMERA["Camera Hardware<br/>Webcam/Built-in Camera"]:::inputModule
 
-            CV_CAPTURE["📡 OpenCV VideoCapture<br/>• cv2.VideoCapture device_id<br/>• Resolution config width/height<br/>• Frame rate optimization"]:::inputModule
+            CV_CAPTURE["OpenCV VideoCapture<br/>• cv2.VideoCapture device_id<br/>• Resolution config width/height<br/>• Frame rate optimization"]:::inputModule
 
-            FRAME_PROC["🔄 Frame Processing<br/>• Continuous frame reading<br/>• Horizontal flip mirror effect<br/>• Thread-safe frame access<br/>• Frame buffering"]:::inputModule
+            FRAME_PROC["Frame Processing<br/>• Continuous frame reading<br/>• Horizontal flip mirror effect<br/>• Thread-safe frame access<br/>• Frame buffering"]:::inputModule
 
-            INPUT_API["🔌 Input Manager Interface<br/>• start - Initialize camera<br/>• get_frame - Latest frame<br/>• stop - Release resources"]:::inputModule
+            INPUT_API["Input Manager Interface<br/>• start - Initialize camera<br/>• get_frame - Latest frame<br/>• stop - Release resources"]:::inputModule
 
             CAMERA --> CV_CAPTURE
             CV_CAPTURE --> FRAME_PROC
@@ -83,43 +83,43 @@ graph TB
         end
 
         %% RECOGNITION ENGINE MODULE
-        subgraph REC_ENGINE ["🤖 2. RECOGNITION ENGINE MODULE"]
+        subgraph REC_ENGINE ["2. RECOGNITION ENGINE MODULE"]
             direction TB
 
             %% Hand Detection Submodule
-            subgraph HAND_DETECT ["🖐️ Hand Detection Submodule"]
-                MEDIAPIPE["📋 MediaPipe Hands<br/>• Hand localization<br/>• Bounding box extraction<br/>• Multi-hand support<br/>• Confidence scoring"]:::recognitionModule
+            subgraph HAND_DETECT ["Hand Detection Submodule"]
+                MEDIAPIPE["MediaPipe Hands<br/>• Hand localization<br/>• Bounding box extraction<br/>• Multi-hand support<br/>• Confidence scoring"]:::recognitionModule
 
-                HAND_CROP["✂️ Hand Region Cropping<br/>• Extract hand ROI<br/>• Normalize dimensions<br/>• Image preprocessing"]:::recognitionModule
+                HAND_CROP["Hand Region Cropping<br/>• Extract hand ROI<br/>• Normalize dimensions<br/>• Image preprocessing"]:::recognitionModule
 
                 MEDIAPIPE --> HAND_CROP
             end
 
             %% Gesture Classification Submodule
-            subgraph GESTURE_CLASS ["🎭 Gesture Classification Submodule"]
-                STATIC_DYNAMIC["🔀 Static vs Dynamic<br/>Gesture Detection<br/>• Motion analysis<br/>• Temporal windowing"]:::recognitionModule
+            subgraph GESTURE_CLASS ["Gesture Classification Submodule"]
+                STATIC_DYNAMIC["Static vs Dynamic<br/>Gesture Detection<br/>• Motion analysis<br/>• Temporal windowing"]:::recognitionModule
 
                 %% Static Path
-                subgraph STATIC_PATH ["📸 Static Gesture Path"]
-                    STATIC_FRAME["🖼️ Single Frame<br/>Extraction"]:::recognitionModule
+                subgraph STATIC_PATH ["Static Gesture Path"]
+                    STATIC_FRAME["Single Frame<br/>Extraction"]:::recognitionModule
 
-                    VIT_STATIC["🔍 Vision Transformer ViT<br/>• ViT-B/16 pre-trained<br/>• ImageNet-21k features<br/>• Patch-based processing<br/>• Global attention mechanism<br/>• 768-dim feature vector"]:::recognitionModule
+                    VIT_STATIC["Vision Transformer ViT<br/>• ViT-B/16 pre-trained<br/>• ImageNet-21k features<br/>• Patch-based processing<br/>• Global attention mechanism<br/>• 768-dim feature vector"]:::recognitionModule
 
-                    STATIC_FEATURES["📊 Static Feature Vector<br/>768-dimensional"]:::recognitionModule
+                    STATIC_FEATURES["Static Feature Vector<br/>768-dimensional"]:::recognitionModule
 
                     STATIC_FRAME --> VIT_STATIC
                     VIT_STATIC --> STATIC_FEATURES
                 end
 
                 %% Dynamic Path
-                subgraph DYNAMIC_PATH ["🎬 Dynamic Gesture Path"]
-                    FRAME_SEQ["🎞️ Frame Sequence<br/>Extraction<br/>T frames"]:::recognitionModule
+                subgraph DYNAMIC_PATH ["Dynamic Gesture Path"]
+                    FRAME_SEQ["Frame Sequence<br/>Extraction<br/>T frames"]:::recognitionModule
 
-                    VIT_DYNAMIC["🔍 ViT Feature Extraction<br/>Per Frame<br/>• Process each frame<br/>• Temporal consistency<br/>• Rich visual features"]:::recognitionModule
+                    VIT_DYNAMIC["ViT Feature Extraction<br/>Per Frame<br/>• Process each frame<br/>• Temporal consistency<br/>• Rich visual features"]:::recognitionModule
 
-                    LSTM_PROC["🧠 LSTM Temporal Processing<br/>• Sequence modeling<br/>• Memory cells & gates<br/>• Long-range dependencies<br/>• Motion understanding"]:::recognitionModule
+                    LSTM_PROC["LSTM Temporal Processing<br/>• Sequence modeling<br/>• Memory cells & gates<br/>• Long-range dependencies<br/>• Motion understanding"]:::recognitionModule
 
-                    DYNAMIC_FEATURES["📊 Dynamic Feature Vector<br/>Context + Temporal info"]:::recognitionModule
+                    DYNAMIC_FEATURES["Dynamic Feature Vector<br/>Context + Temporal info"]:::recognitionModule
 
                     FRAME_SEQ --> VIT_DYNAMIC
                     VIT_DYNAMIC --> LSTM_PROC
@@ -131,12 +131,12 @@ graph TB
             end
 
             %% Semantic Understanding Submodule
-            subgraph SEMANTIC_UNDERSTAND ["🧩 Semantic Understanding ALBEF-inspired"]
-                VISUAL_EMBED["🎨 Visual Embedding Vector<br/>V_gesture<br/>Unified representation"]:::semantic
+            subgraph SEMANTIC_UNDERSTAND ["Semantic Understanding ALBEF-inspired"]
+                VISUAL_EMBED["Visual Embedding Vector<br/>V_gesture<br/>Unified representation"]:::semantic
 
-                COSINE_SIM["📐 Cosine Similarity Matching<br/>• Compare V_gesture with all T_commands<br/>• Find closest semantic match<br/>• Confidence scoring"]:::semantic
+                COSINE_SIM["Cosine Similarity Matching<br/>• Compare V_gesture with all T_commands<br/>• Find closest semantic match<br/>• Confidence scoring"]:::semantic
 
-                SEMANTIC_RESULT["🎯 Semantic Match Result<br/>• Best matching command<br/>• Confidence score<br/>• Alternative candidates"]:::semantic
+                SEMANTIC_RESULT["Semantic Match Result<br/>• Best matching command<br/>• Confidence score<br/>• Alternative candidates"]:::semantic
 
                 STATIC_FEATURES --> VISUAL_EMBED
                 DYNAMIC_FEATURES --> VISUAL_EMBED
@@ -148,16 +148,16 @@ graph TB
         end
 
         %% ACTION MAPPER MODULE
-        subgraph ACTION_MAP ["🎛️ 3. ACTION MAPPER MODULE"]
+        subgraph ACTION_MAP ["3. ACTION MAPPER MODULE"]
             direction TB
 
-            CMD_MAPPING["🗺️ Command Mapping Logic<br/>• Semantic text → Command ID<br/>• Dictionary/lookup table<br/>• Custom user mappings<br/>• Priority handling"]:::actionModule
+            CMD_MAPPING["Command Mapping Logic<br/>• Semantic text → Command ID<br/>• Dictionary/lookup table<br/>• Custom user mappings<br/>• Priority handling"]:::actionModule
 
-            STATE_MGR["🔄 State Management<br/>• Activation/deactivation control<br/>• Gesture mode switching<br/>• Context awareness<br/>• Timeout handling"]:::actionModule
+            STATE_MGR["State Management<br/>• Activation/deactivation control<br/>• Gesture mode switching<br/>• Context awareness<br/>• Timeout handling"]:::actionModule
 
-            CONFIG_MGR["⚙️ Configuration Manager<br/>• User customization<br/>• Gesture-to-action mapping<br/>• Sensitivity settings<br/>• Profile management"]:::actionModule
+            CONFIG_MGR["Configuration Manager<br/>• User customization<br/>• Gesture-to-action mapping<br/>• Sensitivity settings<br/>• Profile management"]:::actionModule
 
-            ACTION_CMD["📤 Action Command Output<br/>• Standardized command format<br/>• Parameters & metadata<br/>• Execution priority"]:::actionModule
+            ACTION_CMD["Action Command Output<br/>• Standardized command format<br/>• Parameters & metadata<br/>• Execution priority"]:::actionModule
 
             CMD_MAPPING --> STATE_MGR
             STATE_MGR --> CONFIG_MGR
@@ -165,30 +165,30 @@ graph TB
         end
 
         %% OS CONTROLLER MODULE
-        subgraph OS_CTRL ["💻 4. OS CONTROLLER MODULE"]
+        subgraph OS_CTRL ["4. OS CONTROLLER MODULE"]
             direction TB
 
             %% Platform Interface Submodule
-            subgraph PLATFORM_INT ["🖥️ Platform Interface"]
-                CROSS_PLATFORM["🌐 Cross-Platform Abstraction<br/>• Windows/macOS/Linux support<br/>• API standardization<br/>• Platform detection"]:::osModule
+            subgraph PLATFORM_INT ["Platform Interface"]
+                CROSS_PLATFORM["Cross-Platform Abstraction<br/>• Windows/macOS/Linux support<br/>• API standardization<br/>• Platform detection"]:::osModule
 
-                LIB_MGR["📚 Library Manager<br/>• pyautogui for cross-platform<br/>• pynput for advanced input<br/>• Platform-specific optimizations"]:::osModule
+                LIB_MGR["Library Manager<br/>• pyautogui for cross-platform<br/>• pynput for advanced input<br/>• Platform-specific optimizations"]:::osModule
 
                 CROSS_PLATFORM --> LIB_MGR
             end
 
             %% Execution Engine Submodule
-            subgraph EXEC_ENGINE ["⚡ Execution Engine"]
-                KEYBOARD_CTRL["⌨️ Keyboard Control<br/>• Key press simulation<br/>• Modifier combinations<br/>• Hotkey sequences<br/>• Text input"]:::osModule
+            subgraph EXEC_ENGINE ["Execution Engine"]
+                KEYBOARD_CTRL["Keyboard Control<br/>• Key press simulation<br/>• Modifier combinations<br/>• Hotkey sequences<br/>• Text input"]:::osModule
 
-                MOUSE_CTRL["🖱️ Mouse Control<br/>• Cursor movement<br/>• Click simulation<br/>• Drag & drop<br/>• Scroll operations"]:::osModule
+                MOUSE_CTRL["Mouse Control<br/>• Cursor movement<br/>• Click simulation<br/>• Drag & drop<br/>• Scroll operations"]:::osModule
 
-                MEDIA_CTRL["🎵 Media Control<br/>• Volume adjustment<br/>• Playback control<br/>• Track navigation<br/>• System sounds"]:::osModule
+                MEDIA_CTRL["Media Control<br/>• Volume adjustment<br/>• Playback control<br/>• Track navigation<br/>• System sounds"]:::osModule
 
-                SYS_CTRL["🔧 System Control<br/>• Application switching<br/>• Window management<br/>• Brightness control<br/>• Power management"]:::osModule
+                SYS_CTRL["System Control<br/>• Application switching<br/>• Window management<br/>• Brightness control<br/>• Power management"]:::osModule
             end
 
-            OS_INTERFACE["🔌 OS Interface<br/>• Command execution<br/>• Error handling<br/>• Feedback system<br/>• Safety mechanisms"]:::osModule
+            OS_INTERFACE["OS Interface<br/>• Command execution<br/>• Error handling<br/>• Feedback system<br/>• Safety mechanisms"]:::osModule
 
             LIB_MGR --> EXEC_ENGINE
             EXEC_ENGINE --> OS_INTERFACE
@@ -200,11 +200,11 @@ graph TB
     TEXT_EMBEDDINGS -.->|"Precomputed Embeddings"| COSINE_SIM
     SEMANTIC_RESULT -->|"Semantic Command<br/>e.g., volume up"| CMD_MAPPING
     ACTION_CMD -->|"Standardized Command<br/>e.g., VOLUME_UP"| CROSS_PLATFORM
-    OS_INTERFACE -->|"System Execution"| OS_OUTPUT["🎯 System Output<br/>• Volume changes<br/>• Mouse movements<br/>• Application control<br/>• Media playback"]:::dataflow
+    OS_INTERFACE -->|"System Execution"| OS_OUTPUT["System Output<br/>• Volume changes<br/>• Mouse movements<br/>• Application control<br/>• Media playback"]:::dataflow
 
     %% External Connections
     CAMERA -.->|"Video Stream"| CV_CAPTURE
-    OS_OUTPUT -.->|"User Feedback"| USER["👤 User"]:::dataflow
+    OS_OUTPUT -.->|"User Feedback"| USER["User"]:::dataflow
     USER -.->|"Hand Gestures"| CAMERA
 ```
 
@@ -212,12 +212,12 @@ graph TB
 
 ```mermaid
 graph TD
-    %% Styling
-    classDef interface fill:#f8f9fa,stroke:#6c757d,stroke-width:2px
-    classDef dataStruct fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    %% Styling with better contrast and readability
+    classDef interface fill:#f8f9fa,stroke:#343a40,stroke-width:2px,color:#000000
+    classDef dataStruct fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000000
 
     %% Interface Definitions
-    subgraph INTERFACES ["🔌 Module Interfaces"]
+    subgraph INTERFACES ["Module Interfaces"]
         direction TB
 
         INPUT_IF["InputManager Interface<br/>• start → bool<br/>• get_frame → np.ndarray<br/>• stop → bool<br/>• is_active → bool"]:::interface
@@ -230,16 +230,16 @@ graph TD
     end
 
     %% Data Structures
-    subgraph DATA_STRUCTS ["📊 Data Structures"]
+    subgraph DATA_STRUCTS ["Data Structures"]
         direction TB
 
-        FRAME_DATA["Frame Data<br/>• np.ndarray: raw_frame<br/>• int: timestamp<br/>• tuple: dimensions<br/>• dict: metadata"]:::dataStruct
+        FRAME_DATA["Frame Data<br/>• np.ndarray - raw_frame<br/>• int - timestamp<br/>• tuple - dimensions<br/>• dict - metadata"]:::dataStruct
 
-        SEMANTIC_RESULT["SemanticResult<br/>• str: semantic_command<br/>• float: confidence<br/>• list: alternatives<br/>• dict: gesture_features<br/>• bool: is_dynamic"]:::dataStruct
+        SEMANTIC_RESULT["SemanticResult<br/>• str - semantic_command<br/>• float - confidence<br/>• list - alternatives<br/>• dict - gesture_features<br/>• bool - is_dynamic"]:::dataStruct
 
-        COMMAND_OBJ["Command Object<br/>• str: command_type<br/>• dict: parameters<br/>• int: priority<br/>• str: execution_mode<br/>• function: callback"]:::dataStruct
+        COMMAND_OBJ["Command Object<br/>• str - command_type<br/>• dict - parameters<br/>• int - priority<br/>• str - execution_mode<br/>• function - callback"]:::dataStruct
 
-        EXEC_RESULT["ExecutionResult<br/>• bool: success<br/>• str: error_message<br/>• float: execution_time<br/>• dict: system_feedback"]:::dataStruct
+        EXEC_RESULT["ExecutionResult<br/>• bool - success<br/>• str - error_message<br/>• float - execution_time<br/>• dict - system_feedback"]:::dataStruct
     end
 
     %% Flow Connections
@@ -250,43 +250,44 @@ graph TD
     ACTION_IF -.->|"Command"| COMMAND_OBJ
     COMMAND_OBJ -.->|"execute_command"| OS_IF
     OS_IF -.->|"ExecutionResult"| EXEC_RESULT
-```
+
+````
 
 ## Error Handling and Safety Mechanisms
 
 ```mermaid
 graph TB
-    %% Styling
-    classDef safety fill:#ffebee,stroke:#c62828,stroke-width:2px
-    classDef error fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef recovery fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    %% Styling with better contrast and readability
+    classDef safety fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#000000
+    classDef error fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000000
+    classDef recovery fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px,color:#000000
 
     %% Error Handling Flow
-    GESTURE_INPUT["👋 User Gesture Input"]
+    GESTURE_INPUT["User Gesture Input"]
 
-    subgraph ERROR_CHECKS ["⚠️ Safety & Error Checks"]
-        CONF_CHECK["🎯 Confidence Validation<br/>confidence > threshold"]:::safety
-        STATE_CHECK["🔒 System State Validation<br/>gesture_mode == active"]:::safety
-        SAFETY_CHECK["🛡️ Safety Validation<br/>command not in blacklist"]:::safety
-        RATE_LIMIT["⏱️ Rate Limiting<br/>prevent spam execution"]:::safety
+    subgraph ERROR_CHECKS ["Safety & Error Checks"]
+        CONF_CHECK["Confidence Validation<br/>confidence greater than threshold"]:::safety
+        STATE_CHECK["System State Validation<br/>gesture_mode equals active"]:::safety
+        SAFETY_CHECK["Safety Validation<br/>command not in blacklist"]:::safety
+        RATE_LIMIT["Rate Limiting<br/>prevent spam execution"]:::safety
     end
 
-    subgraph ERROR_RECOVERY ["🔄 Error Recovery"]
-        LOG_ERROR["📝 Error Logging<br/>timestamp, error_type, context"]:::error
-        FALLBACK["🎭 Fallback Behavior<br/>safe default actions"]:::recovery
-        USER_FEEDBACK["💬 User Notification<br/>visual/audio alerts"]:::recovery
-        RETRY_LOGIC["🔄 Retry Mechanism<br/>intelligent retry with backoff"]:::recovery
+    subgraph ERROR_RECOVERY ["Error Recovery"]
+        LOG_ERROR["Error Logging<br/>timestamp, error_type, context"]:::error
+        FALLBACK["Fallback Behavior<br/>safe default actions"]:::recovery
+        USER_FEEDBACK["User Notification<br/>visual/audio alerts"]:::recovery
+        RETRY_LOGIC["Retry Mechanism<br/>intelligent retry with backoff"]:::recovery
     end
 
     GESTURE_INPUT --> ERROR_CHECKS
-    ERROR_CHECKS -->|"Pass"| NORMAL_EXEC["✅ Normal Execution"]:::recovery
+    ERROR_CHECKS -->|"Pass"| NORMAL_EXEC["Normal Execution"]:::recovery
     ERROR_CHECKS -->|"Fail"| ERROR_RECOVERY
     ERROR_RECOVERY --> USER_FEEDBACK
-```
+````
 
 ## Module Breakdown
 
-### 1. Input Manager Module 📹
+### 1. Input Manager Module
 
 **Purpose**: Capture and preprocess video frames from camera hardware
 
@@ -304,24 +305,24 @@ graph TB
 - Horizontal flip for intuitive mirror effect
 - Thread-safe frame access for multi-module usage
 
-### 2. Recognition Engine Module 🤖
+### 2. Recognition Engine Module
 
 **Purpose**: Core AI module performing semantic gesture recognition
 
 **Key Components**:
 
-#### Hand Detection Submodule 🖐️
+#### Hand Detection Submodule
 
 - **MediaPipe Integration**: Efficient hand localization and bounding box extraction
 - **Hand Region Cropping**: Precise ROI extraction with normalization
 
-#### Gesture Classification Submodule 🎭
+#### Gesture Classification Submodule
 
 - **Static/Dynamic Detection**: Intelligent routing based on motion analysis
 - **Vision Transformer (ViT)**: State-of-the-art visual feature extraction using ViT-B/16 pre-trained on ImageNet-21k
 - **LSTM Processing**: Advanced temporal modeling for dynamic gestures
 
-#### Semantic Understanding Submodule 🧩
+#### Semantic Understanding Submodule
 
 - **Visual Embedding**: Unified representation of gesture features
 - **Cosine Similarity Matching**: Semantic comparison with precomputed text embeddings
@@ -333,7 +334,7 @@ graph TB
 - Implements semantic grounding through contrastive learning
 - Enables zero-shot gesture recognition through language understanding
 
-### 3. Action Mapper Module 🎛️
+### 3. Action Mapper Module
 
 **Purpose**: Bridge between semantic understanding and system commands
 
@@ -351,18 +352,18 @@ graph TB
 - Priority handling for conflicting gestures
 - Timeout mechanisms for gesture sessions
 
-### 4. OS Controller Module 💻
+### 4. OS Controller Module
 
 **Purpose**: Execute commands on the host operating system
 
 **Key Components**:
 
-#### Platform Interface 🖥️
+#### Platform Interface
 
 - **Cross-Platform Abstraction**: Unified interface for Windows/macOS/Linux
 - **Library Management**: Optimized use of pyautogui, pynput, and platform-specific APIs
 
-#### Execution Engine ⚡
+#### Execution Engine
 
 - **Keyboard Control**: Key press simulation, modifier combinations, text input
 - **Mouse Control**: Cursor movement, clicking, dragging, scrolling
@@ -377,13 +378,13 @@ graph TB
 
 ## Data Flow Architecture
 
-### Precomputation Phase 🚀
+### Precomputation Phase
 
 1. **Command Definition**: System loads predefined text commands
 2. **Text Encoding**: SentenceTransformer processes commands into semantic vectors
 3. **Embedding Storage**: Precomputed embeddings stored for real-time comparison
 
-### Real-time Processing ⚡
+### Real-time Processing
 
 1. **Frame Capture**: Input Manager captures and preprocesses video frames
 2. **Hand Detection**: MediaPipe locates and crops hand regions
@@ -395,25 +396,25 @@ graph TB
 
 ## Key Innovations
 
-### 1. Semantic Understanding 🧠
+### 1. Semantic Understanding
 
 - **Problem Solved**: Traditional systems use rigid gesture-to-action mappings
 - **Our Solution**: Learn semantic relationships between gestures and natural language commands
 - **Benefit**: Flexible, extensible system that understands meaning, not just patterns
 
-### 2. Vision Transformer Integration 🔍
+### 2. Vision Transformer Integration
 
 - **Problem Solved**: Landmark-based methods lose visual context and are brittle
 - **Our Solution**: Use entire hand image with global attention mechanisms
 - **Benefit**: More robust recognition with better handling of variations
 
-### 3. Cross-Modal Architecture 🌉
+### 3. Cross-Modal Architecture
 
 - **Problem Solved**: Gesture and command spaces are typically disconnected
 - **Our Solution**: Shared semantic vector space using contrastive learning
 - **Benefit**: Zero-shot learning potential and natural language extensibility
 
-### 4. Modular Design 🧩
+### 4. Modular Design
 
 - **Problem Solved**: Monolithic gesture recognition systems are hard to maintain
 - **Our Solution**: Clean separation of concerns with well-defined interfaces
@@ -423,41 +424,41 @@ graph TB
 
 ```mermaid
 graph TB
-    %% Styling
-    classDef training fill:#ffe0b2,stroke:#f57c00,stroke-width:2px
-    classDef inference fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
-    classDef shared fill:#e1bee7,stroke:#8e24aa,stroke-width:2px
+    %% Styling with better contrast and readability
+    classDef training fill:#ffe0b2,stroke:#f57c00,stroke-width:2px,color:#000000
+    classDef inference fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000000
+    classDef shared fill:#e1bee7,stroke:#8e24aa,stroke-width:2px,color:#000000
 
     %% Training Phase
-    subgraph TRAIN_PHASE ["🎓 TRAINING PHASE Offline"]
+    subgraph TRAIN_PHASE ["TRAINING PHASE Offline"]
         direction TB
 
-        TRAIN_DATA["📚 Training Dataset<br/>Pairs: Gesture Video, Text Command<br/>• thumbs up ↔ like<br/>• swipe left ↔ previous<br/>• peace sign ↔ select"]:::training
+        TRAIN_DATA["Training Dataset<br/>Pairs Gesture Video, Text Command<br/>• thumbs up - like<br/>• swipe left - previous<br/>• peace sign - select"]:::training
 
-        subgraph DUAL_ENCODER ["🤝 Dual Encoder Training"]
-            VIS_ENC_TRAIN["🎨 Visual Encoder<br/>ViT + LSTM<br/>→ V_gesture"]:::training
-            TEXT_ENC_TRAIN["📝 Text Encoder<br/>BERT + SentenceTransformer<br/>→ T_command"]:::training
+        subgraph DUAL_ENCODER ["Dual Encoder Training"]
+            VIS_ENC_TRAIN["Visual Encoder<br/>ViT + LSTM<br/>→ V_gesture"]:::training
+            TEXT_ENC_TRAIN["Text Encoder<br/>BERT + SentenceTransformer<br/>→ T_command"]:::training
         end
 
-        CONTRASTIVE["⚖️ Contrastive Learning<br/>InfoNCE Loss<br/>Minimize: distance V_gesture, T_command for matches<br/>Maximize: distance for non-matches"]:::training
+        CONTRASTIVE["Contrastive Learning<br/>InfoNCE Loss<br/>Minimize distance V_gesture, T_command for matches<br/>Maximize distance for non-matches"]:::training
 
         TRAIN_DATA --> DUAL_ENCODER
         DUAL_ENCODER --> CONTRASTIVE
     end
 
     %% Inference Phase
-    subgraph INFER_PHASE ["⚡ INFERENCE PHASE Real-time"]
+    subgraph INFER_PHASE ["INFERENCE PHASE Real-time"]
         direction TB
 
-        NEW_GESTURE["🖐️ New User Gesture<br/>Live video input"]:::inference
+        NEW_GESTURE["New User Gesture<br/>Live video input"]:::inference
 
-        VIS_ENC_INFER["🎨 Trained Visual Encoder<br/>ViT + LSTM<br/>→ V_new"]:::shared
+        VIS_ENC_INFER["Trained Visual Encoder<br/>ViT + LSTM<br/>→ V_new"]:::shared
 
-        PRE_COMPUTED["💾 Pre-computed Text Embeddings<br/>T_1: volume up<br/>T_2: next slide<br/>T_3: like<br/>...T_n"]:::inference
+        PRE_COMPUTED["Pre-computed Text Embeddings<br/>T_1 volume up<br/>T_2 next slide<br/>T_3 like<br/>...T_n"]:::inference
 
-        SIMILARITY["📐 Cosine Similarity<br/>Compare V_new with all T_i<br/>Find closest match"]:::inference
+        SIMILARITY["Cosine Similarity<br/>Compare V_new with all T_i<br/>Find closest match"]:::inference
 
-        BEST_MATCH["🎯 Best Semantic Match<br/>Execute closest command<br/>with confidence score"]:::inference
+        BEST_MATCH["Best Semantic Match<br/>Execute closest command<br/>with confidence score"]:::inference
 
         NEW_GESTURE --> VIS_ENC_INFER
         VIS_ENC_INFER --> SIMILARITY
@@ -489,3 +490,4 @@ graph TB
 - **Framework**: OpenCV for video processing, PyTorch/TensorFlow for AI models
 
 This architecture represents a significant advancement in gesture recognition technology, moving from simple pattern matching to true semantic understanding of user intent.
+````
