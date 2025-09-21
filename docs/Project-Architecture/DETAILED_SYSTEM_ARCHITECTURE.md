@@ -251,7 +251,7 @@ graph TD
     COMMAND_OBJ -.->|"execute_command"| OS_IF
     OS_IF -.->|"ExecutionResult"| EXEC_RESULT
 
-````
+```
 
 ## Error Handling and Safety Mechanisms
 
@@ -283,7 +283,7 @@ graph TB
     ERROR_CHECKS -->|"Pass"| NORMAL_EXEC["Normal Execution"]:::recovery
     ERROR_CHECKS -->|"Fail"| ERROR_RECOVERY
     ERROR_RECOVERY --> USER_FEEDBACK
-````
+```
 
 ## Module Breakdown
 
@@ -490,4 +490,7 @@ graph TB
 - **Framework**: OpenCV for video processing, PyTorch/TensorFlow for AI models
 
 This architecture represents a significant advancement in gesture recognition technology, moving from simple pattern matching to true semantic understanding of user intent.
-````
+
+```
+
+```
