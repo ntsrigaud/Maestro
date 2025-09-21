@@ -19,7 +19,7 @@
   - [Recognition Engine](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/S1fag1asll)
   - [Action Mapper](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/ryPM-yaoeg)
   - [OS Controller](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/B1PIby6iex)
-  - [System Architecture Key Concepts and Notes](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/H1U_2wToex) 
+  - [System Architecture Key Concepts and Notes](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/H1U_2wToex)
 - [Project Contributions](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/SkS6Z16oge)
 
 - [HAVIT: Gesture Recognition](https://www.nature.com/articles/s41598-025-10758-9)
