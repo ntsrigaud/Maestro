@@ -30,4 +30,16 @@ This approach offers several key benefits:
 - **Semantic Understanding:** The system will be able to understand what gestures _mean_, making it more flexible and easier to customize.
 - **Extensibility:** Adding new gestures and commands will be a matter of providing new training data, not rewriting code.
 
+## Detailed Architecture Diagram
+
+For a comprehensive visual representation of all system components and their interactions, see the [**Detailed System Architecture Diagram**](./DETAILED_SYSTEM_ARCHITECTURE.md). This document provides:
+
+- Complete component breakdown for all four modules
+- Data flow visualization with technical specifications
+- Implementation details for each submodule
+- Technical stack and innovation explanations
+- Visual representation of the semantic understanding pipeline
+
+## Module Documentation
+
 For more detailed information on the technical design and implementation plan for each module, please refer to the `README.md` file within each module's directory.
