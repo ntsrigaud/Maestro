@@ -14,7 +14,7 @@
 - [Project Proposal](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/B1Aj0PSsgl)
 
 - [Project Architecture](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/r1lpJy6see)
-  - [Detailed System Architecture Diagram](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/HJVqjv6ogx) 
+  - [Detailed System Architecture Diagram](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/HJVqjv6ogx)
   - [Input Manager](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/BkZLgyToxx)
   - [Recognition Engine](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/S1fag1asll)
   - [Action Mapper](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/ryPM-yaoeg)
