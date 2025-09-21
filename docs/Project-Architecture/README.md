@@ -11,11 +11,33 @@ The system consists of four main modules:
 3.  **Action Mapper:** Translates gestures into commands.
 4.  **OS Controller:** Executes commands on the host OS.
 
-```
-+-------------------+      +----------------------+      +---------------------+      +--------------------+
-| 1. Input Manager  |----->| 2. Recognition       |----->| 3. Action Mapper    |----->| 4. OS Controller   |
-| (Webcam Capture)  |      |    Engine (AI/ML)    |      | (Gesture-to-Action) |      | (Virtual Mouse)    |
-+-------------------+      +----------------------+      +---------------------+      +--------------------+
+```mermaid
+flowchart LR
+    %% Styling with better contrast and readability
+    classDef inputModule fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000000
+    classDef recognitionModule fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#000000
+    classDef actionModule fill:#e8f5e8,stroke:#388e3c,stroke-width:3px,color:#000000
+    classDef osModule fill:#fff3e0,stroke:#f57c00,stroke-width:3px,color:#000000
+    classDef dataArrow fill:none,stroke:#424242,stroke-width:2px
+
+    %% Main Modules
+    INPUT["INPUT MANAGER<br/>• Camera capture<br/>• Frame preprocessing<br/>• OpenCV integration"]:::inputModule
+
+    RECOGNITION["RECOGNITION ENGINE<br/>• Hand detection MediaPipe<br/>• Feature extraction ViT<br/>• Semantic understanding ALBEF"]:::recognitionModule
+
+    ACTION["ACTION MAPPER<br/>• Command translation<br/>• State management<br/>• User configuration"]:::actionModule
+
+    OS["OS CONTROLLER<br/>• Cross-platform execution<br/>• Keyboard/mouse control<br/>• System integration"]:::osModule
+
+    %% Data Flow
+    INPUT -->|"Raw Video Frames"| RECOGNITION
+    RECOGNITION -->|"Semantic Commands<br/>volume up, next slide"| ACTION
+    ACTION -->|"Standardized Commands<br/>VOLUME_UP, NEXT_SLIDE"| OS
+    OS -->|"System Actions"| OUTPUT["System Output<br/>User sees results"]
+
+    %% User Interaction
+    USER["User<br/>Hand Gestures"] -->|"Video Stream"| INPUT
+    OUTPUT -.->|"Visual/Audio Feedback"| USER
 ```
 
 ## Technical Direction
