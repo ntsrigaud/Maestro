@@ -295,14 +295,22 @@ graph TB
 
 - **Camera Hardware Interface**: Direct connection to webcam/built-in camera
 - **OpenCV VideoCapture**: Low-level video capture with configurable resolution and frame rate
-- **Frame Processing**: Continuous frame reading with mirror effect and thread-safe access
+- **Frame Processing**: Continuous frame reading with **smart mirroring detection** to ensure consistent user experience and thread-safe access
 - **API Interface**: Clean abstraction with start(), get_frame(), stop() methods
 
 **Technical Details**:
 
 - Uses `cv2.VideoCapture` for camera access
 - Implements frame buffering for smooth operation
-- Horizontal flip for intuitive mirror effect
+- **Horizontal flip for intuitive mirror effect**: Essential for natural user interaction
+  - **Problem**: Raw camera feed shows user from camera's perspective (non-mirrored)
+  - **Issue**: When user raises right hand, it appears on left side of screen
+  - **Solution**: Apply `cv2.flip(frame, 1)` to horizontally mirror the image
+  - **Benefits**:
+    - Natural hand-eye coordination (like looking in a mirror)
+    - Intuitive gesture mapping (user's right gesture = system's right gesture)
+    - Reduced cognitive load during interaction
+    - Consistent with user expectations from video calls/selfie cameras
 - Thread-safe frame access for multi-module usage
 
 ### 2. Recognition Engine Module
@@ -333,6 +341,17 @@ graph TB
 - Moves beyond landmark-based approaches to full image understanding
 - Implements semantic grounding through contrastive learning
 - Enables zero-shot gesture recognition through language understanding
+
+**Critical Considerations for Frame Orientation**:
+
+- **Consistency Requirement**: Recognition engine expects frames in the same orientation as training data
+- **Training Data Orientation**: Models are typically trained on mirrored/user-perspective images
+- **Detection Method**: System can detect camera behavior through:
+  - Initial calibration gesture (user raises specific hand)
+  - Configuration file/user preference
+  - Automatic detection via gesture confidence scoring
+- **Frame Metadata**: Input manager tags frames with `is_mirrored: boolean` for downstream processing
+- **Handedness Mapping**: Ensures "raise right hand" gesture maps to correct system command regardless of camera type
 
 ### 3. Action Mapper Module
 
