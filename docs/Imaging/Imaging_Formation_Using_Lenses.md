@@ -38,7 +38,7 @@ It is convenient to represent the _aperture_ as a fraction of _focal length_.
 
 - Aperture: $D = \frac{f}{N}$
 - f-Number: $N = \frac{f}{D}$
-  where $N$ is called teh **f-Number** of lens.
+  where $N$ is called the **f-Number** of lens.
 
 ### Lens Defocus
 
