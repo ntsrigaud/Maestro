@@ -18,13 +18,13 @@ flowchart LR
     classDef dataArrow fill:none,stroke:#424242,stroke-width:2px
 
     %% Main Modules
-    INPUT["INPUT MANAGER<br/>• Camera capture<br/>• Frame preprocessing<br/>• OpenCV integration"]:::inputModule
+    INPUT["INPUT MANAGER<br/>- Camera capture<br/>- Frame preprocessing<br/>- OpenCV integration"]:::inputModule
 
-    RECOGNITION["RECOGNITION ENGINE<br/>• Hand detection MediaPipe<br/>• Feature extraction ViT<br/>• Semantic understanding ALBEF"]:::recognitionModule
+    RECOGNITION["RECOGNITION ENGINE<br/>- Hand detection MediaPipe<br/>- Feature extraction ViT<br/>- Semantic understanding ALBEF"]:::recognitionModule
 
-    ACTION["ACTION MAPPER<br/>• Command translation<br/>• State management<br/>• User configuration"]:::actionModule
+    ACTION["ACTION MAPPER<br/>- Command translation<br/>- State management<br/>- User configuration"]:::actionModule
 
-    OS["OS CONTROLLER<br/>• Cross-platform execution<br/>• Keyboard/mouse control<br/>• System integration"]:::osModule
+    OS["OS CONTROLLER<br/>- Cross-platform execution<br/>- Keyboard/mouse control<br/>- System integration"]:::osModule
 
     %% Data Flow
     INPUT -->|"Raw Video Frames"| RECOGNITION
@@ -53,7 +53,7 @@ graph TB
     %% Precomputation Phase (System Initialization)
     subgraph PRECOMP ["PRECOMPUTATION PHASE System Startup"]
         direction TB
-        CMD_LIST["Pre-defined Text Commands<br/>• volume up<br/>• next slide<br/>• like<br/>• scroll down<br/>• mouse click<br/>• etc."]:::precompute
+        CMD_LIST["Pre-defined Text Commands<br/>- volume up<br/>- next slide<br/>- like<br/>- scroll down<br/>- mouse click<br/>- etc."]:::precompute
 
         SENT_TRANS["SentenceTransformer<br/>Text Embedding Model<br/>BERT-based all-MiniLM-L6-v2"]:::precompute
 
@@ -71,11 +71,11 @@ graph TB
             direction TB
             CAMERA["Camera Hardware<br/>Webcam/Built-in Camera"]:::inputModule
 
-            CV_CAPTURE["OpenCV VideoCapture<br/>• cv2.VideoCapture device_id<br/>• Resolution config width/height<br/>• Frame rate optimization"]:::inputModule
+            CV_CAPTURE["OpenCV VideoCapture<br/>- cv2.VideoCapture device_id<br/>- Resolution config width/height<br/>- Frame rate optimization"]:::inputModule
 
-            FRAME_PROC["Frame Processing<br/>• Continuous frame reading<br/>• Smart mirroring detection/correction<br/>• Thread-safe frame access<br/>• Frame buffering"]:::inputModule
+            FRAME_PROC["Frame Processing<br/>- Continuous frame reading<br/>- Smart mirroring detection/correction<br/>- Thread-safe frame access<br/>- Frame buffering"]:::inputModule
 
-            INPUT_API["Input Manager Interface<br/>• start - Initialize camera<br/>• get_frame - Latest frame<br/>• stop - Release resources"]:::inputModule
+            INPUT_API["Input Manager Interface<br/>- start - Initialize camera<br/>- get_frame - Latest frame<br/>- stop - Release resources"]:::inputModule
 
             CAMERA --> CV_CAPTURE
             CV_CAPTURE --> FRAME_PROC
@@ -88,22 +88,22 @@ graph TB
 
             %% Hand Detection Submodule
             subgraph HAND_DETECT ["Hand Detection Submodule"]
-                MEDIAPIPE["MediaPipe Hands<br/>• Hand localization<br/>• Bounding box extraction<br/>• Multi-hand support<br/>• Confidence scoring"]:::recognitionModule
+                MEDIAPIPE["MediaPipe Hands<br/>- Hand localization<br/>- Bounding box extraction<br/>- Multi-hand support<br/>- Confidence scoring"]:::recognitionModule
 
-                HAND_CROP["Hand Region Cropping<br/>• Extract hand ROI<br/>• Normalize dimensions<br/>• Image preprocessing"]:::recognitionModule
+                HAND_CROP["Hand Region Cropping<br/>- Extract hand ROI<br/>- Normalize dimensions<br/>- Image preprocessing"]:::recognitionModule
 
                 MEDIAPIPE --> HAND_CROP
             end
 
             %% Gesture Classification Submodule
             subgraph GESTURE_CLASS ["Gesture Classification Submodule"]
-                STATIC_DYNAMIC["Static vs Dynamic<br/>Gesture Detection<br/>• Motion analysis<br/>• Temporal windowing"]:::recognitionModule
+                STATIC_DYNAMIC["Static vs Dynamic<br/>Gesture Detection<br/>- Motion analysis<br/>- Temporal windowing"]:::recognitionModule
 
                 %% Static Path
                 subgraph STATIC_PATH ["Static Gesture Path"]
                     STATIC_FRAME["Single Frame<br/>Extraction"]:::recognitionModule
 
-                    VIT_STATIC["Vision Transformer ViT<br/>• ViT-B/16 pre-trained<br/>• ImageNet-21k features<br/>• Patch-based processing<br/>• Global attention mechanism<br/>• 768-dim feature vector"]:::recognitionModule
+                    VIT_STATIC["Vision Transformer ViT<br/>- ViT-B/16 pre-trained<br/>- ImageNet-21k features<br/>- Patch-based processing<br/>- Global attention mechanism<br/>- 768-dim feature vector"]:::recognitionModule
 
                     STATIC_FEATURES["Static Feature Vector<br/>768-dimensional"]:::recognitionModule
 
@@ -115,9 +115,9 @@ graph TB
                 subgraph DYNAMIC_PATH ["Dynamic Gesture Path"]
                     FRAME_SEQ["Frame Sequence<br/>Extraction<br/>T frames"]:::recognitionModule
 
-                    VIT_DYNAMIC["ViT Feature Extraction<br/>Per Frame<br/>• Process each frame<br/>• Temporal consistency<br/>• Rich visual features"]:::recognitionModule
+                    VIT_DYNAMIC["ViT Feature Extraction<br/>Per Frame<br/>- Process each frame<br/>- Temporal consistency<br/>- Rich visual features"]:::recognitionModule
 
-                    LSTM_PROC["LSTM Temporal Processing<br/>• Sequence modeling<br/>• Memory cells & gates<br/>• Long-range dependencies<br/>• Motion understanding"]:::recognitionModule
+                    LSTM_PROC["LSTM Temporal Processing<br/>- Sequence modeling<br/>- Memory cells & gates<br/>- Long-range dependencies<br/>- Motion understanding"]:::recognitionModule
 
                     DYNAMIC_FEATURES["Dynamic Feature Vector<br/>Context + Temporal info"]:::recognitionModule
 
@@ -134,9 +134,9 @@ graph TB
             subgraph SEMANTIC_UNDERSTAND ["Semantic Understanding ALBEF-inspired"]
                 VISUAL_EMBED["Visual Embedding Vector<br/>V_gesture<br/>Unified representation"]:::semantic
 
-                COSINE_SIM["Cosine Similarity Matching<br/>• Compare V_gesture with all T_commands<br/>• Find closest semantic match<br/>• Confidence scoring"]:::semantic
+                COSINE_SIM["Cosine Similarity Matching<br/>- Compare V_gesture with all T_commands<br/>- Find closest semantic match<br/>- Confidence scoring"]:::semantic
 
-                SEMANTIC_RESULT["Semantic Match Result<br/>• Best matching command<br/>• Confidence score<br/>• Alternative candidates"]:::semantic
+                SEMANTIC_RESULT["Semantic Match Result<br/>- Best matching command<br/>- Confidence score<br/>- Alternative candidates"]:::semantic
 
                 STATIC_FEATURES --> VISUAL_EMBED
                 DYNAMIC_FEATURES --> VISUAL_EMBED
@@ -151,13 +151,13 @@ graph TB
         subgraph ACTION_MAP ["3. ACTION MAPPER MODULE"]
             direction TB
 
-            CMD_MAPPING["Command Mapping Logic<br/>• Semantic text → Command ID<br/>• Dictionary/lookup table<br/>• Custom user mappings<br/>• Priority handling"]:::actionModule
+            CMD_MAPPING["Command Mapping Logic<br/>- Semantic text → Command ID<br/>- Dictionary/lookup table<br/>- Custom user mappings<br/>- Priority handling"]:::actionModule
 
-            STATE_MGR["State Management<br/>• Activation/deactivation control<br/>• Gesture mode switching<br/>• Context awareness<br/>• Timeout handling"]:::actionModule
+            STATE_MGR["State Management<br/>- Activation/deactivation control<br/>- Gesture mode switching<br/>- Context awareness<br/>- Timeout handling"]:::actionModule
 
-            CONFIG_MGR["Configuration Manager<br/>• User customization<br/>• Gesture-to-action mapping<br/>• Sensitivity settings<br/>• Profile management"]:::actionModule
+            CONFIG_MGR["Configuration Manager<br/>- User customization<br/>- Gesture-to-action mapping<br/>- Sensitivity settings<br/>- Profile management"]:::actionModule
 
-            ACTION_CMD["Action Command Output<br/>• Standardized command format<br/>• Parameters & metadata<br/>• Execution priority"]:::actionModule
+            ACTION_CMD["Action Command Output<br/>- Standardized command format<br/>- Parameters & metadata<br/>- Execution priority"]:::actionModule
 
             CMD_MAPPING --> STATE_MGR
             STATE_MGR --> CONFIG_MGR
@@ -170,25 +170,25 @@ graph TB
 
             %% Platform Interface Submodule
             subgraph PLATFORM_INT ["Platform Interface"]
-                CROSS_PLATFORM["Cross-Platform Abstraction<br/>• Windows/macOS/Linux support<br/>• API standardization<br/>• Platform detection"]:::osModule
+                CROSS_PLATFORM["Cross-Platform Abstraction<br/>- Windows/macOS/Linux support<br/>- API standardization<br/>- Platform detection"]:::osModule
 
-                LIB_MGR["Library Manager<br/>• pyautogui for cross-platform<br/>• pynput for advanced input<br/>• Platform-specific optimizations"]:::osModule
+                LIB_MGR["Library Manager<br/>- pyautogui for cross-platform<br/>- pynput for advanced input<br/>- Platform-specific optimizations"]:::osModule
 
                 CROSS_PLATFORM --> LIB_MGR
             end
 
             %% Execution Engine Submodule
             subgraph EXEC_ENGINE ["Execution Engine"]
-                KEYBOARD_CTRL["Keyboard Control<br/>• Key press simulation<br/>• Modifier combinations<br/>• Hotkey sequences<br/>• Text input"]:::osModule
+                KEYBOARD_CTRL["Keyboard Control<br/>- Key press simulation<br/>- Modifier combinations<br/>- Hotkey sequences<br/>- Text input"]:::osModule
 
-                MOUSE_CTRL["Mouse Control<br/>• Cursor movement<br/>• Click simulation<br/>• Drag & drop<br/>• Scroll operations"]:::osModule
+                MOUSE_CTRL["Mouse Control<br/>- Cursor movement<br/>- Click simulation<br/>- Drag & drop<br/>- Scroll operations"]:::osModule
 
-                MEDIA_CTRL["Media Control<br/>• Volume adjustment<br/>• Playback control<br/>• Track navigation<br/>• System sounds"]:::osModule
+                MEDIA_CTRL["Media Control<br/>- Volume adjustment<br/>- Playback control<br/>- Track navigation<br/>- System sounds"]:::osModule
 
-                SYS_CTRL["System Control<br/>• Application switching<br/>• Window management<br/>• Brightness control<br/>• Power management"]:::osModule
+                SYS_CTRL["System Control<br/>- Application switching<br/>- Window management<br/>- Brightness control<br/>- Power management"]:::osModule
             end
 
-            OS_INTERFACE["OS Interface<br/>• Command execution<br/>• Error handling<br/>• Feedback system<br/>• Safety mechanisms"]:::osModule
+            OS_INTERFACE["OS Interface<br/>- Command execution<br/>- Error handling<br/>- Feedback system<br/>- Safety mechanisms"]:::osModule
 
             LIB_MGR --> EXEC_ENGINE
             EXEC_ENGINE --> OS_INTERFACE
@@ -200,7 +200,7 @@ graph TB
     TEXT_EMBEDDINGS -.->|"Precomputed Embeddings"| COSINE_SIM
     SEMANTIC_RESULT -->|"Semantic Command<br/>e.g., volume up"| CMD_MAPPING
     ACTION_CMD -->|"Standardized Command<br/>e.g., VOLUME_UP"| CROSS_PLATFORM
-    OS_INTERFACE -->|"System Execution"| OS_OUTPUT["System Output<br/>• Volume changes<br/>• Mouse movements<br/>• Application control<br/>• Media playback"]:::dataflow
+    OS_INTERFACE -->|"System Execution"| OS_OUTPUT["System Output<br/>- Volume changes<br/>- Mouse movements<br/>- Application control<br/>- Media playback"]:::dataflow
 
     %% External Connections
     CAMERA -.->|"Video Stream"| CV_CAPTURE
@@ -220,26 +220,26 @@ graph TD
     subgraph INTERFACES ["Module Interfaces"]
         direction TB
 
-        INPUT_IF["InputManager Interface<br/>• start → bool<br/>• get_frame → np.ndarray<br/>• stop → bool<br/>• is_active → bool"]:::interface
+        INPUT_IF["InputManager Interface<br/>- start → bool<br/>- get_frame → np.ndarray<br/>- stop → bool<br/>- is_active → bool"]:::interface
 
-        REC_IF["RecognitionEngine Interface<br/>• process_frame frame → SemanticResult<br/>• initialize_models → bool<br/>• set_confidence_threshold float<br/>• get_supported_gestures → List str"]:::interface
+        REC_IF["RecognitionEngine Interface<br/>- process_frame frame → SemanticResult<br/>- initialize_models → bool<br/>- set_confidence_threshold float<br/>- get_supported_gestures → List str"]:::interface
 
-        ACTION_IF["ActionMapper Interface<br/>• map_semantic_to_command semantic → Command<br/>• update_user_config config<br/>• set_active_state bool<br/>• get_current_mappings → Dict"]:::interface
+        ACTION_IF["ActionMapper Interface<br/>- map_semantic_to_command semantic → Command<br/>- update_user_config config<br/>- set_active_state bool<br/>- get_current_mappings → Dict"]:::interface
 
-        OS_IF["OSController Interface<br/>• execute_command command → ExecutionResult<br/>• get_supported_commands → List str<br/>• set_safety_mode bool<br/>• validate_command command → bool"]:::interface
+        OS_IF["OSController Interface<br/>- execute_command command → ExecutionResult<br/>- get_supported_commands → List str<br/>- set_safety_mode bool<br/>- validate_command command → bool"]:::interface
     end
 
     %% Data Structures
     subgraph DATA_STRUCTS ["Data Structures"]
         direction TB
 
-        FRAME_DATA["Frame Data<br/>• np.ndarray - raw_frame<br/>• int - timestamp<br/>• tuple - dimensions<br/>• dict - metadata"]:::dataStruct
+        FRAME_DATA["Frame Data<br/>- np.ndarray - raw_frame<br/>- int - timestamp<br/>- tuple - dimensions<br/>- dict - metadata"]:::dataStruct
 
-        SEMANTIC_RESULT["SemanticResult<br/>• str - semantic_command<br/>• float - confidence<br/>• list - alternatives<br/>• dict - gesture_features<br/>• bool - is_dynamic"]:::dataStruct
+        SEMANTIC_RESULT["SemanticResult<br/>- str - semantic_command<br/>- float - confidence<br/>- list - alternatives<br/>- dict - gesture_features<br/>- bool - is_dynamic"]:::dataStruct
 
-        COMMAND_OBJ["Command Object<br/>• str - command_type<br/>• dict - parameters<br/>• int - priority<br/>• str - execution_mode<br/>• function - callback"]:::dataStruct
+        COMMAND_OBJ["Command Object<br/>- str - command_type<br/>- dict - parameters<br/>- int - priority<br/>- str - execution_mode<br/>- function - callback"]:::dataStruct
 
-        EXEC_RESULT["ExecutionResult<br/>• bool - success<br/>• str - error_message<br/>• float - execution_time<br/>• dict - system_feedback"]:::dataStruct
+        EXEC_RESULT["ExecutionResult<br/>- bool - success<br/>- str - error_message<br/>- float - execution_time<br/>- dict - system_feedback"]:::dataStruct
     end
 
     %% Flow Connections
@@ -452,7 +452,7 @@ graph TB
     subgraph TRAIN_PHASE ["TRAINING PHASE Offline"]
         direction TB
 
-        TRAIN_DATA["Training Dataset<br/>Pairs Gesture Video, Text Command<br/>• thumbs up - like<br/>• swipe left - previous<br/>• peace sign - select"]:::training
+        TRAIN_DATA["Training Dataset<br/>Pairs Gesture Video, Text Command<br/>- thumbs up - like<br/>- swipe left - previous<br/>- peace sign - select"]:::training
 
         subgraph DUAL_ENCODER ["Dual Encoder Training"]
             VIS_ENC_TRAIN["Visual Encoder<br/>ViT + LSTM<br/>→ V_gesture"]:::training
