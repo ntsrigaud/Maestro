@@ -42,4 +42,4 @@ related to the project.
 - Sley Hortes
 - Neil Taison Rigaud
 - Khishig Tuguldur
-- Eder Guerrero 
+- Eder Guerrero
