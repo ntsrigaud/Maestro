@@ -2,7 +2,7 @@
 
 ## Meeting Notes
 
-- [2025-09-08 (Meeting With TAs)](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/Hk7tMcWoxx)
+- [2025-09-08 (Meeting with TAs)](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/Hk7tMcWoxx)
 - [2025-09-09](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/Hk9EX5Wjlx)
 - [2025-09-12](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/rJj3XqWieg)
 - [2025-09-15 (Meeting with TAs)](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/Hk1yuC2see)
