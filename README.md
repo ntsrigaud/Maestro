@@ -40,6 +40,6 @@ related to the project.
 ## Group Members:
 
 - Sley Hortes
-- Neil Taison Rigaud
+- Neil Rigaud Taison
 - Khishig Tuguldur
-- Eder Guerrero
+- Eder Guerrero 
