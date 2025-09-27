@@ -3,7 +3,6 @@ import sys
 
 import numpy as np
 
-# Add current directory to path (where the library should be copied)
 sys.path.insert(0, os.path.dirname(__file__))
 
 try:

@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/hsley13/Dev/CSU-Capstone-Project/InputManagerModule/build/cmake_install.cmake",
+		"/Users/hsley13/Dev/CSU-Capstone-Project/InputManagerModule/build/_deps/pybind11-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

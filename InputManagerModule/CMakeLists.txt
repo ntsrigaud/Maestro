@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 4.1.1)
 project(InputManager)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (MSVC)
     add_compile_options(/W4)
@@ -33,7 +35,11 @@ else ()
 endif ()
 
 include(FetchContent)
-FetchContent_Declare(pybind11 GIT_REPOSITORY https://github.com/pybind/pybind11.git GIT_TAG v2.11.1)
+FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG v2.13.5
+    QUIET)
 FetchContent_MakeAvailable(pybind11)
 
 if (WIN32)
@@ -44,14 +50,6 @@ pybind11_add_module(input_manager_native InputManager.cpp Bindings.cpp)
 
 target_link_libraries(input_manager_native PRIVATE ${OpenCV_LIBS})
 target_include_directories(input_manager_native PRIVATE ${OpenCV_INCLUDE_DIRS} ${pybind11_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-
-if (UNIX AND NOT APPLE)
-    set(LIB_EXT ".so")
-elseif (APPLE)
-    set(LIB_EXT ".so")
-elseif (WIN32)
-    set(LIB_EXT ".pyd")
-endif ()
 
 add_custom_command(
     TARGET input_manager_native
