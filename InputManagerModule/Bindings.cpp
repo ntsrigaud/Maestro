@@ -43,7 +43,7 @@ PYBIND11_MODULE(input_manager_native, m) {
                 frame = frame.clone();
             }
             
-            auto output_frame = std::make_unique<cv::Mat>();
+            std::unique_ptr<cv::Mat> output_frame = std::make_unique<cv::Mat>();
             if (frame.depth() != CV_8U) {
                 double minVal, maxVal;
                 cv::minMaxLoc(frame, &minVal, &maxVal);
@@ -78,10 +78,10 @@ PYBIND11_MODULE(input_manager_native, m) {
                 };
             }
             
-            auto* frame_ptr = output_frame.release(); 
+            cv::Mat *frame_ptr = output_frame.release(); 
             py::capsule capsule(frame_ptr, mat_deleter);
-            
-            return py::array_t<unsigned char>(
+
+            return py::array_t<unsigned char>( 
                 shape, 
                 strides, 
                 frame_ptr->data, 
