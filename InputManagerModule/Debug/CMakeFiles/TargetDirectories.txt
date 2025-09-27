@@ -1,0 +1,5 @@
+/Users/hsley13/Dev/InputManager/Debug/CMakeFiles/input_manager_native.dir
+/Users/hsley13/Dev/InputManager/Debug/CMakeFiles/edit_cache.dir
+/Users/hsley13/Dev/InputManager/Debug/CMakeFiles/rebuild_cache.dir
+/Users/hsley13/Dev/InputManager/Debug/_deps/pybind11-build/CMakeFiles/edit_cache.dir
+/Users/hsley13/Dev/InputManager/Debug/_deps/pybind11-build/CMakeFiles/rebuild_cache.dir
