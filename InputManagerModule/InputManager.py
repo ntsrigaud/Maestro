@@ -1,49 +1,98 @@
 import os
 import sys
+import time
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(__file__))
+try:
+    import cv2
+except ImportError:
+    print("❌ OpenCV for Python is not installed.")
+    sys.exit(1)
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "build/lib"))
 
 try:
     import input_manager_native as im
 
-    print("✅ Module imported successfully")
 except ImportError as e:
-    print(f"❌ Failed to import module: {e}")
-    print("Build the project first: mkdir build && cd build && cmake .. && make")
+    print(f"❌ Failed to import native module: {e}")
     sys.exit(1)
 
 
-def test_camera(camera_index):
-    try:
-        cam = im.InputManager(camera_index)
-        started = cam.start_capture()
-        print(f"Camera {camera_index}: started={started}")
+class InputManagerDemo:
+    def __init__(self, camera_index=0):
+        self._cam = im.InputManager(camera_index)
 
-        frame = cam.get_frame()
-        print(f"Frame shape: {frame.shape}, dtype: {frame.dtype}")
+    def capture_frame(self, out_file="output.npy"):
+        """Capture one frame and save it as .npy"""
+        if not self._cam.start_capture():
+            print("❌ Could not start camera")
+            return False
 
-        cam.stop_capture()
-        return started and frame.size > 0
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+        frame = self._cam.get_frame()
+        self._cam.stop_capture()
+
+        if frame.size == 0:
+            print("❌ Failed to capture frame")
+            return False
+
+        np.save(out_file, frame)
+        print(f"✅ Saved single frame to {out_file}")
+        return True
+
+    def record_video(self, out_file="output.mp4", duration=5, fps=30):
+        """Record a short video and save it"""
+        if not self._cam.start_capture():
+            print("❌ Could not start camera")
+            return False
+
+        frame = self._cam.get_frame()
+        if frame.size == 0:
+            print("❌ Failed to capture initial frame")
+            self._cam.stop_capture()
+            return False
+
+        # Convert normalized float32 → uint8 for saving
+        frame_uint8 = ((frame * 0.5) + 0.5) * 255
+        frame_uint8 = frame_uint8.astype(np.uint8)
+        h, w, _ = frame_uint8.shape
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        out = cv2.VideoWriter(out_file, fourcc, fps, (w, h))
+        if not out.isOpened():
+            print(f"❌ Could not open video writer {out_file}")
+            self._cam.stop_capture()
+            return False
+
+        print(f"🎥 Recording video to {out_file} for {duration}s...")
+        start = time.time()
+        frames_written = 0
+
+        while (time.time() - start) < duration:
+            frame = self._cam.get_frame()
+            if frame.size == 0:
+                continue
+
+            frame_uint8 = ((frame * 0.5) + 0.5) * 255
+            frame_uint8 = frame_uint8.astype(np.uint8)
+            frame_bgr = cv2.cvtColor(frame_uint8, cv2.COLOR_RGB2BGR)
+            out.write(frame_bgr)
+            frames_written += 1
+
+        self._cam.stop_capture()
+        out.release()
+        print(f"✅ Saved {frames_written} frames to {out_file}")
+        return True
 
 
 def main():
-    print("Testing cameras...")
+    demo = InputManagerDemo()
 
-    if test_camera(0):
-        print("✅ Camera 0 test passed")
-    else:
-        print("❌ Camera 0 test failed")
-
-    if not test_camera(99):
-        print("✅ Invalid camera test passed")
-    else:
-        print("❌ Invalid camera test failed")
+    if demo.capture_frame("output.npy"):
+        demo.record_video("output.mp4", duration=5)
 
 
 if __name__ == "__main__":
     main()
+
