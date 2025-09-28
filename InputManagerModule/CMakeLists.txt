@@ -50,19 +50,3 @@ pybind11_add_module(input_manager_native InputManager.cpp Bindings.cpp)
 
 target_link_libraries(input_manager_native PRIVATE ${OpenCV_LIBS})
 target_include_directories(input_manager_native PRIVATE ${OpenCV_INCLUDE_DIRS} ${pybind11_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_custom_command(
-    TARGET input_manager_native
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:input_manager_native> ${CMAKE_SOURCE_DIR}/
-    COMMENT "Copying library to source directory")
-
-if (NOT WIN32)
-    set_target_properties(input_manager_native PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
-endif ()
-
-if (WIN32)
-    add_custom_command(TARGET input_manager_native POST_BUILD COMMAND ${CMAKE_COMMAND} -E echo "Build complete! Run: python InputManager.py")
-else ()
-    add_custom_command(TARGET input_manager_native POST_BUILD COMMAND ${CMAKE_COMMAND} -E echo "Build complete! Run: python3 InputManager.py")
-endif ()

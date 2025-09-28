@@ -3,4 +3,3 @@ InputManagerModule/.cache/clangd/index
 InputManagerModule/build
 InputManagerModule/output.mp4
 InputManagerModule/output.npy
-InputManagerModule/input_manager_native.cpython-312-darwin.so
