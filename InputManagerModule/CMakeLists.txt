@@ -16,10 +16,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-if (WIN32)
-    set(OpenCV_DIR "$ENV{OPENCV_DIR}" CACHE PATH "Path to OpenCV build directory")
-endif ()
-
 find_package(OpenCV REQUIRED COMPONENTS core videoio imgproc)
 
 if (OpenCV_FOUND)
@@ -51,18 +47,8 @@ pybind11_add_module(input_manager_native InputManager.cpp Bindings.cpp)
 target_link_libraries(input_manager_native PRIVATE ${OpenCV_LIBS})
 target_include_directories(input_manager_native PRIVATE ${OpenCV_INCLUDE_DIRS} ${pybind11_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_custom_command(
-    TARGET input_manager_native
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:input_manager_native> ${CMAKE_SOURCE_DIR}/
-    COMMENT "Copying library to source directory")
+set_target_properties(input_manager_native PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 
-if (NOT WIN32)
-    set_target_properties(input_manager_native PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
-endif ()
-
-if (WIN32)
-    add_custom_command(TARGET input_manager_native POST_BUILD COMMAND ${CMAKE_COMMAND} -E echo "Build complete! Run: python InputManager.py")
-else ()
-    add_custom_command(TARGET input_manager_native POST_BUILD COMMAND ${CMAKE_COMMAND} -E echo "Build complete! Run: python3 InputManager.py")
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(input_manager_native PRIVATE -O3)
 endif ()
