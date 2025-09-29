@@ -38,10 +38,10 @@ The Python Input Manager is a complete rewrite of the original C++/pybind11 Inpu
 │  │  Threading  │  │   MediaPipe     │   │
 │  │   Module    │  │  Integration    │   │
 │  └─────────────┘  └─────────────────┘   │
-│  ┌─────────────────────────────────────┐ │
-│  │      Frame Processing Pipeline      │ │
+│  ┌────────────────────────────────────┐ │
+│  │      Frame Processing Pipeline     │ │
 │  │  BGR→RGB | Resize | Normalize      │ │
-│  └─────────────────────────────────────┘ │
+│  └────────────────────────────────────┘ │
 └─────────────────┬───────────────────────┘
                   │
 ┌─────────────────▼───────────────────────┐
@@ -52,18 +52,21 @@ The Python Input Manager is a complete rewrite of the original C++/pybind11 Inpu
 ## Features
 
 ### Core Functionality
+
 - **Real-time Video Capture**: High-performance camera interface using OpenCV
 - **Preprocessing Pipeline**: Automatic BGR→RGB conversion, resizing, and normalization
 - **Thread-safe Operation**: Background capture with thread-safe frame access
 - **Memory Efficient**: Optimized frame buffering with configurable queue sizes
 
 ### Advanced Features
+
 - **MediaPipe Integration**: Real-time hand detection and landmark extraction
 - **Performance Monitoring**: Built-in metrics collection and analysis
 - **Error Handling**: Robust error handling and recovery mechanisms
 - **Flexible Configuration**: Customizable processing parameters
 
 ### API Compatibility
+
 - **Drop-in Replacement**: Compatible with existing C++ InputManager API
 - **Migration Support**: Compatibility wrapper for seamless transition
 - **Feature Parity**: All original functionality preserved and enhanced
@@ -101,6 +104,7 @@ mediapipe>=0.10.0
 ```
 
 Optional dependencies for development:
+
 ```
 pytest>=7.0.0
 pytest-cov>=3.0.0
@@ -126,15 +130,15 @@ input_manager = PythonInputManager(
 if input_manager.start_continuous_capture():
     # Get latest frame
     frame_data = input_manager.get_latest_frame()
-    
+
     if frame_data:
         frame = frame_data.get_frame()  # numpy array (224, 224, 3)
         timestamp = frame_data.timestamp
         hands = frame_data.hands_detected
-        
+
         print(f"Frame shape: {frame.shape}")
         print(f"Hands detected: {len(hands) if hands else 0}")
-    
+
     # Stop capture
     input_manager.stop_continuous_capture()
 ```
@@ -147,7 +151,7 @@ from python_input_manager import PythonInputManager
 # Use as context manager for automatic cleanup
 with PythonInputManager(camera_index=0) as input_manager:
     input_manager.start_continuous_capture()
-    
+
     # Process frames
     for i in range(100):
         frame_data = input_manager.get_latest_frame()
@@ -189,6 +193,7 @@ PythonInputManager(
 ```
 
 **Parameters:**
+
 - `camera_index`: Camera device index (default: 0)
 - `target_size`: Output frame dimensions (default: 224x224)
 - `enable_mediapipe`: Enable hand detection (default: True)
@@ -201,16 +206,19 @@ PythonInputManager(
 ```python
 def start_capture() -> bool
 ```
+
 Initialize camera device. Returns True if successful.
 
 ```python
 def stop_capture() -> None
 ```
+
 Stop camera and release resources.
 
 ```python
 def is_capture_open() -> bool
 ```
+
 Check if camera is currently open.
 
 ##### Continuous Capture
@@ -218,11 +226,13 @@ Check if camera is currently open.
 ```python
 def start_continuous_capture() -> bool
 ```
+
 Start background frame capture thread. Returns True if successful.
 
 ```python
 def stop_continuous_capture() -> None
 ```
+
 Stop background capture and cleanup threads.
 
 ##### Frame Access
@@ -230,11 +240,13 @@ Stop background capture and cleanup threads.
 ```python
 def get_latest_frame() -> Optional[FrameData]
 ```
+
 Get the most recently captured frame.
 
 ```python
 def get_all_frames() -> List[FrameData]
 ```
+
 Get all frames captured since continuous capture started.
 
 ##### Configuration
@@ -242,11 +254,13 @@ Get all frames captured since continuous capture started.
 ```python
 def set_normalization_params(mean: float, std: float) -> None
 ```
+
 Set frame normalization parameters.
 
 ```python
 def set_mirror_enabled(enabled: bool) -> None
 ```
+
 Enable or disable horizontal frame mirroring.
 
 ##### Performance Monitoring
@@ -254,6 +268,7 @@ Enable or disable horizontal frame mirroring.
 ```python
 def get_performance_metrics() -> Dict[str, Any]
 ```
+
 Get detailed performance metrics including FPS, processing times, and resource usage.
 
 ### FrameData Class
@@ -272,6 +287,7 @@ Container for processed frame data and metadata.
 ```python
 def get_frame() -> np.ndarray
 ```
+
 Returns the frame as numpy array for API compatibility.
 
 ## Performance
@@ -280,14 +296,15 @@ Returns the frame as numpy array for API compatibility.
 
 Performance comparison between Python and C++ implementations:
 
-| Metric | Python Implementation | C++ Implementation | Ratio |
-|--------|----------------------|-------------------|--------|
-| Average FPS | 28.5 | 29.2 | 97.6% |
-| Frame Processing Latency | 2.1ms | 1.8ms | 116.7% |
-| Memory Usage | 45MB | 42MB | 107.1% |
-| CPU Usage | 12.3% | 11.8% | 104.2% |
+| Metric                   | Python Implementation | C++ Implementation | Ratio  |
+| ------------------------ | --------------------- | ------------------ | ------ |
+| Average FPS              | 28.5                  | 29.2               | 97.6%  |
+| Frame Processing Latency | 2.1ms                 | 1.8ms              | 116.7% |
+| Memory Usage             | 45MB                  | 42MB               | 107.1% |
+| CPU Usage                | 12.3%                 | 11.8%              | 104.2% |
 
 **Key Findings:**
+
 - Performance difference is negligible for computer vision applications
 - Python implementation provides 97.6% of C++ performance
 - Memory overhead is minimal (7.1% increase)
@@ -296,12 +313,14 @@ Performance comparison between Python and C++ implementations:
 ### Optimization Features
 
 #### GPU Acceleration
+
 ```python
 # Optional: Use GPU-accelerated preprocessing
 input_manager = GPUAcceleratedInputManager(camera_index=0)
 ```
 
 #### Performance Monitoring
+
 ```python
 metrics = input_manager.get_performance_metrics()
 print(f"Current FPS: {metrics['fps']:.2f}")
@@ -317,12 +336,14 @@ The Python Input Manager is designed as a drop-in replacement for the C++ implem
 #### 1. Update Imports
 
 **Before (C++):**
+
 ```python
 import input_manager_native as im
 input_manager = im.InputManager(0)
 ```
 
 **After (Python):**
+
 ```python
 from python_input_manager import InputManager
 input_manager = InputManager(0)
@@ -365,6 +386,7 @@ metrics = input_manager.get_performance_metrics()
 #### 4. Build System Simplification
 
 **Before (C++):**
+
 ```bash
 # Complex build process
 mkdir build && cd build
@@ -373,6 +395,7 @@ make
 ```
 
 **After (Python):**
+
 ```bash
 # Simple installation
 pip install -r requirements.txt
@@ -513,6 +536,7 @@ python demo.py --mode compatibility
 ### Common Issues
 
 #### Camera Access Issues
+
 ```bash
 # Check camera availability
 python -c "import cv2; print('Camera available:', cv2.VideoCapture(0).isOpened())"
@@ -528,6 +552,7 @@ for i in range(5):
 ```
 
 #### MediaPipe Issues
+
 ```bash
 # Test MediaPipe installation
 python -c "import mediapipe as mp; print('MediaPipe version:', mp.__version__)"
@@ -537,6 +562,7 @@ python demo.py --no-mediapipe
 ```
 
 #### Performance Issues
+
 ```bash
 # Monitor resource usage
 python demo.py --mode benchmark --duration 10
@@ -569,6 +595,7 @@ python demo.py --mode benchmark --duration 10
 ### Reporting Issues
 
 Please include:
+
 - Python version and platform
 - Camera specifications
 - Full error traceback

@@ -1,0 +1,48 @@
+{
+  "benchmark_config": {
+    "duration_seconds": 10,
+    "camera_index": 0,
+    "timestamp": "2025-09-29 17:34:35"
+  },
+  "results": {
+    "Python": {
+      "frame_count": 7855,
+      "total_duration": 10.089324235916138,
+      "avg_fps": 788.8184167552736,
+      "avg_latency_ms": 0.0005143224472152739,
+      "min_latency_ms": 0.0,
+      "max_latency_ms": 0.007867813110351562,
+      "memory_usage_mb": 369.6875,
+      "cpu_usage_percent": 62.94461206896551,
+      "success_rate": 0.995690201546457,
+      "additional_metrics": {
+        "frame_count": 231,
+        "avg_processing_time_ms": 41.98471546173096,
+        "min_processing_time_ms": 20.184040069580078,
+        "max_processing_time_ms": 54.78620529174805,
+        "fps": 23.818191668144074,
+        "queue_size": 30,
+        "mediapipe_enabled": true
+      }
+    },
+    "C++": {
+      "frame_count": 7612,
+      "total_duration": 10.119460821151733,
+      "avg_fps": 763.792199678432,
+      "avg_latency_ms": 0.0042972035991851116,
+      "min_latency_ms": 0.0,
+      "max_latency_ms": 0.1952648162841797,
+      "memory_usage_mb": 151.453125,
+      "cpu_usage_percent": 36.46625212724179,
+      "success_rate": 0.9963350785340314,
+      "additional_metrics": {}
+    }
+  },
+  "comparison": {
+    "fps_ratio_python_vs_cpp": 1.0327657405867434,
+    "latency_ratio_python_vs_cpp": 0.11968770744602514,
+    "memory_difference_mb": 218.234375,
+    "cpu_difference_percent": 26.478359941723724,
+    "success_rate_difference": -0.0006448769875743166
+  }
+}
