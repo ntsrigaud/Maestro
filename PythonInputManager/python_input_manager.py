@@ -244,14 +244,19 @@ class PythonInputManager:
             
             # Process frame
             try:
-                processed_frame = self._process_frame(frame)
+                # Apply mirroring first if enabled (for consistency with hand detection)
+                display_frame = frame
+                if self.mirror_enabled:
+                    display_frame = cv2.flip(frame, 1)
+                
+                # Process the mirrored frame for preprocessing
+                processed_frame = self._process_frame(display_frame, apply_mirror=False)  # Don't mirror again
+                
                 if processed_frame is not None:
-                    # Detect hands if enabled
+                    # Detect hands if enabled (use the same mirrored frame)
                     hands_result = None
                     if self.enable_mediapipe and self.hands:
-                        hands_result = self._detect_hands(frame)
-                    
-                    # Create frame data
+                        hands_result = self._detect_hands(display_frame)                    # Create frame data
                     frame_data = FrameData(
                         frame=processed_frame,
                         timestamp=time.time(),
@@ -286,19 +291,20 @@ class PythonInputManager:
         
         logger.info("Capture loop ended")
     
-    def _process_frame(self, frame: np.ndarray) -> Optional[np.ndarray]:
+    def _process_frame(self, frame: np.ndarray, apply_mirror: bool = True) -> Optional[np.ndarray]:
         """
         Apply preprocessing pipeline to frame.
         
         Args:
             frame: Raw frame from camera
+            apply_mirror: Whether to apply mirroring (default True for backward compatibility)
             
         Returns:
             Preprocessed frame or None if processing failed
         """
         try:
-            # Mirror if enabled
-            if self.mirror_enabled:
+            # Mirror if enabled and apply_mirror is True
+            if self.mirror_enabled and apply_mirror:
                 frame = cv2.flip(frame, 1)
             
             # Convert BGR to RGB

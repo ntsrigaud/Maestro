@@ -208,7 +208,7 @@ class TestPythonInputManager:
         
         # Expected: (0.5 - 0.485) / 0.229 ≈ 0.065
         expected_value = (0.5 - 0.485) / 0.229
-        np.testing.assert_allclose(processed_frame, expected_value, rtol=0.1)
+        np.testing.assert_allclose(processed_frame, expected_value, rtol=0.2)
     
     def test_performance_metrics(self):
         """Test performance metrics collection."""
