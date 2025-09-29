@@ -256,7 +256,8 @@ class PythonInputManager:
                     # Detect hands if enabled (use the same mirrored frame)
                     hands_result = None
                     if self.enable_mediapipe and self.hands:
-                        hands_result = self._detect_hands(display_frame)                    # Create frame data
+                        hands_result = self._detect_hands(display_frame)
+                    # Create frame data
                     frame_data = FrameData(
                         frame=processed_frame,
                         timestamp=time.time(),
