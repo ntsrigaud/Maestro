@@ -2,3 +2,6 @@ docs/Project-Architecture/hand-gesture-recognition-mediapipe
 InputManagerModule/.cache/clangd/index
 InputManagerModule/build
 InputManagerModule/captured_video_detailed.txt
+InputManagerModule/input_manager_native.cpython-312-darwin.so
+InputManagerModule/output.npy
+InputManagerModule/output_detailed.txt
