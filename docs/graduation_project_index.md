@@ -10,6 +10,7 @@
 - [2025-09-19](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/HkA4h02oel)
 - [2025-09-21](https://hackmd.io/@edzz/Bkb5X7-nxl)
 - [2025-09-22 (Meeting with TAs)](https://hackmd.io/@edzz/rkUBU7-2xe)
+- [2025-09-29 (Meeting with TAs)](https://hackmd.io/@edzz/BkdK5pqnlx)
 
 ## Main Topic Researches
 
