@@ -1,0 +1,3 @@
+[submodule "InputManagerModule/vcpkg"]
+	path = InputManagerModule/vcpkg
+	url = https://github.com/microsoft/vcpkg.git

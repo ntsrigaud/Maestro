@@ -1,0 +1,11 @@
+{
+  "name": "input-manager-module",
+  "version": "0.1.0",
+  "dependencies": [
+    "opencv",
+    {
+      "name": "pybind11",
+      "default-features": false
+    }
+  ]
+}

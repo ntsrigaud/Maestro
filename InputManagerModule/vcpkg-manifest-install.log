@@ -1,0 +1,46 @@
+Detecting compiler hash for triplet arm64-osx...
+Compiler found: /usr/bin/c++
+The following packages are already installed:
+  * abseil:arm64-osx@20250512.1 -- git+https://github.com/microsoft/vcpkg@2999911d2655e693394770d9dd7600b277a86f37
+  * bzip2[core,tool]:arm64-osx@1.0.8#6 -- git+https://github.com/microsoft/vcpkg@2d029da682847c5ebdc54e4dbea001331a02207e
+  * expat:arm64-osx@2.7.3 -- git+https://github.com/microsoft/vcpkg@1f334673a6e31a6887fa5377a330e436b4f1f6a7
+  * flatbuffers:arm64-osx@25.9.23#1 -- git+https://github.com/microsoft/vcpkg@cf3ccaa4a8abd4a9dcc02a2006d3387e13e3a94c
+  * gettext-libintl:arm64-osx@0.22.5#4 -- git+https://github.com/microsoft/vcpkg@f68d5e391ae2bc2cf4ed86cb26097b2f0c218e2c
+  * libffi:arm64-osx@3.5.2 -- git+https://github.com/microsoft/vcpkg@7af0617a77238936f200b50b6f1797e280a43fbf
+  * libiconv:arm64-osx@1.18#2 -- git+https://github.com/microsoft/vcpkg@8bde4af83c1a6471dfad7afaaf2d487f18fb6e82
+  * libjpeg-turbo:arm64-osx@3.1.2 -- git+https://github.com/microsoft/vcpkg@26b02f049c1cbfc9d996c7b56cfd1f4598f6f158
+  * liblzma:arm64-osx@5.8.1 -- git+https://github.com/microsoft/vcpkg@55eb3803f1d0388aebca8fd293963721bbf0092c
+  * libpng:arm64-osx@1.6.50 -- git+https://github.com/microsoft/vcpkg@54b6eefbef1cb0f477c6eb54e2236badd140feea
+  * libwebp[core,libwebpmux,nearlossless,simd]:arm64-osx@1.6.0#1 -- git+https://github.com/microsoft/vcpkg@c0a4a598eacd380393ff3a92be045f4474643649
+  * ncurses:arm64-osx@6.5#1 -- git+https://github.com/microsoft/vcpkg@a714211f4eb04f17c6f4f5e5b3ada6ea02484b4c
+    opencv:arm64-osx@4.11.0 -- git+https://github.com/microsoft/vcpkg@c4ce4fdee8218d45d5e344a95bd62a6683df684c
+  * opencv4[calib3d,core,dnn,fs,gapi,highgui,intrinsics,jpeg,png,quirc,thread,tiff,webp]:arm64-osx@4.11.0#4 -- git+https://github.com/microsoft/vcpkg@f96663c0d36e2aed2c1519d4138f712055014208
+  * openssl:arm64-osx@3.6.0 -- git+https://github.com/microsoft/vcpkg@8d9898336b57c74a04ae8378e330ffd4dd88837c
+  * protobuf:arm64-osx@5.29.5#2 -- git+https://github.com/microsoft/vcpkg@b71ee5bb425cd832ed1615601bd92573f07e9206
+    pybind11:arm64-osx@3.0.1 -- git+https://github.com/microsoft/vcpkg@2c5d74751c919edb2c3c7a183ee633df69c45c15
+  * python3[core,extensions]:arm64-osx@3.12.9#7 -- git+https://github.com/microsoft/vcpkg@278873ae3425fd9c3d79e37b2b918790704c491e
+  * quirc:arm64-osx@1.2 -- git+https://github.com/microsoft/vcpkg@f586c894573b92fc601590eb0e38b3e54e0c7f5c
+  * sqlite3[core,json1]:arm64-osx@3.50.4 -- git+https://github.com/microsoft/vcpkg@66b97ff5a04f74e09b321708432721c5dca0c213
+  * tiff[core,jpeg,lzma,zip]:arm64-osx@4.7.1 -- git+https://github.com/microsoft/vcpkg@9391305288677bb3959bf22a08218a61ffec0be0
+  * utf8-range:arm64-osx@5.29.5 -- git+https://github.com/microsoft/vcpkg@5d28e170bfcc212d629bb070520e72492240ce65
+  * vcpkg-cmake:arm64-osx@2024-04-23 -- git+https://github.com/microsoft/vcpkg@e74aa1e8f93278a8e71372f1fa08c3df420eb840
+  * vcpkg-cmake-config:arm64-osx@2024-05-23 -- git+https://github.com/microsoft/vcpkg@97a63e4bc1a17422ffe4eff71da53b4b561a7841
+  * vcpkg-cmake-get-vars:arm64-osx@2025-05-29 -- git+https://github.com/microsoft/vcpkg@d6510f888dd526c7828f6b973349e7f30be51254
+  * vcpkg-get-python:arm64-osx@2025-02-09 -- git+https://github.com/microsoft/vcpkg@0a0384810888b341ad84b0e08559481ff9a82150
+  * vcpkg-get-python-packages:arm64-osx@2025-04-05 -- git+https://github.com/microsoft/vcpkg@2550a21f375bb78fd3fba745a2e58a2355912767
+  * vcpkg-make:arm64-osx@2025-09-29 -- git+https://github.com/microsoft/vcpkg@73a90e27dfaf176bb25ec339e8b3077054de52da
+  * zlib:arm64-osx@1.3.1 -- git+https://github.com/microsoft/vcpkg@3f05e04b9aededb96786a911a16193cdb711f0c9
+pybind11 provides CMake integration:
+
+  # Easy
+  set(PYBIND11_FINDPYTHON ON)
+  find_package(pybind11 CONFIG REQUIRED)
+  pybind11_add_module(MyModule1 src1.cpp)
+
+  # Advanced
+  find_package(Python COMPONENTS Interpreter Development)
+  find_package(pybind11 CONFIG REQUIRED)
+  Python_add_library(MyModule2 src2.cpp)
+  target_link_libraries(MyModule2 PRIVATE pybind11::headers)
+
+All requested installations completed successfully in: 212 us

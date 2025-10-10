@@ -44,8 +44,10 @@ bool InputManager::start_continuous_capture() {
         return false;
     }
 
-    std::lock_guard<std::mutex> lock(_frame_mutex);
-    _captured_frames.clear();
+    {
+        std::lock_guard<std::mutex> lock(_frame_mutex);
+        _captured_frames.clear();
+    }
 
     _is_capturing = true;
     _capture_thread = std::thread(&InputManager::capture_loop, this);
@@ -66,13 +68,13 @@ void InputManager::capture_loop() {
         if (!frame.empty()) {
             FrameData frame_data;
             frame_data.frame = frame.clone();
-            frame_data.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                       std::chrono::system_clock::now().time_since_epoch())
-                                       .count();
+            frame_data.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-            std::lock_guard<std::mutex> lock(_frame_mutex);
-            _latest_frame = frame_data;
-            _captured_frames.push_back(frame_data);
+            {
+                std::lock_guard<std::mutex> lock(_frame_mutex);
+                _latest_frame = frame_data;
+                _captured_frames.push_back(frame_data);
+            }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }

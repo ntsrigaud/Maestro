@@ -2,3 +2,4 @@ docs/Project-Architecture/hand-gesture-recognition-mediapipe
 InputManagerModule/.cache/clangd/index
 InputManagerModule/build
 InputManagerModule/captured_video_detailed.txt
+InputManagerModule/vcpkg_installed
