@@ -7,7 +7,7 @@ Lenses provides the same kind of projection as _pinholes_, but they gather more 
 
 ## Gaussian Lens (Thin Lens) Law
 
-![Gaussian Lens (Thin Lens) Law](./img/gaussian_lens_law.png)
+![Gaussian Lens (Thin Lens) Law](./imgs/gaussian_lens_law.png)
 
 > [!NOTE]
 > When using a point that is far away in the scene such that $o$ tends to infinity, then the distance between the focused image and the lens is the **focal length**.
@@ -38,7 +38,7 @@ It is convenient to represent the _aperture_ as a fraction of _focal length_.
 
 - Aperture: $D = \frac{f}{N}$
 - f-Number: $N = \frac{f}{D}$
-  where $N$ is called teh **f-Number** of lens.
+  where $N$ is called the **f-Number** of lens.
 
 ### Lens Defocus
 
