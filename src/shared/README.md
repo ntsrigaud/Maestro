@@ -40,17 +40,48 @@ import logging
 configure_logging(level=logging.DEBUG)
 ```
 
-#### Production Mode (With file logging)
+#### Production Mode (With file logging and rotation)
 
 ```python
 from shared.logger import configure_logging
 import logging
 
-# INFO level with file logging
+# INFO level with file logging and automatic rotation
 configure_logging(
     level=logging.INFO,
     enable_file_logging=True,
-    log_dir="/path/to/logs"
+    log_dir="/path/to/logs",
+    max_bytes=10 * 1024 * 1024,  # 10MB per file (default)
+    backup_count=5  # Keep 5 backup files (default)
+)
+```
+
+**Log Rotation:**
+
+- Log file: `logs/application.log`
+- When `application.log` reaches 10MB, it's renamed to `application.log.1`
+- Previous backups are renamed: `.1` → `.2`, `.2` → `.3`, etc.
+- Oldest backup (`.5`) is deleted
+- New logs start in fresh `application.log`
+- Total disk usage: ~50MB maximum (10MB × 5 backups)
+
+#### Custom Rotation Settings
+
+```python
+# Larger files, more backups for production
+configure_logging(
+    level=logging.INFO,
+    enable_file_logging=True,
+    max_bytes=20 * 1024 * 1024,  # 20MB per file
+    backup_count=10  # Keep 10 backups = 200MB total
+)
+
+# Smaller files, fewer backups for development
+configure_logging(
+    level=logging.DEBUG,
+    enable_file_logging=True,
+    max_bytes=5 * 1024 * 1024,  # 5MB per file
+    backup_count=3  # Keep 3 backups = 15MB total
 )
 ```
 
