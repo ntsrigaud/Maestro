@@ -153,7 +153,6 @@ class InputManager:
         self._capture_thread.start()
 
         # Wait for first frame to be captured (max 1 second)
-        import time
 
         for _ in range(100):  # Try for 1 second (100 * 10ms)
             if self._latest_frame is not None:
