@@ -1,0 +1,267 @@
+"""
+Shared logging module for the Hand Gesture Recognition System.
+
+This module provides a centralized logging system that can be used across
+all modules (input-manager, recognition-engine, action-mapper, os-controller).
+
+Features:
+- Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Colored console output for better readability
+- File logging with rotation
+- Module-specific loggers
+- Consistent formatting across the project
+"""
+
+import logging
+import sys
+from pathlib import Path
+from typing import Optional
+from datetime import datetime
+
+
+# ANSI color codes for console output
+class LogColors:
+    """ANSI color codes for terminal output."""
+
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+
+    # Log level colors
+    DEBUG = "\033[36m"  # Cyan
+    INFO = "\033[32m"  # Green
+    WARNING = "\033[33m"  # Yellow
+    ERROR = "\033[31m"  # Red
+    CRITICAL = "\033[35m"  # Magenta
+
+    # Component colors
+    TIMESTAMP = "\033[90m"  # Gray
+    MODULE = "\033[94m"  # Blue
+
+
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter that adds colors to console output."""
+
+    LEVEL_COLORS = {
+        logging.DEBUG: LogColors.DEBUG,
+        logging.INFO: LogColors.INFO,
+        logging.WARNING: LogColors.WARNING,
+        logging.ERROR: LogColors.ERROR,
+        logging.CRITICAL: LogColors.CRITICAL,
+    }
+
+    def format(self, record):
+        # Save original levelname
+        levelname = record.levelname
+
+        # Add colors if outputting to terminal
+        if hasattr(sys.stderr, "isatty") and sys.stderr.isatty():
+            level_color = self.LEVEL_COLORS.get(record.levelno, "")
+            record.levelname = f"{level_color}{levelname}{LogColors.RESET}"
+            record.name = f"{LogColors.MODULE}{record.name}{LogColors.RESET}"
+
+        result = super().format(record)
+
+        # Restore original levelname
+        record.levelname = levelname
+
+        return result
+
+
+class ProjectLogger:
+    """
+    Centralized logging system for the project.
+
+    Usage:
+        from shared.logger import get_logger
+
+        logger = get_logger(__name__)
+        logger.info("Starting module")
+        logger.warning("Resource constraint detected")
+        logger.error("Failed to process frame")
+    """
+
+    _initialized = False
+    _log_level = logging.INFO
+    _log_dir: Optional[Path] = None
+    _file_logging_enabled = False
+
+    @classmethod
+    def initialize(
+        cls,
+        level: int = logging.INFO,
+        log_dir: Optional[str] = None,
+        enable_file_logging: bool = False,
+        format_string: Optional[str] = None,
+    ):
+        """
+        Initialize the project-wide logging system.
+
+        Args:
+            level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+            log_dir: Directory for log files (default: project_root/logs)
+            enable_file_logging: Whether to enable file logging
+            format_string: Custom format string for log messages
+        """
+        if cls._initialized:
+            return
+
+        cls._log_level = level
+        cls._file_logging_enabled = enable_file_logging
+
+        # Set up log directory
+        if log_dir:
+            cls._log_dir = Path(log_dir)
+        else:
+            # Default to project_root/logs
+            project_root = Path(__file__).parent.parent.parent
+            cls._log_dir = project_root / "logs"
+
+        if enable_file_logging:
+            cls._log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Default format
+        if format_string is None:
+            format_string = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+
+        # Configure root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(level)
+
+        # Remove existing handlers
+        root_logger.handlers.clear()
+
+        # Console handler with colors
+        console_handler = logging.StreamHandler(sys.stderr)
+        console_handler.setLevel(level)
+        console_formatter = ColoredFormatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
+        console_handler.setFormatter(console_formatter)
+        root_logger.addHandler(console_handler)
+
+        # File handler (if enabled)
+        if enable_file_logging:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_file = cls._log_dir / f"system_{timestamp}.log"
+
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(level)
+            file_formatter = logging.Formatter(
+                format_string, datefmt="%Y-%m-%d %H:%M:%S"
+            )
+            file_handler.setFormatter(file_formatter)
+            root_logger.addHandler(file_handler)
+
+        cls._initialized = True
+
+    @classmethod
+    def set_level(cls, level: int):
+        """Change the logging level at runtime."""
+        cls._log_level = level
+        root_logger = logging.getLogger()
+        root_logger.setLevel(level)
+        for handler in root_logger.handlers:
+            handler.setLevel(level)
+
+    @classmethod
+    def get_level(cls) -> int:
+        """Get current logging level."""
+        return cls._log_level
+
+
+def get_logger(name: str) -> logging.Logger:
+    """
+    Get a logger instance for a module.
+
+    Args:
+        name: Logger name (typically __name__ of the module)
+
+    Returns:
+        Configured logger instance
+
+    Example:
+        logger = get_logger(__name__)
+        logger.info("Processing started")
+    """
+    # Initialize with defaults if not already done
+    if not ProjectLogger._initialized:
+        ProjectLogger.initialize()
+
+    return logging.getLogger(name)
+
+
+def set_log_level(level: int):
+    """
+    Set the logging level for all loggers.
+
+    Args:
+        level: One of logging.DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+    Example:
+        set_log_level(logging.DEBUG)  # Show all messages
+        set_log_level(logging.WARNING)  # Only warnings and above
+    """
+    ProjectLogger.set_level(level)
+
+
+def configure_logging(
+    level: int = logging.INFO,
+    log_dir: Optional[str] = None,
+    enable_file_logging: bool = False,
+):
+    """
+    Configure the project logging system.
+
+    Args:
+        level: Logging level (default: INFO)
+        log_dir: Directory for log files
+        enable_file_logging: Whether to write logs to files
+
+    Example:
+        # Development: verbose console logging only
+        configure_logging(level=logging.DEBUG)
+
+        # Production: info level with file logging
+        configure_logging(
+            level=logging.INFO,
+            enable_file_logging=True,
+            log_dir="/var/log/gesture-recognition"
+        )
+    """
+    ProjectLogger.initialize(
+        level=level, log_dir=log_dir, enable_file_logging=enable_file_logging
+    )
+
+
+# Convenience functions for quick logging without creating logger instance
+_default_logger = None
+
+
+def _get_default_logger():
+    global _default_logger
+    if _default_logger is None:
+        _default_logger = get_logger("gesture-recognition")
+    return _default_logger
+
+
+def debug(message: str, *args, **kwargs):
+    """Quick debug logging."""
+    _get_default_logger().debug(message, *args, **kwargs)
+
+
+def info(message: str, *args, **kwargs):
+    """Quick info logging."""
+    _get_default_logger().info(message, *args, **kwargs)
+
+
+def warning(message: str, *args, **kwargs):
+    """Quick warning logging."""
+    _get_default_logger().warning(message, *args, **kwargs)
+
+
+def error(message: str, *args, **kwargs):
+    """Quick error logging."""
+    _get_default_logger().error(message, *args, **kwargs)
+
+
+def critical(message: str, *args, **kwargs):
+    """Quick critical logging."""
+    _get_default_logger().critical(message, *args, **kwargs)
