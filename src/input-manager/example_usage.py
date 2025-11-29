@@ -7,14 +7,8 @@ This script demonstrates how to use the InputManager for:
 3. Frame preprocessing configuration
 """
 
-import sys
-from pathlib import Path
-
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
-
-from input_manager import InputManager
 import time
+from input_manager import InputManager
 
 
 def example_single_frame():

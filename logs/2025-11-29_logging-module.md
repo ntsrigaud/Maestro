@@ -51,7 +51,27 @@ Implement a proper logging mechanism to replace print statements scattered throu
   - `src/shared/README.md`
 - Files deleted: None
 
-### [23:15] - Session End
+### [23:41] - Progress Update
+
+**Issues encountered:** - Using `sys.path.insert()` to manage imports was causing issues in some execution contexts.
+
+**Solutions applied:** - Make the project installable with `pip install -e .` to properly set up the import paths.
+
+**Changes made:**
+
+- Files modified:
+  - `src/input-manager/example_usage.py`
+  - `src/input-manager/input_manager.py`
+  - `src/input-manager/setup.py`
+- Files created:
+  - `pyproject.toml`
+  - `setup.py`
+  - `__init__.py` in `src/`
+  - `__init__.py` in `src/input-manager/`
+  - `verify_install.py`
+- Files deleted: None
+
+### [23:50] - Session End
 
 **Summary of completed work:**
 
@@ -60,6 +80,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
 - [x] Created shared logging module
 - [x] Replaced print statements in input manager with logging calls
 - [x] Verified logging outputs to console
+- [x] Made project installable with `pip install -e .`
 
 **Testing performed:**
 
@@ -75,14 +96,16 @@ Implement a proper logging mechanism to replace print statements scattered throu
 ### Architecture Changes
 
 - Introduced a centralized logging module to standardize logging across all modules
+- Converted the project to be installable via pip for better dependency and import management
 
 ### Dependencies
 
-- None
+- Python's built-in `logging` module
+- No external dependencies added
 
 ### Configuration Changes
 
-- None
+- Added logging configuration options in `shared/logger.py`
 
 ### Performance Considerations
 
@@ -114,7 +137,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
 ## References
 
 - Documentation: Chapter on Logging in README files
-- Related PRs: [link]
+- Related PRs: [#46 - Logging Module Implementation](https://github.com/blackbird410/CSU-Capstone-Project/pull/46)
 
 ---
 
@@ -139,3 +162,4 @@ What did you learn during this session? Any insights for future work?
 
 - Centralized logging improves maintainability and debugging
 - Consider log rotation for production environments to manage log file sizes
+- Python packages can't have hyphens in their names, now we are using a setup tool to handle that, but the module naming convention should be updated to use underscores to replace the hyphens.
