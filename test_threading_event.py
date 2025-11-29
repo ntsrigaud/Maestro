@@ -34,7 +34,9 @@ print("4. Capturing frames...")
 for i in range(5):
     frame_data = manager.get_latest_frame()
     if frame_data:
-        print(f"   Frame {i}: shape={frame_data.frame.shape}, is_capturing={manager._is_capturing.is_set()}")
+        print(
+            f"   Frame {i}: shape={frame_data.frame.shape}, is_capturing={manager._is_capturing.is_set()}"
+        )
     time.sleep(0.1)
 
 # Test 5: Stop capture
