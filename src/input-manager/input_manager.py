@@ -9,14 +9,10 @@ import cv2
 import numpy as np
 import threading
 import time
-import sys
-from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
 from collections import deque
 
-# Add parent directory to path for shared module imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from shared.logger import get_logger
 
 # Initialize module logger
