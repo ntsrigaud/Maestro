@@ -72,7 +72,7 @@ Refactor the input manager module to improve its portability and maintainability
     - We can always optimize later.
     - Remove C++ implementation from the repository to avoid confusion.
     - Simplify the codebase and reduce maintenance overhead.
-    - Add documenttation on installation and usage in `README.md`.
+    - Add documentation on installation and usage in `README.md`.
   - Add a small delay after starting the camera to allow it to initialize before capturing frames.
 
 - **Observations/Discoveries:**
