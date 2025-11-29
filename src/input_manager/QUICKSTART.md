@@ -5,16 +5,15 @@ Get up and running with InputManager in 2 minutes!
 ## Installation
 
 ```bash
-cd src/input-manager
-pip install -r requirements.txt
-python setup.py
+# From project root
+pip install -e .
 ```
 
 ## Quick Test
 
 ```bash
 # Run examples
-python example_usage.py
+python src/input_manager/example_usage.py
 ```
 
 ## Your First Program
