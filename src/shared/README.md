@@ -141,14 +141,6 @@ ProjectLogger.reset()
 configure_logging(level=logging.WARNING)
 ```
 
-# Switch back to WARNING
-
-```
-
-set_log_level(logging.WARNING)
-
-```
-
 ## Log Levels
 
 | Level    | Numeric Value | When to Use                                    |
@@ -273,6 +265,7 @@ File output (without colors):
 ## Best Practices
 
 1. **Use appropriate log levels**
+
    - DEBUG: Internal state, variable values
    - INFO: Normal operations, milestones
    - WARNING: Recoverable issues, degraded performance
