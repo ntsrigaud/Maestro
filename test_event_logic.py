@@ -30,6 +30,7 @@ print()
 print("4. Testing thread safety...")
 counter = 0
 
+
 def worker():
     """Simulates the capture loop."""
     global counter
@@ -37,6 +38,7 @@ def worker():
         counter += 1
         time.sleep(0.01)
     print(f"   Worker thread stopped after {counter} iterations")
+
 
 # Start background thread
 is_capturing.set()

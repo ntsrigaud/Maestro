@@ -7,7 +7,7 @@ import sys
 import importlib
 
 # Force fresh import
-for module in ['input_manager', 'input_manager.input_manager']:
+for module in ["input_manager", "input_manager.input_manager"]:
     if module in sys.modules:
         del sys.modules[module]
 
@@ -22,7 +22,7 @@ import time
 frame1 = FrameData(
     frame=np.zeros((224, 224, 3), dtype=np.float32),
     timestamp=time.time_ns(),
-    frame_number=1
+    frame_number=1,
 )
 
 time.sleep(0.033)  # ~30 FPS delay
@@ -30,7 +30,7 @@ time.sleep(0.033)  # ~30 FPS delay
 frame2 = FrameData(
     frame=np.zeros((224, 224, 3), dtype=np.float32),
     timestamp=time.time_ns(),
-    frame_number=2
+    frame_number=2,
 )
 
 print(f"\nFrame 1 timestamp (ns): {frame1.timestamp:,}")
@@ -42,10 +42,10 @@ print("Testing helper methods:")
 print("-" * 60)
 
 methods_to_test = [
-    ('timestamp_ms', lambda: frame1.timestamp_ms()),
-    ('timestamp_seconds', lambda: frame1.timestamp_seconds()),
-    ('time_delta_ms', lambda: FrameData.time_delta_ms(frame1, frame2)),
-    ('calculate_fps', lambda: FrameData.calculate_fps(frame1, frame2)),
+    ("timestamp_ms", lambda: frame1.timestamp_ms()),
+    ("timestamp_seconds", lambda: frame1.timestamp_seconds()),
+    ("time_delta_ms", lambda: FrameData.time_delta_ms(frame1, frame2)),
+    ("calculate_fps", lambda: FrameData.calculate_fps(frame1, frame2)),
 ]
 
 all_passed = True
