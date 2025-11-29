@@ -2,7 +2,7 @@
 Shared logging module for the Hand Gesture Recognition System.
 
 This module provides a centralized logging system that can be used across
-all modules (input-manager, recognition-engine, action-mapper, os-controller).
+all modules (input_manager, recognition_engine, action_mapper, os_controller).
 
 Features:
 - Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)

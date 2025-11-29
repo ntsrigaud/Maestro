@@ -31,7 +31,7 @@ from input_manager import InputManager
 
 ```bash
 # All of these work after pip install -e .
-python src/input-manager/example_usage.py
+python src/input_manager/example_usage.py
 python verify_install.py
 python -c "from input_manager import InputManager; print('Works!')"
 
@@ -71,21 +71,12 @@ pip install -e .
 
 ## Adding New Modules
 
-1. Create directory: `src/new-module/`
-2. Add `__init__.py`: `src/new-module/__init__.py`
-3. Update `setup.py`:
+1. Create directory: `src/new_module/`
+2. Add `__init__.py`: `src/new_module/__init__.py`
+3. Install: `pip install -e .` (find_packages() will automatically discover it)
+4. Import: `from new_module import MyClass`
 
-```python
-packages=["input_manager", "shared", "new_module"],
-package_dir={
-    "input_manager": "src/input-manager",
-    "shared": "src/shared",
-    "new_module": "src/new-module",  # Add this
-},
-```
-
-4. Reinstall: `pip install -e .`
-5. Import: `from new_module import MyClass`
+**Note:** Use underscores in directory names (e.g., `input_manager`, `new_module`) to follow Python naming conventions.
 
 ## Why This is Better
 
