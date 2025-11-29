@@ -71,7 +71,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
   - `verify_install.py`
 - Files deleted: None
 
-### [00:25] - Session End
+### [01:50] - Session End
 
 **Summary of completed work:**
 
@@ -87,6 +87,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
 - [x] Remove deprecated setup scripts and documentation references
 - [x] Implement size-based log rotation as log cleanup mechanism
 - [x] Allow reinitialization of logger with different configurations if needed
+- [x] Use **Event** threading primitive to ensure thread-safe camera state management
 
 **Testing performed:**
 
@@ -170,3 +171,4 @@ What did you learn during this session? Any insights for future work?
 - Centralized logging improves maintainability and debugging
 - Consider log rotation for production environments to manage log file sizes
 - Python packages can't have hyphens in their names, now we are using a setup tool to handle that, but the module naming convention should be updated to use underscores to replace the hyphens.
+- An **Event** threading primitive allow one or more thread to wait for a single specific event to be signaled by another thread. In this case, the capture loop will now stop when `stop_continuous_capture()` is called from the main thread, which eliminates the race condition that existed with the plain `_is_capturing()` boolean flag.
