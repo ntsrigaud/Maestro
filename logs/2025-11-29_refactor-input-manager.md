@@ -30,15 +30,15 @@ Refactor the input manager module to improve its portability and maintainability
 
 **What I'm working on:**
 
-- **Create a unified `src/` directory to contain all module implemenations**
+- **Create a unified `src/` directory to contain all module implementations**
 
 **What I did:**
 
 - **Changes made:**
 
 - Files modified: Moved `InputManagerModule` under `src/input-manager`
-- Files created:
-- Files deleted:
+- Files created: Created `src/` directory
+- Files deleted: None
 
 ### [HH:MM] - Progress Update
 
