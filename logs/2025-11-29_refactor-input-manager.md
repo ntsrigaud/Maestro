@@ -19,8 +19,8 @@ Refactor the input manager module to improve its portability and maintainability
 ## Tasks Checklist
 
 - [x] Create a unified `src/` directory to place all module implementations
-- [ ] Update **input-manager** current implementation to allow portability on Linux
-- [ ] Test installation and execution of the module
+- [x] Update **input-manager** current implementation to allow portability on Linux
+- [x] Test installation and execution of the module
 
 ---
 
@@ -40,7 +40,11 @@ Refactor the input manager module to improve its portability and maintainability
 - Files created: Created `src/` directory
 - Files deleted: None
 
-### [HH:MM] - Progress Update
+### [20:45] - Progress Update
+
+**What I'm working on:**
+
+- **Update input-manager implementation for Linux portability**
 
 **What I did:**
 
@@ -53,10 +57,31 @@ Refactor the input manager module to improve its portability and maintainability
 **Observations/Discoveries:**
 
 - **Issues encountered:**
+  - C++ build issues on Linux due to missing dependencies.
+    - CMake version compatibility problems.
+    - OpenCV package installation issues.
+    - Unnecessary build artifacts cluttering the source directory.
+  - Frames not being captured immediately after starting the camera.
 
 - **Solutions applied:**
+  - Pure Python Implementation for Prototyping
+    - Create a preliminary version of the program that works and test concepts quickly without being prevent by current technical issues.
+    - Zero build requirements - works immediately
+    - Cross-platform by default (Linux, macOS, Windows)
+    - Fast iteration during development
+    - We can always optimize later.
+    - Remove C++ implementation from the repository to avoid confusion.
+    - Simplify the codebase and reduce maintenance overhead.
+    - Add documenttation on installation and usage in `README.md`.
+  - Add a small delay after starting the camera to allow it to initialize before capturing frames.
 
-- ***
+- **Observations/Discoveries:**
+  - C++ build complexity outweighs benefits for current project needs.
+  - Python implementation is sufficient for 30 FPS gesture recognition.
+  - Focusing on core innovation (Recognition Engine) is more valuable than optimizing input capture.
+  - The capture thread for the camera needs a moment (1 second) to intialize and capture the first frame.
+    - **Race condition**: The `start_continuous_capture()` method was starting the background thread but returning immediately.
+    - **No frames ready**: When the loop first starts, the capture thread had not captured any frames yet, so `get_latest_frame()` returned `None`
 
 ### [HH:MM] - Session End
 
