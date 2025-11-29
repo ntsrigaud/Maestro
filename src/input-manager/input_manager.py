@@ -152,8 +152,8 @@ class InputManager:
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
 
-        # Wait for first frame to be captured (max 1 second)
 
+        # Wait for first frame to be captured (max 1 second)
         for _ in range(100):  # Try for 1 second (100 * 10ms)
             if self._latest_frame is not None:
                 break
