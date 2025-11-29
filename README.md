@@ -55,10 +55,17 @@ After installation, you can use the input manager:
 ```python
 from input_manager import InputManager
 
+# Single frame capture
 manager = InputManager(camera_index=0)
 manager.start_capture()
-frame_data = manager.capture_frame()
+frame = manager.get_frame()  # Returns numpy array
 manager.stop_capture()
+
+# Continuous capture (recommended)
+manager = InputManager(camera_index=0)
+manager.start_continuous_capture()
+frame_data = manager.get_latest_frame()  # Returns FrameData with timestamp
+manager.stop_continuous_capture()
 ```
 
 See `src/input_manager/example_usage.py` for more examples.
