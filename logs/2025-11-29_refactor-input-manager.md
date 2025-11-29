@@ -2,7 +2,7 @@
 
 ## Log Information
 
-- **Date:** 2025-11-29
+- **Date:** 2025-11-29 ~ 2025-11-30
 - **Developer:** Neil Taison RIGAUD
 - **Branch:** refactor-input-manager
 - **Related Issue/Feature:** Refactor Input Manager
@@ -21,6 +21,7 @@ Refactor the input manager module to improve its portability and maintainability
 - [x] Create a unified `src/` directory to place all module implementations
 - [x] Update **input-manager** current implementation to allow portability on Linux
 - [x] Test installation and execution of the module
+- [x] Convert project into proper Python package to facilitate development and portability
 
 ---
 
@@ -65,7 +66,7 @@ Refactor the input manager module to improve its portability and maintainability
 
 - **Solutions applied:**
   - Pure Python Implementation for Prototyping
-    - Create a preliminary version of the program that works and test concepts quickly without being prevent by current technical issues.
+    - Create a preliminary version of the program that works and test concepts quickly without being prevented by current technical issues.
     - Zero build requirements - works immediately
     - Cross-platform by default (Linux, macOS, Windows)
     - Fast iteration during development
