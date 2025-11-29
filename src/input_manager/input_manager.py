@@ -317,7 +317,7 @@ class InputManager:
             frame = cv2.resize(frame, self._target_size)
 
         # 4. Normalize
-        if self._normalization_std != 1.0 or self._normalization_mean != 0.0:
+        if abs(self._normalization_std - 1.0) > 1e-9 or abs(self._normalization_mean - 0.0) > 1e-9:
             frame = frame.astype(np.float32)
             frame = (frame - self._normalization_mean) / self._normalization_std
 
