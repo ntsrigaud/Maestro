@@ -3,3 +3,4 @@ InputManagerModule/.cache/clangd/index
 InputManagerModule/build
 InputManagerModule/captured_video_detailed.txt
 src/input-manager/build
+src/input-manager/__pycache__
