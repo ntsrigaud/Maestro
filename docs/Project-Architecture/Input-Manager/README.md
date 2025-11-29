@@ -1,10 +1,14 @@
 # Input Manager
 
-The Input Manager is responsible for capturing video frames from the camera and providing them to the Recognition Engine.
+The Input Manager is responsible for capturing video frames from the camera and providing them to the Recognition Engine with precise temporal metadata.
+
+## Documentation
+
+- **[Timestamp Format Specification](./TIMESTAMP_FORMAT.md)** - Detailed explanation of nanosecond timestamp format and usage patterns
 
 ## Technical Design
 
-The Input Manager will be implemented as a standalone module with a simple interface.
+The Input Manager is implemented as a standalone Python module with a thread-safe interface.
 
 ### Key Responsibilities:
 

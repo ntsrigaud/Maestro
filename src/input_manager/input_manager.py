@@ -24,12 +24,51 @@ class FrameData:
     """Container for frame data with metadata."""
 
     frame: np.ndarray
-    timestamp: int  # milliseconds since epoch
+    timestamp: int  # nanoseconds since epoch (time.time_ns())
     frame_number: int = 0
 
     def to_numpy(self) -> np.ndarray:
         """Convert frame to numpy array (for API compatibility)."""
         return self.frame
+
+    def timestamp_ms(self) -> float:
+        """Get timestamp in milliseconds (for human-readable display)."""
+        return self.timestamp / 1_000_000
+
+    def timestamp_seconds(self) -> float:
+        """Get timestamp in seconds (for calculations)."""
+        return self.timestamp / 1_000_000_000
+
+    @staticmethod
+    def time_delta_ms(frame1: "FrameData", frame2: "FrameData") -> float:
+        """
+        Calculate time difference between two frames in milliseconds.
+
+        Args:
+            frame1: Earlier frame
+            frame2: Later frame
+
+        Returns:
+            Time difference in milliseconds (positive if frame2 is later)
+        """
+        return (frame2.timestamp - frame1.timestamp) / 1_000_000
+
+    @staticmethod
+    def calculate_fps(frame1: "FrameData", frame2: "FrameData") -> float:
+        """
+        Calculate instantaneous FPS between two consecutive frames.
+
+        Args:
+            frame1: Earlier frame
+            frame2: Later frame
+
+        Returns:
+            Frames per second
+        """
+        delta_ns = frame2.timestamp - frame1.timestamp
+        if delta_ns <= 0:
+            return 0.0
+        return 1_000_000_000 / delta_ns
 
 
 class InputManager:
@@ -275,7 +314,7 @@ class InputManager:
             # Create frame data
             frame_data = FrameData(
                 frame=processed_frame,
-                timestamp=int(time.time_ns()),
+                timestamp=int(time.time_ns()),  # nanoseconds since epoch
                 frame_number=self._frame_counter,
             )
             self._frame_counter += 1
@@ -317,7 +356,10 @@ class InputManager:
             frame = cv2.resize(frame, self._target_size)
 
         # 4. Normalize
-        if abs(self._normalization_std - 1.0) > 1e-9 or abs(self._normalization_mean - 0.0) > 1e-9:
+        if (
+            abs(self._normalization_std - 1.0) > 1e-9
+            or abs(self._normalization_mean - 0.0) > 1e-9
+        ):
             frame = frame.astype(np.float32)
             frame = (frame - self._normalization_mean) / self._normalization_std
 
