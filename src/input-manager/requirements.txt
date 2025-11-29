@@ -1,0 +1,7 @@
+# Input Manager - Python Dependencies
+
+# Computer Vision
+opencv-python>=4.8.0
+
+# Scientific Computing
+numpy>=1.24.0
