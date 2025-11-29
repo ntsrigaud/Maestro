@@ -14,6 +14,7 @@ from .logger import (
     warning,
     error,
     critical,
+    ProjectLogger,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "warning",
     "error",
     "critical",
+    "ProjectLogger",
 ]
