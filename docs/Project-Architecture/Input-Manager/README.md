@@ -18,16 +18,25 @@ The Input Manager is implemented as a standalone Python module with a thread-saf
 - **Frame Preparation:**
   - Incorporate basic frame preprocessing, including horizontally flipping the image for a more intuitive "mirror" effect for the user.
 - **Interface:**
-  - Expose a simple function, like `get_frame()`, that the Recognition Engine can call to retrieve the latest processed frame from the camera.
+  - Provide two capture modes:
+    - **Synchronous**: `get_frame()` - Capture single frame on demand
+    - **Continuous**: `start_continuous_capture()` + `get_latest_frame()` - Background thread with frame buffering
+  - Return frames with precise nanosecond timestamps for temporal analysis
 
-## Implementation Plan
+## Implementation
+
+The Input Manager is implemented as a pure Python module with:
 
 1.  **Camera Access:**
-    - Use `cv2.VideoCapture` to initialize the camera.
-    - Allow configuration of camera device ID, frame width, and height.
-2.  **Frame Processing Loop:**
-    - Continuously read frames from the camera.
-    - Perform horizontal flip (`cv2.flip`).
-    - Provide a thread-safe way for other modules to access the latest frame.
+    - `cv2.VideoCapture` for camera initialization
+    - Configurable camera device ID, resolution, and target FPS
+2.  **Thread-Safe Continuous Capture:**
+    - Background thread for frame capture
+    - Frame buffering with configurable size (deque)
+    - Thread-safe access with locks and Events
 3.  **Module Interface:**
-    - Implement a class `InputManager` with methods like `start()`, `stop()`, and `get_frame()`.
+    - `start_capture()` / `stop_capture()` - Camera lifecycle
+    - `get_frame()` - Synchronous single frame capture
+    - `start_continuous_capture()` / `stop_continuous_capture()` - Background capture
+    - `get_latest_frame()` - Get most recent frame with FrameData
+    - `get_all_frames()` - Get buffered frame sequence
