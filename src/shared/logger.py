@@ -52,6 +52,7 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record):
         # Save original levelname
         levelname = record.levelname
+        name = record.name
 
         # Add colors if outputting to terminal
         if hasattr(sys.stderr, "isatty") and sys.stderr.isatty():
@@ -63,6 +64,7 @@ class ColoredFormatter(logging.Formatter):
 
         # Restore original levelname
         record.levelname = levelname
+        record.name = name
 
         return result
 
@@ -175,17 +177,17 @@ class ProjectLogger:
     def reset(cls):
         """
         Reset the logging system to uninitialized state.
-        
+
         Closes all handlers and clears configuration. Useful for testing
         or when you need to completely reconfigure logging.
         """
         root_logger = logging.getLogger()
-        
+
         # Close and remove all handlers
         for handler in root_logger.handlers[:]:
             handler.close()
             root_logger.removeHandler(handler)
-        
+
         # Reset state
         cls._initialized = False
         cls._log_level = logging.INFO
@@ -205,7 +207,7 @@ class ProjectLogger:
     def get_level(cls) -> int:
         """Get current logging level."""
         return cls._log_level
-    
+
     @classmethod
     def is_initialized(cls) -> bool:
         """Check if logging system has been initialized."""
@@ -280,7 +282,7 @@ def configure_logging(
             max_bytes=20 * 1024 * 1024,  # 20MB per file
             backup_count=10  # Keep 10 backup files
         )
-        
+
         # Reconfigure at runtime (e.g., enable file logging dynamically)
         configure_logging(
             level=logging.DEBUG,
