@@ -23,12 +23,8 @@ dev = [
     "flake8>=5.0.0",
 ]
 
-[tool.setuptools]
-packages = ["input_manager", "shared"]
-
-[tool.setuptools.package-dir]
-input_manager = "src/input-manager"
-shared = "src/shared"
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.txt"]

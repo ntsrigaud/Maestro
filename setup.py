@@ -4,7 +4,7 @@ Gesture Recognition System - CSU Capstone Project
 A hand gesture recognition system for computer control.
 """
 
-from setuptools import setup
+from setuptools import setup, find_packages
 from pathlib import Path
 
 # Read the README file
@@ -19,14 +19,9 @@ setup(
     long_description_content_type="text/markdown",
     author="CSU Capstone Team",
     python_requires=">=3.8",
-    # Find all packages in src/
-    # Note: Using find_packages won't work with hyphenated directory names
-    # We explicitly declare packages with their correct import names
-    packages=["input_manager", "shared"],
-    package_dir={
-        "input_manager": "src/input-manager",
-        "shared": "src/shared",
-    },
+    # Automatically find all packages in src/ using proper Python naming conventions
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     # Include additional files
     include_package_data=True,
     # Dependencies
