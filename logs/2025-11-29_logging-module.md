@@ -86,6 +86,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
 - [x] Updated .gitignore with Python project best practices
 - [x] Remove deprecated setup scripts and documentation references
 - [x] Implement size-based log rotation as log cleanup mechanism
+- [x] Allow reinitialization of logger with different configurations if needed
 
 **Testing performed:**
 

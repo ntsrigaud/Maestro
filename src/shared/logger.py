@@ -94,9 +94,13 @@ class ProjectLogger:
         format_string: Optional[str] = None,
         max_bytes: int = 10 * 1024 * 1024,  # 10MB default
         backup_count: int = 5,  # Keep 5 backup files
+        force_reinit: bool = False,  # Allow reinitialization
     ):
         """
         Initialize the project-wide logging system.
+
+        Can be called multiple times. If already initialized, does nothing unless
+        force_reinit=True is passed.
 
         Args:
             level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -105,8 +109,10 @@ class ProjectLogger:
             format_string: Custom format string for log messages
             max_bytes: Maximum size of each log file before rotation (default: 10MB)
             backup_count: Number of backup files to keep (default: 5)
+            force_reinit: If True, reinitialize even if already initialized (default: False)
         """
-        if cls._initialized:
+        # Allow reinitialization if explicitly requested
+        if cls._initialized and not force_reinit:
             return
 
         cls._log_level = level
@@ -131,8 +137,10 @@ class ProjectLogger:
         root_logger = logging.getLogger()
         root_logger.setLevel(level)
 
-        # Remove existing handlers
-        root_logger.handlers.clear()
+        # Remove existing handlers to avoid duplicates
+        for handler in root_logger.handlers[:]:
+            handler.close()
+            root_logger.removeHandler(handler)
 
         # Console handler with colors
         console_handler = logging.StreamHandler(sys.stderr)
@@ -164,6 +172,27 @@ class ProjectLogger:
         cls._initialized = True
 
     @classmethod
+    def reset(cls):
+        """
+        Reset the logging system to uninitialized state.
+        
+        Closes all handlers and clears configuration. Useful for testing
+        or when you need to completely reconfigure logging.
+        """
+        root_logger = logging.getLogger()
+        
+        # Close and remove all handlers
+        for handler in root_logger.handlers[:]:
+            handler.close()
+            root_logger.removeHandler(handler)
+        
+        # Reset state
+        cls._initialized = False
+        cls._log_level = logging.INFO
+        cls._log_dir = None
+        cls._file_logging_enabled = False
+
+    @classmethod
     def set_level(cls, level: int):
         """Change the logging level at runtime."""
         cls._log_level = level
@@ -176,6 +205,11 @@ class ProjectLogger:
     def get_level(cls) -> int:
         """Get current logging level."""
         return cls._log_level
+    
+    @classmethod
+    def is_initialized(cls) -> bool:
+        """Check if logging system has been initialized."""
+        return cls._initialized
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -219,9 +253,12 @@ def configure_logging(
     enable_file_logging: bool = False,
     max_bytes: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
+    force_reinit: bool = False,
 ):
     """
     Configure the project logging system.
+
+    Can be called multiple times. Subsequent calls are ignored unless force_reinit=True.
 
     Args:
         level: Logging level (default: INFO)
@@ -229,6 +266,7 @@ def configure_logging(
         enable_file_logging: Whether to write logs to files
         max_bytes: Maximum size per log file before rotation (default: 10MB)
         backup_count: Number of rotated backup files to keep (default: 5)
+        force_reinit: Force reinitialization even if already configured (default: False)
 
     Example:
         # Development: verbose console logging only
@@ -242,6 +280,13 @@ def configure_logging(
             max_bytes=20 * 1024 * 1024,  # 20MB per file
             backup_count=10  # Keep 10 backup files
         )
+        
+        # Reconfigure at runtime (e.g., enable file logging dynamically)
+        configure_logging(
+            level=logging.DEBUG,
+            enable_file_logging=True,
+            force_reinit=True  # Required to apply new settings
+        )
     """
     ProjectLogger.initialize(
         level=level,
@@ -249,6 +294,7 @@ def configure_logging(
         enable_file_logging=enable_file_logging,
         max_bytes=max_bytes,
         backup_count=backup_count,
+        force_reinit=force_reinit,
     )
 
 
