@@ -152,7 +152,6 @@ class InputManager:
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
 
-
         # Wait for first frame to be captured (max 1 second)
         for _ in range(100):  # Try for 1 second (100 * 10ms)
             if self._latest_frame is not None:
@@ -230,8 +229,13 @@ class InputManager:
 
         Args:
             mean: Mean value for normalization
-            std: Standard deviation for normalization
+            std: Standard deviation for normalization (must be > 0)
+
+        Raises:
+            ValueError: If std is zero or negative
         """
+        if std <= 0:
+            raise ValueError(f"Standard deviation must be greater than 0, got {std}")
         self._normalization_mean = mean
         self._normalization_std = std
 
