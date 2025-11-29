@@ -270,7 +270,7 @@ class InputManager:
             # Create frame data
             frame_data = FrameData(
                 frame=processed_frame,
-                timestamp=int(time.time() * 1000),
+                timestamp=int(time.time_ns()),
                 frame_number=self._frame_counter,
             )
             self._frame_counter += 1
