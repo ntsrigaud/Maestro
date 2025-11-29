@@ -13,10 +13,10 @@ Features:
 """
 
 import logging
+import logging.handlers
 import sys
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
 
 
 # ANSI color codes for console output
@@ -92,6 +92,8 @@ class ProjectLogger:
         log_dir: Optional[str] = None,
         enable_file_logging: bool = False,
         format_string: Optional[str] = None,
+        max_bytes: int = 10 * 1024 * 1024,  # 10MB default
+        backup_count: int = 5,  # Keep 5 backup files
     ):
         """
         Initialize the project-wide logging system.
@@ -101,6 +103,8 @@ class ProjectLogger:
             log_dir: Directory for log files (default: project_root/logs)
             enable_file_logging: Whether to enable file logging
             format_string: Custom format string for log messages
+            max_bytes: Maximum size of each log file before rotation (default: 10MB)
+            backup_count: Number of backup files to keep (default: 5)
         """
         if cls._initialized:
             return
@@ -139,10 +143,17 @@ class ProjectLogger:
 
         # File handler (if enabled)
         if enable_file_logging:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_file = cls._log_dir / f"system_{timestamp}.log"
+            # Use a single log file with rotation instead of timestamped files
+            log_file = cls._log_dir / "application.log"
 
-            file_handler = logging.FileHandler(log_file)
+            # RotatingFileHandler automatically rotates when file reaches max_bytes
+            # Keeps backup_count old files (application.log.1, application.log.2, etc.)
+            file_handler = logging.handlers.RotatingFileHandler(
+                log_file,
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+                encoding="utf-8",
+            )
             file_handler.setLevel(level)
             file_formatter = logging.Formatter(
                 format_string, datefmt="%Y-%m-%d %H:%M:%S"
@@ -206,6 +217,8 @@ def configure_logging(
     level: int = logging.INFO,
     log_dir: Optional[str] = None,
     enable_file_logging: bool = False,
+    max_bytes: int = 10 * 1024 * 1024,  # 10MB
+    backup_count: int = 5,
 ):
     """
     Configure the project logging system.
@@ -214,20 +227,28 @@ def configure_logging(
         level: Logging level (default: INFO)
         log_dir: Directory for log files
         enable_file_logging: Whether to write logs to files
+        max_bytes: Maximum size per log file before rotation (default: 10MB)
+        backup_count: Number of rotated backup files to keep (default: 5)
 
     Example:
         # Development: verbose console logging only
         configure_logging(level=logging.DEBUG)
 
-        # Production: info level with file logging
+        # Production: info level with file logging and rotation
         configure_logging(
             level=logging.INFO,
             enable_file_logging=True,
-            log_dir="/var/log/gesture-recognition"
+            log_dir="/var/log/gesture-recognition",
+            max_bytes=20 * 1024 * 1024,  # 20MB per file
+            backup_count=10  # Keep 10 backup files
         )
     """
     ProjectLogger.initialize(
-        level=level, log_dir=log_dir, enable_file_logging=enable_file_logging
+        level=level,
+        log_dir=log_dir,
+        enable_file_logging=enable_file_logging,
+        max_bytes=max_bytes,
+        backup_count=backup_count,
     )
 
 
