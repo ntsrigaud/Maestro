@@ -117,6 +117,7 @@ class InputManager:
         # Capture state
         self._capture: Optional[cv2.VideoCapture] = None
         self._is_capturing = threading.Event()  # Thread-safe flag
+        self._first_frame_ready = threading.Event()  # Signals first frame availability
         self._capture_thread: Optional[threading.Thread] = None
 
         # Frame storage
@@ -192,18 +193,18 @@ class InputManager:
             logger.warning("Continuous capture already running")
             return True
 
+        # Clear event before starting capture
+        self._first_frame_ready.clear()
+
         self._is_capturing.set()
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
 
-        # Wait for first frame to be captured (max 1 second)
-        for _ in range(100):  # Try for 1 second (100 * 10ms)
-            if self._latest_frame is not None:
-                break
-            time.sleep(0.01)
-
-        if self._latest_frame is None:
+        # Wait for first frame using Event (blocks efficiently, no polling)
+        if not self._first_frame_ready.wait(timeout=1.0):
             logger.warning("No frame captured yet after 1 second")
+        else:
+            logger.info("First frame captured successfully")
 
         logger.info("Continuous capture started")
         return True
@@ -323,6 +324,10 @@ class InputManager:
             with self._frame_lock:
                 self._frame_buffer.append(frame_data)
                 self._latest_frame = frame_data
+
+            # Signal that first frame is ready (only once)
+            if not self._first_frame_ready.is_set():
+                self._first_frame_ready.set()
 
             # Maintain target frame rate
             elapsed = time.time() - start_time
