@@ -103,6 +103,52 @@ set_log_level(logging.DEBUG)
 set_log_level(logging.WARNING)
 ```
 
+### Reconfiguring Logging (Reinitialization)
+
+By default, `configure_logging()` can only be called once. Subsequent calls are ignored to prevent accidental reconfiguration. To reconfigure, use `force_reinit=True`:
+
+```python
+from shared.logger import configure_logging
+import logging
+
+# Initial configuration: console only
+configure_logging(level=logging.INFO)
+
+# Later, enable file logging (requires force_reinit)
+configure_logging(
+    level=logging.DEBUG,
+    enable_file_logging=True,
+    force_reinit=True  # Required to apply changes
+)
+```
+
+**When to use `force_reinit`:**
+
+- Switching between development and production configs
+- Enabling file logging after startup
+- Changing log directory or rotation settings
+- Testing different logging configurations
+
+**Alternative: Complete Reset**
+
+```python
+from shared.logger import ProjectLogger
+
+# Reset to uninitialized state
+ProjectLogger.reset()
+
+# Now configure_logging() will work without force_reinit
+configure_logging(level=logging.WARNING)
+```
+
+# Switch back to WARNING
+
+```
+
+set_log_level(logging.WARNING)
+
+```
+
 ## Log Levels
 
 | Level    | Numeric Value | When to Use                                    |
@@ -227,7 +273,6 @@ File output (without colors):
 ## Best Practices
 
 1. **Use appropriate log levels**
-
    - DEBUG: Internal state, variable values
    - INFO: Normal operations, milestones
    - WARNING: Recoverable issues, degraded performance
