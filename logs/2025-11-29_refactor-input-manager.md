@@ -79,7 +79,7 @@ Refactor the input manager module to improve its portability and maintainability
   - C++ build complexity outweighs benefits for current project needs.
   - Python implementation is sufficient for 30 FPS gesture recognition.
   - Focusing on core innovation (Recognition Engine) is more valuable than optimizing input capture.
-  - The capture thread for the camera needs a moment (1 second) to intialize and capture the first frame.
+  - The capture thread for the camera needs a moment (1 second) to initialize and capture the first frame.
     - **Race condition**: The `start_continuous_capture()` method was starting the background thread but returning immediately.
     - **No frames ready**: When the loop first starts, the capture thread had not captured any frames yet, so `get_latest_frame()` returned `None`
 
