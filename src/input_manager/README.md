@@ -75,7 +75,7 @@ Camera → OpenCV → Capture Thread → Preprocessing → FrameData → NumPy A
 **Steps:**
 
 ```bash
-cd src/input-manager
+cd src/input_manager
 
 # Install dependencies
 pip install -r requirements.txt

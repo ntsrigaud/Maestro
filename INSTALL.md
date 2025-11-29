@@ -52,7 +52,7 @@ The editable install (`-e` flag):
 
 ```bash
 # From anywhere in the project
-python src/input-manager/example_usage.py
+python src/input_manager/example_usage.py
 ```
 
 ### Importing in Your Code
@@ -157,6 +157,16 @@ from shared.logger import get_logger  # Might fail depending on execution contex
 ```python
 from shared.logger import get_logger  # Works everywhere after pip install -e .
 ```
+
+## Python Naming Conventions
+
+All module directories use underscores (not hyphens) following PEP 8:
+
+- `src/input_manager/` (not `input-manager`)
+- `src/shared/`
+- Future modules: `src/recognition_engine/`, `src/action_mapper/`, `src/os_controller/`
+
+This allows `find_packages()` to automatically discover all modules without manual configuration.
 
 ## Alternative: PYTHONPATH (Not Recommended)
 
