@@ -77,7 +77,7 @@ class InputManager:
 
         # Capture state
         self._capture: Optional[cv2.VideoCapture] = None
-        self._is_capturing = False
+        self._is_capturing = threading.Event()  # Thread-safe flag
         self._capture_thread: Optional[threading.Thread] = None
 
         # Frame storage
@@ -149,11 +149,11 @@ class InputManager:
             if not self.start_capture():
                 return False
 
-        if self._is_capturing:
+        if self._is_capturing.is_set():
             logger.warning("Continuous capture already running")
             return True
 
-        self._is_capturing = True
+        self._is_capturing.set()
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
 
@@ -171,10 +171,10 @@ class InputManager:
 
     def stop_continuous_capture(self):
         """Stop continuous frame capture."""
-        if not self._is_capturing:
+        if not self._is_capturing.is_set():
             return
 
-        self._is_capturing = False
+        self._is_capturing.clear()
 
         if self._capture_thread is not None:
             self._capture_thread.join(timeout=2.0)
@@ -258,7 +258,7 @@ class InputManager:
         """Background thread for continuous frame capture."""
         frame_time = 1.0 / self._target_fps if self._target_fps > 0 else 0
 
-        while self._is_capturing:
+        while self._is_capturing.is_set():
             start_time = time.time()
 
             ret, frame = self._capture.read()
@@ -363,7 +363,7 @@ class InputManager:
             "height": int(self._capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
             "fps": int(self._capture.get(cv2.CAP_PROP_FPS)),
             "backend": self._capture.getBackendName(),
-            "is_capturing": self._is_capturing,
+            "is_capturing": self._is_capturing.is_set(),
             "buffer_size": len(self._frame_buffer),
             "frames_captured": self._frame_counter,
         }
