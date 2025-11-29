@@ -71,7 +71,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
   - `verify_install.py`
 - Files deleted: None
 
-### [01:50] - Session End
+### [02:45] - Session End
 
 **Summary of completed work:**
 
@@ -88,6 +88,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
 - [x] Implement size-based log rotation as log cleanup mechanism
 - [x] Allow reinitialization of logger with different configurations if needed
 - [x] Use **Event** threading primitive to ensure thread-safe camera state management
+- [x] Use nanosecond precision timestamps for frame capture times
 
 **Testing performed:**
 
