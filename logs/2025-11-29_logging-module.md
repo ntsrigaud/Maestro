@@ -2,7 +2,7 @@
 
 ## Log Information
 
-- **Date:** 2025-11-29
+- **Date:** 2025-11-29 ~ 2025-11-30
 - **Developer:** Neil Taison Rigaud
 - **Branch:** logging-module
 - **Related Issue/Feature:** Logging Module
@@ -71,7 +71,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
   - `verify_install.py`
 - Files deleted: None
 
-### [23:50] - Session End
+### [00:25] - Session End
 
 **Summary of completed work:**
 
@@ -81,6 +81,8 @@ Implement a proper logging mechanism to replace print statements scattered throu
 - [x] Replaced print statements in input manager with logging calls
 - [x] Verified logging outputs to console
 - [x] Made project installable with `pip install -e .`
+- [x] Migrated to proper Python naming conventions to use `find_packages()`
+- [x] Included explanatory documentation for changes
 
 **Testing performed:**
 
@@ -155,6 +157,7 @@ Implement a proper logging mechanism to replace print statements scattered throu
 
 - Used Python's built-in logging module for flexibility
 - Log messages include timestamps and log levels for better traceability
+- Use underscores in package/module names to comply with Python conventions for easier package discovery
 
 ## Lessons Learned
 

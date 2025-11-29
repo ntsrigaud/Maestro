@@ -21,7 +21,7 @@ import sys
 
 def main():
     print("=" * 70)
-    print("⚠️  DEPRECATED SETUP SCRIPT")
+    print("DEPRECATED SETUP SCRIPT")
     print("=" * 70)
     print()
     print("This setup.py is no longer needed.")
