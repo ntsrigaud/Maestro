@@ -4,17 +4,14 @@ This module provides a high-performance interface to capture and preprocess vide
 
 ## Quick Start
 
-**Zero build required!** Just install dependencies and run:
+**Zero build required!** Just install the package and run:
 
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+# 1. Install the package (from project root)
+pip install -e .
 
-# 2. Run setup verification
-python setup.py
-
-# 3. Try the examples
-python example_usage.py
+# 2. Try the examples
+python src/input_manager/example_usage.py
 ```
 
 Works on **Linux, macOS, and Windows**.
@@ -75,19 +72,16 @@ Camera → OpenCV → Capture Thread → Preprocessing → FrameData → NumPy A
 **Steps:**
 
 ```bash
-cd src/input-manager
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Verify installation
-python setup.py
+# From project root
+pip install -e .
 ```
 
 **Dependencies:**
 
 - `opencv-python>=4.8.0` - Computer vision library
 - `numpy>=1.24.0` - Array processing
+
+Dependencies are automatically installed with the package.
 
 ---
 
@@ -305,7 +299,7 @@ for i, frame_data in enumerate(frames):
 manager.stop_continuous_capture()
 ```
 
-**More examples:** Run `python example_usage.py` for comprehensive examples.
+**More examples:** Run `python src/input_manager/example_usage.py` for comprehensive examples.
 
 ---
 

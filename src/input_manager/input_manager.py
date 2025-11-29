@@ -13,6 +13,11 @@ from dataclasses import dataclass
 from typing import Optional, List, Tuple
 from collections import deque
 
+from shared.logger import get_logger
+
+# Initialize module logger
+logger = get_logger(__name__)
+
 
 @dataclass
 class FrameData:
@@ -106,7 +111,7 @@ class InputManager:
         self._capture = cv2.VideoCapture(self._camera_index)
 
         if not self._capture.isOpened():
-            print(f"Failed to open camera {self._camera_index}")
+            logger.error(f"Failed to open camera {self._camera_index}")
             return False
 
         # Configure camera properties
@@ -121,7 +126,7 @@ class InputManager:
         if self._auto_detect_mirror:
             self._detect_mirror_state()
 
-        print(f"Camera {self._camera_index} opened successfully")
+        logger.info(f"Camera {self._camera_index} opened successfully")
         return True
 
     def stop_capture(self):
@@ -131,7 +136,7 @@ class InputManager:
         if self._capture is not None:
             self._capture.release()
             self._capture = None
-            print("Camera released")
+            logger.info("Camera released")
 
     def start_continuous_capture(self) -> bool:
         """
@@ -145,7 +150,7 @@ class InputManager:
                 return False
 
         if self._is_capturing:
-            print("Warning: Continuous capture already running")
+            logger.warning("Continuous capture already running")
             return True
 
         self._is_capturing = True
@@ -159,9 +164,9 @@ class InputManager:
             time.sleep(0.01)
 
         if self._latest_frame is None:
-            print("Warning: No frame captured yet after 1 second")
+            logger.warning("No frame captured yet after 1 second")
 
-        print("Continuous capture started")
+        logger.info("Continuous capture started")
         return True
 
     def stop_continuous_capture(self):
@@ -175,7 +180,7 @@ class InputManager:
             self._capture_thread.join(timeout=2.0)
             self._capture_thread = None
 
-        print("Continuous capture stopped")
+        logger.info("Continuous capture stopped")
 
     def get_latest_frame(self) -> Optional[FrameData]:
         """
@@ -258,7 +263,7 @@ class InputManager:
 
             ret, frame = self._capture.read()
             if not ret:
-                print("Warning: Failed to read frame")
+                logger.warning("Failed to read frame")
                 time.sleep(0.1)
                 continue
 

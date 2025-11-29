@@ -19,14 +19,14 @@ Attention-based Vision Transformer) and **ALBEF** (Align before Fuse) models.
 
 The system architecture is composed of four main components:
 
--   **Input Manager**: Responsible for capturing video frames from a camera
-and preprocessing them for the recognition engine.
--   **Recognition Engine**: The core of the system, which uses a Vision
-Transformer (ViT) based model to analyze the visual data and recognize the
-performed gestures.
--   **Action Mapper**: Translates the recognized gestures into specific
-commands or actions.
--   **OS Controller**: Executes the commands on the underlying operating system.
+- **Input Manager**: Responsible for capturing video frames from a camera
+  and preprocessing them for the recognition engine.
+- **Recognition Engine**: The core of the system, which uses a Vision
+  Transformer (ViT) based model to analyze the visual data and recognize the
+  performed gestures.
+- **Action Mapper**: Translates the recognized gestures into specific
+  commands or actions.
+- **OS Controller**: Executes the commands on the underlying operating system.
 
 A key feature of our project is the focus on **zero-shot learning**, which will
 allow the system to recognize new gestures without the need for retraining. This
@@ -35,11 +35,37 @@ vision and language, enabling the system to understand and generalize
 gesture-based commands.
 
 This repository contains all the code, documentation, and research materials
-related to the project. 
+related to the project.
 
-## Group Members:
+## Installation
+
+To set up the project for development:
+
+```bash
+# Install the project in editable mode
+pip install -e .
+```
+
+For detailed installation instructions, see [INSTALL.md](INSTALL.md).
+
+## Quick Start
+
+After installation, you can use the input manager:
+
+```python
+from input_manager import InputManager
+
+manager = InputManager(camera_index=0)
+manager.start_capture()
+frame_data = manager.capture_frame()
+manager.stop_capture()
+```
+
+See `src/input_manager/example_usage.py` for more examples.
+
+## Group Members
 
 - Sley Hortes
-- Neil Rigaud Taison
+- Neil Taison Rigaud
 - Khishig Tuguldur
-- Eder Guerrero 
+- Eder Guerrero
