@@ -216,7 +216,7 @@ class InputManager:
 
         self._is_capturing.clear()
 
-        if self._capture_thread is not None:
+        if self._capture_thread is not None and self._capture_thread.is_alive():
             self._capture_thread.join(timeout=2.0)
             self._capture_thread = None
 
