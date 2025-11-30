@@ -15,7 +15,6 @@ It validates:
 import sys
 import time
 import numpy as np
-import cv2
 from pathlib import Path
 
 # Add project root to path for imports
@@ -27,7 +26,6 @@ from src.recognition_engine.hand_detection import (
     HandDetector,
     HandCropper,
     HandDetectionResult,
-    HandROI,
 )
 from src.shared.logger import get_logger
 
@@ -165,7 +163,7 @@ def test_cropping():
             # Crop each detected hand
             hand_rois = cropper.crop_multiple(frame_data.frame, detections)
 
-            for i, roi in enumerate(hand_rois):
+            for _, roi in enumerate(hand_rois):
                 crop_count += 1
                 print(f"Crop {crop_count}: {roi.detection.handedness} hand")
                 print(f"  Original bbox: {roi.detection.bbox}")

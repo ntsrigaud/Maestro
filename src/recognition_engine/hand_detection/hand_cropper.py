@@ -7,7 +7,7 @@ using bounding boxes from hand detections, with configurable padding and preproc
 
 import cv2
 import numpy as np
-from typing import Optional, Tuple
+from typing import Tuple
 from recognition_engine.hand_detection.hand_data import HandDetectionResult, HandROI
 from shared.logger import get_logger
 
