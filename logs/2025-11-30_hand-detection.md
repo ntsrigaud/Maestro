@@ -73,7 +73,31 @@ Implement and integrate hand detection functionality within the input-manager an
 - For real-time performance, need to use Lite version of MediaPipe Hands with max_num_hands=1
 - Target size for cropping set to 224x224 for compatibility with future gesture classification models
 
-### [16:00] - Session End
+### [16:30] - Progress Update
+
+**What I did:**
+
+- Added script to capture hand samples with metadata
+- Saves two versions: raw crop and preprocessed
+
+- **Changes made:**
+
+- Files modified:
+  - None
+- Files created:
+  - `scripts/capture_hand_samples.py`
+- Files deleted:
+  - None
+
+**Observations/Discoveries:**
+
+- Raw crops are useful for manual inspection
+- Preprocessed images are ready for model input
+- Preprocessed data is normalized to [0, 1] range for model compatibility
+- We denormalize images to save as viewable JPEGs
+- Normalizing images to [0, 1] is essential for Vision Transformer models because they expect inputs in this range for optimal performance.
+
+### [16:45] - Session End
 
 **Summary of completed work:**
 
@@ -138,7 +162,7 @@ Implement and integrate hand detection functionality within the input-manager an
 
 - Documentation: [Input Manager Documentation](../Input-Manager/README.md)
 - Documentation: [Hand Detection Documentation](HAND_DETECTION_DOCUMENTATION.md)
-- Demo Script: `scripts/demo_hand_detection.py`
+- Demo Script: `scripts/capture_hand_samples.py`
 - Related PRs: [link]
 - External resources: [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands.html)
 
