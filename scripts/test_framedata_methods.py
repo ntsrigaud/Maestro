@@ -4,7 +4,6 @@ Quick test to verify FrameData helper methods are available.
 """
 
 import sys
-import importlib
 
 # Force fresh import
 for module in ["input_manager", "input_manager.input_manager"]:

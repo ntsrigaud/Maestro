@@ -5,7 +5,6 @@ instead of polling loop for first frame notification.
 """
 
 import time
-import threading
 from input_manager import InputManager
 from shared.logger import get_logger
 
