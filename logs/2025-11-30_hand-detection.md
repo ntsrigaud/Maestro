@@ -78,7 +78,7 @@ Implement and integrate hand detection functionality within the input-manager an
 **What I did:**
 
 - Added script to capture hand samples with metadata
-- Saves two versions: raw crop and preprocessed
+- Saves two versions: raw crop (BGR) and preprocessed (RGB, normalized)
 
 - **Changes made:**
 
@@ -195,3 +195,8 @@ What did you learn during this session? Any insights for future work?
 - Mediapipe has industry-standard, proven accuracy, real-time performance and the 21-landmark output is enough for hand detection and ROI cropping.
 - ViT expects square inputs, in our case images with 224x224 dimension would be the optimal solution for a balance between speed and accuracy.
 - Mediapipe already have **Hand Tracking** mode which could be leveraged upon for dynamic gestures.
+- OpenCV uses BGR format by default, while most deep learning models expect RGB format.
+- Normalizing images to [0, 1] is essential for Vision Transformer models because they expect inputs in this range for optimal performance.
+  - Numerical stability during training and inference (Gradients are better behaved)
+  - Faster convergence during training
+  - Matches pretraining conditions (most ViT models are pretrained on normalized images)
