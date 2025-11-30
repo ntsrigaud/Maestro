@@ -5,12 +5,10 @@
 ### Deprecated Module Files
 
 1. **`src/input_manager/setup.py`** - REMOVED
-
    - Reason: Deprecated standalone setup script
    - Replaced by: Root `setup.py` with proper package structure
 
 2. **`src/input_manager/requirements.txt`** - REMOVED
-
    - Reason: Redundant with root `setup.py` dependencies
    - Replaced by: Dependencies in root `setup.py` and `pyproject.toml`
 
@@ -21,17 +19,14 @@
 ### Build Artifacts
 
 4. **`build/`** - REMOVED
-
    - Reason: Generated build directory (recreated on installation)
    - Note: Already in `.gitignore`
 
 5. **`gesture_recognition_system.egg-info/`** - REMOVED
-
    - Reason: Generated package metadata (recreated on installation)
    - Note: Already in `.gitignore`
 
 6. **`__pycache__/`** directories - REMOVED (all locations)
-
    - Reason: Python bytecode cache (recreated automatically)
    - Note: Already in `.gitignore`
 
@@ -44,7 +39,6 @@
 ### Files Modified
 
 1. **`src/input_manager/QUICKSTART.md`**
-
    - Removed references to `setup.py` and `requirements.txt`
    - Updated to use `pip install -e .` from project root
 

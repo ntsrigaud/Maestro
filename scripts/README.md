@@ -23,7 +23,6 @@ This directory contains utility scripts for testing, demonstration, and verifica
 ## Demonstration Scripts
 
 - **`demo_timestamp_usage.py`** - Interactive demonstration of timestamp precision and usage patterns
-
   - Shows nanosecond precision at different scales
   - Frame-to-frame timing measurements
   - LSTM sequence timing analysis

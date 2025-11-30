@@ -238,22 +238,18 @@ else:
 ## Best Practices
 
 1. **Set appropriate size limits**
-
    - Development: 5-10MB (quick to open/read)
    - Production: 20-50MB (balance between granularity and file count)
 
 2. **Choose backup count wisely**
-
    - Development: 3-5 backups (recent history)
    - Production: 10-20 backups (longer history for debugging)
 
 3. **Monitor disk usage**
-
    - Calculate max usage: `max_bytes × (backup_count + 1)`
    - Ensure enough free space on disk
 
 4. **Use appropriate log levels**
-
    - DEBUG in development (rotates frequently)
    - INFO/WARNING in production (rotates less often)
 
