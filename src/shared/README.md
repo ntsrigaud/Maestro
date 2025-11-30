@@ -265,7 +265,6 @@ File output (without colors):
 ## Best Practices
 
 1. **Use appropriate log levels**
-
    - DEBUG: Internal state, variable values
    - INFO: Normal operations, milestones
    - WARNING: Recoverable issues, degraded performance

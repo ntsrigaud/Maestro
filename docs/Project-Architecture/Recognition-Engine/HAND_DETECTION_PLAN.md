@@ -353,7 +353,6 @@ pip install mediapipe>=0.10.0
 Once hand detection is complete:
 
 1. **Gesture Classification Submodule** (ViT + LSTM)
-
    - Static gesture path (single frame → ViT)
    - Dynamic gesture path (frame sequence → ViT → LSTM)
    - Static vs dynamic routing logic

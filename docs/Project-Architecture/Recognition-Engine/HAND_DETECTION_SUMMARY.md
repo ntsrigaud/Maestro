@@ -249,7 +249,6 @@ hand_rois = cropper.crop_multiple(frame_data.frame, detections)
 ### Immediate (Ready for Implementation)
 
 1. **Gesture Classification Module**:
-
    - Static gesture classifier (ViT fine-tuning)
    - Dynamic gesture classifier (ViT + LSTM)
    - Training pipeline setup
@@ -262,7 +261,6 @@ hand_rois = cropper.crop_multiple(frame_data.frame, detections)
 ### Medium-Term
 
 1. **Semantic Understanding Module**:
-
    - ALBEF-inspired text-gesture alignment
    - Contrastive learning framework
    - Command vocabulary
@@ -274,7 +272,6 @@ hand_rois = cropper.crop_multiple(frame_data.frame, detections)
 ### Long-Term
 
 1. **Performance Optimization**:
-
    - Real-world FPS benchmarking
    - Latency profiling
    - Model quantization for edge deployment
@@ -371,4 +368,3 @@ All components validated:
 - [Hand Landmark Model](https://google.github.io/mediapipe/solutions/hands#hand-landmark-model)
 - [HAVIT Paper](https://www.nature.com/articles/s41598-025-10758-9)
 - [Hand Gesture Recognition with MediaPipe](https://github.com/kinivi/hand-gesture-recognition-mediapipe)
-

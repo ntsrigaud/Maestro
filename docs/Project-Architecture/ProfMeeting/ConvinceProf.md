@@ -127,7 +127,6 @@ We achieve higher effective accuracy through temporal modeling and a truly seman
 1.  **Temporal Modeling (LSTM)**: By analyzing a sequence of frames, our LSTM captures motion, allowing it to reliably distinguish dynamic gestures (e.g., "swipe") that HAVIT's static model can miss. HAVIT’s core uses ViT+ALBEF; we add explicit motion cues for dynamic gestures (swipe, wave), which reduces confusion among look-alike static poses.
 
 2.  **True Semantic Flexibility (SentenceTransformer)**: This is our key advantage. We use a general-purpose language model that understands meaning beyond fixed labels.
-
     - `"volume up"`
     - `"increase sound"`
     - `"raise volume"`

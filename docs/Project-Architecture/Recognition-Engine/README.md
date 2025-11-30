@@ -87,12 +87,10 @@ The Recognition Engine's design is based on the **HAVIT (Hybrid Attention-based 
 ### Key Components
 
 - **Feature Extraction with a Vision Transformer (ViT):**
-
   - Instead of relying only on landmark coordinates, we will use a pre-trained Vision Transformer (ViT) to extract rich features from the entire hand image. The ViT's ability to capture global context in an image makes it ideal for understanding the nuances of hand shapes and orientations.
   - We'll use the bounding box of the detected hand (from MediaPipe) to crop the hand image and feed it into the ViT.
 
 - **Gesture Classification:**
-
   - **Static Gestures:** Fine-tune the ViT model to classify static gestures based on the rich features it extracts. This should be more robust and accurate than the simple MLP.
   - **Dynamic Gestures:** Feed the sequence of feature vectors from the ViT (one for each frame) into an LSTM. This approach, inspired by the HAVIT paper's methods for video classification, will provide the LSTM with much more contextual information than just a single point's history, enabling the recognition of more complex dynamic gestures.
 

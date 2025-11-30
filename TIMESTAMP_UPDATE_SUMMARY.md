@@ -61,20 +61,17 @@ timestamp = time.time_ns()
 **Why This Format:**
 
 1. **Precision**: Nanosecond resolution (1e-9 seconds) provides sub-millisecond accuracy
-
    - 30 FPS: ~33ms between frames = 33,000,000 nanoseconds
    - 60 FPS: ~16ms between frames = 16,000,000 nanoseconds
    - Plenty of resolution for motion analysis
 
 2. **32-bit Safety**:
-
    - Milliseconds overflow 32-bit in 2038
    - Nanoseconds require 64-bit from the start
    - Python `int` is arbitrary precision anyway
    - Future-proof until year 2262
 
 3. **Performance**:
-
    - Integer arithmetic is faster than float
    - No floating-point precision loss
    - Direct comparison and sorting
@@ -183,13 +180,11 @@ if latency_ms < 100:
    ```
 
 2. **Verify timestamp precision**:
-
    - Check nanosecond resolution
    - Confirm conversion helpers work correctly
    - Validate FPS calculations
 
 3. **Test with camera**:
-
    - Measure actual frame intervals
    - Check temporal consistency
    - Verify no timestamp drift
