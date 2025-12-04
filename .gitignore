@@ -181,3 +181,4 @@ compile_commands.json
 *.exe
 *.dll
 *.dylib
+data/hagrid_subset
