@@ -13,6 +13,12 @@ This directory contains utility scripts for testing, demonstration, and verifica
 ### Feature Tests
 
 - **`test_framedata_methods.py`** - Verifies FrameData helper methods are accessible (timestamp conversion, FPS calculation)
+- **`test_hand_detection.py`** - Comprehensive tests for hand detection submodule
+  - HandDetector initialization and detection
+  - HandCropper with ROI extraction
+  - Frame boundary handling
+  - Multi-hand detection
+  - Preprocessing pipeline validation
 
 ## Demonstration Scripts
 
@@ -21,6 +27,14 @@ This directory contains utility scripts for testing, demonstration, and verifica
   - Frame-to-frame timing measurements
   - LSTM sequence timing analysis
   - System latency measurement
+
+- **`demo_hand_detection.py`** - Real-time hand detection visualization
+  - Live camera feed with bounding boxes
+  - Hand landmarks (21 points per hand)
+  - Handedness labels and confidence scores
+  - FPS counter and statistics
+  - Cropped hand region windows
+  - Interactive controls (toggle landmarks, cropped view, reset stats)
 
 ## Verification Scripts
 
@@ -38,10 +52,16 @@ python scripts/verify_install.py
 
 # Run demonstrations (interactive)
 python scripts/demo_timestamp_usage.py
+python scripts/demo_hand_detection.py
+
+# Optional arguments for hand detection demo
+python scripts/demo_hand_detection.py --camera 0 --max-hands 2
+python scripts/demo_hand_detection.py --no-landmarks --no-cropped
 
 # Run tests
 python scripts/test_event_based_startup.py
 python scripts/test_framedata_methods.py
+python scripts/test_hand_detection.py
 ```
 
 ## Requirements
