@@ -29,4 +29,3 @@
   - [GitHub Repository](https://github.com/hukenovs/hagrid)
   - [Summary notes](https://hackmd.io/@tJJO0b0UQYilXlfLdhiWaQ/S1fFgErsgg)
   - [Vision Transformers and Self-attention Mechanism](https://hackmd.io/ofgTnTBITDC8327OnwZOHQ)
-
