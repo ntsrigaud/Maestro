@@ -182,3 +182,6 @@ compile_commands.json
 *.dll
 *.dylib
 data/hagrid_subset
+notebooks/checkpoints
+notebooks/data/hagrid-sample-30k-384p/hagrid-sample-30k-384p/hagrid-sample-30k-384p
+notebooks/data/hagrid-sample-30k-384p/hagrid-sample-30k-384p
