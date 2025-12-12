@@ -129,7 +129,7 @@ class InputManager:
         # Preprocessing settings
         self._mirror_enabled = True
         self._auto_detect_mirror = True
-        self._convert_to_rgb = True
+        self._convert_to_rgb = False
         self._normalization_mean = 0.0
         self._normalization_std = 1.0
         self._target_size: Optional[Tuple[int, int]] = None
