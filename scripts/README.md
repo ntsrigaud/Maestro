@@ -23,18 +23,30 @@ This directory contains utility scripts for testing, demonstration, and verifica
 ## Demonstration Scripts
 
 - **`demo_timestamp_usage.py`** - Interactive demonstration of timestamp precision and usage patterns
+
   - Shows nanosecond precision at different scales
   - Frame-to-frame timing measurements
   - LSTM sequence timing analysis
   - System latency measurement
 
 - **`demo_hand_detection.py`** - Real-time hand detection visualization
+
   - Live camera feed with bounding boxes
   - Hand landmarks (21 points per hand)
   - Handedness labels and confidence scores
   - FPS counter and statistics
   - Cropped hand region windows
   - Interactive controls (toggle landmarks, cropped view, reset stats)
+
+- **`demo_gesture_recognition.py`** - **End-to-end real-time gesture recognition** 🆕
+  - Integrates camera input, hand detection, and gesture classification
+  - Uses fine-tuned ViT-B/16 model (18 gesture classes)
+  - Temporal smoothing for stable predictions
+  - Color-coded confidence levels
+  - Multi-hand support (up to 2 hands)
+  - Real-time FPS monitoring
+  - Requires trained model checkpoint (`best_model.pth`)
+  - See `GESTURE_RECOGNITION_DEMO.md` for detailed usage
 
 ## Verification Scripts
 
