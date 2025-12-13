@@ -26,13 +26,31 @@ GESTURE_SEMANTICS = {
             "talk on the phone",
             "dial a number",
             "answer the phone",
-            "communication gesture"
+            "communication gesture",
+            "hold phone to ear",
+            "calling someone",
+            "phone call hand sign",
+            "telephone gesture",
+            "ring me up",
+            "give me a ring",
+            "contact me by phone",
+            "cellular call gesture",
+            "mobile phone sign",
+            "speaking on telephone",
+            "handheld phone posture",
+            "simulate phone conversation"
         ],
         "actions": [
             "initiate phone call",
             "answer incoming call",
             "open phone app",
-            "voice command mode"
+            "voice command mode",
+            "start voice call",
+            "dial contact",
+            "begin telecommunication",
+            "activate phone interface",
+            "launch dialer application",
+            "respond to call"
         ],
         "semantic_group": "communication"
     },
@@ -48,7 +66,20 @@ GESTURE_SEMANTICS = {
             "reject",
             "vote down",
             "downvote",
-            "not good"
+            "not good",
+            "thumb pointing downward",
+            "disapproval sign",
+            "negative response",
+            "rejection gesture",
+            "disagree with this",
+            "do not approve",
+            "this is unacceptable",
+            "poor quality indicator",
+            "express dissatisfaction",
+            "unfavorable rating",
+            "decline this option",
+            "give negative review",
+            "show displeasure"
         ],
         "actions": [
             "decrease volume",
@@ -56,7 +87,13 @@ GESTURE_SEMANTICS = {
             "dislike content",
             "negative feedback",
             "scroll down",
-            "minimize window"
+            "minimize window",
+            "reduce brightness",
+            "lower setting",
+            "move down in list",
+            "dismiss notification",
+            "rate negatively",
+            "decrease value"
         ],
         "semantic_group": "negative_feedback"
     },
@@ -71,14 +108,31 @@ GESTURE_SEMANTICS = {
             "resistance",
             "unity",
             "protest gesture",
-            "clenched hand"
+            "clenched hand",
+            "fist bump ready",
+            "show strength",
+            "tightly closed hand",
+            "power gesture",
+            "demonstrate resolve",
+            "express determination",
+            "solidarity sign",
+            "united front",
+            "firm decision",
+            "hold tight",
+            "grip closed",
+            "assertive posture"
         ],
         "actions": [
             "confirm action",
             "select item",
             "grab object",
             "activate mode",
-            "close hand"
+            "close hand",
+            "execute command firmly",
+            "hold position",
+            "grip control",
+            "lock selection",
+            "finalize choice"
         ],
         "semantic_group": "confirmation"
     },
@@ -91,13 +145,24 @@ GESTURE_SEMANTICS = {
             "count to four",
             "four items",
             "quantity four",
-            "show four"
+            "show four",
+            "quad digits",
+            "fourth choice",
+            "quartet of fingers",
+            "four units",
+            "quaternary option",
+            "quadruple count",
+            "four-way selection",
+            "tetrad gesture"
         ],
         "actions": [
             "select fourth option",
             "jump to page four",
             "set value to four",
-            "display four items"
+            "display four items",
+            "fourth choice",
+            "quad selection",
+            "choose quartet"
         ],
         "semantic_group": "numeric"
     },
@@ -117,7 +182,22 @@ GESTURE_SEMANTICS = {
             "great job",
             "well done",
             "I agree",
-            "confirmed"
+            "confirmed",
+            "thumb pointing upward",
+            "approval sign",
+            "positive response",
+            "acceptance gesture",
+            "express satisfaction",
+            "favorable rating",
+            "this is great",
+            "show appreciation",
+            "endorse this",
+            "support this idea",
+            "give positive feedback",
+            "recommend this",
+            "quality content",
+            "affirmative signal",
+            "express agreement"
         ],
         "actions": [
             "increase volume",
@@ -126,7 +206,14 @@ GESTURE_SEMANTICS = {
             "positive feedback",
             "scroll up",
             "maximize window",
-            "thumbs up reaction"
+            "thumbs up reaction",
+            "boost signal",
+            "raise brightness",
+            "increase setting",
+            "move up in list",
+            "promote content",
+            "rate positively",
+            "increment value"
         ],
         "semantic_group": "positive_feedback"
     },
@@ -141,14 +228,33 @@ GESTURE_SEMANTICS = {
             "quiet please",
             "finger to lips",
             "ssh",
-            "hush"
+            "hush",
+            "silence gesture",
+            "quiet down",
+            "keep silent",
+            "lower your voice",
+            "stop making noise",
+            "whisper sign",
+            "need silence",
+            "mute your microphone",
+            "turn off audio",
+            "disable sound output",
+            "silence is needed",
+            "reduce noise",
+            "quiet mode activated"
         ],
         "actions": [
             "mute audio",
             "disable microphone",
             "silence notifications",
             "pause audio",
-            "turn off sound"
+            "turn off sound",
+            "deactivate speakers",
+            "stop audio playback",
+            "suppress volume",
+            "cut audio feed",
+            "enable silent mode",
+            "quiet system sounds"
         ],
         "semantic_group": "audio_control"
     },
@@ -165,14 +271,33 @@ GESTURE_SEMANTICS = {
             "circle with fingers",
             "zero sign",
             "it's fine",
-            "acknowledged"
+            "acknowledged",
+            "fingers forming circle",
+            "acceptance sign",
+            "things are perfect",
+            "all systems go",
+            "ready to proceed",
+            "affirmative response",
+            "situation is good",
+            "status okay",
+            "confirm understanding",
+            "signal approval",
+            "everything checks out",
+            "satisfactory result",
+            "acceptable condition"
         ],
         "actions": [
             "confirm selection",
             "approve action",
             "acknowledge message",
             "everything OK",
-            "proceed with action"
+            "proceed with action",
+            "validate input",
+            "accept proposal",
+            "green light command",
+            "authorize process",
+            "finalize decision",
+            "complete transaction"
         ],
         "semantic_group": "confirmation"
     },
@@ -187,14 +312,30 @@ GESTURE_SEMANTICS = {
             "count to one",
             "one item",
             "quantity one",
-            "show one"
+            "show one",
+            "one finger raised",
+            "single digit",
+            "first place",
+            "primary option",
+            "solo finger",
+            "singular selection",
+            "number uno",
+            "we are number one",
+            "top choice",
+            "first priority",
+            "one unit",
+            "single count"
         ],
         "actions": [
             "select first option",
             "jump to page one",
             "set value to one",
             "display one item",
-            "number one"
+            "number one",
+            "choose primary",
+            "first selection",
+            "initial choice",
+            "top option"
         ],
         "semantic_group": "numeric"
     },
@@ -210,7 +351,20 @@ GESTURE_SEMANTICS = {
             "open palm",
             "hand forward",
             "stop sign",
-            "hold on"
+            "hold on",
+            "palm facing outward",
+            "hand up gesture",
+            "pause signal",
+            "wait a moment",
+            "hold position",
+            "cease movement",
+            "suspend activity",
+            "give me a second",
+            "hold that thought",
+            "interrupt gesture",
+            "attention please",
+            "request to pause",
+            "break in action"
         ],
         "actions": [
             "stop action",
@@ -218,7 +372,12 @@ GESTURE_SEMANTICS = {
             "halt process",
             "wait command",
             "show palm",
-            "open hand gesture"
+            "open hand gesture",
+            "suspend operation",
+            "freeze frame",
+            "temporary stop",
+            "interrupt sequence",
+            "hold execution"
         ],
         "semantic_group": "stop_control"
     },
@@ -232,14 +391,27 @@ GESTURE_SEMANTICS = {
             "peace gesture",
             "victory sign",
             "V for victory",
-            "two finger salute"
+            "two finger salute",
+            "peace symbol with hand",
+            "hippie gesture",
+            "tranquility sign",
+            "harmony gesture",
+            "victory celebration",
+            "win indicator",
+            "peaceful expression",
+            "serenity signal",
+            "success sign",
+            "triumph gesture"
         ],
         "actions": [
             "select second option",
             "peace gesture",
             "victory celebration",
             "two items",
-            "number two"
+            "number two",
+            "celebrate win",
+            "show peace",
+            "express harmony"
         ],
         "semantic_group": "symbolic"
     },
@@ -271,13 +443,27 @@ GESTURE_SEMANTICS = {
             "rock hand",
             "heavy metal",
             "horn fingers",
-            "rock sign"
+            "rock sign",
+            "metal horns",
+            "rock music gesture",
+            "headbanger sign",
+            "mosh pit gesture",
+            "concert salute",
+            "rock concert sign",
+            "metalhead greeting",
+            "horns up",
+            "rock symbol",
+            "metal culture sign"
         ],
         "actions": [
             "rock gesture",
             "celebration",
             "excitement",
-            "music playback"
+            "music playback",
+            "play rock music",
+            "activate party mode",
+            "energize system",
+            "show enthusiasm"
         ],
         "semantic_group": "symbolic"
     },
@@ -293,14 +479,33 @@ GESTURE_SEMANTICS = {
             "stop action",
             "cease",
             "end",
-            "terminate"
+            "terminate",
+            "halt immediately",
+            "stop right now",
+            "cease all activity",
+            "discontinue process",
+            "abort operation",
+            "end this action",
+            "do not continue",
+            "full stop",
+            "complete cessation",
+            "terminate execution",
+            "cancel everything",
+            "emergency halt",
+            "immediate termination"
         ],
         "actions": [
             "stop playback",
             "halt action",
             "cancel operation",
             "stop scrolling",
-            "emergency stop"
+            "emergency stop",
+            "abort process",
+            "terminate program",
+            "cease activity",
+            "end session",
+            "kill process",
+            "force quit"
         ],
         "semantic_group": "stop_control"
     },
@@ -330,13 +535,24 @@ GESTURE_SEMANTICS = {
             "three items",
             "quantity three",
             "show three",
-            "three finger salute"
+            "three finger salute",
+            "triple digits",
+            "third choice",
+            "trio of fingers",
+            "three units",
+            "tertiary option",
+            "threesome gesture",
+            "triple count",
+            "three-way selection"
         ],
         "actions": [
             "select third option",
             "jump to page three",
             "set value to three",
-            "display three items"
+            "display three items",
+            "third choice",
+            "triple selection",
+            "choose trilogy"
         ],
         "semantic_group": "numeric"
     },
@@ -366,13 +582,27 @@ GESTURE_SEMANTICS = {
             "two items",
             "quantity two",
             "show two",
-            "two fingers up"
+            "two fingers up",
+            "dual digits",
+            "second choice",
+            "pair of fingers",
+            "double count",
+            "twin fingers",
+            "two units",
+            "secondary option",
+            "deuce sign",
+            "couple gesture",
+            "both options"
         ],
         "actions": [
             "select second option",
             "jump to page two",
             "set value to two",
-            "display two items"
+            "display two items",
+            "second choice",
+            "dual selection",
+            "choose pair",
+            "two-item display"
         ],
         "semantic_group": "numeric"
     },
@@ -422,14 +652,34 @@ GESTURE_SEMANTICS = {
             "index finger pointing",
             "direct attention",
             "that way",
-            "look there"
+            "look there",
+            "finger indicating",
+            "select this object",
+            "focus here",
+            "aim at target",
+            "guide attention",
+            "show location",
+            "refer to this",
+            "designate item",
+            "direct gaze",
+            "highlight position",
+            "indicate choice",
+            "choose this one",
+            "target selection",
+            "pointer gesture"
         ],
         "actions": [
             "select item",
             "indicate direction",
             "cursor control",
             "point at object",
-            "mouse click"
+            "mouse click",
+            "choose option",
+            "focus element",
+            "highlight item",
+            "navigate to location",
+            "select target",
+            "activate pointed item"
         ],
         "semantic_group": "navigation"
     },
@@ -508,7 +758,16 @@ ZERO_SHOT_TEST_COMMANDS = {
         "turn it up",
         "make it louder",
         "I agree with this",
-        "yes please"
+        "yes please",
+        "boost the audio",
+        "raise the level",
+        "approve this content",
+        "give positive rating",
+        "this is excellent",
+        "show appreciation",
+        "endorse this item",
+        "support this decision",
+        "favorable response"
     ],
     
     # Should map to "dislike" gesture
@@ -519,7 +778,15 @@ ZERO_SHOT_TEST_COMMANDS = {
         "turn it down",
         "make it quieter",
         "I disagree",
-        "no thanks"
+        "no thanks",
+        "lower the audio",
+        "reduce the level",
+        "reject this content",
+        "unfavorable rating",
+        "this is poor quality",
+        "express dissatisfaction",
+        "decline this option",
+        "disapprove this choice"
     ],
     
     # Should map to "stop" gesture
@@ -529,7 +796,14 @@ ZERO_SHOT_TEST_COMMANDS = {
         "pause everything",
         "stop scrolling",
         "freeze the screen",
-        "cancel this action"
+        "cancel this action",
+        "terminate execution",
+        "abort operation",
+        "cease activity",
+        "end this immediately",
+        "kill the process",
+        "emergency stop",
+        "discontinue playback"
     ],
     
     # Should map to "ok" gesture
@@ -539,7 +813,14 @@ ZERO_SHOT_TEST_COMMANDS = {
         "everything looks good",
         "approved",
         "go ahead",
-        "I accept"
+        "I accept",
+        "validate this input",
+        "authorize action",
+        "all systems are go",
+        "affirmative response",
+        "ready to continue",
+        "things check out",
+        "finalize decision"
     ],
     
     # Should map to "point" gesture
@@ -548,7 +829,13 @@ ZERO_SHOT_TEST_COMMANDS = {
         "click here",
         "choose this option",
         "I want that one",
-        "focus on this"
+        "focus on this",
+        "indicate this target",
+        "highlight this element",
+        "pick this choice",
+        "designate this object",
+        "direct attention here",
+        "show me that"
     ],
     
     # Should map to "mute" gesture
@@ -557,7 +844,12 @@ ZERO_SHOT_TEST_COMMANDS = {
         "silence the audio",
         "disable microphone",
         "quiet mode",
-        "no sound please"
+        "no sound please",
+        "cut the volume",
+        "suppress audio",
+        "deactivate speakers",
+        "enable silent mode",
+        "mute all sounds"
     ],
     
     # Should map to "call" gesture
@@ -566,7 +858,55 @@ ZERO_SHOT_TEST_COMMANDS = {
         "dial this number",
         "start voice chat",
         "answer the call",
-        "open communication"
+        "open communication",
+        "initiate phone conversation",
+        "ring someone up",
+        "place a call",
+        "contact via phone",
+        "begin telecommunication"
+    ],
+    
+    # Should map to "palm" or "stop"
+    "pause_request": [
+        "hold on a moment",
+        "wait a second",
+        "give me time",
+        "pause for now",
+        "hold that thought",
+        "interrupt briefly",
+        "temporary break",
+        "suspend activity"
+    ],
+    
+    # Should map to "fist"
+    "strength_action": [
+        "show determination",
+        "demonstrate strength",
+        "express solidarity",
+        "confirm firmly",
+        "hold tight",
+        "grip control",
+        "assert position"
+    ],
+    
+    # Should map to "peace"
+    "victory_celebration": [
+        "celebrate victory",
+        "show peace",
+        "express harmony",
+        "win gesture",
+        "peaceful sign",
+        "success indicator"
+    ],
+    
+    # Should map to "rock"
+    "excitement_music": [
+        "rock and roll",
+        "party time",
+        "music excitement",
+        "show enthusiasm",
+        "concert energy",
+        "metal music"
     ]
 }
 
