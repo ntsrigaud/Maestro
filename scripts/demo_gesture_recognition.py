@@ -22,6 +22,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 import torch
+import torch.nn as nn
 import timm
 from torchvision import transforms
 from PIL import Image
@@ -31,6 +32,54 @@ from src.recognition_engine.hand_detection import HandDetector, HandCropper
 from src.shared.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+# ============================================================================
+# Model Architecture Definitions (must match training notebook)
+# ============================================================================
+
+class ImprovedClassificationHead(nn.Module):
+    """
+    Enhanced classification head used in training.
+    3-layer architecture: 768 → 512 → 256 → num_classes
+    """
+    def __init__(self, in_features, num_classes, hidden_dim=512, dropout=0.3):
+        super().__init__()
+        self.head = nn.Sequential(
+            nn.LayerNorm(in_features),
+            nn.Linear(in_features, hidden_dim),
+            nn.GELU(),
+            nn.BatchNorm1d(hidden_dim),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.GELU(),
+            nn.BatchNorm1d(hidden_dim // 2),
+            nn.Dropout(dropout / 2),
+            nn.Linear(hidden_dim // 2, num_classes)
+        )
+    
+    def forward(self, x):
+        return self.head(x)
+
+
+class EnhancedViT(nn.Module):
+    """
+    Enhanced ViT wrapper used in training.
+    Consists of ViT backbone + custom classification head.
+    """
+    def __init__(self, backbone, num_classes, hidden_dim=512, dropout=0.3):
+        super().__init__()
+        self.backbone = backbone
+        self.head = ImprovedClassificationHead(
+            in_features=backbone.num_features,
+            num_classes=num_classes,
+            hidden_dim=hidden_dim,
+            dropout=dropout
+        )
+    
+    def forward(self, x):
+        features = self.backbone(x)
+        return self.head(features)
 
 # Hugging Face model repository
 DEFAULT_HF_REPO = "YOUR_USERNAME/hagrid-vit-gesture"  # Replace with your HF repo
@@ -226,16 +275,40 @@ class GestureRecognitionDemo:
 
         # Load gesture classification model
         print(f"Loading model from {self.checkpoint_path}...")
-        self.model = timm.create_model(
-            'vit_base_patch16_224',
-            pretrained=False,
-            num_classes=len(GESTURE_CLASSES)
-        )
-        self.model.load_state_dict(
-            torch.load(self.checkpoint_path, map_location=self.device)
-        )
+        
+        # Load checkpoint
+        checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
+        
+        # Detect architecture by inspecting state_dict keys
+        state_dict_keys = list(checkpoint.keys())
+        is_enhanced_vit = any(key.startswith('backbone.') or key.startswith('head.') 
+                             for key in state_dict_keys)
+        
+        if is_enhanced_vit:
+            logger.info("Detected EnhancedViT architecture (backbone + custom head)")
+            # Create EnhancedViT architecture
+            base_model = timm.create_model('vit_base_patch16_224', pretrained=False, num_classes=0)
+            self.model = EnhancedViT(
+                backbone=base_model,
+                num_classes=len(GESTURE_CLASSES),
+                hidden_dim=512,
+                dropout=0.3
+            )
+            self.model.load_state_dict(checkpoint)
+        else:
+            logger.info("Detected plain ViT architecture")
+            # Create plain ViT
+            self.model = timm.create_model(
+                'vit_base_patch16_224',
+                pretrained=False,
+                num_classes=len(GESTURE_CLASSES)
+            )
+            self.model.load_state_dict(checkpoint)
+        
         self.model = self.model.to(self.device)
         self.model.eval()
+        
+        logger.info(f"✓ Model loaded successfully ({type(self.model).__name__})")
 
         # Define preprocessing transform (matches training)
         self.transform = transforms.Compose([
