@@ -32,6 +32,10 @@ from src.shared.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Hugging Face model repository
+DEFAULT_HF_REPO = "YOUR_USERNAME/hagrid-vit-gesture"  # Replace with your HF repo
+DEFAULT_MODEL_DIR = project_root / "models" / "gesture_recognition"
+
 # Gesture classes (alphabetically sorted - must match training)
 GESTURE_CLASSES = [
     'call', 'dislike', 'fist', 'four', 'like', 'mute', 'ok', 'one',
@@ -49,12 +53,78 @@ COLOR_TEXT = (255, 255, 255)  # White
 COLOR_BG = (0, 0, 0)  # Black
 
 
+def download_model_from_hf(repo_id: str = DEFAULT_HF_REPO, cache_dir: Path = DEFAULT_MODEL_DIR) -> Path:
+    """
+    Download model from Hugging Face Hub if not already cached.
+    
+    Args:
+        repo_id: Hugging Face repository ID (username/repo-name)
+        cache_dir: Local directory to cache downloaded model
+    
+    Returns:
+        Path to downloaded model checkpoint
+    """
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    model_path = cache_dir / "best_model.pth"
+    metadata_path = cache_dir / "model_metadata.json"
+    
+    # Check if model already exists
+    if model_path.exists() and metadata_path.exists():
+        logger.info(f"✓ Model found in cache: {model_path}")
+        return model_path
+    
+    # Download from Hugging Face
+    logger.info(f"Downloading model from Hugging Face: {repo_id}")
+    logger.info("This is a one-time download (~330 MB)...")
+    
+    try:
+        from huggingface_hub import hf_hub_download
+        
+        # Download model weights
+        logger.info("Downloading model weights...")
+        downloaded_model = hf_hub_download(
+            repo_id=repo_id,
+            filename="best_model.pth",
+            cache_dir=cache_dir,
+            force_download=False
+        )
+        
+        # Download metadata
+        logger.info("Downloading metadata...")
+        downloaded_metadata = hf_hub_download(
+            repo_id=repo_id,
+            filename="model_metadata.json",
+            cache_dir=cache_dir,
+            force_download=False
+        )
+        
+        # Copy to cache location
+        import shutil
+        shutil.copy(downloaded_model, model_path)
+        shutil.copy(downloaded_metadata, metadata_path)
+        
+        logger.info(f"✓ Model downloaded successfully to: {model_path}")
+        return model_path
+        
+    except ImportError:
+        logger.error("huggingface_hub not installed. Install with: pip install huggingface_hub")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to download model: {e}")
+        logger.info(f"\nManual download instructions:")
+        logger.info(f"1. Visit: https://huggingface.co/{repo_id}")
+        logger.info(f"2. Download 'best_model.pth' to: {model_path}")
+        logger.info(f"3. Download 'model_metadata.json' to: {metadata_path}")
+        raise
+
+
 class GestureRecognitionDemo:
     """Real-time gesture recognition demo application."""
 
     def __init__(
         self,
-        checkpoint_path: str,
+        checkpoint_path: str = None,
+        hf_repo_id: str = None,
         camera_index: int = 0,
         window_name: str = "Gesture Recognition Demo",
         max_num_hands: int = 2,
@@ -66,7 +136,10 @@ class GestureRecognitionDemo:
         Initialize the gesture recognition demo.
 
         Args:
-            checkpoint_path: Path to fine-tuned model checkpoint (best_model.pth)
+            checkpoint_path: Path to fine-tuned model checkpoint (best_model.pth).
+                           If None, will download from Hugging Face.
+            hf_repo_id: Hugging Face repository ID (e.g., 'username/repo-name').
+                       Used if checkpoint_path is None.
             camera_index: Camera device index
             window_name: Window title
             max_num_hands: Maximum number of hands to detect
@@ -74,7 +147,23 @@ class GestureRecognitionDemo:
             confidence_threshold: Minimum confidence for gesture display
             device: 'cuda', 'mps', 'cpu', or None (auto-detect)
         """
+        # Handle model path
+        if checkpoint_path is None:
+            if hf_repo_id is None:
+                hf_repo_id = DEFAULT_HF_REPO
+            
+            logger.info(f"No checkpoint provided, downloading from Hugging Face: {hf_repo_id}")
+            checkpoint_path = download_model_from_hf(repo_id=hf_repo_id)
+        
         self.checkpoint_path = Path(checkpoint_path)
+        if not self.checkpoint_path.exists():
+            raise FileNotFoundError(
+                f"Model checkpoint not found: {self.checkpoint_path}\n"
+                f"Please either:\n"
+                f"  1. Train the model using notebooks/finetune_vit_hagrid.ipynb, or\n"
+                f"  2. Download from Hugging Face (set hf_repo_id parameter)"
+            )
+        
         self.camera_index = camera_index
         self.window_name = window_name
         self.max_num_hands = max_num_hands
@@ -562,13 +651,31 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Real-time gesture recognition demo"
+        description="Real-time gesture recognition demo",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Use local checkpoint
+  python demo_gesture_recognition.py --checkpoint notebooks/checkpoints/best_model.pth
+  
+  # Auto-download from Hugging Face
+  python demo_gesture_recognition.py --hf-repo username/hagrid-vit-gesture
+  
+  # Use cached model (if already downloaded)
+  python demo_gesture_recognition.py
+        """
     )
     parser.add_argument(
         "--checkpoint",
         type=str,
-        required=True,
-        help="Path to model checkpoint (best_model.pth)"
+        default=None,
+        help="Path to model checkpoint (best_model.pth). If not provided, downloads from Hugging Face."
+    )
+    parser.add_argument(
+        "--hf-repo",
+        type=str,
+        default=DEFAULT_HF_REPO,
+        help=f"Hugging Face repository ID (default: {DEFAULT_HF_REPO})"
     )
     parser.add_argument(
         "--camera",
@@ -602,22 +709,17 @@ def main():
 
     args = parser.parse_args()
 
-    # Validate checkpoint exists
-    if not Path(args.checkpoint).exists():
-        print(f"Error: Checkpoint file not found: {args.checkpoint}")
-        sys.exit(1)
-
     # Create and run demo
-    demo = GestureRecognitionDemo(
-        checkpoint_path=args.checkpoint,
-        camera_index=args.camera,
-        max_num_hands=args.max_hands,
-        show_cropped=args.show_cropped,
-        confidence_threshold=args.confidence,
-        device=args.device
-    )
-
     try:
+        demo = GestureRecognitionDemo(
+            checkpoint_path=args.checkpoint,
+            hf_repo_id=args.hf_repo,
+            camera_index=args.camera,
+            max_num_hands=args.max_hands,
+            show_cropped=args.show_cropped,
+            confidence_threshold=args.confidence,
+            device=args.device
+        )
         demo.run()
     except KeyboardInterrupt:
         print("\nInterrupted by user")
