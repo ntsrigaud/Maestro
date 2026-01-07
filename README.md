@@ -1,78 +1,159 @@
 # Hand Gesture Recognition System
 
-This project is a comprehensive exploration into the field of **Human-Computer
-Interaction (HCI)**, focusing on the development of a sophisticated **Hand
-Gesture Recognition System**. By leveraging cutting-edge techniques in
-**Computer Vision** and **Machine Learning**, we aim to create a system that
-can accurately interpret and translate human hand gestures into actionable
-commands, providing a seamless and intuitive way to interact with computing
-devices.
+A semantic gesture recognition system that understands the *meaning* of hand gestures through vision-language alignment, enabling zero-shot recognition and natural command mapping.
 
-## Introduction
+## Overview
 
-The primary goal of this project is to design and implement a robust gesture
-recognition system that goes beyond simple pattern matching. We are building
-a system that understands the semantic meaning behind gestures, enabling a more
-natural and powerful user experience. Our approach is inspired by
-state-of-the-art research in the field, including the **HAVIT** (Hierarchical
-Attention-based Vision Transformer) and **ALBEF** (Align before Fuse) models.
+This project implements a **semantic gesture recognition system** inspired by state-of-the-art vision-language models (HAVIT, ALBEF). Unlike traditional systems that rely on hardcoded gesture-to-action mappings, our approach learns a shared semantic space between visual gestures and text commands, enabling:
 
-The system architecture is composed of four main components:
+- **Zero-shot learning**: Recognize new gesture variations without retraining
+- **Semantic understanding**: Map gestures to their *meaning*, not just visual patterns
+- **Extensibility**: Add new commands via text descriptions, no model retraining needed
+- **Natural interaction**: Bridge vision and language for intuitive control
 
-- **Input Manager**: Responsible for capturing video frames from a camera
-  and preprocessing them for the recognition engine.
-- **Recognition Engine**: The core of the system, which uses a Vision
-  Transformer (ViT) based model to analyze the visual data and recognize the
-  performed gestures.
-- **Action Mapper**: Translates the recognized gestures into specific
-  commands or actions.
-- **OS Controller**: Executes the commands on the underlying operating system.
+### System Architecture
 
-A key feature of our project is the focus on **zero-shot learning**, which will
-allow the system to recognize new gestures without the need for retraining. This
-is achieved through a cross-modal learning approach that bridges the gap between
-vision and language, enabling the system to understand and generalize
-gesture-based commands.
-
-This repository contains all the code, documentation, and research materials
-related to the project.
-
-## Installation
-
-To set up the project for development:
-
-```bash
-# Install the project in editable mode
-pip install -e .
+```
+┌──────────┐    ┌──────────────┐    ┌──────────────────┐    ┌────────────┐    ┌──────────┐
+│  Camera  │───▶│Input Manager │───▶│Recognition Engine│───▶│Action Mapper│───▶│OS Control│
+└──────────┘    └──────────────┘    └──────────────────┘    └────────────┘    └──────────┘
+                                            │
+                                            ├── Hand Detection (MediaPipe)
+                                            ├── Gesture Classification (ViT)
+                                            ├── Temporal Modeling (LSTM)
+                                            └── Semantic Understanding (BERT)
 ```
 
-For detailed installation instructions, see [INSTALL.md](INSTALL.md).
+**Components**:
+- **Input Manager** ✅ - Camera capture and frame preprocessing
+- **Recognition Engine** 🔬 - Hand detection (complete), gesture classification (in research)
+- **Action Mapper** 📋 - Planned
+- **OS Controller** 📋 - Planned
+
+### Core Innovation
+
+**Traditional approach**:
+```
+Gesture → Classifier → Label → Hardcoded action
+```
+
+**Our approach**:
+```
+Gesture → Visual Embedding (ViT) → Semantic Space ↔ Text Embedding (BERT) → Action
+```
+
+This enables flexible, meaning-based gesture interpretation instead of rigid pattern matching.
 
 ## Quick Start
 
-After installation, you can use the input manager:
+### Installation
 
-```python
-from input_manager import InputManager
+```bash
+# Create conda environment
+conda env create -f environment.yml
+conda activate gesture
 
-# Single frame capture
-manager = InputManager(camera_index=0)
-manager.start_capture()
-frame = manager.get_frame()  # Returns numpy array
-manager.stop_capture()
+# Install project in editable mode
+pip install -e .
 
-# Continuous capture (recommended)
-manager = InputManager(camera_index=0)
-manager.start_continuous_capture()
-frame_data = manager.get_latest_frame()  # Returns FrameData with timestamp
-manager.stop_continuous_capture()
+# Verify installation
+python scripts/verify_install.py
 ```
 
-See `src/input_manager/example_usage.py` for more examples.
+See [INSTALL.md](INSTALL.md) for detailed instructions.
 
-## Group Members
+### Try Hand Detection
+
+```bash
+python scripts/demo_hand_detection.py
+```
+
+This opens a real-time window showing hand detection with landmarks and bounding boxes.
+
+### Train a Gesture Recognition Model
+
+```bash
+# 1. Download dataset (~1.5 GB, 5-15 minutes)
+pip install kaggle
+python scripts/download_hagrid_kaggle.py --save_path ./data/hagrid_subset
+
+# 2. Open training notebook
+jupyter notebook notebooks/finetune_vit_hagrid.ipynb
+
+# 3. Run all cells to train ViT model (~30-60 min on GPU)
+```
+
+Expected accuracy: 85-90% after 10 epochs.
+
+## Documentation
+
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Complete development workflow and common tasks
+- **[Training Guide](TRAINING_README.md)** - Model training details
+- **[Installation Guide](INSTALL.md)** - Detailed setup instructions
+- **[Architecture Overview](docs/Project-Architecture/README.md)** - System design
+- **[API Documentation](docs/)** - Module-level documentation
+
+## Project Structure
+
+```
+├── src/                          # Core implementation
+│   ├── input_manager/            # Camera capture (✅ Complete)
+│   ├── recognition_engine/       # Gesture recognition (🔬 Research)
+│   │   ├── hand_detection/       # MediaPipe integration (✅ Complete)
+│   │   └── temporal/             # LSTM temporal modeling (🔬 Experimental)
+│   └── shared/                   # Utilities (✅ Complete)
+├── notebooks/                    # Training and research
+│   ├── finetune_vit_hagrid.ipynb       # Main training workflow
+│   ├── semantic_gesture_learning.ipynb # Semantic understanding
+│   └── vit_lstm_gesture_training.ipynb # Temporal modeling
+├── scripts/                      # Demos and utilities
+│   ├── demo_hand_detection.py    # Hand detection demo
+│   ├── demo_gesture_recognition.py # Full pipeline demo
+│   └── download_hagrid_kaggle.py # Dataset downloader
+├── docs/                         # Documentation
+│   ├── Project-Architecture/     # Design documents
+│   ├── Topics/                   # Research references
+│   └── HaGRID_DATASET_ASSESSMENT.md # Dataset analysis
+├── environment.yml               # Conda environment
+├── pyproject.toml                # Package configuration
+└── README.md                     # This file
+```
+
+## Research Foundation
+
+Our approach builds on:
+- **HAVIT**: Hierarchical video-text understanding
+- **ALBEF**: Vision-language alignment through contrastive learning
+- **Vision Transformer (ViT)**: Patch-based image understanding
+- **HaGRID Dataset**: 30K hand gesture images across 18 classes
+
+See [docs/Topics/](docs/Topics/) for detailed research documentation.
+
+## Current Status
+
+### Completed ✅
+- Input Manager: Camera capture, frame buffering, timestamp management
+- Hand Detection: MediaPipe-based detection with 21 landmarks
+- ViT Fine-tuning: Gesture classification model trained on HaGRID
+- Logging system: Centralized logging with rotation
+
+### In Progress 🔬
+- Temporal modeling: LSTM-based dynamic gesture recognition
+- Semantic understanding: Vision-language alignment for zero-shot learning
+- End-to-end pipeline: Integrating all components
+
+### Planned 📋
+- Action Mapper: Gesture-to-command translation
+- OS Controller: System command execution
+- Real-time demo: Complete application
+
+## Team
 
 - Sley Hortes
 - Neil Taison Rigaud
 - Khishig Tuguldur
 - Eder Guerrero
+
+## License
+
+This is an academic capstone project for National Dong Hwa University.
