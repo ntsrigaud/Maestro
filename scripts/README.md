@@ -41,12 +41,20 @@ This directory contains utility scripts for testing, demonstration, and verifica
 - **`demo_gesture_recognition.py`** - **End-to-end real-time gesture recognition** 🆕
   - Integrates camera input, hand detection, and gesture classification
   - Uses fine-tuned ViT-B/16 model (18 gesture classes)
+  - **Auto-downloads model from Hugging Face** if not present locally
   - Temporal smoothing for stable predictions
   - Color-coded confidence levels
   - Multi-hand support (up to 2 hands)
   - Real-time FPS monitoring
-  - Requires trained model checkpoint (`best_model.pth`)
   - See `GESTURE_RECOGNITION_DEMO.md` for detailed usage
+
+## Model Management Scripts
+
+- **`upload_model_to_huggingface.py`** - Upload trained models to Hugging Face Hub
+  - Packages model weights and metadata
+  - Auto-generates comprehensive model card
+  - Handles authentication and versioning
+  - Usage: `python upload_model_to_huggingface.py --repo-id username/repo-name --token YOUR_TOKEN`
 
 ## Verification Scripts
 
