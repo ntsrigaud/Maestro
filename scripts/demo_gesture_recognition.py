@@ -164,6 +164,29 @@ class GestureRecognitionDemo:
         # Input manager
         self.input_mgr = InputManager(camera_index=self.camera_index)
         self.input_mgr._convert_to_rgb = False  # Keep BGR for MediaPipe
+        
+        # Start camera capture
+        if not self.input_mgr.start_capture():
+            raise RuntimeError(
+                f"Failed to open camera {self.camera_index}. "
+                f"Please check camera is connected and not in use by another application."
+            )
+        
+        # Start continuous capture in background thread
+        if not self.input_mgr.start_continuous_capture():
+            self.input_mgr.stop_capture()
+            raise RuntimeError("Failed to start continuous capture")
+        
+        # Wait for first frame to be ready
+        logger.info("Waiting for camera...")
+        if not self.input_mgr.wait_for_frame(timeout=5.0):
+            self.input_mgr.stop_capture()
+            raise RuntimeError(
+                "Camera timeout - no frames received. "
+                "Camera may be in use or not responding."
+            )
+        
+        logger.info("✓ Camera ready")
 
         # Hand detector
         self.detector = HandDetector(
@@ -275,7 +298,12 @@ class GestureRecognitionDemo:
 
     def run(self):
         """Run demo loop."""
-        self.initialize()
+        try:
+            self.initialize()
+        except RuntimeError as e:
+            logger.error(f"Initialization failed: {e}")
+            logger.info("Demo cannot run without camera access")
+            return
 
         logger.info("Starting demo...")
         logger.info("Press 'q' to quit")
@@ -285,7 +313,7 @@ class GestureRecognitionDemo:
         try:
             while True:
                 # Get frame
-                frame_data = self.input_mgr.get_frame()
+                frame_data = self.input_mgr.get_latest_frame()
                 if frame_data is None or frame_data.frame is None:
                     logger.warning("Failed to get frame")
                     time.sleep(0.1)
@@ -322,7 +350,10 @@ class GestureRecognitionDemo:
     def cleanup(self):
         """Cleanup resources."""
         if self.input_mgr:
-            self.input_mgr.release()
+            try:
+                self.input_mgr.stop_capture()
+            except Exception as e:
+                logger.warning(f"Error during camera cleanup: {e}")
         cv2.destroyAllWindows()
         logger.info("Demo stopped")
 
