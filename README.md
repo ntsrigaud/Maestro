@@ -87,11 +87,18 @@ Expected accuracy: 85-90% after 10 epochs.
 
 ## Documentation
 
+### Setup & Development
 - **[Development Guide](DEVELOPMENT_GUIDE.md)** - Complete development workflow and common tasks
-- **[Training Guide](TRAINING_README.md)** - Model training details
 - **[Installation Guide](INSTALL.md)** - Detailed setup instructions
 - **[Architecture Overview](docs/Project-Architecture/README.md)** - System design
 - **[API Documentation](docs/)** - Module-level documentation
+
+### Model Training
+- **[Training Guide](TRAINING_README.md)** - Model training details
+- **[Retrain Quick Start](RETRAIN_QUICKSTART.md)** - ⚡ Fast guide to retrain clean baseline model
+- **[Clean Baseline Refactoring](CLEAN_BASELINE_REFACTORING.md)** - 📋 Complete explanation of Version 3.0 changes
+- **[Validation Checklist](CLEAN_BASELINE_VALIDATION.md)** - ✓ Step-by-step verification guide
+- **[Before/After Comparison](CLEAN_BASELINE_BEFORE_AFTER.md)** - 🔄 Side-by-side configuration comparison
 
 ## Project Structure
 
