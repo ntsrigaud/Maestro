@@ -281,8 +281,7 @@ class GestureRecognitionDemo:
         
         # Detect architecture by inspecting state_dict keys
         state_dict_keys = list(checkpoint.keys())
-        is_enhanced_vit = any(key.startswith('backbone.') or key.startswith('head.') 
-                             for key in state_dict_keys)
+        is_enhanced_vit = any(key.startswith('head.head.') for key in state_dict_keys)
         
         if is_enhanced_vit:
             logger.info("Detected EnhancedViT architecture (backbone + custom head)")
@@ -296,7 +295,7 @@ class GestureRecognitionDemo:
             )
             self.model.load_state_dict(checkpoint)
         else:
-            logger.info("Detected plain ViT architecture")
+            logger.info("Detected standard ViT architecture (baseline)")
             # Create plain ViT
             self.model = timm.create_model(
                 'vit_base_patch16_224',
@@ -310,11 +309,15 @@ class GestureRecognitionDemo:
         
         logger.info(f"✓ Model loaded successfully ({type(self.model).__name__})")
 
-        # Define preprocessing transform (matches training)
+        # Define preprocessing transform (MUST match training exactly)
+        # Clean baseline: Resize → ToTensor → Normalize (NO augmentation)
         self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                               std=[0.229, 0.224, 0.225])
+            transforms.Resize((224, 224)),  # Explicit resize (though cropper already does this)
+            transforms.ToTensor(),           # Convert to [0, 1] tensor
+            transforms.Normalize(            # ImageNet normalization
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
         ])
 
         print("✓ Initialization complete")
