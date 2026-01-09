@@ -165,25 +165,12 @@ class GestureRecognitionDemo:
         self.input_mgr = InputManager(camera_index=self.camera_index)
         self.input_mgr._convert_to_rgb = False  # Keep BGR for MediaPipe
         
-        # Start camera capture
-        if not self.input_mgr.start_capture():
+        # Start continuous capture (handles camera opening and frame thread)
+        # This method internally waits for first frame with 1 second timeout
+        if not self.input_mgr.start_continuous_capture():
             raise RuntimeError(
                 f"Failed to open camera {self.camera_index}. "
                 f"Please check camera is connected and not in use by another application."
-            )
-        
-        # Start continuous capture in background thread
-        if not self.input_mgr.start_continuous_capture():
-            self.input_mgr.stop_capture()
-            raise RuntimeError("Failed to start continuous capture")
-        
-        # Wait for first frame to be ready
-        logger.info("Waiting for camera...")
-        if not self.input_mgr.wait_for_frame(timeout=5.0):
-            self.input_mgr.stop_capture()
-            raise RuntimeError(
-                "Camera timeout - no frames received. "
-                "Camera may be in use or not responding."
             )
         
         logger.info("✓ Camera ready")
