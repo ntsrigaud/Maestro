@@ -258,16 +258,18 @@ class GestureRecognitionDemo:
 
         # Process each detection
         for detection in detections:
-            bbox = detection.bbox
-            x1, y1, x2, y2 = bbox
+            # Extract bbox coordinates (x, y, width, height)
+            x, y, w, h = detection.bbox
+            x1, y1 = x, y
+            x2, y2 = x + w, y + h
 
-            # Crop hand region
-            hand_roi = self.cropper.crop(frame, bbox)
-            if hand_roi is None:
+            # Crop hand region using the detection object
+            hand_roi = self.cropper.crop_hand(frame, detection)
+            if hand_roi is None or hand_roi.image is None:
                 continue
 
-            # Classify gesture
-            gesture, confidence = self.classify_gesture(hand_roi)
+            # Classify gesture using the cropped image
+            gesture, confidence = self.classify_gesture(hand_roi.image)
 
             # Draw results if confidence above threshold
             if confidence >= self.confidence_threshold:
@@ -276,8 +278,8 @@ class GestureRecognitionDemo:
 
                 # Label
                 label = f"{gesture}: {confidence:.2f}"
-                (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                cv2.rectangle(frame, (x1, y1 - h - 10), (x1 + w, y1), COLOR_BG, -1)
+                (label_w, label_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                cv2.rectangle(frame, (x1, y1 - label_h - 10), (x1 + label_w, y1), COLOR_BG, -1)
                 cv2.putText(frame, label, (x1, y1 - 5), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_TEXT, 2)
 
