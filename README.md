@@ -1,129 +1,77 @@
 # Hand Gesture Recognition System
 
-A semantic gesture recognition system that understands the *meaning* of hand gestures through vision-language alignment, enabling zero-shot recognition and natural command mapping.
+**Status:** Clean baseline after evaluation collapse  
+**Focus:** Restore correctness before experimental features
+
+---
 
 ## Overview
 
-This project implements a **semantic gesture recognition system** inspired by state-of-the-art vision-language models (HAVIT, ALBEF). Unlike traditional systems that rely on hardcoded gesture-to-action mappings, our approach learns a shared semantic space between visual gestures and text commands, enabling:
+Vision-based gesture recognition using ViT-B/16 for human-computer interaction.
 
-- **Zero-shot learning**: Recognize new gesture variations without retraining
-- **Semantic understanding**: Map gestures to their *meaning*, not just visual patterns
-- **Extensibility**: Add new commands via text descriptions, no model retraining needed
-- **Natural interaction**: Bridge vision and language for intuitive control
+After accuracy collapsed from 89% to 11% with single-class dominance, the system was reset to a minimal, correct baseline.
 
-### System Architecture
+**Current Implementation:**
+- Hand detection (MediaPipe)
+- ViT-B/16 classification (single linear head)
+- No augmentation, no TTA
+- Consistent preprocessing across all code paths
 
-```
-┌──────────┐    ┌──────────────┐    ┌──────────────────┐    ┌────────────┐    ┌──────────┐
-│  Camera  │───▶│Input Manager │───▶│Recognition Engine│───▶│Action Mapper│───▶│OS Control│
-└──────────┘    └──────────────┘    └──────────────────┘    └────────────┘    └──────────┘
-                                            │
-                                            ├── Hand Detection (MediaPipe)
-                                            ├── Gesture Classification (ViT)
-                                            ├── Temporal Modeling (LSTM)
-                                            └── Semantic Understanding (BERT)
-```
+**Design:** Correctness > Performance, Interpretability > Cleverness
 
-**Components**:
-- **Input Manager** ✅ - Camera capture and frame preprocessing
-- **Recognition Engine** 🔬 - Hand detection (complete), gesture classification (in research)
-- **Action Mapper** 📋 - Planned
-- **OS Controller** 📋 - Planned
-
-### Core Innovation
-
-**Traditional approach**:
-```
-Gesture → Classifier → Label → Hardcoded action
-```
-
-**Our approach**:
-```
-Gesture → Visual Embedding (ViT) → Semantic Space ↔ Text Embedding (BERT) → Action
-```
-
-This enables flexible, meaning-based gesture interpretation instead of rigid pattern matching.
+---
 
 ## Quick Start
 
-### Installation
-
 ```bash
-# Create conda environment
-conda env create -f environment.yml
-conda activate gesture
+# Install dependencies
+pip install torch torchvision timm scikit-learn matplotlib seaborn pillow huggingface_hub
 
-# Install project in editable mode
-pip install -e .
+# Download dataset: https://www.kaggle.com/datasets/innominate817/hagrid-sample-30k-384p
+# Extract to: ./data/hagrid-sample-30k-384p/hagrid_30k/
 
-# Verify installation
-python scripts/verify_install.py
-```
+# Verify setup
+python scripts/verify_clean_baseline.py
 
-See [INSTALL.md](INSTALL.md) for detailed instructions.
-
-### Try Hand Detection
-
-```bash
-python scripts/demo_hand_detection.py
-```
-
-This opens a real-time window showing hand detection with landmarks and bounding boxes.
-
-### Train a Gesture Recognition Model
-
-```bash
-# 1. Download dataset (~1.5 GB, 5-15 minutes)
-pip install kaggle
-python scripts/download_hagrid_kaggle.py --save_path ./data/hagrid_subset
-
-# 2. Open training notebook
+# Train (30-45 min on GPU)
 jupyter notebook notebooks/finetune_vit_hagrid.ipynb
 
-# 3. Run all cells to train ViT model (~30-60 min on GPU)
+# Upload to Hugging Face (optional)
+python scripts/upload_model_to_huggingface.py --repo-id username/repo-name
+
+# Run demo
+python scripts/demo_gesture_recognition.py
 ```
 
-Expected accuracy: 85-90% after 10 epochs.
+**Expected:** Test accuracy 85-92%, clear confusion matrix diagonal
+
+**Details:** See [CLEAN_BASELINE.md](CLEAN_BASELINE.md)
 
 ## Documentation
 
-### Setup & Development
-- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Complete development workflow and common tasks
-- **[Installation Guide](INSTALL.md)** - Detailed setup instructions
-- **[Architecture Overview](docs/Project-Architecture/README.md)** - System design
-- **[API Documentation](docs/)** - Module-level documentation
+**Clean Baseline:** [CLEAN_BASELINE.md](CLEAN_BASELINE.md) - Architecture, rationale, quick reference
 
-### Model Training
-- **[Training Guide](TRAINING_README.md)** - Model training details
-- **[Retrain Quick Start](RETRAIN_QUICKSTART.md)** - ⚡ Fast guide to retrain clean baseline model
-- **[Clean Baseline Refactoring](CLEAN_BASELINE_REFACTORING.md)** - 📋 Complete explanation of Version 3.0 changes
-- **[Validation Checklist](CLEAN_BASELINE_VALIDATION.md)** - ✓ Step-by-step verification guide
-- **[Before/After Comparison](CLEAN_BASELINE_BEFORE_AFTER.md)** - 🔄 Side-by-side configuration comparison
+**Additional:**
+- [INSTALL.md](INSTALL.md) - Detailed setup
+- [TRAINING_README.md](TRAINING_README.md) - Training details
+- [docs/](docs/) - Architecture and research documentation
 
 ## Project Structure
 
 ```
-├── src/                          # Core implementation
-│   ├── input_manager/            # Camera capture (✅ Complete)
-│   ├── recognition_engine/       # Gesture recognition (🔬 Research)
-│   │   ├── hand_detection/       # MediaPipe integration (✅ Complete)
-│   │   └── temporal/             # LSTM temporal modeling (🔬 Experimental)
-│   └── shared/                   # Utilities (✅ Complete)
-├── notebooks/                    # Training and research
-│   ├── finetune_vit_hagrid.ipynb       # Main training workflow
-│   ├── semantic_gesture_learning.ipynb # Semantic understanding
-│   └── vit_lstm_gesture_training.ipynb # Temporal modeling
-├── scripts/                      # Demos and utilities
-│   ├── demo_hand_detection.py    # Hand detection demo
-│   ├── demo_gesture_recognition.py # Full pipeline demo
-│   └── download_hagrid_kaggle.py # Dataset downloader
-├── docs/                         # Documentation
-│   ├── Project-Architecture/     # Design documents
-│   ├── Topics/                   # Research references
-│   └── HaGRID_DATASET_ASSESSMENT.md # Dataset analysis
-├── environment.yml               # Conda environment
-├── pyproject.toml                # Package configuration
-└── README.md                     # This file
+├── notebooks/
+│   └── finetune_vit_hagrid.ipynb                   # Training (clean baseline)
+├── scripts/
+│   ├── demo_gesture_recognition.py                 # Demo with HF auto-download
+│   ├── upload_model_to_huggingface.py             # Upload to HF Hub
+│   ├── verify_clean_baseline.py                   # Pre-training verification
+│   └── download_hagrid_kaggle.py                  # Dataset downloader
+├── src/
+│   ├── input_manager/                             # Camera capture
+│   ├── recognition_engine/                        # Hand detection
+│   └── shared/                                    # Logging, utils
+├── docs/                                          # Documentation
+└── CLEAN_BASELINE.md                              # Current implementation
 ```
 
 ## Research Foundation
