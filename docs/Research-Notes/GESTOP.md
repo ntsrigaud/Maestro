@@ -30,7 +30,7 @@
 ## Additional Notes
 
 - **Customizable system**
-  - Map gesturess to arbitrary desktop actions including _shell scripts_.
+  - Map gestures to arbitrary desktop actions including _shell scripts_.
   - More flexible
 - Use **Mediapipe** to detect **_hand keypoints_** for individual video frames.
 - **Keypoints** are used to detect static and dynamic gestures using their neural networks.
