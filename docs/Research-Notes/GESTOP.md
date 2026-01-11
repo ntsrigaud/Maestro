@@ -7,7 +7,7 @@
 - Static and dynamic gestures
 - Dynamic gestures
   - Sequence of poses
-  - Combination of hand motion along with continous pose
+  - Combination of hand motion along with continuous pose
 
 ---
 
