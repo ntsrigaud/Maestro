@@ -188,3 +188,5 @@ notebooks/data/hagrid-sample-30k-384p/hagrid-sample-30k-384p
 notebooks/data/
 notebooks/hagrid-sample-30k-384p/hagrid-sample-30k-384p
 models/gesture_recognition
+checkpoints/.locks/models--neilrigaud--hagrid-vit-gesture
+checkpoints
