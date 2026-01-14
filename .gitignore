@@ -181,6 +181,7 @@ compile_commands.json
 *.exe
 *.dll
 *.dylib
+*.tar.gz
 data/hagrid_subset
 notebooks/checkpoints
 notebooks/data/hagrid-sample-30k-384p/hagrid-sample-30k-384p/hagrid-sample-30k-384p
