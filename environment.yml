@@ -8,7 +8,7 @@ dependencies:
   # Core Python Runtime
   # ====================
   - python=3.10
-  
+
   # ====================
   # Deep Learning Framework
   # ====================
@@ -16,55 +16,55 @@ dependencies:
   - pytorch::pytorch>=2.0.0
   - pytorch::torchvision>=0.15.0
   - pytorch::torchaudio
-  
+
   # Vision models library (ViT-B/16 backbone)
   - conda-forge::timm>=0.9.0
-  
+
   # ====================
   # Computer Vision
   # ====================
   # OpenCV - conda provides better integration with system libraries
   - conda-forge::opencv>=4.8.0
-  
+
   # ====================
   # Scientific Computing
   # ====================
   - conda-forge::numpy>=1.24.0
-  
+
   # ====================
   # Image Processing
   # ====================
   - conda-forge::pillow>=9.0.0
-  
+
   # ====================
   # Data Science & ML
   # ====================
   - conda-forge::pandas>=1.5.0
   - conda-forge::scikit-learn>=1.2.0
-  
+
   # ====================
   # Visualization
   # ====================
   - conda-forge::matplotlib>=3.5.0
   - conda-forge::seaborn>=0.12.0
-  
+
   # ====================
   # Utilities
   # ====================
   - conda-forge::tqdm>=4.65.0
-  
+
   # ====================
   # Jupyter Environment
   # ====================
   - conda-forge::jupyter>=1.0.0
   - conda-forge::ipykernel>=6.20.0
   - conda-forge::nbconvert>=7.0.0
-  
+
   # ====================
   # Package Manager
   # ====================
   - pip
-  
+
   # ====================
   # Pip-Only Dependencies
   # ====================
@@ -73,13 +73,13 @@ dependencies:
       # MediaPipe - Google's ML framework for hand detection
       # Conda version is outdated/broken; pip provides latest 0.10.x API
       - mediapipe>=0.10.21
-      
+
       # Sentence transformers for semantic gesture learning (optional)
       - sentence-transformers>=2.2.0
-      
+
       # Hugging Face ecosystem (optional - for model hosting/download)
       - huggingface-hub>=0.16.0
-      
+
       # Optional: Dataset utilities (for HaGRID download scripts)
       - kagglehub>=0.1.0
       - gdown>=4.7.0
