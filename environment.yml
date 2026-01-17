@@ -70,10 +70,6 @@ dependencies:
   # ====================
   # These packages are unavailable or unreliable in conda channels
   - pip:
-      # MediaPipe - Google's ML framework for hand detection
-      # Conda version is outdated/broken; pip provides latest 0.10.x API
-      - mediapipe>=0.10.21
-
       # Sentence transformers for semantic gesture learning (optional)
       - sentence-transformers>=2.2.0
 
