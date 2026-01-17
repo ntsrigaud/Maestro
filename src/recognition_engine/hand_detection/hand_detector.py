@@ -26,8 +26,6 @@ try:
     import mediapipe as mp
     from mediapipe.tasks import python
     from mediapipe.tasks.python import vision
-    from mediapipe import solutions
-    from mediapipe.framework.formats import landmark_pb2
     
     MEDIAPIPE_VERSION = mp.__version__
     logger.info(f"MediaPipe version {MEDIAPIPE_VERSION} loaded successfully")
@@ -172,11 +170,6 @@ class HandDetector:
         
         # Create the hand landmarker
         self._detector = vision.HandLandmarker.create_from_options(options)
-        
-        # Store reference to solutions for drawing (if needed by downstream code)
-        self._mp_hands = solutions.hands
-        self._mp_drawing = solutions.drawing_utils
-        self._mp_drawing_styles = solutions.drawing_styles
 
         # Performance tracking
         self._frame_count = 0
