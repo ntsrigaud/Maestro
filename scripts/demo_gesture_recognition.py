@@ -36,32 +36,48 @@ logger = get_logger(__name__)
 DEFAULT_HF_REPO = "YOUR_USERNAME/hagrid-vit-gesture"
 DEFAULT_MODEL_DIR = project_root / "checkpoints"
 
-# Gesture classes (alphabetically sorted - MUST match training)
-GESTURE_CLASSES = [
-    "call",
-    "dislike",
-    "fist",
-    "four",
-    "like",
-    "mute",
-    "ok",
-    "one",
-    "palm",
-    "peace",
-    "peace_inverted",
-    "rock",
-    "stop",
-    "stop_inverted",
-    "three",
-    "three2",
-    "two_up",
-    "two_up_inverted",
-]
-
 # Visualization colors (BGR format)
-COLOR_BBOX = (0, 255, 0)
+COLOR_BBOX = (0, 255, 0)  # Green - high confidence
+COLOR_BBOX_LOW = (0, 165, 255)  # Orange - low confidence
 COLOR_TEXT = (255, 255, 255)
 COLOR_BG = (0, 0, 0)
+
+
+def load_class_names(checkpoint_path: Path) -> list:
+    """
+    Load class names dynamically from checkpoint.
+    
+    Args:
+        checkpoint_path: Path to model checkpoint
+        
+    Returns:
+        List of class names in correct order
+        
+    Raises:
+        ValueError: If class names cannot be determined
+    """
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    
+    # Try to get class names from checkpoint metadata
+    if 'class_names' in checkpoint:
+        class_names = checkpoint['class_names']
+        logger.info(f"Loaded {len(class_names)} classes from checkpoint metadata")
+        return class_names
+    
+    # Fallback: infer from model architecture
+    state_dict = checkpoint.get('model_state_dict', checkpoint)
+    if 'head.weight' in state_dict:
+        num_classes = state_dict['head.weight'].shape[0]
+        logger.warning(
+            f"No class_names in checkpoint. Inferred {num_classes} classes from model architecture. "
+            f"Using generic labels (class_0, class_1, ...)."
+        )
+        return [f"class_{i}" for i in range(num_classes)]
+    
+    raise ValueError(
+        "Cannot determine class names from checkpoint. "
+        "Checkpoint must contain 'class_names' metadata or 'head.weight' layer."
+    )
 
 
 def download_model_from_hf(repo_id: str, cache_dir: Path) -> Path:
@@ -166,9 +182,12 @@ class GestureRecognitionDemo:
         self.input_mgr = None
         self.model = None
         self.transform = None
+        self.gesture_classes = None  # Loaded dynamically from checkpoint
 
         # Statistics
         self.fps_history = deque(maxlen=30)
+        self.last_prediction = None  # Track for display
+        self.last_confidence = 0.0
 
     def initialize(self):
         """Initialize all components."""
@@ -188,13 +207,19 @@ class GestureRecognitionDemo:
 
         logger.info("✓ Camera ready")
 
+        # Load class names dynamically from checkpoint
+        logger.info("Loading class names from checkpoint...")
+        self.gesture_classes = load_class_names(self.checkpoint_path)
+        logger.info(f"✓ Loaded {len(self.gesture_classes)} gesture classes")
+        logger.info(f"  Classes: {', '.join(self.gesture_classes[:5])}{'...' if len(self.gesture_classes) > 5 else ''}")
+        
         # Load model
         logger.info(f"Loading model from {self.checkpoint_path}")
         checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
 
         # Load clean baseline ViT (standard architecture)
         self.model = timm.create_model(
-            "vit_base_patch16_224", pretrained=False, num_classes=len(GESTURE_CLASSES)
+            "vit_base_patch16_224", pretrained=False, num_classes=len(self.gesture_classes)
         )
 
         # Handle both full checkpoint and state_dict-only formats
@@ -207,7 +232,23 @@ class GestureRecognitionDemo:
         self.model = self.model.to(self.device)
         self.model.eval()
 
-        logger.info(f"✓ Model loaded (ViT-B/16, {len(GESTURE_CLASSES)} classes)")
+        logger.info(f"✓ Model loaded (ViT-B/16, {len(self.gesture_classes)} classes)")
+        
+        # Verify label alignment
+        if 'model_state_dict' in checkpoint:
+            state_dict = checkpoint['model_state_dict']
+        else:
+            state_dict = checkpoint
+        
+        model_num_classes = state_dict['head.weight'].shape[0]
+        if model_num_classes != len(self.gesture_classes):
+            logger.error(
+                f"LABEL MISMATCH: Model has {model_num_classes} outputs but "
+                f"{len(self.gesture_classes)} class names loaded!"
+            )
+            raise ValueError("Class count mismatch between model and labels")
+        
+        logger.info(f"✓ Label alignment verified ({model_num_classes} classes)")
 
         # Preprocessing transform (MUST match training exactly)
         self.transform = transforms.Compose(
@@ -246,7 +287,11 @@ class GestureRecognitionDemo:
         # Get prediction
         pred_idx = output.argmax(dim=1).item()
         confidence = probs[pred_idx].item()
-        gesture = GESTURE_CLASSES[pred_idx]
+        gesture = self.gesture_classes[pred_idx]
+        
+        # Store for display
+        self.last_prediction = gesture
+        self.last_confidence = confidence
 
         return gesture, confidence
 
@@ -262,26 +307,87 @@ class GestureRecognitionDemo:
         # Classify gesture
         gesture, confidence = self.classify_gesture(preprocessed)
         
-        # Draw results if confidence above threshold
-        if confidence >= self.confidence_threshold:
-            # Draw crop region
-            cv2.rectangle(frame, (x1, y1), (x2, y2), COLOR_BBOX, 2)
-            
-            # Label
-            label = f"{gesture}: {confidence:.2f}"
-            (label_w, label_h), _ = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
-            )
-            cv2.rectangle(
-                frame, (x1, y1 - label_h - 10), (x1 + label_w, y1), COLOR_BG, -1
-            )
+        # ALWAYS show prediction (critical for user feedback)
+        # Choose color based on confidence
+        is_high_conf = confidence >= self.confidence_threshold
+        bbox_color = COLOR_BBOX if is_high_conf else COLOR_BBOX_LOW
+        
+        # Draw crop region
+        cv2.rectangle(frame, (x1, y1), (x2, y2), bbox_color, 3)
+        
+        # ==============================================================
+        # PRIMARY LABEL: Top-left of frame (always visible)
+        # ==============================================================
+        primary_label = f"GESTURE: {gesture.upper()}"
+        conf_label = f"CONFIDENCE: {confidence:.1%}"
+        
+        # Large, bold text for primary label
+        primary_font_scale = 1.2
+        primary_thickness = 3
+        conf_font_scale = 0.9
+        conf_thickness = 2
+        
+        # Position at top-left with padding
+        label_x = 20
+        label_y = 60
+        
+        # Draw background panel for primary labels
+        panel_height = 100
+        cv2.rectangle(
+            frame,
+            (10, 40),
+            (w - 10, 40 + panel_height),
+            COLOR_BG,
+            -1
+        )
+        
+        # Draw primary label (gesture name)
+        cv2.putText(
+            frame,
+            primary_label,
+            (label_x, label_y),
+            cv2.FONT_HERSHEY_DUPLEX,
+            primary_font_scale,
+            bbox_color,  # Use confidence color
+            primary_thickness,
+        )
+        
+        # Draw confidence
+        cv2.putText(
+            frame,
+            conf_label,
+            (label_x, label_y + 40),
+            cv2.FONT_HERSHEY_DUPLEX,
+            conf_font_scale,
+            COLOR_TEXT,
+            conf_thickness,
+        )
+        
+        # Add status indicator
+        status = "✓ HIGH CONFIDENCE" if is_high_conf else "⚠ LOW CONFIDENCE"
+        status_color = COLOR_BBOX if is_high_conf else COLOR_BBOX_LOW
+        cv2.putText(
+            frame,
+            status,
+            (label_x, label_y + 75),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            status_color,
+            2,
+        )
+        
+        # ==============================================================
+        # SECONDARY LABEL: Above crop box (if space available)
+        # ==============================================================
+        if y1 > 50:  # Only if there's space above crop box
+            compact_label = f"{gesture}: {confidence:.0%}"
             cv2.putText(
                 frame,
-                label,
-                (x1, y1 - 5),
+                compact_label,
+                (x1 + 10, y1 - 15),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                COLOR_TEXT,
+                0.7,
+                bbox_color,
                 2,
             )
 
@@ -298,8 +404,13 @@ class GestureRecognitionDemo:
 
         logger.info("Starting demo...")
         logger.info("Press 'q' to quit")
+        logger.info("\n" + "="*70)
+        logger.info("LIVE PREDICTIONS (updated every frame):")
+        logger.info("="*70)
 
         prev_time = time.time()
+        frame_count = 0
+        log_interval = 10  # Log every N frames
 
         try:
             while True:
@@ -314,6 +425,15 @@ class GestureRecognitionDemo:
 
                 # Process frame
                 processed_frame = self.process_frame(frame)
+                
+                # Log predictions to console periodically
+                frame_count += 1
+                if frame_count % log_interval == 0 and self.last_prediction:
+                    conf_status = "HIGH" if self.last_confidence >= self.confidence_threshold else "LOW"
+                    logger.info(
+                        f"[Frame {frame_count:04d}] Gesture: {self.last_prediction.upper():20s} | "
+                        f"Confidence: {self.last_confidence:6.1%} | Status: {conf_status}"
+                    )
 
                 # Calculate FPS
                 curr_time = time.time()
