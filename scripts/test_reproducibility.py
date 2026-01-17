@@ -2,14 +2,26 @@
 """
 Reproducibility Tests for Production Deployment Audit
 
-This script implements the controlled experiments described in Section 6 of
-PRODUCTION_DEPLOYMENT_AUDIT.md to validate the distribution shift hypothesis.
+⚠️  PARTIALLY OBSOLETE - MediaPipe Removed ⚠️
 
-Tests:
-1. Create cropped test set (simulate production pipeline on test data)
-2. Measure accuracy on cropped vs full-frame test sets
-3. Capture live webcam frames for offline evaluation
-4. Compare confidence distributions across datasets
+Test 1 (cropped test set) is OBSOLETE as MediaPipe has been removed from the pipeline.
+The distribution shift has been eliminated by removing hand detection entirely.
+
+Test 2 (full-frame baseline) remains valid for validation purposes.
+
+This script is kept for historical reference. For current validation, see:
+- scripts/demo_gesture_recognition.py (production demo with center-crop)
+- notebooks/finetune_vit_hagrid_CLEAN_BASELINE.ipynb (training pipeline)
+
+Original purpose:
+This script implemented controlled experiments to validate the distribution shift hypothesis:
+1. ❌ OBSOLETE: Create cropped test set (simulate production pipeline on test data)
+2. ✅ VALID: Measure accuracy on full-frame test sets
+3. ✅ VALID: Capture live webcam frames for offline evaluation
+4. ✅ VALID: Compare confidence distributions across datasets
+
+Result: Distribution shift confirmed (25.19% vs 92.49%). 
+Solution: MediaPipe removed, center-crop preprocessing implemented.
 """
 
 import sys
@@ -37,8 +49,11 @@ sys.path.insert(0, str(project_root))
 
 # Import from installed package (after pip install -e .)
 from input_manager import InputManager
-from recognition_engine.hand_detection import HandDetector, HandCropper
 from shared.logger import get_logger
+
+# NOTE: HandDetector/HandCropper removed - Test 1 is now obsolete
+# To use Test 1, you would need to reinstall MediaPipe and restore the hand_detection module
+# However, this is NOT recommended as the architectural decision removed MediaPipe entirely.
 
 logger = get_logger(__name__)
 
@@ -50,11 +65,18 @@ GESTURE_CLASSES = [
 ]
 
 
+# ============================================================================
+# TEST 1: CREATE CROPPED TEST SET (OBSOLETE - MediaPipe removed)
+# ============================================================================
+# This function used HandDetector and HandCropper which have been removed.
+# Kept for historical reference only. DO NOT USE.
+# ============================================================================
+
 def create_cropped_test_set(
     source_dir: Path,
     output_dir: Path,
-    detector: HandDetector,
-    cropper: HandCropper,
+    detector=None,  # OBSOLETE: HandDetector removed
+    cropper=None,   # OBSOLETE: HandCropper removed
     max_images_per_class: int = None
 ) -> Dict[str, int]:
     """
