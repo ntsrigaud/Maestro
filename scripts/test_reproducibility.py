@@ -333,11 +333,14 @@ def capture_webcam_gestures(
     camera_index: int = 0
 ) -> Dict[str, int]:
     """
-    Capture webcam frames for each gesture.
+    Capture webcam frames for each gesture using center-crop preprocessing.
+    
+    NOTE: Updated to use center-crop approach (no hand detection).
+    Captures full center-cropped frames matching the production pipeline.
     
     Args:
         output_dir: Directory to save frames
-        checkpoint_path: Model checkpoint (for detector/cropper config)
+        checkpoint_path: Model checkpoint (unused, kept for compatibility)
         frames_per_gesture: Number of frames to capture per gesture
         camera_index: Camera device index
     
@@ -352,16 +355,11 @@ def capture_webcam_gestures(
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Initialize components
+    # Initialize components (center-crop preprocessing, no hand detection)
     input_mgr = InputManager(camera_index=camera_index)
-    detector = HandDetector()
-    cropper = HandCropper(
-        target_size=(224, 224),
-        padding=0.2,
-        square_crop=True,
-        normalize=False,
-        bgr_to_rgb=True,
-    )
+    
+    # Import preprocessing functions
+    from recognition_engine.preprocessing import center_crop_frame, get_crop_coordinates
     
     # Start camera
     if not input_mgr.start_continuous_capture():
@@ -417,22 +415,18 @@ def capture_webcam_gestures(
                 
                 frame = frame_data.frame
                 
-                # Detect hands
-                detections = detector.detect(frame)
+                # Apply center-crop preprocessing (matches production pipeline)
+                preprocessed = center_crop_frame(frame, target_size=224, bgr_to_rgb=True)
                 
-                if len(detections) > 0:
-                    # Crop hand
-                    hand_roi = cropper.crop_hand(frame, detections[0])
-                    
-                    if hand_roi is not None and hand_roi.image is not None:
-                        # Save frame
-                        save_path = gesture_dir / f"frame_{frames_captured:04d}.jpg"
-                        Image.fromarray(hand_roi.image).save(save_path)
-                        frames_captured += 1
-                        
-                        # Visual feedback
-                        x, y, w, h = detections[0].bbox
-                        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                # Save preprocessed frame
+                save_path = gesture_dir / f"frame_{frames_captured:04d}.jpg"
+                Image.fromarray(preprocessed).save(save_path)
+                frames_captured += 1
+                
+                # Visual feedback - show crop region on display frame
+                h, w = frame.shape[:2]
+                x1, y1, x2, y2 = get_crop_coordinates((h, w))
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 
                 # Display progress
                 cv2.putText(frame, f"{gesture}: {frames_captured}/{frames_per_gesture}", 
