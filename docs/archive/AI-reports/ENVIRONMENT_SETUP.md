@@ -31,6 +31,7 @@ python scripts/validate_hand_detector.py
 This project uses **both** Conda and pip because:
 
 1. **Conda strengths:**
+
    - Platform-optimized binaries (PyTorch with CUDA/Metal acceleration)
    - Better handling of native C/C++ libraries (OpenCV, NumPy)
    - Consistent environment across platforms
@@ -42,15 +43,15 @@ This project uses **both** Conda and pip because:
 
 ### Package Classification
 
-| Package | Install Method | Justification |
-|---------|---------------|---------------|
-| **PyTorch** | Conda | Platform binaries (CUDA/Metal), faster installation |
-| **OpenCV** | Conda | System library integration, better compatibility |
-| **NumPy** | Conda | Optimized BLAS/LAPACK linking |
-| **scikit-learn** | Conda | SciPy stack dependencies |
-| **MediaPipe** | Pip | Conda version outdated (0.9.x), requires 0.10.21+ |
-| **sentence-transformers** | Pip | Not in Conda, actively maintained on PyPI |
-| **huggingface-hub** | Pip | Official distribution only on PyPI |
+| Package                   | Install Method | Justification                                       |
+| ------------------------- | -------------- | --------------------------------------------------- |
+| **PyTorch**               | Conda          | Platform binaries (CUDA/Metal), faster installation |
+| **OpenCV**                | Conda          | System library integration, better compatibility    |
+| **NumPy**                 | Conda          | Optimized BLAS/LAPACK linking                       |
+| **scikit-learn**          | Conda          | SciPy stack dependencies                            |
+| **MediaPipe**             | Pip            | Conda version outdated (0.9.x), requires 0.10.21+   |
+| **sentence-transformers** | Pip            | Not in Conda, actively maintained on PyPI           |
+| **huggingface-hub**       | Pip            | Official distribution only on PyPI                  |
 
 ---
 
@@ -123,6 +124,7 @@ conda env create -f environment.yml
 ```
 
 **Expected output:**
+
 ```
 Collecting package metadata (repodata.json): done
 Solving environment: done
@@ -144,6 +146,7 @@ pip install -e .
 ```
 
 **This installs the package so you can use:**
+
 ```python
 from input_manager import InputManager
 from recognition_engine.hand_detection import HandDetector, HandCropper
@@ -158,6 +161,7 @@ python scripts/validate_hand_detector.py
 ```
 
 **Expected output:**
+
 ```
 ✓ HandDetector instantiation successful
 ✓ API compatibility validated
@@ -193,6 +197,7 @@ python scripts/validate_hand_detector.py
 ```
 
 Validates:
+
 - MediaPipe 0.10.x API compatibility
 - Hand detection pipeline
 - Video/Image mode switching
@@ -221,11 +226,13 @@ Expected: ViT model loads and performs inference
 ### Issue: PyTorch symbol error (`iJIT_NotifyEvent`)
 
 **Symptom:**
+
 ```
 ImportError: undefined symbol: iJIT_NotifyEvent
 ```
 
 **Solution:**
+
 ```bash
 pip uninstall -y torch torchvision torchaudio
 conda install pytorch torchvision torchaudio -c pytorch
@@ -234,12 +241,14 @@ conda install pytorch torchvision torchaudio -c pytorch
 ### Issue: MediaPipe import error
 
 **Symptom:**
+
 ```
 ImportError: cannot import name 'solutions' from 'mediapipe'
 ```
 
 **Solution:**
 Ensure MediaPipe 0.10.21+:
+
 ```bash
 pip install --upgrade mediapipe>=0.10.21
 ```
@@ -247,11 +256,13 @@ pip install --upgrade mediapipe>=0.10.21
 ### Issue: OpenCV not found (`import cv2` fails)
 
 **Symptom:**
+
 ```
 ModuleNotFoundError: No module named 'cv2'
 ```
 
 **Solution:**
+
 ```bash
 # Option 1: Conda (preferred)
 conda install -c conda-forge opencv
@@ -263,6 +274,7 @@ pip install opencv-python>=4.8.0
 ### Issue: CUDA not available (NVIDIA GPUs)
 
 **Symptom:**
+
 ```python
 >>> torch.cuda.is_available()
 False
@@ -270,6 +282,7 @@ False
 
 **Solution:**
 Reinstall PyTorch with CUDA:
+
 ```bash
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 ```
