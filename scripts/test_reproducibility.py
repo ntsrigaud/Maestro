@@ -57,6 +57,14 @@ from shared.logger import get_logger
 
 logger = get_logger(__name__)
 
+# HaGRID gesture classes (alphabetically sorted as in training)
+# This is the standard 18-class set from the full HaGRID dataset
+HAGRID_GESTURE_NAMES = [
+    'call', 'dislike', 'fist', 'four', 'like', 'mute', 'ok', 'one',
+    'palm', 'peace', 'peace_inverted', 'rock', 'stop', 'stop_inverted',
+    'three', 'three2', 'two_up', 'two_up_inverted'
+]
+
 
 def load_gesture_classes(checkpoint_path: Path) -> List[str]:
     """
@@ -79,13 +87,26 @@ def load_gesture_classes(checkpoint_path: Path) -> List[str]:
         logger.info(f"Loaded {len(classes)} classes from checkpoint metadata")
         return classes
     
-    # Fallback: infer from model head
+    # Fallback: use HaGRID gesture names if class count matches
     state_dict = checkpoint.get('model_state_dict', checkpoint)
     if 'head.weight' in state_dict:
         num_classes = state_dict['head.weight'].shape[0]
+        
+        # If model has 18 classes, use the standard HaGRID gesture names
+        if num_classes == len(HAGRID_GESTURE_NAMES):
+            logger.warning(
+                f"No class_names in checkpoint. Using standard HaGRID gesture names "
+                f"({num_classes} classes). Ensure your model was trained with HaGRID "
+                f"in alphabetical order: {', '.join(HAGRID_GESTURE_NAMES[:3])}..."
+            )
+            return HAGRID_GESTURE_NAMES
+        
+        # For non-standard class counts, use generic labels
         logger.warning(
             f"No class_names in checkpoint. Inferred {num_classes} classes. "
-            f"Using generic labels."
+            f"Class count doesn't match standard HaGRID (18 classes). "
+            f"Using generic labels (class_0, class_1, ...). "
+            f"Consider re-saving checkpoint with 'class_names' metadata."
         )
         return [f"class_{i}" for i in range(num_classes)]
     
