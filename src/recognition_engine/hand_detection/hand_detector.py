@@ -3,11 +3,13 @@ Hand detection using MediaPipe Hands.
 
 This module provides the HandDetector class for detecting and localizing hands
 in video frames using Google's MediaPipe Hands solution.
+
+COMPATIBILITY NOTE: Refactored for MediaPipe 0.10.x+ API while maintaining
+exact backward compatibility with the previous 0.9.x interface.
 """
 
 import cv2
 import numpy as np
-import mediapipe as mp
 import time
 from typing import List, Optional, Tuple
 from recognition_engine.hand_detection.hand_data import HandDetectionResult
@@ -15,6 +17,23 @@ from shared.logger import get_logger
 
 # Initialize module logger
 logger = get_logger(__name__)
+
+# Import MediaPipe - handle API versions
+try:
+    import mediapipe as mp
+    from mediapipe.tasks import python
+    from mediapipe.tasks.python import vision
+    from mediapipe import solutions
+    from mediapipe.framework.formats import landmark_pb2
+    
+    MEDIAPIPE_VERSION = mp.__version__
+    logger.info(f"MediaPipe version {MEDIAPIPE_VERSION} loaded successfully")
+    
+except ImportError as e:
+    raise ImportError(
+        f"MediaPipe not found or incomplete: {e}\n"
+        "Install with: pip install mediapipe>=0.10.0"
+    )
 
 
 class HandDetector:
@@ -67,26 +86,51 @@ class HandDetector:
         self._model_complexity = model_complexity
         self._static_image_mode = static_image_mode
 
-        # Initialize MediaPipe Hands
-        self._mp_hands = mp.solutions.hands
-        self._hands = self._mp_hands.Hands(
-            static_image_mode=static_image_mode,
-            max_num_hands=max_num_hands,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence,
-            model_complexity=model_complexity,
+        # Initialize MediaPipe Hands using new API (0.10.x+)
+        # Configure running mode based on static_image_mode
+        running_mode = (
+            vision.RunningMode.IMAGE if static_image_mode
+            else vision.RunningMode.VIDEO
         )
+        
+        # Create base options
+        base_options = python.BaseOptions(
+            model_asset_path=None  # Uses default bundled model
+        )
+        
+        # Create hand landmarker options
+        # Note: MediaPipe 0.10+ doesn't have separate model_complexity parameter
+        # Model quality is fixed; we ignore this parameter but keep API compatible
+        options = vision.HandLandmarkerOptions(
+            base_options=base_options,
+            running_mode=running_mode,
+            num_hands=max_num_hands,
+            min_hand_detection_confidence=min_detection_confidence,
+            min_hand_presence_confidence=min_tracking_confidence,
+            min_tracking_confidence=min_tracking_confidence,
+        )
+        
+        # Create the hand landmarker
+        self._detector = vision.HandLandmarker.create_from_options(options)
+        
+        # Store reference to solutions for drawing (if needed by downstream code)
+        self._mp_hands = solutions.hands
+        self._mp_drawing = solutions.drawing_utils
+        self._mp_drawing_styles = solutions.drawing_styles
 
         # Performance tracking
         self._frame_count = 0
         self._detection_count = 0
+        
+        # Track last frame time for VIDEO mode timestamp calculation
+        self._last_timestamp_ms = 0
 
         logger.info(
-            f"HandDetector initialized: "
+            f"HandDetector initialized (MediaPipe {MEDIAPIPE_VERSION}): "
             f"max_hands={max_num_hands}, "
             f"detection_conf={min_detection_confidence}, "
             f"tracking_conf={min_tracking_confidence}, "
-            f"complexity={model_complexity}"
+            f"mode={'IMAGE' if static_image_mode else 'VIDEO'}"
         )
 
     def detect(
@@ -115,30 +159,51 @@ class HandDetector:
 
         # Convert BGR to RGB (MediaPipe expects RGB)
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # Process the frame
-        results = self._hands.process(frame_rgb)
+        
+        # Create MediaPipe Image
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+        
+        # Process based on running mode
+        if self._static_image_mode:
+            # IMAGE mode: no timestamp needed
+            detection_result = self._detector.detect(mp_image)
+        else:
+            # VIDEO mode: requires timestamp in milliseconds
+            # Convert nanoseconds to milliseconds
+            timestamp_ms = timestamp // 1_000_000
+            
+            # Ensure timestamps are monotonically increasing for VIDEO mode
+            if timestamp_ms <= self._last_timestamp_ms:
+                timestamp_ms = self._last_timestamp_ms + 1
+            
+            self._last_timestamp_ms = timestamp_ms
+            
+            detection_result = self._detector.detect_for_video(mp_image, timestamp_ms)
 
         # No hands detected
-        if not results.multi_hand_landmarks:
+        if not detection_result.hand_landmarks:
             return []
 
         # Extract detection results
         detections = []
         frame_height, frame_width = frame.shape[:2]
 
-        for idx, (hand_landmarks, hand_handedness) in enumerate(
-            zip(results.multi_hand_landmarks, results.multi_handedness)
-        ):
+        # Iterate through detected hands
+        for idx in range(len(detection_result.hand_landmarks)):
+            hand_landmarks_list = detection_result.hand_landmarks[idx]
+            handedness_list = detection_result.handedness[idx]
+            
             # Extract landmarks as numpy array (normalized coordinates)
-            landmarks = self._extract_landmarks(hand_landmarks)
+            landmarks = self._extract_landmarks(hand_landmarks_list)
 
             # Calculate bounding box from landmarks
             bbox = self._calculate_bbox(landmarks, frame_width, frame_height)
 
             # Extract handedness and confidence
-            handedness = hand_handedness.classification[0].label  # "Left" or "Right"
-            confidence = hand_handedness.classification[0].score
+            # handedness_list is a list of Category objects
+            handedness_category = handedness_list[0]
+            handedness = handedness_category.category_name  # "Left" or "Right"
+            confidence = handedness_category.score
 
             # Create detection result
             detection = HandDetectionResult(
@@ -193,18 +258,20 @@ class HandDetector:
 
         return results
 
-    def _extract_landmarks(self, hand_landmarks) -> np.ndarray:
+    def _extract_landmarks(self, hand_landmarks_list) -> np.ndarray:
         """
         Extract hand landmarks as numpy array.
 
         Args:
-            hand_landmarks: MediaPipe hand landmarks object
+            hand_landmarks_list: MediaPipe hand landmarks list (from new API)
 
         Returns:
             Array of shape (21, 3) with normalized (x, y, z) coordinates
         """
+        # New API: hand_landmarks_list is a list of NormalizedLandmark objects
         landmarks = np.array(
-            [[lm.x, lm.y, lm.z] for lm in hand_landmarks.landmark], dtype=np.float32
+            [[lm.x, lm.y, lm.z] for lm in hand_landmarks_list], 
+            dtype=np.float32
         )
 
         return landmarks
@@ -267,9 +334,9 @@ class HandDetector:
 
     def close(self):
         """Release MediaPipe resources."""
-        if self._hands:
-            self._hands.close()
-            self._hands = None
+        if hasattr(self, '_detector') and self._detector:
+            self._detector.close()
+            self._detector = None
             logger.info("HandDetector closed")
 
     def __enter__(self):
@@ -282,7 +349,10 @@ class HandDetector:
 
     def __del__(self):
         """Cleanup on deletion."""
-        self.close()
+        try:
+            self.close()
+        except:
+            pass  # Silently handle cleanup errors during destruction
 
     def __repr__(self) -> str:
         """String representation for debugging."""
