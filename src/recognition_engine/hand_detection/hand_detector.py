@@ -11,6 +11,9 @@ exact backward compatibility with the previous 0.9.x interface.
 import cv2
 import numpy as np
 import time
+import os
+import urllib.request
+from pathlib import Path
 from typing import List, Optional, Tuple
 from recognition_engine.hand_detection.hand_data import HandDetectionResult
 from shared.logger import get_logger
@@ -34,6 +37,60 @@ except ImportError as e:
         f"MediaPipe not found or incomplete: {e}\n"
         "Install with: pip install mediapipe>=0.10.0"
     )
+
+# Model configuration
+MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+MODEL_NAME = "hand_landmarker.task"
+
+
+def _get_model_path() -> str:
+    """
+    Get or download the MediaPipe hand landmarker model.
+    
+    Returns:
+        Absolute path to the model file
+    """
+    # Try multiple locations in order of preference
+    model_locations = [
+        # 1. User's home directory cache
+        Path.home() / ".mediapipe" / "models" / MODEL_NAME,
+        # 2. Project directory
+        Path(__file__).parent / "models" / MODEL_NAME,
+        # 3. System temp directory (fallback)
+        Path("/tmp") / "mediapipe_models" / MODEL_NAME,
+    ]
+    
+    # Check if model exists in any location
+    for model_path in model_locations:
+        if model_path.exists():
+            logger.debug(f"Using cached model: {model_path}")
+            return str(model_path)
+    
+    # Model not found, download to first location
+    download_path = model_locations[0]
+    download_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    logger.info(f"Downloading hand landmarker model to {download_path}...")
+    try:
+        urllib.request.urlretrieve(MODEL_URL, download_path)
+        logger.info(f"✓ Model downloaded successfully")
+        return str(download_path)
+    except Exception as e:
+        # Try fallback location if home directory fails
+        download_path = model_locations[2]
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            urllib.request.urlretrieve(MODEL_URL, download_path)
+            logger.info(f"✓ Model downloaded to fallback location: {download_path}")
+            return str(download_path)
+        except Exception as e2:
+            raise RuntimeError(
+                f"Failed to download MediaPipe hand landmarker model:\n"
+                f"  Primary error: {e}\n"
+                f"  Fallback error: {e2}\n"
+                f"Manual download: {MODEL_URL}\n"
+                f"Save to: {model_locations[0]}"
+            )
 
 
 class HandDetector:
@@ -93,9 +150,12 @@ class HandDetector:
             else vision.RunningMode.VIDEO
         )
         
-        # Create base options
+        # Get or download the model
+        model_path = _get_model_path()
+        
+        # Create base options with explicit model path
         base_options = python.BaseOptions(
-            model_asset_path=None  # Uses default bundled model
+            model_asset_path=model_path
         )
         
         # Create hand landmarker options
