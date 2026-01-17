@@ -32,12 +32,13 @@ from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 # Add project root to path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.input_manager import InputManager
-from src.recognition_engine.hand_detection import HandDetector, HandCropper
-from src.shared.logger import get_logger
+# Import from installed package (after pip install -e .)
+from input_manager import InputManager
+from recognition_engine.hand_detection import HandDetector, HandCropper
+from shared.logger import get_logger
 
 logger = get_logger(__name__)
 
