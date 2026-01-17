@@ -57,12 +57,39 @@ from shared.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Gesture classes (must match training)
-GESTURE_CLASSES = [
-    "call", "dislike", "fist", "four", "like", "mute", "ok", "one",
-    "palm", "peace", "peace_inverted", "rock", "stop", "stop_inverted",
-    "three", "three2", "two_up", "two_up_inverted",
-]
+
+def load_gesture_classes(checkpoint_path: Path) -> List[str]:
+    """
+    Load gesture class names dynamically from checkpoint.
+    
+    Args:
+        checkpoint_path: Path to model checkpoint
+        
+    Returns:
+        List of class names in training order
+        
+    Raises:
+        ValueError: If classes cannot be determined
+    """
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    
+    # Try checkpoint metadata first
+    if 'class_names' in checkpoint:
+        classes = checkpoint['class_names']
+        logger.info(f"Loaded {len(classes)} classes from checkpoint metadata")
+        return classes
+    
+    # Fallback: infer from model head
+    state_dict = checkpoint.get('model_state_dict', checkpoint)
+    if 'head.weight' in state_dict:
+        num_classes = state_dict['head.weight'].shape[0]
+        logger.warning(
+            f"No class_names in checkpoint. Inferred {num_classes} classes. "
+            f"Using generic labels."
+        )
+        return [f"class_{i}" for i in range(num_classes)]
+    
+    raise ValueError("Cannot determine classes from checkpoint")
 
 
 # ============================================================================
@@ -109,8 +136,8 @@ def create_cropped_test_set(
             continue
         
         class_name = class_dir.name
-        if class_name not in GESTURE_CLASSES:
-            logger.warning(f"Skipping unknown class: {class_name}")
+        if class_name not in gesture_classes:
+            logger.warning(f"Skipping unknown class: {class_name} (not in model's {len(gesture_classes)} classes)")
             continue
         
         # Create output directory
@@ -329,6 +356,7 @@ def compare_results(
 def capture_webcam_gestures(
     output_dir: Path,
     checkpoint_path: Path,
+    gesture_classes: List[str],
     frames_per_gesture: int = 30,
     camera_index: int = 0
 ) -> Dict[str, int]:
@@ -341,6 +369,7 @@ def capture_webcam_gestures(
     Args:
         output_dir: Directory to save frames
         checkpoint_path: Model checkpoint (unused, kept for compatibility)
+        gesture_classes: List of gesture class names to capture
         frames_per_gesture: Number of frames to capture per gesture
         camera_index: Camera device index
     
@@ -371,7 +400,7 @@ def capture_webcam_gestures(
     stats = {}
     
     try:
-        for gesture in GESTURE_CLASSES:
+        for gesture in gesture_classes:
             logger.info(f"\n{'='*70}")
             logger.info(f"GESTURE: {gesture}")
             logger.info(f"{'='*70}")
@@ -541,19 +570,26 @@ def main():
     # Load checkpoint first to get number of classes
     checkpoint = torch.load(checkpoint_path, map_location=device)
     
+    # Load gesture classes dynamically from checkpoint
+    gesture_classes = load_gesture_classes(checkpoint_path)
+    logger.info(f"Using {len(gesture_classes)} gesture classes")
+    
     # Detect number of classes from checkpoint
     if 'model_state_dict' in checkpoint:
         state_dict = checkpoint['model_state_dict']
-        # Also load class names if available
-        if 'class_names' in checkpoint:
-            GESTURE_CLASSES[:] = checkpoint['class_names']
-            logger.info(f"Loaded {len(GESTURE_CLASSES)} class names from checkpoint")
     else:
         state_dict = checkpoint
     
     # Get num_classes from head.weight shape
     num_classes = state_dict['head.weight'].shape[0]
     logger.info(f"Detected {num_classes} classes from checkpoint")
+    
+    # Verify consistency
+    if len(gesture_classes) != num_classes:
+        logger.warning(
+            f"Class count mismatch: {len(gesture_classes)} names vs {num_classes} in model. "
+            f"This may cause incorrect evaluation."
+        )
     
     # Create model with correct number of classes
     model = timm.create_model('vit_base_patch16_224', pretrained=False, 
@@ -613,7 +649,7 @@ def main():
             
             print_evaluation_results(
                 "Full-Frame Test Set", full_acc, full_labels, 
-                full_preds, full_conf, GESTURE_CLASSES
+                full_preds, full_conf, gesture_classes
             )
             
             # Cropped test set
@@ -627,7 +663,7 @@ def main():
             
             print_evaluation_results(
                 "Cropped Test Set", cropped_acc, cropped_labels,
-                cropped_preds, cropped_conf, GESTURE_CLASSES
+                cropped_preds, cropped_conf, gesture_classes
             )
             
             # Compare results
@@ -643,6 +679,7 @@ def main():
             capture_stats = capture_webcam_gestures(
                 output_dir=webcam_dir,
                 checkpoint_path=checkpoint_path,
+                gesture_classes=gesture_classes,
                 frames_per_gesture=30
             )
         else:
@@ -660,7 +697,7 @@ def main():
             
             print_evaluation_results(
                 "Webcam Frames (Offline)", webcam_acc, webcam_labels,
-                webcam_preds, webcam_conf, GESTURE_CLASSES
+                webcam_preds, webcam_conf, gesture_classes
             )
     
     logger.info("\n" + "="*70)
