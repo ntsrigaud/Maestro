@@ -3,10 +3,10 @@
 Clean Baseline Gesture Recognition Demo
 
 Demonstrates real-time gesture recognition using the clean baseline ViT model.
-Architecture matches finetune_vit_hagrid_CLEAN_BASELINE.ipynb exactly:
-- Single preprocessing pipeline (no augmentation)
+Architecture matches training exactly:
+- Center-crop preprocessing (no hand detection)
 - Standard ViT-B/16 + linear head
-- No TTA, no experimental components
+- Full-frame inference aligned with HaGRID training distribution
 """
 
 import sys
@@ -27,7 +27,7 @@ import timm
 from torchvision import transforms
 
 from src.input_manager import InputManager
-from src.recognition_engine.hand_detection import HandDetector, HandCropper
+from src.recognition_engine.preprocessing import center_crop_frame, get_crop_coordinates
 from src.shared.logger import get_logger
 
 logger = get_logger(__name__)
@@ -164,8 +164,6 @@ class GestureRecognitionDemo:
 
         # Components
         self.input_mgr = None
-        self.detector = None
-        self.cropper = None
         self.model = None
         self.transform = None
 
@@ -179,10 +177,9 @@ class GestureRecognitionDemo:
 
         # Input manager
         self.input_mgr = InputManager(camera_index=self.camera_index)
-        self.input_mgr._convert_to_rgb = False  # Keep BGR for MediaPipe
+        self.input_mgr._convert_to_rgb = False  # Keep BGR for OpenCV
 
-        # Start continuous capture (handles camera opening and frame thread)
-        # This method internally waits for first frame with 1 second timeout
+        # Start continuous capture
         if not self.input_mgr.start_continuous_capture():
             raise RuntimeError(
                 f"Failed to open camera {self.camera_index}. "
@@ -190,20 +187,6 @@ class GestureRecognitionDemo:
             )
 
         logger.info("✓ Camera ready")
-
-        # Hand detector
-        self.detector = HandDetector(
-            max_num_hands=2, min_detection_confidence=0.5, min_tracking_confidence=0.5
-        )
-
-        # Hand cropper
-        self.cropper = HandCropper(
-            target_size=(224, 224),
-            padding=0.2,
-            square_crop=True,
-            normalize=False,
-            bgr_to_rgb=True,
-        )
 
         # Load model
         logger.info(f"Loading model from {self.checkpoint_path}")
@@ -239,18 +222,18 @@ class GestureRecognitionDemo:
 
         logger.info("✓ Initialization complete")
 
-    def classify_gesture(self, hand_roi: np.ndarray) -> tuple:
+    def classify_gesture(self, frame_rgb: np.ndarray) -> tuple:
         """
-        Classify gesture from cropped hand image.
+        Classify gesture from preprocessed frame.
 
         Args:
-            hand_roi: Cropped hand image (224x224, RGB)
+            frame_rgb: Preprocessed frame (224x224, RGB)
 
         Returns:
             (gesture_name, confidence)
         """
         # Convert to PIL Image
-        pil_img = Image.fromarray(hand_roi)
+        pil_img = Image.fromarray(frame_rgb)
 
         # Apply transform
         img_tensor = self.transform(pil_img).unsqueeze(0).to(self.device)
@@ -268,47 +251,39 @@ class GestureRecognitionDemo:
         return gesture, confidence
 
     def process_frame(self, frame: np.ndarray) -> np.ndarray:
-        """Process single frame."""
-        # Detect hands
-        detections = self.detector.detect(frame)
-
-        # Process each detection
-        for detection in detections:
-            # Extract bbox coordinates (x, y, width, height)
-            x, y, w, h = detection.bbox
-            x1, y1 = x, y
-            x2, y2 = x + w, y + h
-
-            # Crop hand region using the detection object
-            hand_roi = self.cropper.crop_hand(frame, detection)
-            if hand_roi is None or hand_roi.image is None:
-                continue
-
-            # Classify gesture using the cropped image
-            gesture, confidence = self.classify_gesture(hand_roi.image)
-
-            # Draw results if confidence above threshold
-            if confidence >= self.confidence_threshold:
-                # Bounding box
-                cv2.rectangle(frame, (x1, y1), (x2, y2), COLOR_BBOX, 2)
-
-                # Label
-                label = f"{gesture}: {confidence:.2f}"
-                (label_w, label_h), _ = cv2.getTextSize(
-                    label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
-                )
-                cv2.rectangle(
-                    frame, (x1, y1 - label_h - 10), (x1 + label_w, y1), COLOR_BG, -1
-                )
-                cv2.putText(
-                    frame,
-                    label,
-                    (x1, y1 - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    COLOR_TEXT,
-                    2,
-                )
+        """Process single frame with center-crop preprocessing."""
+        # Get crop coordinates for visualization
+        h, w = frame.shape[:2]
+        x1, y1, x2, y2 = get_crop_coordinates((h, w))
+        
+        # Apply center-crop preprocessing (matches training exactly)
+        preprocessed = center_crop_frame(frame, target_size=224, bgr_to_rgb=True)
+        
+        # Classify gesture
+        gesture, confidence = self.classify_gesture(preprocessed)
+        
+        # Draw results if confidence above threshold
+        if confidence >= self.confidence_threshold:
+            # Draw crop region
+            cv2.rectangle(frame, (x1, y1), (x2, y2), COLOR_BBOX, 2)
+            
+            # Label
+            label = f"{gesture}: {confidence:.2f}"
+            (label_w, label_h), _ = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+            )
+            cv2.rectangle(
+                frame, (x1, y1 - label_h - 10), (x1 + label_w, y1), COLOR_BG, -1
+            )
+            cv2.putText(
+                frame,
+                label,
+                (x1, y1 - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                COLOR_TEXT,
+                2,
+            )
 
         return frame
 
