@@ -521,14 +521,28 @@ def main():
     
     # Load model
     logger.info(f"Loading model from {checkpoint_path}")
-    model = timm.create_model('vit_base_patch16_224', pretrained=False, 
-                             num_classes=len(GESTURE_CLASSES))
     
+    # Load checkpoint first to get number of classes
     checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # Detect number of classes from checkpoint
     if 'model_state_dict' in checkpoint:
-        model.load_state_dict(checkpoint['model_state_dict'])
+        state_dict = checkpoint['model_state_dict']
+        # Also load class names if available
+        if 'class_names' in checkpoint:
+            GESTURE_CLASSES[:] = checkpoint['class_names']
+            logger.info(f"Loaded {len(GESTURE_CLASSES)} class names from checkpoint")
     else:
-        model.load_state_dict(checkpoint)
+        state_dict = checkpoint
+    
+    # Get num_classes from head.weight shape
+    num_classes = state_dict['head.weight'].shape[0]
+    logger.info(f"Detected {num_classes} classes from checkpoint")
+    
+    # Create model with correct number of classes
+    model = timm.create_model('vit_base_patch16_224', pretrained=False, 
+                             num_classes=num_classes)
+    model.load_state_dict(state_dict)
     
     model = model.to(device)
     model.eval()
