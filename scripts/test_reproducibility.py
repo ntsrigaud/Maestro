@@ -374,14 +374,9 @@ def capture_webcam_gestures(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Reproducibility tests for production deployment audit"
-    )
-    parser.add_argument(
-        '--test',
-        type=str,
-        choices=['2'],
-        default='2',
-        help="Which test to run: 2 (webcam capture). Test 1 removed (MediaPipe dependency eliminated)"
+        description="Reproducibility tests for production deployment audit. "
+                    "Runs Test 2: webcam capture and evaluation. "
+                    "(Test 1 removed - MediaPipe dependency eliminated)"
     )
     parser.add_argument(
         '--checkpoint',
@@ -479,32 +474,31 @@ def main():
     ])
     
     # Test 2: Capture and evaluate webcam frames
-    if args.test == '2':
-        # Capture frames
-        if not webcam_dir.exists() or len(list(webcam_dir.glob('*/*.jpg'))) == 0:
-            capture_stats = capture_webcam_gestures(
-                output_dir=webcam_dir,
-                checkpoint_path=checkpoint_path,
-                gesture_classes=gesture_classes,
-                frames_per_gesture=30
-            )
-        else:
-            logger.info(f"Webcam frames already exist: {webcam_dir}")
+    # Capture frames
+    if not webcam_dir.exists() or len(list(webcam_dir.glob('*/*.jpg'))) == 0:
+        capture_stats = capture_webcam_gestures(
+            output_dir=webcam_dir,
+            checkpoint_path=checkpoint_path,
+            gesture_classes=gesture_classes,
+            frames_per_gesture=30
+        )
+    else:
+        logger.info(f"Webcam frames already exist: {webcam_dir}")
+    
+    # Evaluate on webcam frames
+    if webcam_dir.exists() and len(list(webcam_dir.glob('*/*.jpg'))) > 0:
+        webcam_dataset = ImageFolder(webcam_dir, transform=transform)
+        webcam_loader = DataLoader(webcam_dataset, batch_size=args.batch_size,
+                                  shuffle=False, num_workers=0)
         
-        # Evaluate on webcam frames
-        if webcam_dir.exists() and len(list(webcam_dir.glob('*/*.jpg'))) > 0:
-            webcam_dataset = ImageFolder(webcam_dir, transform=transform)
-            webcam_loader = DataLoader(webcam_dataset, batch_size=args.batch_size,
-                                      shuffle=False, num_workers=0)
-            
-            webcam_acc, webcam_labels, webcam_preds, webcam_conf = evaluate_model(
-                model, webcam_loader, device, "Webcam Frames (Offline)"
-            )
-            
-            print_evaluation_results(
-                "Webcam Frames (Offline)", webcam_acc, webcam_labels,
-                webcam_preds, webcam_conf, gesture_classes
-            )
+        webcam_acc, webcam_labels, webcam_preds, webcam_conf = evaluate_model(
+            model, webcam_loader, device, "Webcam Frames (Offline)"
+        )
+        
+        print_evaluation_results(
+            "Webcam Frames (Offline)", webcam_acc, webcam_labels,
+            webcam_preds, webcam_conf, gesture_classes
+        )
     
     logger.info("\n" + "="*70)
     logger.info("REPRODUCIBILITY TESTS COMPLETE")
