@@ -67,7 +67,6 @@ def test_project_imports():
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         from input_manager import InputManager
-        from recognition_engine.hand_detection import HandDetector, HandCropper
         from shared.logger import get_logger
         print_success("gesture-recognition-system (local package)")
         return True
@@ -120,31 +119,6 @@ def test_torch():
         print_error(f"torch - {e}")
         return False
 
-def test_mediapipe():
-    """Test MediaPipe hand detection."""
-    try:
-        import mediapipe as mp
-        version = mp.__version__
-        
-        # Check version
-        major, minor = map(int, version.split('.')[:2])
-        if major == 0 and minor < 10:
-            print_error(f"mediapipe (v{version}) - OLD VERSION")
-            print(f"         This project requires MediaPipe 0.10.21+")
-            print(f"         Upgrade with: pip install --upgrade mediapipe>=0.10.21")
-            return False
-        
-        print_success(f"mediapipe (v{version})")
-        
-        # Test new API availability
-        from mediapipe.tasks import python
-        from mediapipe.tasks.python import vision
-        print_success(f"  └─ Task API available (0.10.x)")
-        return True
-    except Exception as e:
-        print_error(f"mediapipe - {e}")
-        return False
-
 def main():
     print_header("Environment Validation Script")
     print("Testing all required dependencies...\n")
@@ -159,7 +133,6 @@ def main():
     # Computer Vision
     print(f"\n{BOLD}Computer Vision:{RESET}")
     results.append(test_opencv())
-    results.append(test_mediapipe())
     
     # Deep Learning
     print(f"\n{BOLD}Deep Learning:{RESET}")
@@ -202,7 +175,6 @@ def main():
         print(f"\n{GREEN}Environment is fully configured!{RESET}")
         print(f"You can now run:")
         print(f"  • python scripts/demo_gesture_recognition.py")
-        print(f"  • python scripts/validate_hand_detector.py")
         print(f"  • jupyter notebook notebooks/finetune_vit_hagrid.ipynb")
         return 0
     else:
