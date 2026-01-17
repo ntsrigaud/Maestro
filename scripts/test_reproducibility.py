@@ -474,8 +474,10 @@ def main():
     ])
     
     # Test 2: Capture and evaluate webcam frames
-    # Capture frames
-    if not webcam_dir.exists() or len(list(webcam_dir.glob('*/*.jpg'))) == 0:
+    # Capture frames if they don't exist
+    webcam_frames_exist = webcam_dir.exists() and len(list(webcam_dir.glob('*/*.jpg'))) > 0
+    
+    if not webcam_frames_exist:
         capture_stats = capture_webcam_gestures(
             output_dir=webcam_dir,
             checkpoint_path=checkpoint_path,
@@ -486,7 +488,7 @@ def main():
         logger.info(f"Webcam frames already exist: {webcam_dir}")
     
     # Evaluate on webcam frames
-    if webcam_dir.exists() and len(list(webcam_dir.glob('*/*.jpg'))) > 0:
+    if webcam_frames_exist or webcam_dir.exists():
         webcam_dataset = ImageFolder(webcam_dir, transform=transform)
         webcam_loader = DataLoader(webcam_dataset, batch_size=args.batch_size,
                                   shuffle=False, num_workers=0)
