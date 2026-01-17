@@ -321,7 +321,8 @@ class GestureRecognitionDemo:
         cv2.rectangle(frame, (x1, y1), (x2, y2), bbox_color, 3)
         
         if not should_display_prediction:
-            # Only show crop region for low-confidence predictions when filtering is enabled
+            # Skip prediction labels when filtering is enabled and confidence is low
+            # (crop region is already drawn to show system is active)
             return frame
         
         # ==============================================================
