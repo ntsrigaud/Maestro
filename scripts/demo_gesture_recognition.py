@@ -138,6 +138,7 @@ class GestureRecognitionDemo:
         camera_index: int = 0,
         confidence_threshold: float = 0.5,
         device: str = None,
+        show_all_predictions: bool = True,
     ):
         """
         Initialize demo.
@@ -148,6 +149,7 @@ class GestureRecognitionDemo:
             camera_index: Camera device index
             confidence_threshold: Minimum confidence for display
             device: 'cuda', 'mps', 'cpu', or None (auto-detect)
+            show_all_predictions: If True, always show predictions. If False, only show high-confidence predictions.
         """
         # Handle model path
         if checkpoint_path is None:
@@ -166,6 +168,7 @@ class GestureRecognitionDemo:
 
         self.camera_index = camera_index
         self.confidence_threshold = confidence_threshold
+        self.show_all_predictions = show_all_predictions
 
         # Auto-detect device
         if device is None:
@@ -307,9 +310,15 @@ class GestureRecognitionDemo:
         # Classify gesture
         gesture, confidence = self.classify_gesture(preprocessed)
         
-        # ALWAYS show prediction (critical for user feedback)
-        # Choose color based on confidence
+        # Determine if we should show prediction based on configuration
         is_high_conf = confidence >= self.confidence_threshold
+        should_display = self.show_all_predictions or is_high_conf
+        
+        if not should_display:
+            # Skip display for low-confidence predictions when filtering is enabled
+            return frame
+        
+        # Choose color based on confidence
         bbox_color = COLOR_BBOX if is_high_conf else COLOR_BBOX_LOW
         
         # Draw crop region
@@ -500,6 +509,18 @@ def main():
         "--confidence", type=float, default=0.5, help="Minimum confidence threshold"
     )
     parser.add_argument(
+        "--show-all-predictions",
+        action="store_true",
+        default=True,
+        help="Always show predictions regardless of confidence (default: True). Use --no-show-all-predictions to only show high-confidence predictions.",
+    )
+    parser.add_argument(
+        "--no-show-all-predictions",
+        dest="show_all_predictions",
+        action="store_false",
+        help="Only show predictions when confidence exceeds threshold (cleaner UX)",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         choices=["cuda", "mps", "cpu", "auto"],
@@ -524,6 +545,7 @@ def main():
         camera_index=args.camera,
         confidence_threshold=args.confidence,
         device=device,
+        show_all_predictions=args.show_all_predictions,
     )
 
     demo.run()
