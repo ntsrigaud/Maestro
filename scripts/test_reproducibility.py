@@ -94,10 +94,11 @@ def load_gesture_classes(checkpoint_path: Path) -> List[str]:
         
         # If model has 18 classes, use the standard HaGRID gesture names
         if num_classes == len(HAGRID_GESTURE_NAMES):
+            preview_count = 3
             logger.warning(
                 f"No class_names in checkpoint. Using standard HaGRID gesture names "
                 f"({num_classes} classes). Ensure your model was trained with HaGRID "
-                f"in alphabetical order: {', '.join(HAGRID_GESTURE_NAMES[:3])}..."
+                f"in alphabetical order: {', '.join(HAGRID_GESTURE_NAMES[:preview_count])}..."
             )
             return HAGRID_GESTURE_NAMES
         
