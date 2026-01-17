@@ -49,6 +49,7 @@ conda env create -f environment.yml
 ```
 
 This installs:
+
 - PyTorch (with GPU acceleration if available)
 - OpenCV, MediaPipe, NumPy
 - Training tools (scikit-learn, matplotlib, seaborn)
@@ -67,6 +68,7 @@ pip install -e .
 ```
 
 The `-e` (editable) flag:
+
 - Links to source code instead of copying
 - Changes are immediately available
 - No reinstall needed after edits
@@ -82,6 +84,7 @@ python scripts/verify_environment.py
 ```
 
 Checks:
+
 - All 19 dependencies installed
 - Correct versions
 - MediaPipe 0.10.21+ API
@@ -104,6 +107,7 @@ print("✓ All imports successful")
 ## What Gets Installed
 
 ### Core Runtime (Always)
+
 - opencv-python 4.8.0+
 - numpy 1.24.0+
 - mediapipe 0.10.21+
@@ -113,10 +117,12 @@ print("✓ All imports successful")
 - pillow 9.0.0+
 
 ### Training/Development (Conda environment)
+
 - scikit-learn, pandas, matplotlib, seaborn
 - tqdm, jupyter, ipykernel
 
 ### Optional Research
+
 ```bash
 # Semantic gesture learning
 pip install -e ".[semantic]"
@@ -170,6 +176,7 @@ jupyter notebook notebooks/finetune_vit_hagrid.ipynb
 ### Issue: ImportError for cv2
 
 **Solution:**
+
 ```bash
 conda install -c conda-forge opencv
 ```
@@ -179,6 +186,7 @@ conda install -c conda-forge opencv
 **Symptom:** `cannot import name 'solutions'`
 
 **Solution:**
+
 ```bash
 pip install --upgrade mediapipe>=0.10.21
 ```
@@ -188,6 +196,7 @@ pip install --upgrade mediapipe>=0.10.21
 **Symptom:** `undefined symbol: iJIT_NotifyEvent`
 
 **Solution:**
+
 ```bash
 pip uninstall -y torch torchvision torchaudio
 conda install pytorch torchvision torchaudio -c pytorch
@@ -196,6 +205,7 @@ conda install pytorch torchvision torchaudio -c pytorch
 ### Issue: Environment validation fails
 
 **Solution:**
+
 ```bash
 # Update environment
 conda env update -f environment.yml --prune
@@ -211,16 +221,19 @@ pip install -e . --force-reinstall
 ## Platform-Specific Notes
 
 ### macOS (Apple Silicon)
+
 - Metal (MPS) acceleration automatic
 - No Rosetta 2 required
 
 ### Linux (CUDA)
+
 ```bash
 # For NVIDIA GPUs
 conda install pytorch torchvision pytorch-cuda=11.8 -c pytorch -c nvidia
 ```
 
 ### Windows
+
 - Enable long path support: `git config --system core.longpaths true`
 - Visual C++ Redistributable installed automatically
 
@@ -275,7 +288,6 @@ If you encounter issues:
 ---
 
 **This installation method has been validated to work from a clean machine with zero manual package installations.**
-
 
 ### Running Examples
 
