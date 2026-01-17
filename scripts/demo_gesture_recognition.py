@@ -312,17 +312,17 @@ class GestureRecognitionDemo:
         
         # Determine if we should show prediction based on configuration
         is_high_conf = confidence >= self.confidence_threshold
-        should_display = self.show_all_predictions or is_high_conf
-        
-        if not should_display:
-            # Skip display for low-confidence predictions when filtering is enabled
-            return frame
+        should_display_prediction = self.show_all_predictions or is_high_conf
         
         # Choose color based on confidence
         bbox_color = COLOR_BBOX if is_high_conf else COLOR_BBOX_LOW
         
-        # Draw crop region
+        # Always draw crop region to show system is active
         cv2.rectangle(frame, (x1, y1), (x2, y2), bbox_color, 3)
+        
+        if not should_display_prediction:
+            # Only show crop region for low-confidence predictions when filtering is enabled
+            return frame
         
         # ==============================================================
         # PRIMARY LABEL: Top-left of frame (always visible)
@@ -509,16 +509,11 @@ def main():
         "--confidence", type=float, default=0.5, help="Minimum confidence threshold"
     )
     parser.add_argument(
-        "--show-all-predictions",
-        action="store_true",
-        default=True,
-        help="Always show predictions regardless of confidence (default: True). Use --no-show-all-predictions to only show high-confidence predictions.",
-    )
-    parser.add_argument(
         "--no-show-all-predictions",
         dest="show_all_predictions",
         action="store_false",
-        help="Only show predictions when confidence exceeds threshold (cleaner UX)",
+        default=True,
+        help="Only show predictions when confidence exceeds threshold (cleaner UX). By default, all predictions are shown.",
     )
     parser.add_argument(
         "--device",
