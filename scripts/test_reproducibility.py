@@ -2,14 +2,26 @@
 """
 Reproducibility Tests for Production Deployment Audit
 
-This script implements the controlled experiments described in Section 6 of
-PRODUCTION_DEPLOYMENT_AUDIT.md to validate the distribution shift hypothesis.
+⚠️  PARTIALLY OBSOLETE - MediaPipe Removed ⚠️
 
-Tests:
-1. Create cropped test set (simulate production pipeline on test data)
-2. Measure accuracy on cropped vs full-frame test sets
-3. Capture live webcam frames for offline evaluation
-4. Compare confidence distributions across datasets
+Test 1 (cropped test set) is OBSOLETE as MediaPipe has been removed from the pipeline.
+The distribution shift has been eliminated by removing hand detection entirely.
+
+Test 2 (full-frame baseline) remains valid for validation purposes.
+
+This script is kept for historical reference. For current validation, see:
+- scripts/demo_gesture_recognition.py (production demo with center-crop)
+- notebooks/finetune_vit_hagrid_CLEAN_BASELINE.ipynb (training pipeline)
+
+Original purpose:
+This script implemented controlled experiments to validate the distribution shift hypothesis:
+1. ❌ OBSOLETE: Create cropped test set (simulate production pipeline on test data)
+2. ✅ VALID: Measure accuracy on full-frame test sets
+3. ✅ VALID: Capture live webcam frames for offline evaluation
+4. ✅ VALID: Compare confidence distributions across datasets
+
+Result: Distribution shift confirmed (25.19% vs 92.49%). 
+Solution: MediaPipe removed, center-crop preprocessing implemented.
 """
 
 import sys
@@ -37,24 +49,61 @@ sys.path.insert(0, str(project_root))
 
 # Import from installed package (after pip install -e .)
 from input_manager import InputManager
-from recognition_engine.hand_detection import HandDetector, HandCropper
 from shared.logger import get_logger
+
+# NOTE: HandDetector/HandCropper removed - Test 1 is now obsolete
+# To use Test 1, you would need to reinstall MediaPipe and restore the hand_detection module
+# However, this is NOT recommended as the architectural decision removed MediaPipe entirely.
 
 logger = get_logger(__name__)
 
-# Gesture classes (must match training)
-GESTURE_CLASSES = [
-    "call", "dislike", "fist", "four", "like", "mute", "ok", "one",
-    "palm", "peace", "peace_inverted", "rock", "stop", "stop_inverted",
-    "three", "three2", "two_up", "two_up_inverted",
-]
 
+def load_gesture_classes(checkpoint_path: Path) -> List[str]:
+    """
+    Load gesture class names dynamically from checkpoint.
+    
+    Args:
+        checkpoint_path: Path to model checkpoint
+        
+    Returns:
+        List of class names in training order
+        
+    Raises:
+        ValueError: If classes cannot be determined
+    """
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    
+    # Try checkpoint metadata first
+    if 'class_names' in checkpoint:
+        classes = checkpoint['class_names']
+        logger.info(f"Loaded {len(classes)} classes from checkpoint metadata")
+        return classes
+    
+    # Fallback: infer from model head
+    state_dict = checkpoint.get('model_state_dict', checkpoint)
+    if 'head.weight' in state_dict:
+        num_classes = state_dict['head.weight'].shape[0]
+        logger.warning(
+            f"No class_names in checkpoint. Inferred {num_classes} classes. "
+            f"Using generic labels."
+        )
+        return [f"class_{i}" for i in range(num_classes)]
+    
+    raise ValueError("Cannot determine classes from checkpoint")
+
+
+# ============================================================================
+# TEST 1: CREATE CROPPED TEST SET (OBSOLETE - MediaPipe removed)
+# ============================================================================
+# This function used HandDetector and HandCropper which have been removed.
+# Kept for historical reference only. DO NOT USE.
+# ============================================================================
 
 def create_cropped_test_set(
     source_dir: Path,
     output_dir: Path,
-    detector: HandDetector,
-    cropper: HandCropper,
+    detector=None,  # OBSOLETE: HandDetector removed
+    cropper=None,   # OBSOLETE: HandCropper removed
     max_images_per_class: int = None
 ) -> Dict[str, int]:
     """
@@ -87,8 +136,8 @@ def create_cropped_test_set(
             continue
         
         class_name = class_dir.name
-        if class_name not in GESTURE_CLASSES:
-            logger.warning(f"Skipping unknown class: {class_name}")
+        if class_name not in gesture_classes:
+            logger.warning(f"Skipping unknown class: {class_name} (not in model's {len(gesture_classes)} classes)")
             continue
         
         # Create output directory
@@ -307,15 +356,20 @@ def compare_results(
 def capture_webcam_gestures(
     output_dir: Path,
     checkpoint_path: Path,
+    gesture_classes: List[str],
     frames_per_gesture: int = 30,
     camera_index: int = 0
 ) -> Dict[str, int]:
     """
-    Capture webcam frames for each gesture.
+    Capture webcam frames for each gesture using center-crop preprocessing.
+    
+    NOTE: Updated to use center-crop approach (no hand detection).
+    Captures full center-cropped frames matching the production pipeline.
     
     Args:
         output_dir: Directory to save frames
-        checkpoint_path: Model checkpoint (for detector/cropper config)
+        checkpoint_path: Model checkpoint (unused, kept for compatibility)
+        gesture_classes: List of gesture class names to capture
         frames_per_gesture: Number of frames to capture per gesture
         camera_index: Camera device index
     
@@ -330,16 +384,11 @@ def capture_webcam_gestures(
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Initialize components
+    # Initialize components (center-crop preprocessing, no hand detection)
     input_mgr = InputManager(camera_index=camera_index)
-    detector = HandDetector()
-    cropper = HandCropper(
-        target_size=(224, 224),
-        padding=0.2,
-        square_crop=True,
-        normalize=False,
-        bgr_to_rgb=True,
-    )
+    
+    # Import preprocessing functions
+    from recognition_engine.preprocessing import center_crop_frame, get_crop_coordinates
     
     # Start camera
     if not input_mgr.start_continuous_capture():
@@ -351,7 +400,7 @@ def capture_webcam_gestures(
     stats = {}
     
     try:
-        for gesture in GESTURE_CLASSES:
+        for gesture in gesture_classes:
             logger.info(f"\n{'='*70}")
             logger.info(f"GESTURE: {gesture}")
             logger.info(f"{'='*70}")
@@ -395,22 +444,18 @@ def capture_webcam_gestures(
                 
                 frame = frame_data.frame
                 
-                # Detect hands
-                detections = detector.detect(frame)
+                # Apply center-crop preprocessing (matches production pipeline)
+                preprocessed = center_crop_frame(frame, target_size=224, bgr_to_rgb=True)
                 
-                if len(detections) > 0:
-                    # Crop hand
-                    hand_roi = cropper.crop_hand(frame, detections[0])
-                    
-                    if hand_roi is not None and hand_roi.image is not None:
-                        # Save frame
-                        save_path = gesture_dir / f"frame_{frames_captured:04d}.jpg"
-                        Image.fromarray(hand_roi.image).save(save_path)
-                        frames_captured += 1
-                        
-                        # Visual feedback
-                        x, y, w, h = detections[0].bbox
-                        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                # Save preprocessed frame
+                save_path = gesture_dir / f"frame_{frames_captured:04d}.jpg"
+                Image.fromarray(preprocessed).save(save_path)
+                frames_captured += 1
+                
+                # Visual feedback - show crop region on display frame
+                h, w = frame.shape[:2]
+                x1, y1, x2, y2 = get_crop_coordinates((h, w))
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 
                 # Display progress
                 cv2.putText(frame, f"{gesture}: {frames_captured}/{frames_per_gesture}", 
@@ -525,19 +570,26 @@ def main():
     # Load checkpoint first to get number of classes
     checkpoint = torch.load(checkpoint_path, map_location=device)
     
+    # Load gesture classes dynamically from checkpoint
+    gesture_classes = load_gesture_classes(checkpoint_path)
+    logger.info(f"Using {len(gesture_classes)} gesture classes")
+    
     # Detect number of classes from checkpoint
     if 'model_state_dict' in checkpoint:
         state_dict = checkpoint['model_state_dict']
-        # Also load class names if available
-        if 'class_names' in checkpoint:
-            GESTURE_CLASSES[:] = checkpoint['class_names']
-            logger.info(f"Loaded {len(GESTURE_CLASSES)} class names from checkpoint")
     else:
         state_dict = checkpoint
     
     # Get num_classes from head.weight shape
     num_classes = state_dict['head.weight'].shape[0]
     logger.info(f"Detected {num_classes} classes from checkpoint")
+    
+    # Verify consistency
+    if len(gesture_classes) != num_classes:
+        logger.warning(
+            f"Class count mismatch: {len(gesture_classes)} names vs {num_classes} in model. "
+            f"This may cause incorrect evaluation."
+        )
     
     # Create model with correct number of classes
     model = timm.create_model('vit_base_patch16_224', pretrained=False, 
@@ -597,7 +649,7 @@ def main():
             
             print_evaluation_results(
                 "Full-Frame Test Set", full_acc, full_labels, 
-                full_preds, full_conf, GESTURE_CLASSES
+                full_preds, full_conf, gesture_classes
             )
             
             # Cropped test set
@@ -611,7 +663,7 @@ def main():
             
             print_evaluation_results(
                 "Cropped Test Set", cropped_acc, cropped_labels,
-                cropped_preds, cropped_conf, GESTURE_CLASSES
+                cropped_preds, cropped_conf, gesture_classes
             )
             
             # Compare results
@@ -627,6 +679,7 @@ def main():
             capture_stats = capture_webcam_gestures(
                 output_dir=webcam_dir,
                 checkpoint_path=checkpoint_path,
+                gesture_classes=gesture_classes,
                 frames_per_gesture=30
             )
         else:
@@ -644,7 +697,7 @@ def main():
             
             print_evaluation_results(
                 "Webcam Frames (Offline)", webcam_acc, webcam_labels,
-                webcam_preds, webcam_conf, GESTURE_CLASSES
+                webcam_preds, webcam_conf, gesture_classes
             )
     
     logger.info("\n" + "="*70)
