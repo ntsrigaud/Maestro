@@ -8,17 +8,20 @@
 ### 1. HaGRID Dataset Assessment
 
 **Findings:**
+
 - HaGRID v2-1M is a massive dataset (1.5TB, 1M+ images, 33 gesture classes)
 - Per-class archives range from 37-54 GB each
 - Dataset is split into separate ZIPs by gesture class (enables selective download)
 - Annotations available in JSON (COCO format) with bounding boxes, landmarks, and metadata
 
 **Solution for Storage Constraints:**
+
 - Created custom subset downloader that samples N images per class
 - Maintains train/val/test split ratios (76%/9%/15%)
 - Target: 10 gesture classes × 800 samples = ~2.5 GB total
 
 **Selected Gestures (from screenshot):**
+
 1. call
 2. dislike
 3. fist
@@ -31,6 +34,7 @@
 10. no_gesture
 
 **Documentation:**
+
 - `docs/HaGRID_DATASET_ASSESSMENT.md` - Detailed assessment report
 - `docs/HAGRID_DOWNLOAD_GUIDE.md` - Download instructions and troubleshooting
 
@@ -39,6 +43,7 @@
 **Created**: `scripts/download_hagrid_subset.py`
 
 **Features:**
+
 - Selective gesture class downloading
 - Random stratified sampling (preserves split ratios)
 - Progress tracking with tqdm
@@ -46,6 +51,7 @@
 - Folder-per-class structure for PyTorch compatibility
 
 **Usage:**
+
 ```bash
 python scripts/download_hagrid_subset.py \
     --save_path ./data/hagrid_subset \
@@ -59,6 +65,7 @@ python scripts/download_hagrid_subset.py \
 **Created**: `notebooks/finetune_vit_hagrid.ipynb`
 
 **Contents:**
+
 1. **Environment Setup** - Conda instructions for PyTorch, timm, etc.
 2. **Dataset Loading** - Custom PyTorch Dataset for HaGRID subset CSV
 3. **Data Augmentation** - Transforms (resize, flip, rotation, color jitter)
@@ -71,6 +78,7 @@ python scripts/download_hagrid_subset.py \
 10. **Next Steps** - Model export (TorchScript/ONNX), integration, optimization
 
 **Key Features:**
+
 - GPU/MPS/CPU auto-detection
 - Best model checkpointing (saves to `../checkpoints/vit_hagrid_best.pt`)
 - F1 score and accuracy tracking
@@ -80,12 +88,14 @@ python scripts/download_hagrid_subset.py \
 ### 4. Model Architecture Selection
 
 **Primary Model**: `vit_base_patch16_224`
+
 - 86M parameters
 - ImageNet pretrained
 - 224×224 input size
 - Good baseline for fine-tuning
 
 **Alternative Candidates** (documented in notebook):
+
 - `deit_small_patch16_224` - More efficient (22M params)
 - `swin_small_patch4_window7_224` - Hierarchical, better for details (50M params)
 - `mobilevit_s` - Lightweight for real-time (5.6M params)
@@ -93,6 +103,7 @@ python scripts/download_hagrid_subset.py \
 ### 5. Preprocessing Pipeline
 
 **Implemented:**
+
 - Resize to 224×224 (ViT input size)
 - Data augmentation:
   - Random horizontal flip
@@ -102,6 +113,7 @@ python scripts/download_hagrid_subset.py \
 - Separate train/val transforms
 
 **Designed for Integration:**
+
 - Accepts cropped hand images (output from hand detection module)
 - Same preprocessing can be applied at inference time
 
@@ -165,6 +177,7 @@ jupyter notebook notebooks/finetune_vit_hagrid.ipynb
 ### 4. Update Configuration in Notebook
 
 In cell 5, update:
+
 ```python
 DATASET_ROOT = './data/hagrid_subset'  # Or your actual path
 ```
@@ -172,6 +185,7 @@ DATASET_ROOT = './data/hagrid_subset'  # Or your actual path
 ### 5. Run Training
 
 Execute all cells sequentially:
+
 1. Environment check
 2. Dataset loading
 3. Visualization (verify data)
@@ -184,6 +198,7 @@ Execute all cells sequentially:
 ### 6. Monitor Training
 
 Expected results (after 10 epochs on 8K images):
+
 - **Training accuracy**: 95-98%
 - **Validation accuracy**: 85-92%
 - **Test accuracy**: 85-90%
@@ -193,12 +208,12 @@ Expected results (after 10 epochs on 8K images):
 
 Try different models by changing `MODEL_NAME` in the notebook:
 
-| Model | Params | Speed | Best For |
-|-------|--------|-------|----------|
-| `vit_base_patch16_224` | 86M | Medium | Baseline, high accuracy |
-| `deit_small_patch16_224` | 22M | Fast | Balanced speed/accuracy |
-| `swin_small_patch4_window7_224` | 50M | Medium | Fine-grained gestures |
-| `mobilevit_s` | 5.6M | Very Fast | Real-time inference |
+| Model                           | Params | Speed     | Best For                |
+| ------------------------------- | ------ | --------- | ----------------------- |
+| `vit_base_patch16_224`          | 86M    | Medium    | Baseline, high accuracy |
+| `deit_small_patch16_224`        | 22M    | Fast      | Balanced speed/accuracy |
+| `swin_small_patch4_window7_224` | 50M    | Medium    | Fine-grained gestures   |
+| `mobilevit_s`                   | 5.6M   | Very Fast | Real-time inference     |
 
 ## Performance Targets
 
@@ -240,18 +255,22 @@ After training completes:
 ## Troubleshooting
 
 ### Dataset Download Issues
+
 - **Problem**: Download fails or is very slow
 - **Solution**: Use wired connection, run overnight, or reduce `samples_per_class`
 
 ### Out of Memory During Training
+
 - **Problem**: CUDA/MPS out of memory
 - **Solution**: Reduce `BATCH_SIZE` (try 16 or 8), or use a smaller model
 
 ### Low Accuracy
+
 - **Problem**: Test accuracy <80%
 - **Solution**: Increase `samples_per_class`, add more augmentation, train longer (20-30 epochs)
 
 ### Slow Inference
+
 - **Problem**: >100ms per image
 - **Solution**: Switch to `mobilevit_s` or `deit_small`, use quantization, batch inference
 
@@ -260,9 +279,10 @@ After training completes:
 ✅ **Assessment Complete**: HaGRID dataset analyzed, subset strategy defined  
 ✅ **Downloader Ready**: Script to fetch 2.5GB subset (~8K images, 10 classes)  
 ✅ **Training Pipeline**: Full notebook with ViT fine-tuning, evaluation, visualization  
-✅ **Documentation**: Comprehensive guides for dataset and training  
+✅ **Documentation**: Comprehensive guides for dataset and training
 
 **User is ready to**:
+
 1. Download subset
 2. Train ViT model
 3. Achieve 85-90% gesture recognition accuracy

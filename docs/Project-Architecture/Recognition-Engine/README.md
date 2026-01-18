@@ -11,7 +11,7 @@ The Recognition Engine is responsible for gesture recognition using Vision Trans
   - Dataset: HaGRID subset (~30K images, 18 classes)
   - Training: 85-90% validation accuracy achieved
   - Deployment: Model published to [neilrigaud/hagrid-vit-gesture](https://huggingface.co/neilrigaud/hagrid-vit-gesture)
-  
+
 ### In Development 🔬
 
 - **Inference Pipeline** - Real-time gesture classification module
@@ -46,6 +46,7 @@ Gesture Prediction (18 classes)
 ```
 
 **Key Details**:
+
 - No hand detection preprocessing required
 - Processes entire frame through ViT
 - Single-stage classification
@@ -85,6 +86,7 @@ two_up_inverted - Two fingers up inverted
 Training is performed via the Jupyter notebook: [notebooks/finetune_vit_hagrid.ipynb](../../../notebooks/finetune_vit_hagrid.ipynb)
 
 **Training Configuration**:
+
 ```python
 model = "vit_base_patch16_224"  # ViT-B/16
 pretrained = True                # ImageNet-21k weights
@@ -96,11 +98,13 @@ optimizer = "AdamW"
 ```
 
 **Dataset**: HuggingFace `neilrigaud/hagrid-subset`
+
 - Train split: ~24K images
 - Validation split: ~3K images
 - Test split: ~3K images
 
 **Results**:
+
 - Training Accuracy: ~90%
 - Validation Accuracy: 85-90%
 - Training Time: 30-60 minutes on GPU
@@ -131,6 +135,7 @@ results = classifier.predict_batch(frames)
 ### Current Status
 
 The inference module is under development. Currently available:
+
 - Trained model checkpoint: `checkpoints/best_model.pth`
 - Model on Hugging Face Hub: `neilrigaud/hagrid-vit-gesture`
 - Preprocessing utilities: `src/recognition_engine/preprocessing.py`
@@ -154,6 +159,7 @@ src/recognition_engine/
 Currently no demo script available (inference pipeline in development).
 
 For training demonstration, use the notebook:
+
 ```bash
 jupyter notebook notebooks/finetune_vit_hagrid.ipynb
 ```
@@ -183,6 +189,7 @@ Dynamic Gesture Classification
 Long-term research direction: Vision-language alignment
 
 **Inspiration**: HAVIT, ALBEF approaches
+
 - Vision-text semantic space
 - Zero-shot gesture recognition
 - Natural language command mapping
@@ -195,24 +202,26 @@ Long-term research direction: Vision-language alignment
 
 ### Current System (ViT-B/16)
 
-| Metric | Value |
-|--------|-------|
-| Model Size | ~86M parameters |
-| Input Size | 224×224×3 |
-| Classes | 18 gestures |
-| Validation Accuracy | 85-90% |
-| Training Time | 30-60 min (GPU) |
-| Inference Speed | TBD (in development) |
+| Metric              | Value                |
+| ------------------- | -------------------- |
+| Model Size          | ~86M parameters      |
+| Input Size          | 224×224×3            |
+| Classes             | 18 gestures          |
+| Validation Accuracy | 85-90%               |
+| Training Time       | 30-60 min (GPU)      |
+| Inference Speed     | TBD (in development) |
 
 ### Comparison with MediaPipe Approach
 
 **Previous MediaPipe Approach** (no longer used):
+
 - Hand landmark detection (21 points)
 - Lightweight MLP classifier
 - Pros: Fast, low compute
 - Cons: Limited by landmark precision, loses visual context
 
 **Current ViT Approach**:
+
 - Full-frame deep learning
 - Rich visual feature extraction
 - Pros: Robust, accurate, transfer learning
