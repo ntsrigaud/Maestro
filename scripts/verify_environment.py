@@ -66,8 +66,6 @@ def test_project_imports():
     """Test project package imports."""
     try:
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-        from input_manager import InputManager
-        from shared.logger import get_logger
         print_success("gesture-recognition-system (local package)")
         return True
     except ImportError as e:
@@ -85,7 +83,7 @@ def test_opencv():
         # Test basic functionality
         import numpy as np
         test_img = np.zeros((100, 100, 3), dtype=np.uint8)
-        gray = cv2.cvtColor(test_img, cv2.COLOR_BGR2GRAY)
+        _ = cv2.cvtColor(test_img, cv2.COLOR_BGR2GRAY)
         print_success(f"  └─ cv2.cvtColor() works")
         return True
     except Exception as e:
@@ -101,18 +99,15 @@ def test_torch():
         
         # Check device availability
         if torch.cuda.is_available():
-            device = "cuda"
             gpu_name = torch.cuda.get_device_name(0)
             print_success(f"  └─ CUDA available: {gpu_name}")
         elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            device = "mps"
             print_success(f"  └─ Metal (MPS) available")
         else:
-            device = "cpu"
             print_warning(f"  └─ CPU only (no GPU acceleration)")
         
         # Test tensor creation
-        x = torch.randn(2, 2)
+        _ = torch.randn(2, 2)
         print_success(f"  └─ Tensor creation works")
         return True
     except Exception as e:

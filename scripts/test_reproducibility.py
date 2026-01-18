@@ -25,10 +25,8 @@ Solution: MediaPipe removed, center-crop preprocessing implemented.
 """
 
 import sys
-import time
 import argparse
 from pathlib import Path
-from collections import defaultdict, Counter
 from typing import Dict, List, Tuple
 
 import cv2
@@ -267,7 +265,6 @@ def compare_results(
 
 def capture_webcam_gestures(
     output_dir: Path,
-    checkpoint_path: Path,
     gesture_classes: List[str],
     frames_per_gesture: int = 30,
     camera_index: int = 0
@@ -500,9 +497,8 @@ def main():
     webcam_frames_exist = webcam_dir.exists() and any(webcam_dir.glob('*/*.jpg'))
     
     if not webcam_frames_exist:
-        capture_stats = capture_webcam_gestures(
+        _ = capture_webcam_gestures(
             output_dir=webcam_dir,
-            checkpoint_path=checkpoint_path,
             gesture_classes=gesture_classes,
             frames_per_gesture=30
         )
