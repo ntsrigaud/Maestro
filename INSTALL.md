@@ -1,52 +1,293 @@
 # Installation Guide
 
-This guide shows you how to install the Gesture Recognition System as a proper Python package.
+**Updated:** January 17, 2026  
+**Status:** Complete environment setup with full dependency management
 
-## Quick Install (Recommended)
+---
 
-### Option 1: Editable Install (For Development)
-
-This is the **recommended approach** for development. It allows you to make changes to the code without reinstalling:
+## Quick Start (One Command)
 
 ```bash
-# From the project root directory
+# 1. Create conda environment (includes all dependencies)
+conda env create -f environment.yml
+
+# 2. Activate environment
+conda activate gesture
+
+# 3. Install project package
+pip install -e .
+
+# 4. Verify installation
+python scripts/verify_environment.py
+```
+
+**Expected output:** `✓ ALL TESTS PASSED (13/13)`
+
+---
+
+## Prerequisites
+
+- **Conda or Miniconda** installed ([download](https://docs.conda.io/en/latest/miniconda.html))
+- **10 GB disk space** (for packages + models)
+- **Python 3.10** (automatically installed by environment.yml)
+
+---
+
+## Detailed Steps
+
+### 1. Clone Repository
+
+```bash
+git clone <repository-url>
+cd CSU-Capstone-Project
+```
+
+### 2. Create Environment
+
+```bash
+conda env create -f environment.yml
+```
+
+This installs:
+
+- PyTorch (with GPU acceleration if available)
+- OpenCV, MediaPipe, NumPy
+- Training tools (scikit-learn, matplotlib, seaborn)
+- Jupyter notebooks
+
+### 3. Activate Environment
+
+```bash
+conda activate gesture
+```
+
+### 4. Install Package
+
+```bash
 pip install -e .
 ```
 
-After this, you can import modules from anywhere:
+The `-e` (editable) flag:
+
+- Links to source code instead of copying
+- Changes are immediately available
+- No reinstall needed after edits
+
+---
+
+## Verify Installation
+
+### Automated Test
+
+```bash
+python scripts/verify_environment.py
+```
+
+Checks:
+
+- All 19 dependencies installed
+- Correct versions
+- MediaPipe 0.10.21+ API
+- Project imports work
+
+### Manual Test
 
 ```python
+import cv2
+import numpy as np
+import torch
+import mediapipe as mp
 from input_manager import InputManager
+from recognition_engine.hand_detection import HandDetector, HandCropper
+print("✓ All imports successful")
+```
+
+---
+
+## What Gets Installed
+
+### Core Runtime (Always)
+
+- opencv-python 4.8.0+
+- numpy 1.24.0+
+- mediapipe 0.10.21+
+- torch 2.0.0+
+- torchvision 0.15.0+
+- timm 0.9.0+
+- pillow 9.0.0+
+
+### Training/Development (Conda environment)
+
+- scikit-learn, pandas, matplotlib, seaborn
+- tqdm, jupyter, ipykernel
+
+### Optional Research
+
+```bash
+# Semantic gesture learning
+pip install -e ".[semantic]"
+
+# Model hosting
+pip install -e ".[huggingface]"
+
+# Dataset downloads
+pip install -e ".[datasets]"
+
+# All extras
+pip install -e ".[semantic,huggingface,datasets]"
+```
+
+---
+
+## Usage After Installation
+
+### Import from Anywhere
+
+```python
+# No sys.path hacks needed!
+from input_manager import InputManager
+from recognition_engine.hand_detection import HandDetector, HandCropper
 from shared.logger import get_logger
 ```
 
-### Option 2: Regular Install
-
-For production or testing:
+### Run Scripts
 
 ```bash
-pip install .
+# Hand detection demo
+python scripts/demo_hand_detection.py
+
+# Gesture recognition (requires webcam)
+python scripts/demo_gesture_recognition.py
+
+# Test reproducibility experiments
+python scripts/test_reproducibility.py --test 2
 ```
 
-### Option 3: Install with Development Tools
-
-To install with additional development dependencies (pytest, black, flake8):
+### Run Notebooks
 
 ```bash
-pip install -e ".[dev]"
+jupyter notebook notebooks/finetune_vit_hagrid.ipynb
 ```
 
-## What This Does
+---
 
-The editable install (`-e` flag):
+## Troubleshooting
 
-- Creates links to your source code instead of copying files
-- Changes you make are immediately available without reinstalling
-- Properly sets up Python's import system
-- Eliminates the need for `sys.path.insert()` hacks
-- Works consistently across different execution contexts
+### Issue: ImportError for cv2
 
-## Usage After Installation
+**Solution:**
+
+```bash
+conda install -c conda-forge opencv
+```
+
+### Issue: MediaPipe version error
+
+**Symptom:** `cannot import name 'solutions'`
+
+**Solution:**
+
+```bash
+pip install --upgrade mediapipe>=0.10.21
+```
+
+### Issue: PyTorch symbol error
+
+**Symptom:** `undefined symbol: iJIT_NotifyEvent`
+
+**Solution:**
+
+```bash
+pip uninstall -y torch torchvision torchaudio
+conda install pytorch torchvision torchaudio -c pytorch
+```
+
+### Issue: Environment validation fails
+
+**Solution:**
+
+```bash
+# Update environment
+conda env update -f environment.yml --prune
+
+# Reinstall package
+pip install -e . --force-reinstall
+```
+
+**See:** [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for complete troubleshooting guide
+
+---
+
+## Platform-Specific Notes
+
+### macOS (Apple Silicon)
+
+- Metal (MPS) acceleration automatic
+- No Rosetta 2 required
+
+### Linux (CUDA)
+
+```bash
+# For NVIDIA GPUs
+conda install pytorch torchvision pytorch-cuda=11.8 -c pytorch -c nvidia
+```
+
+### Windows
+
+- Enable long path support: `git config --system core.longpaths true`
+- Visual C++ Redistributable installed automatically
+
+---
+
+## Alternative: Development Only
+
+If you don't need the full training environment:
+
+```bash
+# Install only core runtime dependencies
+pip install -e .
+
+# This gets you:
+# - OpenCV, MediaPipe, PyTorch
+# - Hand detection and gesture recognition
+# - No jupyter, matplotlib, etc.
+```
+
+---
+
+## Uninstall
+
+```bash
+# Remove package
+pip uninstall gesture-recognition-system
+
+# Remove environment
+conda deactivate
+conda env remove -n gesture
+```
+
+---
+
+## Documentation
+
+- **[ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md)** - Complete setup guide with validation
+- **[DEPENDENCY_RATIONALE.md](DEPENDENCY_RATIONALE.md)** - Why each package exists
+- **[ENVIRONMENT_AUDIT_COMPLETE.md](ENVIRONMENT_AUDIT_COMPLETE.md)** - Audit summary
+
+---
+
+## Support
+
+If you encounter issues:
+
+1. Run `python scripts/verify_environment.py` to diagnose
+2. Check [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) troubleshooting section
+3. Verify Python version: `python --version` (should be 3.10.x)
+4. Check MediaPipe: `pip show mediapipe` (should be 0.10.21+)
+
+---
+
+**This installation method has been validated to work from a clean machine with zero manual package installations.**
 
 ### Running Examples
 

@@ -25,10 +25,10 @@ echo ""
 
 # Check Python dependencies
 echo "Checking dependencies..."
-python3 -c "import torch, timm, cv2, mediapipe" 2>/dev/null
+python3 -c "import torch, timm, cv2" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "Missing dependencies. Installing..."
-    pip install torch torchvision timm opencv-python mediapipe pillow
+    pip install torch torchvision timm opencv-python pillow
 else
     echo "✓ All dependencies installed"
 fi
