@@ -16,6 +16,7 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 **File:** [notebooks/finetune_vit_hagrid.ipynb](../notebooks/finetune_vit_hagrid.ipynb)
 
 #### Identified Weaknesses (Baseline)
+
 - Limited augmentation (only basic flips, rotation, color jitter)
 - No label smoothing (overconfidence risk)
 - No gradient clipping (training instability)
@@ -28,6 +29,7 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 #### Implemented Improvements
 
 **A. Enhanced Data Augmentation**
+
 ```python
 # Geometric transformations
 - RandomRotation(20°)           # Increased from 15°
@@ -46,6 +48,7 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 ```
 
 **B. Improved Optimization**
+
 ```python
 # Loss function
 - Label Smoothing (0.1)          # NEW: Prevents overconfidence
@@ -62,12 +65,14 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 ```
 
 **C. Better Regularization**
+
 ```python
 - Early Stopping (patience=5)    # NEW: Auto overfitting prevention
 - Extended Training (15 epochs)  # Increased from 10
 ```
 
 **D. Enhanced Evaluation**
+
 ```python
 - Test-Time Augmentation         # NEW: Multi-augmentation averaging
 - F1 Score Tracking              # NEW: Beyond accuracy
@@ -75,6 +80,7 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 ```
 
 **E. Model Versioning & Metadata**
+
 ```python
 - Automatic versioning           # NEW: Timestamp-based IDs
 - Comprehensive metadata         # NEW: Training config, metrics
@@ -83,13 +89,13 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 
 #### Expected Performance Improvements
 
-| Metric | Baseline | Enhanced | Improvement |
-|--------|----------|----------|-------------|
-| Validation Accuracy | 75-80% | 82-88% | **+5-8%** |
-| Test Accuracy (TTA) | 74-79% | 83-89% | **+7-10%** |
-| F1 Score | 0.73-0.78 | 0.81-0.87 | **+8-10%** |
-| Training Stability | Moderate | High | Reduced variance |
-| Generalization | Good | Excellent | Better zero-shot |
+| Metric              | Baseline  | Enhanced  | Improvement      |
+| ------------------- | --------- | --------- | ---------------- |
+| Validation Accuracy | 75-80%    | 82-88%    | **+5-8%**        |
+| Test Accuracy (TTA) | 74-79%    | 83-89%    | **+7-10%**       |
+| F1 Score            | 0.73-0.78 | 0.81-0.87 | **+8-10%**       |
+| Training Stability  | Moderate  | High      | Reduced variance |
+| Generalization      | Good      | Excellent | Better zero-shot |
 
 ---
 
@@ -101,10 +107,11 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 ✅ Did NOT switch to custom subset (as instructed)  
 ✅ Enhanced augmentation strategy instead of changing data source  
 ✅ Augmentations designed for real-world robustness:
-  - Lighting variations (ColorJitter with hue)
-  - Scale and perspective changes (Affine, Perspective)
-  - Partial occlusion (RandomErasing)
-  - Motion blur (GaussianBlur)
+
+- Lighting variations (ColorJitter with hue)
+- Scale and perspective changes (Affine, Perspective)
+- Partial occlusion (RandomErasing)
+- Motion blur (GaussianBlur)
 
 **Rationale:** The Kaggle dataset is larger (30K images), cleaner, and more suitable for training. Custom subset is NOT ready for use.
 
@@ -113,11 +120,13 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 ### 3. Best Model Tracking and Preservation
 
 **Files Created:**
+
 - `notebooks/checkpoints/best_model.pth` - Model weights
 - `notebooks/checkpoints/model_metadata.json` - Training metadata
 - `notebooks/checkpoints/README.md` - Auto-generated model card
 
 **Features:**
+
 - ✅ Automatic best model saving based on validation accuracy
 - ✅ Comprehensive metadata including:
   - Version ID (timestamp-based)
@@ -129,6 +138,7 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 - ✅ Easy model comparison across training runs
 
 **Metadata Structure:**
+
 ```json
 {
   "version": "v1.0_20250107_143022",
@@ -150,6 +160,7 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 **File:** [scripts/upload_model_to_huggingface.py](../scripts/upload_model_to_huggingface.py)
 
 **Features:**
+
 - ✅ Automated upload to Hugging Face Hub
 - ✅ Proper repository creation and management
 - ✅ Comprehensive model card generation (Markdown)
@@ -158,6 +169,7 @@ This document summarizes the comprehensive improvements made to the Vision Trans
 - ✅ Token-based authentication
 
 **Usage:**
+
 ```bash
 python scripts/upload_model_to_huggingface.py \
     --repo-id username/hagrid-vit-gesture \
@@ -166,6 +178,7 @@ python scripts/upload_model_to_huggingface.py \
 ```
 
 **Model Card Contents:**
+
 - Model description and architecture
 - Performance metrics
 - Training details and configuration
@@ -182,6 +195,7 @@ python scripts/upload_model_to_huggingface.py \
 **File:** [scripts/demo_gesture_recognition.py](../scripts/demo_gesture_recognition.py) (updated)
 
 **Features Added:**
+
 - ✅ Automatic model download from Hugging Face if not cached
 - ✅ Local caching in `models/gesture_recognition/`
 - ✅ Fallback to local checkpoint if provided
@@ -189,6 +203,7 @@ python scripts/upload_model_to_huggingface.py \
 - ✅ Transparent download progress
 
 **New Function:**
+
 ```python
 def download_model_from_hf(repo_id, cache_dir):
     """Download model from HF Hub if not cached"""
@@ -199,6 +214,7 @@ def download_model_from_hf(repo_id, cache_dir):
 ```
 
 **Updated Usage:**
+
 ```bash
 # Auto-download from Hugging Face (first time)
 python scripts/demo_gesture_recognition.py --hf-repo username/hagrid-vit-gesture
@@ -211,6 +227,7 @@ python scripts/demo_gesture_recognition.py --checkpoint path/to/best_model.pth
 ```
 
 **Benefits:**
+
 - No manual download required
 - One-time download, persistent cache
 - Seamless end-user experience
@@ -247,6 +264,7 @@ python scripts/demo_gesture_recognition.py --checkpoint path/to/best_model.pth
    - Highlighted auto-download capability
 
 **Documentation Quality:**
+
 - ✅ Professional and technical tone
 - ✅ Concise and actionable
 - ✅ Code examples included
@@ -259,6 +277,7 @@ python scripts/demo_gesture_recognition.py --checkpoint path/to/best_model.pth
 ## 📊 Summary of Changes
 
 ### Files Modified
+
 1. `notebooks/finetune_vit_hagrid.ipynb` - **Major enhancement** (300+ lines changed)
    - Enhanced augmentation pipeline
    - Improved training loop
@@ -272,11 +291,13 @@ python scripts/demo_gesture_recognition.py --checkpoint path/to/best_model.pth
    - Better error handling
 
 ### Files Created
+
 1. `scripts/upload_model_to_huggingface.py` - **New** (400+ lines)
 2. `docs/MODEL_TRAINING_GUIDE.md` - **New** (700+ lines)
 3. `docs/QUICK_REFERENCE_TRAINING.md` - **New** (250+ lines)
 
 ### Files Auto-Generated (by training)
+
 1. `notebooks/checkpoints/best_model.pth` - Model weights
 2. `notebooks/checkpoints/model_metadata.json` - Training metadata
 3. `notebooks/checkpoints/README.md` - Model card
@@ -286,33 +307,39 @@ python scripts/demo_gesture_recognition.py --checkpoint path/to/best_model.pth
 ## 🎯 Objectives Met
 
 ✅ **CRITICAL: Training Notebook Deep Review and Improvement**
+
 - Analyzed all aspects of training pipeline
 - Identified 8 major weaknesses
 - Implemented 15+ improvements
 - Expected 5-10% accuracy gain
 
 ✅ **IMPORTANT: Dataset Usage and Augmentation Strategy**
+
 - Continued using HaGRID Sample 30K
 - Did NOT switch to custom subset
 - Implemented 6 new augmentation techniques
 - Designed for zero-shot capability
 
 ✅ **Best Model Tracking and Preservation**
+
 - Automatic saving with validation tracking
 - Comprehensive metadata generation
 - Versioned and reproducible
 
 ✅ **Hugging Face Model Upload**
+
 - Clean, reusable script
 - Auto-generated model cards
 - Follows HF conventions
 
 ✅ **Runtime Model Retrieval for Demo Script**
+
 - Auto-download from HF
 - Local caching
 - Transparent and robust
 
 ✅ **Minimal Usage Guide**
+
 - Two-tier documentation (comprehensive + quick reference)
 - Professional and technical
 - Concise and actionable
@@ -322,12 +349,14 @@ python scripts/demo_gesture_recognition.py --checkpoint path/to/best_model.pth
 ## 🚀 How to Use
 
 ### 1. Train Enhanced Model
+
 ```bash
 # Open notebook and run all cells
 jupyter notebook notebooks/finetune_vit_hagrid.ipynb
 ```
 
 ### 2. Upload to Hugging Face
+
 ```bash
 pip install huggingface_hub
 python scripts/upload_model_to_huggingface.py \
@@ -336,6 +365,7 @@ python scripts/upload_model_to_huggingface.py \
 ```
 
 ### 3. Deploy in Demo
+
 ```bash
 # First run - downloads from HF
 python scripts/demo_gesture_recognition.py --hf-repo username/hagrid-vit-gesture
@@ -349,18 +379,21 @@ python scripts/demo_gesture_recognition.py
 ## 📈 Expected Impact
 
 ### Model Quality
+
 - **Accuracy**: 82-88% (was 75-80%)
 - **Generalization**: Significantly improved
 - **Robustness**: Better handling of variations
 - **Zero-shot capability**: Enhanced through augmentation
 
 ### Development Workflow
+
 - **Reproducibility**: Full metadata tracking
 - **Deployment**: One-line model download
 - **Maintenance**: Easy model versioning
 - **Collaboration**: HF Hub integration
 
 ### User Experience
+
 - **Training**: Clear progress and metrics
 - **Deployment**: Automatic model retrieval
 - **Monitoring**: Comprehensive visualizations
@@ -373,26 +406,31 @@ python scripts/demo_gesture_recognition.py
 ### Why These Improvements Matter
 
 **Label Smoothing (0.1)**
+
 - Prevents model overconfidence (e.g., [0.99, 0.01, 0.0, ...])
 - Encourages consideration of similar gestures
 - Better generalization to unseen variations
 
 **Gradient Clipping (1.0)**
+
 - Prevents gradient explosion
 - More stable training dynamics
 - Consistent convergence
 
 **Warmup + Cosine Annealing**
+
 - Stable start (warmup prevents early instability)
 - Smooth convergence (cosine annealing)
 - Better final performance
 
 **Test-Time Augmentation**
+
 - Averages predictions over multiple views
 - +1-3% accuracy boost
 - Minimal computational cost
 
 **Enhanced Augmentation**
+
 - RandomAffine: Scale, translation, shear variations
 - RandomPerspective: Different viewpoints
 - GaussianBlur: Motion and focus variations
@@ -423,7 +461,7 @@ All objectives have been successfully completed with a focus on:
 ✅ **Stability**: Robust training with multiple safeguards  
 ✅ **Deployment**: Seamless HF integration with auto-download  
 ✅ **Reproducibility**: Comprehensive versioning and metadata  
-✅ **Documentation**: Professional, technical, and concise guides  
+✅ **Documentation**: Professional, technical, and concise guides
 
 The enhanced training pipeline is **production-ready** and provides a solid foundation for continued development and deployment.
 
@@ -432,6 +470,7 @@ The enhanced training pipeline is **production-ready** and provides a solid foun
 ---
 
 **Next Steps:**
+
 1. Train model using enhanced notebook
 2. Evaluate results and visualizations
 3. Upload to Hugging Face
