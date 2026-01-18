@@ -138,6 +138,7 @@ class GestureRecognitionDemo:
         camera_index: int = 0,
         confidence_threshold: float = 0.5,
         device: str = None,
+        show_all_predictions: bool = True,
     ):
         """
         Initialize demo.
@@ -148,6 +149,7 @@ class GestureRecognitionDemo:
             camera_index: Camera device index
             confidence_threshold: Minimum confidence for display
             device: 'cuda', 'mps', 'cpu', or None (auto-detect)
+            show_all_predictions: If True, always show predictions. If False, only show high-confidence predictions.
         """
         # Handle model path
         if checkpoint_path is None:
@@ -166,6 +168,7 @@ class GestureRecognitionDemo:
 
         self.camera_index = camera_index
         self.confidence_threshold = confidence_threshold
+        self.show_all_predictions = show_all_predictions
 
         # Auto-detect device
         if device is None:
@@ -307,13 +310,20 @@ class GestureRecognitionDemo:
         # Classify gesture
         gesture, confidence = self.classify_gesture(preprocessed)
         
-        # ALWAYS show prediction (critical for user feedback)
-        # Choose color based on confidence
+        # Determine if we should show prediction based on configuration
         is_high_conf = confidence >= self.confidence_threshold
+        should_display_prediction = self.show_all_predictions or is_high_conf
+        
+        # Choose color based on confidence
         bbox_color = COLOR_BBOX if is_high_conf else COLOR_BBOX_LOW
         
-        # Draw crop region
+        # Always draw crop region to show system is active
         cv2.rectangle(frame, (x1, y1), (x2, y2), bbox_color, 3)
+        
+        if not should_display_prediction:
+            # Skip prediction labels when filtering is enabled and confidence is low
+            # (crop region is already drawn to show system is active)
+            return frame
         
         # ==============================================================
         # PRIMARY LABEL: Top-left of frame (always visible)
@@ -500,6 +510,13 @@ def main():
         "--confidence", type=float, default=0.5, help="Minimum confidence threshold"
     )
     parser.add_argument(
+        "--no-show-all-predictions",
+        dest="show_all_predictions",
+        action="store_false",
+        default=True,
+        help="Only show predictions when confidence exceeds threshold (cleaner UX). By default, all predictions are shown.",
+    )
+    parser.add_argument(
         "--device",
         type=str,
         choices=["cuda", "mps", "cpu", "auto"],
@@ -524,6 +541,7 @@ def main():
         camera_index=args.camera,
         confidence_threshold=args.confidence,
         device=device,
+        show_all_predictions=args.show_all_predictions,
     )
 
     demo.run()
