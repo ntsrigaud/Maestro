@@ -141,7 +141,7 @@ This Vision Transformer (ViT-B/16) model is fine-tuned on the HaGRID dataset for
 
 ### Installation
 ```bash
-pip install torch timm pillow opencv-python mediapipe
+pip install torch timm pillow opencv-python
 ```
 
 ### Quick Start
