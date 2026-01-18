@@ -32,6 +32,7 @@ flowchart LR
 **Implementation**: `src/input_manager/`
 
 **Key Components**:
+
 - `InputManager`: Camera capture with OpenCV
 - `FrameData`: Frame container with metadata
 - Thread-safe frame buffering
@@ -70,6 +71,7 @@ Gesture Prediction (18 classes)
 ```
 
 **Model Details**:
+
 - **Base Model**: ViT-B/16 (timm library)
 - **Pre-training**: ImageNet-21k
 - **Fine-tuning Dataset**: HaGRID subset (~30K images)
@@ -81,19 +83,22 @@ Gesture Prediction (18 classes)
 - **Output Classes**: 18 gestures
 
 **Gesture Classes**:
+
 ```
 call, dislike, fist, four, like, mute, ok, one, palm,
-peace, peace_inverted, rock, stop, stop_inverted, 
+peace, peace_inverted, rock, stop, stop_inverted,
 three, three2, two_up, two_up_inverted
 ```
 
 **Training Performance**:
+
 - Train Accuracy: ~90%
 - Validation Accuracy: 85-90%
 - Training Time: 30-60 min on GPU (10 epochs)
 - Trained Model: [neilrigaud/hagrid-vit-gesture](https://huggingface.co/neilrigaud/hagrid-vit-gesture)
 
 **Current Status**:
+
 - ✅ Training pipeline complete
 - ✅ Model trained and published to Hugging Face
 - 🔬 Inference pipeline in development
@@ -111,6 +116,7 @@ three, three2, two_up, two_up_inverted
 **Planned Implementation**: `src/action_mapper/`
 
 **Planned Features**:
+
 - Gesture-to-command mapping configuration
 - User-customizable command bindings
 - State management (enable/disable gestures)
@@ -131,6 +137,7 @@ three, three2, two_up, two_up_inverted
 **Planned Implementation**: `src/os_controller/`
 
 **Planned Features**:
+
 - Cross-platform support (macOS, Windows, Linux)
 - Keyboard simulation (pyautogui/pynput)
 - Mouse control
@@ -175,22 +182,26 @@ graph LR
 ### Core Libraries
 
 **Computer Vision & Input**:
+
 - OpenCV: Camera capture and image processing
 - PIL/Pillow: Image manipulation
 - NumPy: Array operations
 
 **Deep Learning**:
+
 - PyTorch: Deep learning framework
 - timm: Pre-trained ViT models
 - transformers (Hugging Face): Model deployment
 - datasets (Hugging Face): Dataset loading
 
 **Training**:
+
 - torchvision: Image transforms
 - tqdm: Progress tracking
 - matplotlib: Visualization
 
 **System Control (Planned)**:
+
 - pyautogui: Cross-platform automation
 - pynput: Keyboard/mouse control
 
@@ -216,12 +227,14 @@ graph LR
 ## Future Enhancements
 
 ### Short-term
+
 1. Complete Recognition Engine inference pipeline
 2. Implement Action Mapper module
 3. Implement OS Controller module
 4. Create end-to-end demo application
 
 ### Long-term (Research)
+
 1. **Temporal Modeling**: Add LSTM for dynamic gesture recognition
 2. **Semantic Understanding**: Vision-language alignment (ALBEF-inspired)
 3. **Zero-shot Learning**: Recognize new gestures without retraining
@@ -235,11 +248,13 @@ graph LR
 This project draws inspiration from state-of-the-art research:
 
 **HAVIT** (Hierarchical Attention-based Vision Transformer):
+
 - Vision Transformer application to video understanding
 - Hierarchical attention mechanisms
 - Vision-language alignment
 
 **ALBEF** (Align Before Fuse):
+
 - Vision-language pre-training
 - Contrastive learning for alignment
 - Multi-modal understanding
@@ -250,13 +265,13 @@ This project draws inspiration from state-of-the-art research:
 
 ## Implementation Status Summary
 
-| Module | Status | Completion |
-|--------|--------|-----------|
-| Input Manager | ✅ Complete | 100% |
-| Recognition Engine - Training | ✅ Complete | 100% |
-| Recognition Engine - Inference | 🔬 In Development | 30% |
-| Action Mapper | 📋 Planned | 0% |
-| OS Controller | 📋 Planned | 0% |
+| Module                         | Status            | Completion |
+| ------------------------------ | ----------------- | ---------- |
+| Input Manager                  | ✅ Complete       | 100%       |
+| Recognition Engine - Training  | ✅ Complete       | 100%       |
+| Recognition Engine - Inference | 🔬 In Development | 30%        |
+| Action Mapper                  | 📋 Planned        | 0%         |
+| OS Controller                  | 📋 Planned        | 0%         |
 
 **Overall Progress**: ~40% complete
 
