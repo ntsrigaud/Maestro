@@ -93,127 +93,17 @@ def load_gesture_classes(checkpoint_path: Path) -> List[str]:
 
 
 # ============================================================================
-# TEST 1: CREATE CROPPED TEST SET (OBSOLETE - MediaPipe removed)
+# TEST 1: REMOVED - MediaPipe Dependency Eliminated
 # ============================================================================
-# This function used HandDetector and HandCropper which have been removed.
-# Kept for historical reference only. DO NOT USE.
+# Test 1 (create_cropped_test_set) has been removed as MediaPipe HandDetector
+# and HandCropper classes no longer exist in the codebase. The distribution
+# shift issue has been resolved by removing hand detection and using center-crop
+# preprocessing instead.
+#
+# For current validation, use Test 2 (webcam capture) or see:
+# - scripts/demo_gesture_recognition.py (production demo with center-crop)
+# - notebooks/finetune_vit_hagrid_CLEAN_BASELINE.ipynb (training pipeline)
 # ============================================================================
-
-def create_cropped_test_set(
-    source_dir: Path,
-    output_dir: Path,
-    detector=None,  # OBSOLETE: HandDetector removed
-    cropper=None,   # OBSOLETE: HandCropper removed
-    max_images_per_class: int = None
-) -> Dict[str, int]:
-    """
-    Create a test set of cropped hands from full-frame images.
-    
-    This simulates the production pipeline on test data to measure
-    accuracy drop due to distribution shift.
-    
-    Args:
-        source_dir: Directory with full-frame test images (ImageFolder structure)
-        output_dir: Directory to save cropped images
-        detector: Hand detector instance
-        cropper: Hand cropper instance
-        max_images_per_class: Limit per class (None = process all)
-    
-    Returns:
-        Dictionary with statistics per class
-    """
-    logger.info("="*70)
-    logger.info("TEST 1: Creating Cropped Test Set")
-    logger.info("="*70)
-    logger.info(f"Source: {source_dir}")
-    logger.info(f"Output: {output_dir}")
-    
-    stats = defaultdict(lambda: {'processed': 0, 'saved': 0, 'no_hands': 0, 'errors': 0})
-    
-    # Process each class directory
-    for class_dir in sorted(source_dir.iterdir()):
-        if not class_dir.is_dir():
-            continue
-        
-        class_name = class_dir.name
-        if class_name not in gesture_classes:
-            logger.warning(f"Skipping unknown class: {class_name} (not in model's {len(gesture_classes)} classes)")
-            continue
-        
-        # Create output directory
-        output_class_dir = output_dir / class_name
-        output_class_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Get all images
-        image_files = list(class_dir.glob('*.jpg')) + list(class_dir.glob('*.png'))
-        if max_images_per_class:
-            image_files = image_files[:max_images_per_class]
-        
-        logger.info(f"\nProcessing class '{class_name}': {len(image_files)} images")
-        
-        # Process each image
-        for img_path in tqdm(image_files, desc=f"  {class_name}"):
-            try:
-                stats[class_name]['processed'] += 1
-                
-                # Read image
-                frame = cv2.imread(str(img_path))
-                if frame is None:
-                    logger.warning(f"Failed to read {img_path}")
-                    stats[class_name]['errors'] += 1
-                    continue
-                
-                # Detect hands
-                detections = detector.detect(frame)
-                if len(detections) == 0:
-                    stats[class_name]['no_hands'] += 1
-                    continue
-                
-                # Crop first hand (matches production)
-                hand_roi = cropper.crop_hand(frame, detections[0])
-                if hand_roi is None or hand_roi.image is None:
-                    stats[class_name]['errors'] += 1
-                    continue
-                
-                # Save cropped hand (RGB format)
-                save_path = output_class_dir / img_path.name
-                Image.fromarray(hand_roi.image).save(save_path)
-                stats[class_name]['saved'] += 1
-                
-            except Exception as e:
-                logger.error(f"Error processing {img_path}: {e}")
-                stats[class_name]['errors'] += 1
-    
-    # Print statistics
-    logger.info("\n" + "="*70)
-    logger.info("CROPPING STATISTICS")
-    logger.info("="*70)
-    
-    total_processed = 0
-    total_saved = 0
-    total_no_hands = 0
-    total_errors = 0
-    
-    logger.info(f"{'Class':<20} {'Processed':>10} {'Saved':>10} {'No Hands':>10} {'Errors':>10}")
-    logger.info("-"*70)
-    
-    for class_name in sorted(stats.keys()):
-        s = stats[class_name]
-        logger.info(f"{class_name:<20} {s['processed']:>10} {s['saved']:>10} "
-                   f"{s['no_hands']:>10} {s['errors']:>10}")
-        total_processed += s['processed']
-        total_saved += s['saved']
-        total_no_hands += s['no_hands']
-        total_errors += s['errors']
-    
-    logger.info("-"*70)
-    logger.info(f"{'TOTAL':<20} {total_processed:>10} {total_saved:>10} "
-               f"{total_no_hands:>10} {total_errors:>10}")
-    logger.info(f"\nSuccess rate: {100*total_saved/total_processed:.1f}%")
-    logger.info(f"No hand detected: {100*total_no_hands/total_processed:.1f}%")
-    logger.info(f"Errors: {100*total_errors/total_processed:.1f}%")
-    
-    return dict(stats)
 
 
 def evaluate_model(
@@ -484,14 +374,9 @@ def capture_webcam_gestures(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Reproducibility tests for production deployment audit"
-    )
-    parser.add_argument(
-        '--test',
-        type=str,
-        choices=['1', '2', 'all'],
-        default='all',
-        help="Which test to run: 1 (cropped test set), 2 (webcam capture), all"
+        description="Reproducibility tests for production deployment audit. "
+                    "Runs Test 2: webcam capture and evaluation. "
+                    "(Test 1 removed - MediaPipe dependency eliminated)"
     )
     parser.add_argument(
         '--checkpoint',
@@ -500,28 +385,10 @@ def main():
         help="Path to model checkpoint"
     )
     parser.add_argument(
-        '--test-dir',
-        type=str,
-        default='./notebooks/data/hagrid_subset/test',
-        help="Path to full-frame test set"
-    )
-    parser.add_argument(
-        '--cropped-dir',
-        type=str,
-        default='./data/hagrid_subset_cropped/test',
-        help="Path to save/load cropped test set"
-    )
-    parser.add_argument(
         '--webcam-dir',
         type=str,
         default='./data/webcam_test_frames',
         help="Path to save webcam frames"
-    )
-    parser.add_argument(
-        '--max-images',
-        type=int,
-        default=None,
-        help="Max images per class to process (for quick testing)"
     )
     parser.add_argument(
         '--batch-size',
@@ -554,8 +421,6 @@ def main():
     
     # Paths
     checkpoint_path = Path(args.checkpoint)
-    test_dir = Path(args.test_dir)
-    cropped_dir = Path(args.cropped_dir)
     webcam_dir = Path(args.webcam_dir)
     
     # Verify checkpoint exists
@@ -608,97 +473,34 @@ def main():
                            std=[0.229, 0.224, 0.225])
     ])
     
-    # Test 1: Create and evaluate cropped test set
-    if args.test in ['1', 'all']:
-        # Initialize detector and cropper
-        detector = HandDetector()
-        cropper = HandCropper(
-            target_size=(224, 224),
-            padding=0.2,
-            square_crop=True,
-            normalize=False,
-            bgr_to_rgb=True,
+    # Test 2: Capture and evaluate webcam frames
+    # Capture frames if they don't exist
+    webcam_frames_exist = webcam_dir.exists() and any(webcam_dir.glob('*/*.jpg'))
+    
+    if not webcam_frames_exist:
+        capture_stats = capture_webcam_gestures(
+            output_dir=webcam_dir,
+            checkpoint_path=checkpoint_path,
+            gesture_classes=gesture_classes,
+            frames_per_gesture=30
+        )
+    else:
+        logger.info(f"Webcam frames already exist: {webcam_dir}")
+    
+    # Evaluate on webcam frames if directory exists
+    if webcam_dir.exists():
+        webcam_dataset = ImageFolder(webcam_dir, transform=transform)
+        webcam_loader = DataLoader(webcam_dataset, batch_size=args.batch_size,
+                                  shuffle=False, num_workers=0)
+        
+        webcam_acc, webcam_labels, webcam_preds, webcam_conf = evaluate_model(
+            model, webcam_loader, device, "Webcam Frames (Offline)"
         )
         
-        # Create cropped test set if it doesn't exist
-        if not cropped_dir.exists():
-            if not test_dir.exists():
-                logger.error(f"Test directory not found: {test_dir}")
-                logger.error("Cannot run Test 1 without full-frame test data")
-            else:
-                create_cropped_test_set(
-                    source_dir=test_dir,
-                    output_dir=cropped_dir,
-                    detector=detector,
-                    cropper=cropper,
-                    max_images_per_class=args.max_images
-                )
-        else:
-            logger.info(f"Cropped test set already exists: {cropped_dir}")
-        
-        # Evaluate on both datasets
-        if test_dir.exists() and cropped_dir.exists():
-            # Full-frame test set
-            full_dataset = ImageFolder(test_dir, transform=transform)
-            full_loader = DataLoader(full_dataset, batch_size=args.batch_size, 
-                                   shuffle=False, num_workers=0)
-            
-            full_acc, full_labels, full_preds, full_conf = evaluate_model(
-                model, full_loader, device, "Full-Frame Test Set"
-            )
-            
-            print_evaluation_results(
-                "Full-Frame Test Set", full_acc, full_labels, 
-                full_preds, full_conf, gesture_classes
-            )
-            
-            # Cropped test set
-            cropped_dataset = ImageFolder(cropped_dir, transform=transform)
-            cropped_loader = DataLoader(cropped_dataset, batch_size=args.batch_size,
-                                      shuffle=False, num_workers=0)
-            
-            cropped_acc, cropped_labels, cropped_preds, cropped_conf = evaluate_model(
-                model, cropped_loader, device, "Cropped Test Set"
-            )
-            
-            print_evaluation_results(
-                "Cropped Test Set", cropped_acc, cropped_labels,
-                cropped_preds, cropped_conf, gesture_classes
-            )
-            
-            # Compare results
-            compare_results(
-                "Full-Frame", full_acc, full_conf,
-                "Cropped", cropped_acc, cropped_conf
-            )
-    
-    # Test 2: Capture and evaluate webcam frames
-    if args.test in ['2', 'all']:
-        # Capture frames
-        if not webcam_dir.exists() or len(list(webcam_dir.glob('*/*.jpg'))) == 0:
-            capture_stats = capture_webcam_gestures(
-                output_dir=webcam_dir,
-                checkpoint_path=checkpoint_path,
-                gesture_classes=gesture_classes,
-                frames_per_gesture=30
-            )
-        else:
-            logger.info(f"Webcam frames already exist: {webcam_dir}")
-        
-        # Evaluate on webcam frames
-        if webcam_dir.exists() and len(list(webcam_dir.glob('*/*.jpg'))) > 0:
-            webcam_dataset = ImageFolder(webcam_dir, transform=transform)
-            webcam_loader = DataLoader(webcam_dataset, batch_size=args.batch_size,
-                                      shuffle=False, num_workers=0)
-            
-            webcam_acc, webcam_labels, webcam_preds, webcam_conf = evaluate_model(
-                model, webcam_loader, device, "Webcam Frames (Offline)"
-            )
-            
-            print_evaluation_results(
-                "Webcam Frames (Offline)", webcam_acc, webcam_labels,
-                webcam_preds, webcam_conf, gesture_classes
-            )
+        print_evaluation_results(
+            "Webcam Frames (Offline)", webcam_acc, webcam_labels,
+            webcam_preds, webcam_conf, gesture_classes
+        )
     
     logger.info("\n" + "="*70)
     logger.info("REPRODUCIBILITY TESTS COMPLETE")
