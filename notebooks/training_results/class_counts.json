@@ -1,0 +1,110 @@
+{
+  "train": {
+    "class_counts": {
+      "call": 30,
+      "dislike": 30,
+      "fist": 31,
+      "four": 32,
+      "grabbing": 32,
+      "grip": 33,
+      "like": 29,
+      "middle_finger": 32,
+      "mute": 30,
+      "no_gesture": 30,
+      "ok": 35,
+      "one": 30,
+      "palm": 32,
+      "peace": 32,
+      "peace_inverted": 29,
+      "rock": 32,
+      "stop": 31,
+      "stop_inverted": 33,
+      "three": 31,
+      "three2": 30,
+      "three3": 33,
+      "two_up": 32,
+      "two_up_inverted": 30
+    },
+    "metrics": {
+      "total": 719,
+      "num_classes": 23,
+      "max_count": 35,
+      "min_count": 29,
+      "imbalance_ratio": 1.206896551724138,
+      "gini": 0.018080667593880495,
+      "entropy": 0.9996585746201017
+    }
+  },
+  "val": {
+    "class_counts": {
+      "call": 6,
+      "dislike": 6,
+      "fist": 6,
+      "four": 7,
+      "grabbing": 7,
+      "grip": 7,
+      "like": 6,
+      "middle_finger": 6,
+      "mute": 6,
+      "no_gesture": 6,
+      "ok": 7,
+      "one": 6,
+      "palm": 7,
+      "peace": 6,
+      "peace_inverted": 6,
+      "rock": 6,
+      "stop": 6,
+      "stop_inverted": 7,
+      "three": 6,
+      "three2": 6,
+      "three3": 7,
+      "two_up": 7,
+      "two_up_inverted": 6
+    },
+    "metrics": {
+      "total": 146,
+      "num_classes": 23,
+      "max_count": 7,
+      "min_count": 6,
+      "imbalance_ratio": 1.1666666666666667,
+      "gini": 0.007742703990470501,
+      "entropy": 0.999115497777767
+    }
+  },
+  "test": {
+    "class_counts": {
+      "call": 8,
+      "dislike": 8,
+      "fist": 8,
+      "four": 8,
+      "grabbing": 8,
+      "grip": 8,
+      "like": 7,
+      "middle_finger": 8,
+      "mute": 8,
+      "no_gesture": 8,
+      "ok": 8,
+      "one": 7,
+      "palm": 8,
+      "peace": 8,
+      "peace_inverted": 7,
+      "rock": 8,
+      "stop": 8,
+      "stop_inverted": 8,
+      "three": 8,
+      "three2": 8,
+      "three3": 8,
+      "two_up": 8,
+      "two_up_inverted": 8
+    },
+    "metrics": {
+      "total": 181,
+      "num_classes": 23,
+      "max_count": 8,
+      "min_count": 7,
+      "imbalance_ratio": 1.1428571428571428,
+      "gini": 0.029065577708383472,
+      "entropy": 0.9996982504946417
+    }
+  }
+}
