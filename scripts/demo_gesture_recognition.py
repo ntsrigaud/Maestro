@@ -9,7 +9,6 @@ Architecture matches training exactly:
 - Full-frame inference aligned with HaGRID training distribution
 """
 
-
 import sys
 import time
 from pathlib import Path
@@ -30,9 +29,6 @@ from torchvision import transforms
 from src.input_manager import InputManager
 from src.recognition_engine.preprocessing import center_crop_frame, get_crop_coordinates
 from src.shared.logger import get_logger
-
-# --- LSTM-ViT imports ---
-from src.recognition_engine.temporal.dynamic_gesture_recognizer import DynamicGestureRecognizer
 
 logger = get_logger(__name__)
 
@@ -165,8 +161,6 @@ class GestureRecognitionDemo:
         confidence_threshold: float = 0.5,
         device: str = None,
         show_all_predictions: bool = True,
-        enable_dynamic_gesture: bool = True,
-        lstm_seq_len: int = 12,
     ):
         """
         Initialize demo.
@@ -220,14 +214,6 @@ class GestureRecognitionDemo:
         self.last_prediction = None  # Track for display
         self.last_confidence = 0.0
 
-        # --- Dynamic gesture (LSTM-ViT) ---
-        self.enable_dynamic_gesture = enable_dynamic_gesture
-        self.lstm_seq_len = lstm_seq_len
-        self.frame_buffer = deque(maxlen=lstm_seq_len)
-        self.dynamic_gesture_result = None
-        self.dynamic_gesture_conf = 0.0
-        self.dynamic_gesture_model = None
-
     def initialize(self):
         """Initialize all components."""
         logger.info(f"Initializing clean baseline demo...")
@@ -272,21 +258,6 @@ class GestureRecognitionDemo:
         self.model.eval()
 
         logger.info(f"✓ Model loaded (ViT-B/16, {len(self.gesture_classes)} classes)")
-
-        # --- Initialize LSTM-ViT dynamic gesture recognizer ---
-        if self.enable_dynamic_gesture:
-            try:
-                lstm_params = dict(input_dim=768, hidden_dim=256, num_layers=2, num_classes=len(self.gesture_classes))
-                self.dynamic_gesture_model = DynamicGestureRecognizer(
-                    vit_model_name="vit_base_patch16_224",
-                    lstm_params=lstm_params,
-                    gesture_labels=self.gesture_classes,
-                    device=self.device,
-                )
-                logger.info("✓ Dynamic gesture recognizer (LSTM-ViT) initialized")
-            except Exception as e:
-                logger.warning(f"Could not initialize dynamic gesture recognizer: {e}")
-                self.enable_dynamic_gesture = False
         
         # Verify label alignment
         if 'model_state_dict' in checkpoint:
@@ -360,17 +331,6 @@ class GestureRecognitionDemo:
         
         # Classify gesture
         gesture, confidence = self.classify_gesture(preprocessed)
-
-        # --- Dynamic gesture (LSTM-ViT) ---
-        if self.enable_dynamic_gesture and self.dynamic_gesture_model is not None:
-            # Add current frame to buffer (convert to PIL)
-            pil_frame = Image.fromarray(preprocessed)
-            self.frame_buffer.append(pil_frame)
-            # Only run LSTM if buffer is full
-            if len(self.frame_buffer) == self.lstm_seq_len:
-                result = self.dynamic_gesture_model.predict(list(self.frame_buffer))
-                self.dynamic_gesture_result = result['description']
-                self.dynamic_gesture_conf = result['confidence']
         
         # Determine if we should show prediction based on configuration
         is_high_conf = confidence >= self.confidence_threshold
@@ -392,19 +352,19 @@ class GestureRecognitionDemo:
         # ==============================================================
         primary_label = f"GESTURE: {gesture.upper()}"
         conf_label = f"CONFIDENCE: {confidence:.1%}"
-
+        
         # Large, bold text for primary label
         primary_font_scale = 1.2
         primary_thickness = 3
         conf_font_scale = 0.9
         conf_thickness = 2
-
+        
         # Position at top-left with padding
         label_x = 20
         label_y = 60
-
+        
         # Draw background panel for primary labels
-        panel_height = 140 if self.enable_dynamic_gesture else 100
+        panel_height = 100
         cv2.rectangle(
             frame,
             (10, 40),
@@ -412,7 +372,7 @@ class GestureRecognitionDemo:
             COLOR_BG,
             -1
         )
-
+        
         # Draw primary label (gesture name)
         cv2.putText(
             frame,
@@ -423,7 +383,7 @@ class GestureRecognitionDemo:
             bbox_color,  # Use confidence color
             primary_thickness,
         )
-
+        
         # Draw confidence
         cv2.putText(
             frame,
@@ -434,7 +394,7 @@ class GestureRecognitionDemo:
             COLOR_TEXT,
             conf_thickness,
         )
-
+        
         # Add status indicator
         status = "✓ HIGH CONFIDENCE" if is_high_conf else "⚠ LOW CONFIDENCE"
         status_color = COLOR_BBOX if is_high_conf else COLOR_BBOX_LOW
@@ -447,29 +407,6 @@ class GestureRecognitionDemo:
             status_color,
             2,
         )
-
-        # --- Dynamic gesture label ---
-        if self.enable_dynamic_gesture and self.dynamic_gesture_result:
-            dyn_label = f"DYNAMIC: {self.dynamic_gesture_result}"
-            dyn_conf = f"DYN CONF: {self.dynamic_gesture_conf:.1%}"
-            cv2.putText(
-                frame,
-                dyn_label,
-                (label_x, label_y + 110),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 255),
-                2,
-            )
-            cv2.putText(
-                frame,
-                dyn_conf,
-                (label_x, label_y + 135),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 255),
-                2,
-            )
         
         # ==============================================================
         # SECONDARY LABEL: Above crop box (if space available)
