@@ -27,7 +27,8 @@ default_gesture_names = [
 ]
 logger = get_logger(__name__)
 
-class DynamicGestureMeaningDemo:
+
+class RealTimeDynamicGestureDemo:
     def __init__(self, checkpoint_path, camera_index=0, buffer_size=16, device=None):
         self.checkpoint_path = Path(checkpoint_path)
         self.camera_index = camera_index
@@ -38,11 +39,12 @@ class DynamicGestureMeaningDemo:
         self.model = None
         self.transform = None
         self.gesture_classes = default_gesture_names
-        self.pred_buffer = deque(maxlen=buffer_size)
-        self.fps_history = deque(maxlen=30)
+        self.feature_extractor = None
+        self.dynamic_recognizer = None
+        self.fps_history = []
 
     def initialize(self):
-        logger.info(f"Initializing dynamic gesture meaning demo...")
+        logger.info(f"Initializing real-time dynamic gesture demo...")
         self.input_mgr = InputManager(camera_index=self.camera_index)
         self.input_mgr._convert_to_rgb = False
         if not self.input_mgr.start_continuous_capture():
@@ -63,7 +65,14 @@ class DynamicGestureMeaningDemo:
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
-        logger.info("✓ Model loaded and ready")
+        self.feature_extractor = ViTFrameFeatureExtractor(device=self.device)
+        self.dynamic_recognizer = DynamicGestureRecognizer(
+            vit_model_name="vit_base_patch16_224",
+            gesture_labels=self.gesture_classes,
+            buffer_size=self.buffer_size,
+            device=self.device
+        )
+        logger.info("✓ Model and recognizer ready")
 
     def classify_gesture(self, frame_rgb):
         pil_img = Image.fromarray(frame_rgb)
@@ -76,25 +85,9 @@ class DynamicGestureMeaningDemo:
         gesture = self.gesture_classes[pred_idx]
         return gesture, confidence
 
-    def infer_dynamic_meaning(self):
-        # Simple rule-based dynamic meaning from buffer
-        if not self.pred_buffer:
-            return "No gesture detected"
-        counts = Counter(self.pred_buffer)
-        most_common, freq = counts.most_common(1)[0]
-        if freq > len(self.pred_buffer) * 0.7:
-            return f"Holding: {most_common}"
-        if len(set(self.pred_buffer)) > 1:
-            # Detect transitions
-            if self.pred_buffer[0] != self.pred_buffer[-1]:
-                return f"Transition: {self.pred_buffer[0]} → {self.pred_buffer[-1]}"
-            else:
-                return f"Changing gesture"
-        return f"Gesture: {most_common}"
-
     def run(self):
         self.initialize()
-        logger.info("Starting dynamic gesture meaning demo. Press 'q' to quit.")
+        logger.info("Starting real-time dynamic gesture demo. Press 'q' to quit.")
         prev_time = time.time()
         while True:
             frame_data = self.input_mgr.get_latest_frame()
@@ -106,8 +99,8 @@ class DynamicGestureMeaningDemo:
             x1, y1, x2, y2 = get_crop_coordinates((h, w))
             preprocessed = center_crop_frame(frame, target_size=224, bgr_to_rgb=True)
             gesture, confidence = self.classify_gesture(preprocessed)
-            self.pred_buffer.append(gesture)
-            meaning = self.infer_dynamic_meaning()
+            self.dynamic_recognizer.add_prediction(gesture)
+            meaning = self.dynamic_recognizer.infer_dynamic_meaning()
             # Draw crop box
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             # Draw meaning
@@ -117,7 +110,7 @@ class DynamicGestureMeaningDemo:
             curr_time = time.time()
             fps = 1.0 / (curr_time - prev_time) if curr_time != prev_time else 0
             self.fps_history.append(fps)
-            avg_fps = np.mean(self.fps_history) if self.fps_history else 0
+            avg_fps = np.mean(self.fps_history[-30:]) if self.fps_history else 0
             prev_time = curr_time
             cv2.putText(frame, f"FPS: {avg_fps:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
             cv2.imshow("Dynamic Gesture Meaning", frame)
