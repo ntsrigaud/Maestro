@@ -22,11 +22,10 @@ Date: 2026-01-23
 
 import argparse
 import cv2
-import numpy as np
 from pathlib import Path
 import shutil
 import json
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from tqdm import tqdm
 import random
 

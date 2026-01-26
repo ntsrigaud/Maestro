@@ -6,7 +6,6 @@ CelebA is available from multiple sources. This script provides instructions
 and automated download from alternative sources.
 """
 
-import subprocess
 from pathlib import Path
 
 print(f"\n{'='*70}")
@@ -44,8 +43,9 @@ print("\nAutomated download attempt using wget...")
 print("Trying mirror at: https://files.fast.ai/data/...")
 print("=" * 70)
 
-# Try fast.ai mirror (smaller subset)
-output_dir = Path('/home/rachel/.Neil/CSU-Capstone-Project/notebooks/data/celeba')
+# Get project root dynamically
+project_root = Path(__file__).parent.parent
+output_dir = project_root / 'notebooks/data/celeba'
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Fast.ai has a smaller CelebA subset

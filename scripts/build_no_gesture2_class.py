@@ -25,7 +25,6 @@ from collections import Counter
 from datetime import datetime
 
 import cv2
-import numpy as np
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
