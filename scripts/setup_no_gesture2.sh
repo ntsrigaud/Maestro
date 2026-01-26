@@ -4,7 +4,8 @@
 
 set -e  # Exit on error
 
-PROJECT_ROOT="/home/rachel/.Neil/CSU-Capstone-Project"
+# Determine project root dynamically
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATASET_ROOT="$PROJECT_ROOT/notebooks/data/hagrid_subset"
 SOURCE_DIR="$PROJECT_ROOT/notebooks/data/coco_val2017/val2017"
 
@@ -31,9 +32,9 @@ echo ""
 
 # Step 2: Check/Install MediaPipe
 echo "Step 2: Checking MediaPipe installation..."
-if ! /home/rachel/.Neil/CSU-Capstone-Project/.venv/bin/python -c "import mediapipe" 2>/dev/null; then
+if ! python -c "import mediapipe" 2>/dev/null; then
     echo "  Installing MediaPipe..."
-    /home/rachel/.Neil/CSU-Capstone-Project/.venv/bin/python -m pip install -q mediapipe opencv-python
+    python -m pip install -q mediapipe opencv-python
     echo "  ✓ MediaPipe installed"
 else
     echo "  ✓ MediaPipe already installed"
@@ -47,7 +48,7 @@ echo "  Processing time: ~10-15 minutes"
 echo ""
 
 cd "$PROJECT_ROOT"
-/home/rachel/.Neil/CSU-Capstone-Project/.venv/bin/python scripts/build_no_gesture2_class.py \
+python scripts/build_no_gesture2_class.py \
     --source "$SOURCE_DIR" \
     --output "$DATASET_ROOT" \
     --max-samples 5000 \

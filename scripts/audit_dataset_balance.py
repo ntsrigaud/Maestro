@@ -7,7 +7,6 @@ Analyzes class distribution across splits and computes imbalance metrics.
 import json
 import sys
 from pathlib import Path
-from collections import Counter
 import numpy as np
 from scipy.stats import entropy
 
@@ -51,7 +50,6 @@ def compute_imbalance_metrics(class_counts):
     # Gini coefficient
     sorted_counts = np.sort(counts)
     n = len(counts)
-    cumsum = np.cumsum(sorted_counts)
     gini = (2 * np.sum((n - np.arange(n)) * sorted_counts)) / (n * total) - 1
     
     # Entropy (normalized)

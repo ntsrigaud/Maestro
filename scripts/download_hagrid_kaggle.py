@@ -16,9 +16,7 @@ Usage:
 """
 
 import argparse
-import os
 import shutil
-import zipfile
 from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
