@@ -46,7 +46,7 @@ def download_celeba(output_dir):
         os.chdir(output_path)
         
         # Download dataset
-        result = subprocess.run(
+        subprocess.run(
             ['kaggle', 'datasets', 'download', '-d', 'jessicali9530/celeba-dataset'],
             check=True,
             capture_output=True,
@@ -103,8 +103,12 @@ def download_celeba(output_dir):
 
 
 if __name__ == '__main__':
-    output_dir = '/home/rachel/.Neil/CSU-Capstone-Project/notebooks/data/celeba'
-    result = download_celeba(output_dir)
+    # Get project root dynamically
+    project_root = Path(__file__).parent.parent
+    output_dir = project_root / 'notebooks/data/celeba'
+    hagrid_dir = project_root / 'notebooks/data/hagrid_subset'
+    
+    result = download_celeba(str(output_dir))
     
     if result:
         print(f"\n{'='*70}")
@@ -113,7 +117,7 @@ if __name__ == '__main__':
         print("Next step:")
         print(f"  python scripts/build_no_gesture2_simple.py \\")
         print(f"    --source_dir {result} \\")
-        print(f"    --output_dir /home/rachel/.Neil/CSU-Capstone-Project/notebooks/data/hagrid_subset \\")
+        print(f"    --output_dir {hagrid_dir} \\")
         print(f"    --target_count 7000")
         sys.exit(0)
     else:
