@@ -46,7 +46,6 @@ Usage:
     python scripts/organize_hagrid_dataset.py --input ./hagrid-sample-30k-384p --output ./data
 """
 
-import json
 import shutil
 from pathlib import Path
 import argparse
