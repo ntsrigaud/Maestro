@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Quick verification that no_gesture2 class was added successfully."""
 
-from torchvision.datasets import ImageFolder
+from pathlib import Path
 from collections import Counter
+from torchvision.datasets import ImageFolder
+
+# Get project root dynamically
+project_root = Path(__file__).parent.parent
+dataset_path = project_root / 'notebooks/data/hagrid_subset/train'
 
 # Load training dataset
-ds = ImageFolder('/home/rachel/.Neil/CSU-Capstone-Project/notebooks/data/hagrid_subset/train')
+ds = ImageFolder(dataset_path)
 
 # Count samples per class
 counts = Counter([ds.classes[lbl] for _, lbl in ds.samples])

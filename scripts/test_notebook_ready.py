@@ -11,8 +11,9 @@ print("\n" + "="*70)
 print("TRAINING NOTEBOOK PRE-FLIGHT CHECK")
 print("="*70 + "\n")
 
-# Simulate notebook's dataset loading
-DATASET_ROOT = Path('/home/rachel/.Neil/CSU-Capstone-Project/notebooks/data/hagrid_subset')
+# Get project root dynamically
+project_root = Path(__file__).parent.parent
+DATASET_ROOT = project_root / 'notebooks/data/hagrid_subset'
 
 print(f"Loading dataset from {DATASET_ROOT}...")
 

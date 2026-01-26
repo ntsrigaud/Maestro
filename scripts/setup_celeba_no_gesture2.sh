@@ -3,7 +3,8 @@
 
 set -e
 
-PROJECT_ROOT="/home/rachel/.Neil/CSU-Capstone-Project"
+# Determine project root dynamically
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CELEBA_DIR="$PROJECT_ROOT/notebooks/data/celeba"
 HAGRID_DIR="$PROJECT_ROOT/notebooks/data/hagrid_subset"
 

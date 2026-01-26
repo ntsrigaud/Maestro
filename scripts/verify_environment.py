@@ -51,13 +51,13 @@ def test_import(module_name, package_name=None, min_version=None):
                     if current < required:
                         print_error(f"{package_name}{version_str} - UPGRADE REQUIRED (need >={min_version})")
                         return False
-                except:
+                except Exception:
                     pass  # Skip version check if parsing fails
         else:
             version_str = ""
         print_success(f"{package_name}{version_str}")
         return True
-    except ImportError as e:
+    except ImportError:
         print_error(f"{package_name} - NOT FOUND")
         print(f"         Install with: pip install {package_name}")
         return False
