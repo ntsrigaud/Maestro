@@ -23,14 +23,12 @@ This directory contains utility scripts for testing, demonstration, and verifica
 ## Demonstration Scripts
 
 - **`demo_timestamp_usage.py`** - Interactive demonstration of timestamp precision and usage patterns
-
   - Shows nanosecond precision at different scales
   - Frame-to-frame timing measurements
   - LSTM sequence timing analysis
   - System latency measurement
 
 - **`demo_hand_detection.py`** - Real-time hand detection visualization
-
   - Live camera feed with bounding boxes
   - Hand landmarks (21 points per hand)
   - Handedness labels and confidence scores
