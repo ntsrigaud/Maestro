@@ -13,9 +13,7 @@ Usage:
 
 import argparse
 import urllib.request
-import json
 from pathlib import Path
-from tqdm import tqdm
 
 
 def download_unsplash_lite_sample(output_dir, max_samples=6000):
