@@ -1,1 +1,2 @@
 *.ipynb filter=lfs diff=lfs merge=lfs -text
+notebooks/lstm_train_vit_features.ipynb filter=lfs diff=lfs merge=lfs -text
