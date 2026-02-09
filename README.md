@@ -1,50 +1,132 @@
-# Hand Gesture Recognition System
+# Semantic Gesture Understanding System
 
-A deep learning gesture recognition system using Vision Transformers (ViT-B/16) for robust hand gesture classification.
+**A vision-language system that maps human gestures to computer commands through explicit semantic intent representation.**
 
-## Overview
+---
 
-This project implements a **gesture recognition system** trained on the HaGRID dataset using Vision Transformers. The system processes full-frame images through a pre-trained ViT-B/16 model fine-tuned for 18 gesture classes.
+## Project Status
 
-**Key Features**:
+🚧 **Phase 0 Complete** - Repository cleaned and aligned with semantic architecture  
+📋 **Phase 1 Starting** - CLIP-based semantic foundation implementation
 
-- **Vision Transformer**: Uses ViT-B/16 pre-trained on ImageNet-21k for rich visual feature extraction
-- **HaGRID Dataset**: Trained on 30K+ hand gesture images across 18 gesture classes
-- **Full-frame Processing**: Direct image classification without hand detection preprocessing
-- **Transfer Learning**: Leverages ImageNet pre-training for efficient learning
-- **Production Ready**: Trained model available on Hugging Face Hub
+**Authoritative Documentation**: [docs/SEMANTIC_SYSTEM_ARCHITECTURE.md](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md)
 
-### System Architecture
+---
+
+## What This Project Is
+
+This project implements a **semantic gesture understanding system** that:
+
+1. **Captures gesture data** from camera input
+2. **Detects and localizes hands** using MediaPipe
+3. **Extracts semantic intent** using vision-language models (CLIP)
+4. **Resolves commands** through semantic similarity matching
+5. **Executes system commands** with safety boundaries
+
+### Core Objective
+
+> Map human gestures to computer commands through **explicit semantic understanding**, NOT direct gesture-to-command mappings.
+
+Gestures are **expressions of intent**. The system understands meaning, not just visual patterns.
+
+---
+
+## What This Project Is NOT
+
+- ❌ A gesture classifier (labels without understanding)
+- ❌ A direct gesture-to-command mapper
+- ❌ A purely visual pattern matching system
+- ❌ A gesture database with hard-coded actions
+
+---
+
+## System Architecture
 
 ```
-┌──────────┐    ┌──────────────┐    ┌──────────────────┐    ┌────────────┐    ┌──────────┐
-│  Camera  │───▶│Input Manager │───▶│Recognition Engine│───▶│Action Mapper│───▶│OS Control│
-└──────────┘    └──────────────┘    └──────────────────┘    └────────────┘    └──────────┘
-                                            │
-                                            └── ViT-B/16 Gesture Classifier
+┌─────────────────────────────────────────────────────────────────┐
+│                  SEMANTIC GESTURE SYSTEM                        │
+│                   (Five-Layer Architecture)                     │
+└─────────────────────────────────────────────────────────────────┘
+
+Camera Input
+     ↓
+┌────────────────┐
+│ LAYER 1:       │  Hand detection, temporal segmentation
+│ Perception     │  Status: ✅ 70% complete (missing temporal)
+└────────┬───────┘
+         ↓
+┌────────────────┐
+│ LAYER 2:       │  CLIP visual encoding
+│ Representation │  Status: 📋 Phase 1 (Weeks 1-2)
+└────────┬───────┘
+         ↓
+┌────────────────┐
+│ LAYER 3:       │  Semantic intent extraction
+│ Semantic       │  Status: 📋 Phase 1 (Weeks 1-6)
+│ Intent         │
+└────────┬───────┘
+         ↓
+┌────────────────┐
+│ LAYER 4:       │  Command resolution via semantic matching
+│ Command        │  Status: 📋 Phase 1 (Weeks 3-4)
+│ Resolution     │
+└────────┬───────┘
+         ↓
+┌────────────────┐
+│ LAYER 5:       │  OS command execution with safety
+│ Execution      │  Status: 📋 Phase 1 (Weeks 4-5)
+└────────────────┘
 ```
 
-**Components**:
+**Status Legend**:
 
-- **Input Manager** ✅ - Camera capture and frame preprocessing
-- **Recognition Engine** 🔬 - ViT-B/16 gesture classification (training complete, inference in development)
-- **Action Mapper** 📋 - Planned
-- **OS Controller** 📋 - Planned
+- ✅ Complete and validated
+- 🔬 In development
+- 📋 Planned (with timeline)
 
-### Technical Approach
+---
 
-**Architecture**:
+## Key Features
+
+### Semantic Understanding (Not Classification)
+
+**Traditional Approach** (What we DON'T do):
 
 ```
-Input Image (224x224) → ViT-B/16 Encoder → Classification Head → Gesture Label
+Gesture → Classifier → Label → Hard-coded action
 ```
 
-The model processes images by:
+**Our Approach** (Semantic understanding):
 
-1. Dividing input into 16×16 patches (196 patches total)
-2. Applying patch embeddings with positional encoding
-3. Processing through 12 transformer encoder layers
-4. Classifying via a linear head to 18 gesture classes
+```
+Gesture → Visual Embedding (CLIP) → Semantic Space → Text Command → Action
+```
+
+### Zero-Shot Capability
+
+Add new gestures by describing them in text - **no retraining required**:
+
+```yaml
+# configs/intent_vocabulary.yaml
+zoom_in:
+  - "zoom in"
+  - "make bigger"
+  - "enlarge view"
+```
+
+The system immediately understands gestures with zoom-in-like semantics through CLIP's vision-language alignment.
+
+### Research-Backed Design
+
+Every architectural decision grounded in research:
+
+- **CLIP** (Radford et al., 2021) - Vision-language joint embedding
+- **SentenceTransformers** (Reimers & Gurevych, 2019) - Semantic text matching
+- **MediaPipe Hands** - Production-ready hand detection
+
+See [docs/SEMANTIC_SYSTEM_ARCHITECTURE.md](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md) for complete research foundation.
+
+---
 
 ## Quick Start
 
@@ -55,140 +137,237 @@ The model processes images by:
 conda env create -f environment.yml
 conda activate gesture
 
-# Install project in editable mode
+# Install project
 pip install -e .
 
 # Verify installation
 python scripts/verify_install.py
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed instructions.
+See [INSTALL.md](INSTALL.md) for detailed setup instructions.
 
-### Train a Gesture Recognition Model
+### Phase 1 Implementation (Current)
 
-The training pipeline uses the [neilrigaud/hagrid-subset](https://huggingface.co/datasets/neilrigaud/hagrid-subset) dataset hosted on Hugging Face.
+Phase 1 focuses on building the semantic foundation for **static gestures**:
 
-```bash
-# 1. Install dependencies
-conda env create -f environment.yml
-conda activate gesture
-pip install -e .
+**Timeline**: Weeks 1-6  
+**Objective**: CLIP-based gesture → command pipeline  
+**Goal**: >70% intent recognition accuracy, zero-shot capability
 
-# 2. Open training notebook
-jupyter notebook notebooks/finetune_vit_hagrid.ipynb
+**Week 1-2**: CLIP integration  
+**Week 2-3**: Intent vocabulary & matching  
+**Week 3-4**: Command resolution  
+**Week 4-5**: Execution layer  
+**Week 5-6**: Integration & testing
 
-# 3. Run all cells to train ViT-B/16 model (~30-60 min on GPU)
-```
+See [docs/SEMANTIC_SYSTEM_ARCHITECTURE.md#phase-1](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md#phase-1-semantic-foundation-weeks-1-6) for detailed plan.
 
-**Training Configuration**:
+---
 
-- Model: ViT-B/16 (timm, ImageNet-21k pre-trained)
-- Dataset: HaGRID subset (30K+ images, 18 classes)
-- Expected accuracy: 85-90% after 10 epochs
-- Trained model: Available at [neilrigaud/hagrid-vit-gesture](https://huggingface.co/neilrigaud/hagrid-vit-gesture)
-
-### Use Pre-trained Model
-
-```python
-from transformers import AutoModelForImageClassification, AutoImageProcessor
-
-model = AutoModelForImageClassification.from_pretrained("neilrigaud/hagrid-vit-gesture")
-processor = AutoImageProcessor.from_pretrained("neilrigaud/hagrid-vit-gesture")
-
-# Process image and classify
-inputs = processor(images=image, return_tensors="pt")
-outputs = model(**inputs)
-predicted_class = outputs.logits.argmax(-1)
-```
-
-## Documentation
-
-### Setup & Development
-
-- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Complete development workflow and common tasks
-- **[Installation Guide](INSTALL.md)** - Detailed setup instructions
-- **[Architecture Overview](docs/Project-Architecture/README.md)** - System design
-- **[API Documentation](docs/)** - Module-level documentation
-
-### Model Training
-
-- **[Training Guide](docs/MODEL_TRAINING_GUIDE.md)** - ViT fine-tuning details
-- **[Dataset Guide](docs/HAGRID_DOWNLOAD_GUIDE.md)** - HaGRID dataset access
-- **[Training Notebook](notebooks/finetune_vit_hagrid.ipynb)** - Complete training workflow
-- **[HaGRID Dataset Assessment](docs/HaGRID_DATASET_ASSESSMENT.md)** - Dataset analysis
-
-## Project Structure
+## Repository Structure
 
 ```
-├── src/                          # Core implementation
-│   ├── input_manager/            # Camera capture (✅ Complete)
-│   ├── recognition_engine/       # Gesture recognition (🔬 In Development)
-│   │   ├── preprocessing.py      # Image preprocessing utilities
-│   │   └── temporal/             # LSTM temporal modeling (🔬 Experimental)
-│   └── shared/                   # Logging and utilities (✅ Complete)
-├── notebooks/                    # Training and research
-│   ├── finetune_vit_hagrid.ipynb       # ViT training workflow (✅ Complete)
-│   ├── semantic_gesture_learning.ipynb # Semantic understanding research
-│   └── vit_lstm_gesture_training.ipynb # Temporal modeling experiments
-├── scripts/                      # Demos and utilities
-│   ├── demo_gesture_recognition.py     # Gesture inference demo
-│   ├── download_hagrid_subset.py       # Dataset downloader
-│   └── verify_install.py               # Installation verification
-├── docs/                         # Documentation
-│   ├── Project-Architecture/     # Design documents
-│   ├── Topics/                   # Research references
-│   └── HaGRID_DATASET_ASSESSMENT.md # Dataset analysis
-├── checkpoints/                  # Model checkpoints
-│   └── best_model.pth           # Trained ViT model
-├── environment.yml               # Conda environment
-├── pyproject.toml                # Package configuration
-└── README.md                     # This file
+CSU-Capstone-Project/
+├── README.md                          # This file
+├── INSTALL.md                         # Installation guide
+├── docs/
+│   ├── SEMANTIC_SYSTEM_ARCHITECTURE.md # ⭐ AUTHORITATIVE specification
+│   ├── research/                      # Research foundations (planned)
+│   ├── architecture/                  # Layer-by-layer design (planned)
+│   ├── guides/                        # User/developer guides (planned)
+│   ├── implementation/                # Phase plans & ADRs (planned)
+│   └── legacy/                        # 🗄️ Archived historical docs
+│
+├── src/
+│   ├── input_manager/                 # ✅ Camera capture (complete)
+│   ├── recognition_engine/
+│   │   ├── hand_detection/            # ✅ MediaPipe hands (complete)
+│   │   └── temporal/                  # 📋 Temporal segmentation (Phase 1)
+│   ├── shared/                        # ✅ Logger (complete)
+│   │
+│   ├── perception/                    # 📋 Layer 1 (Phase 1)
+│   ├── representation/                # 📋 Layer 2 (Phase 1)
+│   ├── semantics/                     # 📋 Layer 3 (Phase 1)
+│   ├── action_mapper/                 # 📋 Layer 4 (Phase 1)
+│   ├── execution/                     # 📋 Layer 5 (Phase 1)
+│   └── pipeline/                      # 📋 Integration (Phase 1)
+│
+├── notebooks/
+│   ├── phase1_semantic_foundation/    # 📋 Phase 1 experiments
+│   └── archive/                       # 🗄️ Old classification notebooks
+│
+├── scripts/
+│   ├── setup/                         # Installation scripts (planned)
+│   ├── demos/                         # Demo scripts (planned)
+│   └── utilities/                     # Development tools (planned)
+│
+├── tests/                             # Unit & integration tests (planned)
+├── configs/                           # YAML configurations (planned)
+└── work-logs/                         # Engineering logs
 ```
 
-## Research Foundation
+**Legend**:
 
-This project explores gesture recognition using Vision Transformers, drawing inspiration from:
+- ⭐ Authoritative documentation
+- ✅ Complete and validated
+- 📋 Planned with timeline
+- 🗄️ Archived (historical reference only)
 
-- **Vision Transformer (ViT)**: Patch-based image understanding with self-attention
-- **Transfer Learning**: Leveraging ImageNet-21k pre-training for gesture classification
-- **HaGRID Dataset**: Large-scale hand gesture dataset with 18 gesture classes
-- **HAVIT & ALBEF**: Vision-language research inspiring future semantic understanding work
+---
 
-See [docs/Topics/](docs/Topics/) for detailed research documentation.
+## Technology Stack
 
-## Current Status
+### Phase 1 (Immediate - Production Ready)
 
-### Completed ✅
+| Component            | Technology           | Purpose                    | Status         |
+| -------------------- | -------------------- | -------------------------- | -------------- |
+| **Hand Detection**   | MediaPipe Hands      | Locate hands in frame      | ✅ Implemented |
+| **Visual Encoding**  | CLIP (OpenCLIP)      | Gesture → visual embedding | 📋 Week 1-2    |
+| **Semantic Intent**  | CLIP Text Encoder    | Intent extraction          | 📋 Week 1-2    |
+| **Command Matching** | SentenceTransformers | Semantic similarity        | 📋 Week 2-3    |
+| **Execution**        | pyautogui / pynput   | OS commands                | 📋 Week 3-4    |
 
-- Input Manager: Camera capture, frame buffering, timestamp management
-- ViT Fine-tuning: Gesture classification model trained on HaGRID (85-90% accuracy)
-- Training Pipeline: Complete notebook workflow with Hugging Face integration
-- Model Deployment: Trained model published to Hugging Face Hub
-- Logging System: Centralized logging with rotation
+### Phase 2-3 (Future)
 
-### In Progress 🔬
+- **BLIP-2**: Query-based intent understanding (Months 2-3)
+- **VideoCLIP/X-CLIP**: Dynamic gesture temporal modeling (Months 4-6)
+- **ActionCLIP**: Temporal action recognition (Months 4-6)
 
-- Recognition Engine: Inference pipeline for real-time gesture classification
-- Temporal Modeling: LSTM-based dynamic gesture recognition (experimental)
-- End-to-end Integration: Connecting all system components
+---
 
-### Planned 📋
+## Development Workflow
 
-- Action Mapper: Gesture-to-command translation layer
-- OS Controller: System command execution module
-- Real-time Demo: Complete application with UI
-- Semantic Understanding: Vision-language alignment for zero-shot learning (research)
+### Current Phase: Phase 0 → Phase 1 Transition
 
-## Team
+1. **Phase 0 Complete**: Repository cleaned, aligned with semantic architecture
+2. **Phase 1 Next**: Begin CLIP integration (Week 1-2)
 
-- Sley Hortes
-- Neil Taison Rigaud
-- Neil Taison Rigaud
-- Khishig Tuguldur
-- Eder Guerrero
+### Implementation Process
 
-- Eder Guerrero
+1. Read [docs/SEMANTIC_SYSTEM_ARCHITECTURE.md](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md) (authoritative spec)
+2. Follow Phase 1 week-by-week checklist
+3. Validate against success criteria:
+   - [ ] 10+ semantic intents recognized
+   - [ ] Zero-shot capability demonstrated
+   - [ ] > 70% intent recognition accuracy
+   - [ ] <1 second latency
+   - [ ] No safety violations
+
+### Documentation Standards
+
+- **Authoritative**: [docs/SEMANTIC_SYSTEM_ARCHITECTURE.md](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md)
+- **Layer Design**: `docs/architecture/layer{N}-*.md` (planned)
+- **Implementation Plans**: `docs/implementation/phase{N}-plan.md` (planned)
+- **Decisions**: `docs/implementation/decisions/*.md` (ADRs, planned)
+
+---
+
+## Current Implementation Status
+
+### ✅ Complete (Validated)
+
+- **Camera Capture**: `src/input_manager/` - Thread-safe frame buffering, timestamps
+- **Hand Detection**: `src/recognition_engine/hand_detection/` - MediaPipe integration, ROI extraction
+- **Logging System**: `src/shared/logger.py` - Rotation, structured logging
+
+### 📋 Phase 1 (Weeks 1-6)
+
+All five layers to be implemented following [authoritative architecture](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md).
+
+### 🗄️ Archived (Historical)
+
+- **ViT Classification Training**: See `notebooks/archive/finetune_vit_hagrid.ipynb`
+  - 18 gesture classes, 85-90% accuracy baseline
+  - Useful for comparison, not the target architecture
+- **Old Documentation**: See `docs/legacy/` for historical context
+
+---
+
+## Validation & Testing
+
+Phase 1 must demonstrate:
+
+1. **Zero-Shot Recognition**:
+
+   ```yaml
+   # Add new intent without retraining
+   new_intent: ["zoom in", "make bigger", "enlarge"]
+   # System immediately recognizes semantically similar gestures
+   ```
+
+2. **Semantic Similarity**:
+
+   ```
+   System groups these as equivalent:
+   - "increase volume"
+   - "turn up sound"
+   - "make it louder"
+   ```
+
+3. **Safety**:
+   ```
+   System refuses:
+   - File deletion
+   - Network operations
+   - Rapid-fire commands (rate limited)
+   ```
+
+---
+
+## Contributing
+
+### Before Contributing
+
+1. Read [docs/SEMANTIC_SYSTEM_ARCHITECTURE.md](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md) - **mandatory**
+2. Understand the five-layer architecture
+3. Follow research-backed design principles
+
+### Development Principles
+
+1. **Semantic First**: Visual recognition serves semantic interpretation
+2. **Research-Backed**: Cite papers for major decisions
+3. **No Hard-Coding**: Use configuration files (YAML) for intents/commands
+4. **Zero-Shot Capable**: New intents via text descriptions, not retraining
+
+### Code Standards
+
+- Architecture: Five-layer structure (see `src/`)
+- Documentation: Every layer has README
+- Testing: >80% code coverage (Phase 1 goal)
+- Configuration: YAML files in `configs/` (not hard-coded)
+
+---
 
 ## License
 
-This is an academic capstone project for National Dong Hwa University.
+[Specify license here]
+
+---
+
+## References
+
+### Core Research
+
+- **CLIP**: Radford et al. (2021) - "Learning Transferable Visual Models From Natural Language Supervision"
+- **SentenceTransformers**: Reimers & Gurevych (2019) - "Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks"
+- **MediaPipe**: Google Research - Production hand detection and pose estimation
+
+### Related Work
+
+- **BLIP-2**: Li et al. (2023) - Vision-language understanding
+- **VideoCLIP**: Xu et al. (2021) - Temporal video-text alignment
+- **ActionCLIP**: Wang et al. (2021) - Video action recognition paradigm
+
+See [docs/SEMANTIC_SYSTEM_ARCHITECTURE.md#research-foundation](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md#2-research-foundation) for complete literature review.
+
+---
+
+## Contact & Support
+
+For questions about the architecture or implementation:
+
+1. Review [docs/SEMANTIC_SYSTEM_ARCHITECTURE.md](docs/SEMANTIC_SYSTEM_ARCHITECTURE.md)
+2. Check `docs/legacy/` for historical context
+3. See `work-logs/` for implementation decisions
+
+**Status**: February 10, 2026 - Phase 0 complete, Phase 1 starting
