@@ -1,78 +1,194 @@
 # Hand Gesture Recognition System
 
-This project is a comprehensive exploration into the field of **Human-Computer
-Interaction (HCI)**, focusing on the development of a sophisticated **Hand
-Gesture Recognition System**. By leveraging cutting-edge techniques in
-**Computer Vision** and **Machine Learning**, we aim to create a system that
-can accurately interpret and translate human hand gestures into actionable
-commands, providing a seamless and intuitive way to interact with computing
-devices.
+A deep learning gesture recognition system using Vision Transformers (ViT-B/16) for robust hand gesture classification.
 
-## Introduction
+## Overview
 
-The primary goal of this project is to design and implement a robust gesture
-recognition system that goes beyond simple pattern matching. We are building
-a system that understands the semantic meaning behind gestures, enabling a more
-natural and powerful user experience. Our approach is inspired by
-state-of-the-art research in the field, including the **HAVIT** (Hierarchical
-Attention-based Vision Transformer) and **ALBEF** (Align before Fuse) models.
+This project implements a **gesture recognition system** trained on the HaGRID dataset using Vision Transformers. The system processes full-frame images through a pre-trained ViT-B/16 model fine-tuned for 18 gesture classes.
 
-The system architecture is composed of four main components:
+**Key Features**:
 
-- **Input Manager**: Responsible for capturing video frames from a camera
-  and preprocessing them for the recognition engine.
-- **Recognition Engine**: The core of the system, which uses a Vision
-  Transformer (ViT) based model to analyze the visual data and recognize the
-  performed gestures.
-- **Action Mapper**: Translates the recognized gestures into specific
-  commands or actions.
-- **OS Controller**: Executes the commands on the underlying operating system.
+- **Vision Transformer**: Uses ViT-B/16 pre-trained on ImageNet-21k for rich visual feature extraction
+- **HaGRID Dataset**: Trained on 30K+ hand gesture images across 18 gesture classes
+- **Full-frame Processing**: Direct image classification without hand detection preprocessing
+- **Transfer Learning**: Leverages ImageNet pre-training for efficient learning
+- **Production Ready**: Trained model available on Hugging Face Hub
 
-A key feature of our project is the focus on **zero-shot learning**, which will
-allow the system to recognize new gestures without the need for retraining. This
-is achieved through a cross-modal learning approach that bridges the gap between
-vision and language, enabling the system to understand and generalize
-gesture-based commands.
+### System Architecture
 
-This repository contains all the code, documentation, and research materials
-related to the project.
-
-## Installation
-
-To set up the project for development:
-
-```bash
-# Install the project in editable mode
-pip install -e .
+```
+┌──────────┐    ┌──────────────┐    ┌──────────────────┐    ┌────────────┐    ┌──────────┐
+│  Camera  │───▶│Input Manager │───▶│Recognition Engine│───▶│Action Mapper│───▶│OS Control│
+└──────────┘    └──────────────┘    └──────────────────┘    └────────────┘    └──────────┘
+                                            │
+                                            └── ViT-B/16 Gesture Classifier
 ```
 
-For detailed installation instructions, see [INSTALL.md](INSTALL.md).
+**Components**:
+
+- **Input Manager** ✅ - Camera capture and frame preprocessing
+- **Recognition Engine** 🔬 - ViT-B/16 gesture classification (training complete, inference in development)
+- **Action Mapper** 📋 - Planned
+- **OS Controller** 📋 - Planned
+
+### Technical Approach
+
+**Architecture**:
+
+```
+Input Image (224x224) → ViT-B/16 Encoder → Classification Head → Gesture Label
+```
+
+The model processes images by:
+
+1. Dividing input into 16×16 patches (196 patches total)
+2. Applying patch embeddings with positional encoding
+3. Processing through 12 transformer encoder layers
+4. Classifying via a linear head to 18 gesture classes
 
 ## Quick Start
 
-After installation, you can use the input manager:
+### Installation
 
-```python
-from input_manager import InputManager
+```bash
+# Create conda environment
+conda env create -f environment.yml
+conda activate gesture
 
-# Single frame capture
-manager = InputManager(camera_index=0)
-manager.start_capture()
-frame = manager.get_frame()  # Returns numpy array
-manager.stop_capture()
+# Install project in editable mode
+pip install -e .
 
-# Continuous capture (recommended)
-manager = InputManager(camera_index=0)
-manager.start_continuous_capture()
-frame_data = manager.get_latest_frame()  # Returns FrameData with timestamp
-manager.stop_continuous_capture()
+# Verify installation
+python scripts/verify_install.py
 ```
 
-See `src/input_manager/example_usage.py` for more examples.
+See [INSTALL.md](INSTALL.md) for detailed instructions.
 
-## Group Members
+### Train a Gesture Recognition Model
+
+The training pipeline uses the [neilrigaud/hagrid-subset](https://huggingface.co/datasets/neilrigaud/hagrid-subset) dataset hosted on Hugging Face.
+
+```bash
+# 1. Install dependencies
+conda env create -f environment.yml
+conda activate gesture
+pip install -e .
+
+# 2. Open training notebook
+jupyter notebook notebooks/finetune_vit_hagrid.ipynb
+
+# 3. Run all cells to train ViT-B/16 model (~30-60 min on GPU)
+```
+
+**Training Configuration**:
+
+- Model: ViT-B/16 (timm, ImageNet-21k pre-trained)
+- Dataset: HaGRID subset (30K+ images, 18 classes)
+- Expected accuracy: 85-90% after 10 epochs
+- Trained model: Available at [neilrigaud/hagrid-vit-gesture](https://huggingface.co/neilrigaud/hagrid-vit-gesture)
+
+### Use Pre-trained Model
+
+```python
+from transformers import AutoModelForImageClassification, AutoImageProcessor
+
+model = AutoModelForImageClassification.from_pretrained("neilrigaud/hagrid-vit-gesture")
+processor = AutoImageProcessor.from_pretrained("neilrigaud/hagrid-vit-gesture")
+
+# Process image and classify
+inputs = processor(images=image, return_tensors="pt")
+outputs = model(**inputs)
+predicted_class = outputs.logits.argmax(-1)
+```
+
+## Documentation
+
+### Setup & Development
+
+- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Complete development workflow and common tasks
+- **[Installation Guide](INSTALL.md)** - Detailed setup instructions
+- **[Architecture Overview](docs/Project-Architecture/README.md)** - System design
+- **[API Documentation](docs/)** - Module-level documentation
+
+### Model Training
+
+- **[Training Guide](docs/MODEL_TRAINING_GUIDE.md)** - ViT fine-tuning details
+- **[Dataset Guide](docs/HAGRID_DOWNLOAD_GUIDE.md)** - HaGRID dataset access
+- **[Training Notebook](notebooks/finetune_vit_hagrid.ipynb)** - Complete training workflow
+- **[HaGRID Dataset Assessment](docs/HaGRID_DATASET_ASSESSMENT.md)** - Dataset analysis
+
+## Project Structure
+
+```
+├── src/                          # Core implementation
+│   ├── input_manager/            # Camera capture (✅ Complete)
+│   ├── recognition_engine/       # Gesture recognition (🔬 In Development)
+│   │   ├── preprocessing.py      # Image preprocessing utilities
+│   │   └── temporal/             # LSTM temporal modeling (🔬 Experimental)
+│   └── shared/                   # Logging and utilities (✅ Complete)
+├── notebooks/                    # Training and research
+│   ├── finetune_vit_hagrid.ipynb       # ViT training workflow (✅ Complete)
+│   ├── semantic_gesture_learning.ipynb # Semantic understanding research
+│   └── vit_lstm_gesture_training.ipynb # Temporal modeling experiments
+├── scripts/                      # Demos and utilities
+│   ├── demo_gesture_recognition.py     # Gesture inference demo
+│   ├── download_hagrid_subset.py       # Dataset downloader
+│   └── verify_install.py               # Installation verification
+├── docs/                         # Documentation
+│   ├── Project-Architecture/     # Design documents
+│   ├── Topics/                   # Research references
+│   └── HaGRID_DATASET_ASSESSMENT.md # Dataset analysis
+├── checkpoints/                  # Model checkpoints
+│   └── best_model.pth           # Trained ViT model
+├── environment.yml               # Conda environment
+├── pyproject.toml                # Package configuration
+└── README.md                     # This file
+```
+
+## Research Foundation
+
+This project explores gesture recognition using Vision Transformers, drawing inspiration from:
+
+- **Vision Transformer (ViT)**: Patch-based image understanding with self-attention
+- **Transfer Learning**: Leveraging ImageNet-21k pre-training for gesture classification
+- **HaGRID Dataset**: Large-scale hand gesture dataset with 18 gesture classes
+- **HAVIT & ALBEF**: Vision-language research inspiring future semantic understanding work
+
+See [docs/Topics/](docs/Topics/) for detailed research documentation.
+
+## Current Status
+
+### Completed ✅
+
+- Input Manager: Camera capture, frame buffering, timestamp management
+- ViT Fine-tuning: Gesture classification model trained on HaGRID (85-90% accuracy)
+- Training Pipeline: Complete notebook workflow with Hugging Face integration
+- Model Deployment: Trained model published to Hugging Face Hub
+- Logging System: Centralized logging with rotation
+
+### In Progress 🔬
+
+- Recognition Engine: Inference pipeline for real-time gesture classification
+- Temporal Modeling: LSTM-based dynamic gesture recognition (experimental)
+- End-to-end Integration: Connecting all system components
+
+### Planned 📋
+
+- Action Mapper: Gesture-to-command translation layer
+- OS Controller: System command execution module
+- Real-time Demo: Complete application with UI
+- Semantic Understanding: Vision-language alignment for zero-shot learning (research)
+
+## Team
 
 - Sley Hortes
 - Neil Taison Rigaud
+- Neil Taison Rigaud
 - Khishig Tuguldur
 - Eder Guerrero
+
+- Eder Guerrero
+
+## License
+
+This is an academic capstone project for National Dong Hwa University.
