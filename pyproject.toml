@@ -7,22 +7,57 @@ name = "gesture-recognition-system"
 version = "0.1.0"
 description = "Hand Gesture Recognition System for Computer Control"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [
     {name = "CSU Capstone Team"}
 ]
+# Core runtime dependencies for pip install -e .
+# These are the MINIMAL required packages for the installed package to function
+# Training/notebook dependencies are specified in environment.yml
 dependencies = [
-    "opencv-python>=4.8.0",
-    "numpy>=1.24.0",
-    "mediapipe>=0.10.0",
+    "opencv-python>=4.8.0",      # Computer vision - cv2 module
+    "numpy>=1.24.0",             # Array operations
+    "torch>=2.0.0",              # Deep learning framework
+    "torchvision>=0.15.0",       # Vision transforms
+    "timm>=0.9.0",               # Vision transformer models
+    "pillow>=9.0.0",             # Image loading/processing
 ]
 
 [project.optional-dependencies]
+# Development tools
 dev = [
     "pytest>=7.0.0",
     "black>=22.0.0",
     "flake8>=5.0.0",
 ]
+
+# Full training/notebook environment (includes data science tools)
+training = [
+    "scikit-learn>=1.2.0",       # Metrics, confusion matrix
+    "matplotlib>=3.5.0",         # Plotting
+    "seaborn>=0.12.0",           # Statistical visualization
+    "pandas>=1.5.0",             # Data manipulation
+    "tqdm>=4.65.0",              # Progress bars
+    "jupyter>=1.0.0",            # Notebook environment
+    "ipykernel>=6.20.0",         # Jupyter kernel
+]
+
+# Semantic gesture learning (optional research feature)
+semantic = [
+    "sentence-transformers>=2.2.0",  # Text embeddings for gesture semantics
+]
+
+# Model hosting/download utilities (optional)
+huggingface = [
+    "huggingface-hub>=0.16.0",
+]
+
+# Dataset download utilities (optional)
+datasets = [
+    "kagglehub>=0.1.0",          # Kaggle dataset downloads
+    "gdown>=4.7.0",              # Google Drive downloads
+]
+
 
 [tool.setuptools.packages.find]
 where = ["src"]
