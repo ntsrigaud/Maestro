@@ -19,9 +19,7 @@ import json
 import sys
 from pathlib import Path
 
-import torch
-import timm
-from huggingface_hub import HfApi, create_repo, upload_file
+from huggingface_hub import HfApi, create_repo
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
