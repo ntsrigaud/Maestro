@@ -1,5 +1,4 @@
 #!/bin/bash
-# Quick start script for gesture recognition demo
 
 echo "==================================================="
 echo "Gesture Recognition Demo - Quick Start"

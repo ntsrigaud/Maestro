@@ -1,11 +1,7 @@
-from .temporal_heads import (
-    TemporalHeadBase,
-    LSTMTemporalHead,
-    TemporalClassifier,
-)
+from .lstm_model import LSTMGestureModel
+from .vit_feature_extractor import ViTFeatureExtractor
 
 __all__ = [
-    "TemporalHeadBase",
-    "LSTMTemporalHead",
-    "TemporalClassifier",
+    "LSTMGestureModel",
+    "ViTFeatureExtractor",
 ]
