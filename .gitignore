@@ -1,4 +1,5 @@
 # Project-specific
+# Project-specific
 docs/Project-Architecture/hand-gesture-recognition-mediapipe
 InputManagerModule/.cache/clangd/index
 InputManagerModule/build
@@ -181,3 +182,14 @@ compile_commands.json
 *.exe
 *.dll
 *.dylib
+*.tar.gz
+data/hagrid_subset
+notebooks/checkpoints
+notebooks/data/hagrid-sample-30k-384p/hagrid-sample-30k-384p/hagrid-sample-30k-384p
+notebooks/data/hagrid-sample-30k-384p/hagrid-sample-30k-384p
+notebooks/data/
+notebooks/hagrid-sample-30k-384p/hagrid-sample-30k-384p
+models/gesture_recognition
+checkpoints/.locks/models--neilrigaud--hagrid-vit-gesture
+checkpoints
+data/webcam_test_frames
