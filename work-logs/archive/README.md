@@ -28,6 +28,7 @@ See `/work-logs/2026-02-10_phase0-cleanup.md` for concise Phase 0 summary follow
 ## New Standard
 
 All work logs must:
+
 - Fit on small number of screens
 - Focus on decisions and outcomes (not process narration)
 - Use 8 sections maximum
