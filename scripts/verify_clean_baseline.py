@@ -22,7 +22,6 @@ import torch
 import timm
 from torchvision import transforms
 from PIL import Image
-import numpy as np
 
 
 # Expected gesture classes (alphabetically sorted)

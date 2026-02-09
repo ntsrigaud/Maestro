@@ -40,6 +40,7 @@ Input Image (224x224) → ViT-B/16 Encoder → Classification Head → Gesture L
 ```
 
 The model processes images by:
+
 1. Dividing input into 16×16 patches (196 patches total)
 2. Applying patch embeddings with positional encoding
 3. Processing through 12 transformer encoder layers
@@ -80,6 +81,7 @@ jupyter notebook notebooks/finetune_vit_hagrid.ipynb
 ```
 
 **Training Configuration**:
+
 - Model: ViT-B/16 (timm, ImageNet-21k pre-trained)
 - Dataset: HaGRID subset (30K+ images, 18 classes)
 - Expected accuracy: 85-90% after 10 epochs
@@ -181,7 +183,10 @@ See [docs/Topics/](docs/Topics/) for detailed research documentation.
 
 - Sley Hortes
 - Neil Taison Rigaud
+- Neil Taison Rigaud
 - Khishig Tuguldur
+- Eder Guerrero
+
 - Eder Guerrero
 
 ## License
