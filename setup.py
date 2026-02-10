@@ -12,22 +12,24 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
 setup(
-    name="gesture-recognition-system",
+    name="semantic-gesture-system",
     version="0.1.0",
-    description="Hand Gesture Recognition System for Computer Control",
+    description="Semantic Gesture Understanding System for Computer Control",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="CSU Capstone Team",
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     # Automatically find all packages in src/ using proper Python naming conventions
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     # Include additional files
     include_package_data=True,
-    # Dependencies
+    # Minimal dependencies - Phase 1 input layer only
     install_requires=[
         "opencv-python>=4.8.0",
         "numpy>=1.24.0",
+        "pillow>=9.0.0",
+        "mediapipe>=0.10.0",
     ],
     # Optional dependencies for development
     extras_require={
@@ -35,6 +37,15 @@ setup(
             "pytest>=7.0.0",
             "black>=22.0.0",
             "flake8>=5.0.0",
+            "tqdm>=4.65.0",
+        ],
+        "clip": [
+            "torch>=2.0.0",
+            "torchvision>=0.15.0",
+            "open-clip-torch>=2.20.0",
+        ],
+        "semantic": [
+            "sentence-transformers>=2.2.0",
         ],
     },
     # Entry points (if you want to create CLI commands later)
