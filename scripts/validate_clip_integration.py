@@ -189,7 +189,7 @@ class CLIPIntegrationValidator:
                 
                 start = time.perf_counter()
                 embedding = encoder.encode_image(test_image)
-                intents = extractor.extract_intent(embedding, top_k=5)
+                extractor.extract_intent(embedding, top_k=5)
                 end = time.perf_counter()
                 
                 latency_ms = (end - start) * 1000
