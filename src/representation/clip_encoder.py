@@ -183,10 +183,10 @@ class CLIPEncoder:
                 embedding = embedding_tensor.cpu().numpy().squeeze()
             
             # Final validation
-            assert embedding.shape == (self.embedding_dim,), \
-                f"Unexpected embedding shape: {embedding.shape}"
-            assert np.isfinite(embedding).all(), \
-                "Embedding contains NaN or Inf values"
+            if embedding.shape != (self.embedding_dim,):
+                raise RuntimeError(f"Unexpected embedding shape: {embedding.shape}")
+            if not np.isfinite(embedding).all():
+                raise RuntimeError("Embedding contains NaN or Inf values")
             
             return embedding.astype(np.float32)
             
