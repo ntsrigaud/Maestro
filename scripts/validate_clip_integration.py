@@ -51,6 +51,8 @@ class CLIPIntegrationValidator:
             'integration_test': False
         }
         self.latency_ms = None
+        self.encoder = None
+        self.extractor = None
     
     def validate_model_loading(self) -> bool:
         """Test 1: CLIP model loads successfully."""
@@ -59,13 +61,13 @@ class CLIPIntegrationValidator:
         logger.info("=" * 60)
         
         try:
-            encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
+            self.encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
             
-            logger.info(f"✅ Model loaded: {encoder.model_name}")
-            logger.info(f"   Device: {encoder.device}")
-            logger.info(f"   Embedding dim: {encoder.embedding_dim}")
+            logger.info(f"✅ Model loaded: {self.encoder.model_name}")
+            logger.info(f"   Device: {self.encoder.device}")
+            logger.info(f"   Embedding dim: {self.encoder.embedding_dim}")
             
-            assert encoder.embedding_dim == 512, "Expected 512-dim for ViT-B/32"
+            assert self.encoder.embedding_dim == 512, "Expected 512-dim for ViT-B/32"
             
             self.results['model_loading'] = True
             logger.info("✅ Test 1 PASSED\n")
@@ -82,13 +84,14 @@ class CLIPIntegrationValidator:
         logger.info("=" * 60)
         
         try:
-            encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
+            if self.encoder is None:
+                self.encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
             
             # Create test image
             test_image = np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8)
             
             # Encode
-            embedding = encoder.encode_image(test_image)
+            embedding = self.encoder.encode_image(test_image)
             
             # Validate
             assert embedding.shape == (512,), f"Expected (512,), got {embedding.shape}"
@@ -121,19 +124,22 @@ class CLIPIntegrationValidator:
         logger.info("=" * 60)
         
         try:
-            encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
-            extractor = SemanticIntentExtractor(
-                clip_model=encoder.model,
-                device=encoder.device,
-                intent_vocabulary=SEMANTIC_INTENTS
-            )
+            if self.encoder is None:
+                self.encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
+            
+            if self.extractor is None:
+                self.extractor = SemanticIntentExtractor(
+                    clip_model=self.encoder.model,
+                    device=self.encoder.device,
+                    intent_vocabulary=SEMANTIC_INTENTS
+                )
             
             # Create test embedding
             test_image = np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8)
-            embedding = encoder.encode_image(test_image)
+            embedding = self.encoder.encode_image(test_image)
             
             # Extract intents
-            intents = extractor.extract_intent(embedding, top_k=5)
+            intents = self.extractor.extract_intent(embedding, top_k=5)
             
             # Validate
             assert len(intents) > 0, "No intents extracted"
@@ -149,7 +155,7 @@ class CLIPIntegrationValidator:
             confidences = [conf for _, conf in intents]
             assert confidences == sorted(confidences, reverse=True), "Intents not sorted by confidence"
             
-            logger.info(f"✅ Extracted {len(intents)} intents from {extractor.get_intent_count()} vocabulary")
+            logger.info(f"✅ Extracted {len(intents)} intents from {self.extractor.get_intent_count()} vocabulary")
             logger.info(f"   Top-5 predictions:")
             for i, (name, conf) in enumerate(intents[:5], 1):
                 logger.info(f"   {i}. {name:20s} (confidence: {conf:.3f})")
@@ -169,16 +175,19 @@ class CLIPIntegrationValidator:
         logger.info("=" * 60)
         
         try:
-            encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
-            extractor = SemanticIntentExtractor(
-                clip_model=encoder.model,
-                device=encoder.device,
-                intent_vocabulary=SEMANTIC_INTENTS
-            )
+            if self.encoder is None:
+                self.encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
+            
+            if self.extractor is None:
+                self.extractor = SemanticIntentExtractor(
+                    clip_model=self.encoder.model,
+                    device=self.encoder.device,
+                    intent_vocabulary=SEMANTIC_INTENTS
+                )
             
             # Warm-up
             test_image = np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8)
-            _ = encoder.encode_image(test_image)
+            _ = self.encoder.encode_image(test_image)
             
             # Measure latency over multiple runs
             num_runs = 10
@@ -188,8 +197,8 @@ class CLIPIntegrationValidator:
                 test_image = np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8)
                 
                 start = time.perf_counter()
-                embedding = encoder.encode_image(test_image)
-                extractor.extract_intent(embedding, top_k=5)
+                embedding = self.encoder.encode_image(test_image)
+                self.extractor.extract_intent(embedding, top_k=5)
                 end = time.perf_counter()
                 
                 latency_ms = (end - start) * 1000
@@ -260,12 +269,16 @@ class CLIPIntegrationValidator:
         
         try:
             # Initialize all components
-            encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
-            extractor = SemanticIntentExtractor(
-                clip_model=encoder.model,
-                device=encoder.device,
-                intent_vocabulary=SEMANTIC_INTENTS
-            )
+            if self.encoder is None:
+                self.encoder = CLIPEncoder(model_name='ViT-B-32', device='cpu')
+            
+            if self.extractor is None:
+                self.extractor = SemanticIntentExtractor(
+                    clip_model=self.encoder.model,
+                    device=self.encoder.device,
+                    intent_vocabulary=SEMANTIC_INTENTS
+                )
+            
             HandDetector()
             
             logger.info("✅ All components initialized")
@@ -274,11 +287,11 @@ class CLIPIntegrationValidator:
             simulated_hand_crop = np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8)
             
             # Layer 1 → Layer 2: Hand crop → Embedding
-            embedding = encoder.encode_image(simulated_hand_crop)
+            embedding = self.encoder.encode_image(simulated_hand_crop)
             logger.info(f"✅ Layer 1→2: Generated {embedding.shape} embedding")
             
             # Layer 2 → Layer 3: Embedding → Semantic Intent
-            intents = extractor.extract_intent(embedding, top_k=3)
+            intents = self.extractor.extract_intent(embedding, top_k=3)
             logger.info(f"✅ Layer 2→3: Extracted top-3 intents:")
             for i, (name, conf) in enumerate(intents, 1):
                 logger.info(f"   {i}. {name} ({conf:.3f})")
