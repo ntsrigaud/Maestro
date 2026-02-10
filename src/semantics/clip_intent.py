@@ -335,8 +335,8 @@ class SemanticIntentExtractor:
         norm = np.linalg.norm(gesture_embedding)
         if norm < 1e-10:
             raise ValueError(
-                f"Gesture embedding has zero or near-zero norm (norm={norm:.2e}). "
-                f"Cannot normalize embedding."
+                f"Gesture embedding appears to be a zero vector (norm={norm:.2e}). "
+                f"Cannot normalize a zero-length vector."
             )
         if not np.isclose(norm, 1.0, atol=1e-5):
             logger.warning(
@@ -431,11 +431,12 @@ class SemanticIntentExtractor:
         
         # Ensure embeddings are normalized
         norms = np.linalg.norm(gesture_embeddings, axis=1)
-        if np.any(norms < 1e-10):
-            zero_indices = np.where(norms < 1e-10)[0]
+        zero_mask = norms < 1e-10
+        if np.any(zero_mask):
+            zero_indices = np.where(zero_mask)[0]
             raise ValueError(
-                f"Batch contains {len(zero_indices)} embedding(s) with zero or near-zero norm "
-                f"at indices {zero_indices.tolist()}. Cannot normalize embeddings."
+                f"Batch contains {len(zero_indices)} zero vector(s) "
+                f"at indices {zero_indices.tolist()}. Cannot normalize zero-length vectors."
             )
         if not np.allclose(norms, 1.0, atol=1e-5):
             logger.warning("Batch embeddings not normalized. Normalizing automatically.")
