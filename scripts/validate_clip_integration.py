@@ -233,7 +233,7 @@ class CLIPIntegrationValidator:
         try:
             # Test that Layer 1 components still import and initialize
             InputManager()
-            hand_detector = HandDetector()
+            HandDetector()
             
             logger.info("✅ InputManager initialized")
             logger.info("✅ HandDetector initialized")
