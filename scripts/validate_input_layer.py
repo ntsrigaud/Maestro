@@ -16,20 +16,17 @@ Usage:
 """
 
 import sys
-import os
 import cv2
 import numpy as np
 import time
 from pathlib import Path
-from typing import List, Tuple, Optional
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from input_manager.input_manager import InputManager, FrameData
+from input_manager.input_manager import InputManager
 from recognition_engine.hand_detection.hand_detector import HandDetector
 from recognition_engine.hand_detection.hand_cropper import HandCropper
-from recognition_engine.hand_detection.hand_data import HandDetectionResult
 
 
 class InputLayerValidator:
