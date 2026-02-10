@@ -14,11 +14,18 @@ authors = [
 # Core runtime dependencies for pip install -e .
 # Phase 1 minimal: Input layer (Layer 1: Perception) only
 # CLIP and semantic dependencies will be added in Phase 1 Week 1-2
+#
+# NOTE: opencv-python (pip) vs opencv (conda) conflict:
+# When using conda environment, opencv is installed via conda in environment.yml.
+# Running `pip install -e .` will attempt to install opencv-python wheel alongside,
+# which can cause ABI/runtime conflicts. Recommended workflows:
+# 1. Conda: Use `pip install -e . --no-deps` to skip opencv-python installation
+# 2. Pure pip: Use `pip install -e .` which installs opencv-python wheel
 dependencies = [
-    "opencv-python>=4.8.0",      # Camera capture and image operations
-    "numpy>=1.24.0",             # Array operations for frame data
-    "pillow>=9.0.0",             # Image format support
-    "mediapipe>=0.10.0",         # Hand detection and landmark extraction
+    "opencv-python>=4.8.0,<5.0.0",       # Camera capture and image operations
+    "numpy>=1.24.0,<2.0.0",              # Array operations for frame data  
+    "pillow>=9.0.0,<13.0.0",             # Image format support
+    "mediapipe==0.10.21",                # Hand detection (last version with solutions API)
 ]
 
 [project.optional-dependencies]
