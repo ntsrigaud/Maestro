@@ -204,19 +204,19 @@ class InputLayerValidator:
                     continue  # Only process single-hand frames
                 
                 detection = detections[0]
-                cropped_hands = cropper.crop_hands(frame_data.frame, [detection])
+                cropped_hands = cropper.crop_multiple(frame_data.frame, [detection])
                 
                 if len(cropped_hands) == 1:
                     cropped = cropped_hands[0]
                     samples_collected += 1
                     
                     # Record crop size
-                    self.stats["crop_sizes"].append(cropped.cropped_image.shape[:2])
+                    self.stats["crop_sizes"].append(cropped.image.shape[:2])
                     
                     # Save artifact if requested
                     if self.save_artifacts and samples_collected <= 10:
                         crop_path = self.session_dir / f"crop_sample_{samples_collected:03d}.jpg"
-                        cv2.imwrite(str(crop_path), cropped.cropped_image)
+                        cv2.imwrite(str(crop_path), cropped.image)
                     
                     if samples_collected % 5 == 0:
                         print(f"  Collected {samples_collected}/{num_samples} samples")
