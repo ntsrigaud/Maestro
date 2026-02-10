@@ -320,7 +320,10 @@ class InputLayerValidator:
             report.append(f"\nDetection Statistics:")
             report.append(f"  Total frames processed: {self.stats['total_frames']}")
             report.append(f"  Frames with hands: {self.stats['frames_with_hands']} ({detection_rate*100:.1f}%)")
-            report.append(f"  Average detection confidence: {np.mean(self.stats['detection_confidences']):.3f}")
+            if self.stats["detection_confidences"]:
+                report.append(
+                    f"  Average detection confidence: {np.mean(self.stats['detection_confidences']):.3f}"
+                )
             report.append(f"  Average processing time: {np.mean(self.stats['processing_times']):.1f}ms")
         
         if self.stats["crop_sizes"]:
