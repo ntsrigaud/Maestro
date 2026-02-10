@@ -17,7 +17,7 @@ Design Principles:
 """
 
 import logging
-from typing import Optional, Tuple
+from typing import Optional
 import numpy as np
 import torch
 from PIL import Image
