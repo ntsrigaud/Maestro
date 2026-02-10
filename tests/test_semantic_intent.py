@@ -12,7 +12,7 @@ Tests validate:
 import unittest
 import numpy as np
 import torch
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import sys
 import os
 
