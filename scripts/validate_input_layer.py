@@ -59,6 +59,7 @@ class InputLayerValidator:
         """Validate camera initialization and frame capture."""
         print("\n=== Testing Camera Capture ===")
         
+        input_mgr = None
         try:
             input_mgr = InputManager(camera_index=0, buffer_size=10)
             input_mgr.start_continuous_capture()
@@ -74,8 +75,6 @@ class InputLayerValidator:
                     print(f"  Frame {i+1}: {frame_data.frame.shape}, timestamp: {frame_data.timestamp_ms():.2f}ms")
                 time.sleep(0.1)
             
-            input_mgr.stop_capture()
-            
             if frames_captured == 10:
                 print(f"✓ Successfully captured {frames_captured}/10 frames")
                 return True
@@ -86,12 +85,16 @@ class InputLayerValidator:
         except Exception as e:
             print(f"✗ Camera capture failed: {e}")
             return False
+        finally:
+            if input_mgr is not None:
+                input_mgr.stop_capture()
 
     def validate_hand_detection(self, duration_seconds: int = 10) -> bool:
         """Validate hand detection over a duration."""
         print(f"\n=== Testing Hand Detection ({duration_seconds}s) ===")
         print("Hold your hand in front of the camera...")
         
+        input_mgr = None
         try:
             input_mgr = InputManager(camera_index=0, buffer_size=10)
             detector = HandDetector(
@@ -141,8 +144,6 @@ class InputLayerValidator:
                     print(f"  {elapsed:.1f}s: {self.stats['total_frames']} frames, "
                           f"{self.stats['frames_with_hands']} with hands ({hands_pct:.1f}%)")
             
-            input_mgr.stop_capture()
-            
             # Print summary
             print("\n--- Detection Summary ---")
             print(f"Total frames: {self.stats['total_frames']}")
@@ -175,12 +176,16 @@ class InputLayerValidator:
             import traceback
             traceback.print_exc()
             return False
+        finally:
+            if input_mgr is not None:
+                input_mgr.stop_capture()
 
     def validate_cropping(self, num_samples: int = 20) -> bool:
         """Validate hand cropping quality."""
         print(f"\n=== Testing Hand Cropping ({num_samples} samples) ===")
         print("Hold your hand steady in front of camera...")
         
+        input_mgr = None
         try:
             input_mgr = InputManager(camera_index=0, buffer_size=10)
             detector = HandDetector(max_num_hands=1, min_detection_confidence=0.6)
@@ -221,8 +226,6 @@ class InputLayerValidator:
                     if samples_collected % 5 == 0:
                         print(f"  Collected {samples_collected}/{num_samples} samples")
             
-            input_mgr.stop_capture()
-            
             # Analyze crop quality
             print("\n--- Cropping Summary ---")
             print(f"Samples collected: {samples_collected}/{num_samples}")
@@ -252,6 +255,9 @@ class InputLayerValidator:
             import traceback
             traceback.print_exc()
             return False
+        finally:
+            if input_mgr is not None:
+                input_mgr.stop_capture()
 
     def test_failure_modes(self) -> bool:
         """Test handling of edge cases and failure modes."""
