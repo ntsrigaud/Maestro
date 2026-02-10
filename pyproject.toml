@@ -15,10 +15,10 @@ authors = [
 # Phase 1 minimal: Input layer (Layer 1: Perception) only
 # CLIP and semantic dependencies will be added in Phase 1 Week 1-2
 dependencies = [
-    "opencv-python>=4.8.0",      # Camera capture and image operations
-    "numpy>=1.24.0",             # Array operations for frame data
-    "pillow>=9.0.0",             # Image format support
-    "mediapipe>=0.10.0",         # Hand detection and landmark extraction
+    "opencv-python>=4.8.0,<5.0.0",       # Camera capture and image operations
+    "numpy>=1.24.0,<2.0.0",              # Array operations for frame data  
+    "pillow>=9.0.0,<13.0.0",             # Image format support
+    "mediapipe==0.10.21",                # Hand detection (last version with solutions API)
 ]
 
 [project.optional-dependencies]

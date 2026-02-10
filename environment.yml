@@ -34,6 +34,7 @@ dependencies:
   # ====================
   # Pip-Only Dependencies
   # ====================
-  # MediaPipe - hand detection (unavailable in conda)
+  # MediaPipe - hand detection (pin to 0.10.21 - last version with solutions API)
+  # Versions 0.10.22+ removed mp.solutions.hands and require migration to tasks.vision API
   - pip:
-      - mediapipe>=0.10.0
+      - mediapipe==0.10.21
