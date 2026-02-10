@@ -228,10 +228,13 @@ class SemanticIntentExtractor:
         # Precompute text embeddings for all intent descriptions
         self._precompute_text_embeddings()
         
+        # Calculate total number of text variations
+        total_descriptions = sum(len(variations) for variations in self.intent_vocabulary.values())
+        
         logger.info(
             f"SemanticIntentExtractor initialized: "
             f"{len(self.intent_names)} intents, "
-            f"{self.text_embeddings.shape[0]} text descriptions"
+            f"{total_descriptions} text descriptions"
         )
     
     def _precompute_text_embeddings(self):
@@ -330,6 +333,11 @@ class SemanticIntentExtractor:
         
         # Ensure embedding is normalized (should be, but verify)
         norm = np.linalg.norm(gesture_embedding)
+        if norm < 1e-10:
+            raise ValueError(
+                f"Gesture embedding appears to be a zero vector (norm={norm:.2e}). "
+                f"Cannot normalize a zero-length vector."
+            )
         if not np.isclose(norm, 1.0, atol=1e-5):
             logger.warning(
                 f"Gesture embedding not normalized (norm={norm:.4f}). "
@@ -423,6 +431,13 @@ class SemanticIntentExtractor:
         
         # Ensure embeddings are normalized
         norms = np.linalg.norm(gesture_embeddings, axis=1)
+        zero_mask = norms < 1e-10
+        if np.any(zero_mask):
+            zero_indices = np.where(zero_mask)[0]
+            raise ValueError(
+                f"Batch contains {len(zero_indices)} zero vector(s) "
+                f"at indices {zero_indices.tolist()}. Cannot normalize zero-length vectors."
+            )
         if not np.allclose(norms, 1.0, atol=1e-5):
             logger.warning("Batch embeddings not normalized. Normalizing automatically.")
             gesture_embeddings = gesture_embeddings / norms[:, np.newaxis]
