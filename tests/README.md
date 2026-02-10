@@ -27,7 +27,7 @@ KMP_DUPLICATE_LIB_OK=TRUE python scripts/validate_clip_integration.py
 
 ### Layer 2: Representation (`test_clip_encoder.py`)
 
-**16 tests** covering:
+**22 tests** covering:
 
 - Model initialization and configuration
 - Image encoding (uint8, float32)
@@ -38,7 +38,7 @@ KMP_DUPLICATE_LIB_OK=TRUE python scripts/validate_clip_integration.py
 
 ### Layer 3: Semantic Intent (`test_semantic_intent.py`)
 
-**6 tests** covering:
+**22 tests** covering:
 
 - Intent extractor initialization
 - Semantic matching with embeddings
@@ -57,7 +57,7 @@ KMP_DUPLICATE_LIB_OK=TRUE python scripts/validate_clip_integration.py
 
 ## Status
 
-✅ **22/22 tests passing** (as of February 10, 2026)
+✅ **44/44 tests passing** (as of February 10, 2026)
 
 ## Adding New Tests
 
