@@ -267,7 +267,7 @@ class CLIPIntegrationValidator:
                 device=encoder.device,
                 intent_vocabulary=SEMANTIC_INTENTS
             )
-            hand_detector = HandDetector()
+            HandDetector()
             
             logger.info("✅ All components initialized")
             
