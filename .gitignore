@@ -196,3 +196,4 @@ data/webcam_test_frames
 notebooks/best_lstm_model75.h5
 notebooks/best_lstm_model77.h5
 notebooks/best_lstm_model79.h5
+/validation_output.txt
