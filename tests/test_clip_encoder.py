@@ -6,7 +6,7 @@ Tests validate:
 - Input validation and error handling
 - Embedding generation correctness
 - Deterministic behavior
-- No external dependencies (no network access)
+- Uses real OpenAI CLIP weights via open_clip (may require network access on first run)
 """
 
 import unittest
