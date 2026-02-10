@@ -129,7 +129,7 @@
 
 **Installed (Layer 1)**:
 
-- python=3.10, opencv≥4.8.0, numpy≥1.24.0, pillow≥9.0.0, mediapipe≥0.10.0, tqdm
+- python=3.10, opencv≥4.8.0, numpy≥1.24.0, pillow≥9.0.0, mediapipe==0.10.21, tqdm
 
 **Pending (Layer 2 - Phase 1-2)**:
 
