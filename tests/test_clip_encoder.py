@@ -11,8 +11,6 @@ Tests validate:
 
 import unittest
 import numpy as np
-import torch
-from unittest.mock import patch, MagicMock
 import sys
 import os
 
