@@ -50,7 +50,7 @@ KMP_DUPLICATE_LIB_OK=TRUE python scripts/validate_clip_integration.py
 ## Test Principles
 
 1. **Deterministic**: All tests produce consistent results
-2. **No Network**: No external dependencies or downloads
+2. **Minimal Network**: Avoids external dependencies; CLIP weights may be downloaded once then cached
 3. **Fast**: Complete test suite runs in <1 minute
 4. **Isolated**: Each test is independent
 5. **Comprehensive**: Validates both success and failure paths
