@@ -270,10 +270,10 @@ class CLIPEncoder:
                 embeddings = embedding_tensors.cpu().numpy()
             
             # Final validation
-            assert embeddings.shape == (batch_size, self.embedding_dim), \
-                f"Unexpected embeddings shape: {embeddings.shape}"
-            assert np.isfinite(embeddings).all(), \
-                "Embeddings contain NaN or Inf values"
+            if embeddings.shape != (batch_size, self.embedding_dim):
+                raise ValueError(f"Unexpected embeddings shape: {embeddings.shape}")
+            if not np.isfinite(embeddings).all():
+                raise ValueError("Embeddings contain NaN or Inf values")
             
             return embeddings.astype(np.float32)
             
