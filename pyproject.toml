@@ -3,24 +3,22 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gesture-recognition-system"
+name = "semantic-gesture-system"
 version = "0.1.0"
-description = "Hand Gesture Recognition System for Computer Control"
+description = "Semantic Gesture Understanding System for Computer Control"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
     {name = "CSU Capstone Team"}
 ]
 # Core runtime dependencies for pip install -e .
-# These are the MINIMAL required packages for the installed package to function
-# Training/notebook dependencies are specified in environment.yml
+# Phase 1 minimal: Input layer (Layer 1: Perception) only
+# CLIP and semantic dependencies will be added in Phase 1 Week 1-2
 dependencies = [
-    "opencv-python>=4.8.0",      # Computer vision - cv2 module
-    "numpy>=1.24.0",             # Array operations
-    "torch>=2.0.0",              # Deep learning framework
-    "torchvision>=0.15.0",       # Vision transforms
-    "timm>=0.9.0",               # Vision transformer models
-    "pillow>=9.0.0",             # Image loading/processing
+    "opencv-python>=4.8.0",      # Camera capture and image operations
+    "numpy>=1.24.0",             # Array operations for frame data
+    "pillow>=9.0.0",             # Image format support
+    "mediapipe>=0.10.0",         # Hand detection and landmark extraction
 ]
 
 [project.optional-dependencies]
@@ -29,33 +27,19 @@ dev = [
     "pytest>=7.0.0",
     "black>=22.0.0",
     "flake8>=5.0.0",
+    "tqdm>=4.65.0",              # Progress bars for scripts
 ]
 
-# Full training/notebook environment (includes data science tools)
-training = [
-    "scikit-learn>=1.2.0",       # Metrics, confusion matrix
-    "matplotlib>=3.5.0",         # Plotting
-    "seaborn>=0.12.0",           # Statistical visualization
-    "pandas>=1.5.0",             # Data manipulation
-    "tqdm>=4.65.0",              # Progress bars
-    "jupyter>=1.0.0",            # Notebook environment
-    "ipykernel>=6.20.0",         # Jupyter kernel
+# Phase 1 Week 1-2: CLIP integration dependencies
+clip = [
+    "torch>=2.0.0",              # CLIP backbone
+    "torchvision>=0.15.0",       # Vision preprocessing
+    "open-clip-torch>=2.20.0",   # OpenCLIP implementation
 ]
 
-# Semantic gesture learning (optional research feature)
+# Phase 1 Week 2-3: Semantic command matching
 semantic = [
-    "sentence-transformers>=2.2.0",  # Text embeddings for gesture semantics
-]
-
-# Model hosting/download utilities (optional)
-huggingface = [
-    "huggingface-hub>=0.16.0",
-]
-
-# Dataset download utilities (optional)
-datasets = [
-    "kagglehub>=0.1.0",          # Kaggle dataset downloads
-    "gdown>=4.7.0",              # Google Drive downloads
+    "sentence-transformers>=2.2.0",  # Command similarity matching
 ]
 
 
