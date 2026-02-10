@@ -159,13 +159,11 @@
 
 ## Next Immediate Actions
 
-1. **Create visual validation script** (blocking Phase 1-1 completion)
-2. **Execute manual webcam testing** with real-time display
-3. **Install CLIP dependencies** - `pip install -e ".[clip]"`
-4. **Create CLIP encoder** - `src/representation/clip_encoder.py`
-5. **Create intent extractor** - `src/semantics/clip_intent.py`
-6. **Integration test** - Camera → MediaPipe → CLIP → 512-dim embedding
-7. **Validate latency** - Target <100ms end-to-end
+1. **Install CLIP dependencies** - `pip install -e ".[clip]"`
+2. **Create CLIP encoder** - `src/representation/clip_encoder.py`
+3. **Create intent extractor** - `src/semantics/clip_intent.py`
+4. **Integration test** - Camera → MediaPipe → CLIP → 512-dim embedding
+5. **Validate latency** - Target <100ms end-to-end
 
 ## Success Metrics - Phase 1-1
 
