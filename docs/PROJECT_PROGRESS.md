@@ -154,8 +154,11 @@
 
 - PyTorch 2.10.0, torchvision 0.25.0, open-clip-torch 3.2.0
 
-**Layer 3 (Semantics)** - ⏳ Pending (Phase 1-3):
+**Layer 3 (Semantic Intent)** - ✅ Implemented:
 
+- (no additional external dependencies beyond Layer 2)
+
+**Layer 4 (Command Matching)** - ⏳ Pending (Phase 1-3):
 - sentence-transformers ≥2.2.0
 
 ---
