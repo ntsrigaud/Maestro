@@ -165,14 +165,14 @@ from representation.clip_encoder import CLIPEncoder
 
 **CLIP (included in base):**
 
-- `clip @ git+https://github.com/openai/CLIP.git` - OpenAI CLIP
-- `ftfy` - Text normalization
-- `regex` - Pattern matching
+- `open-clip-torch` - OpenCLIP implementation for semantic embeddings
 
 **Development:**
 
 - `pytest` - Testing framework
-- `ruff` - Linting and formatting
+- `black` - Code formatting
+- `flake8` - Linting
+- `mypy` - Type checking
 
 ### Optional Dependencies
 
@@ -200,7 +200,7 @@ PyTorch with CUDA automatically installed by conda if GPU detected.
 pip install -e .
 
 # Verify installation
-pip show semantic-gesture-system
+pip show semantic-hgr
 ```
 
 ### Issue: CLIP import fails
@@ -222,7 +222,7 @@ pip install -e .  # Reinstall (includes CLIP)
 
 ```bash
 # Reinstall
-pip uninstall semantic-gesture-system
+pip uninstall semantic-hgr
 pip install -e .
 
 # Verify
