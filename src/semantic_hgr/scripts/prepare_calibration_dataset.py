@@ -23,7 +23,6 @@ Controls (interactive mode):
     - Press 'q' to quit and save partial dataset
 """
 
-import sys
 import json
 import argparse
 import cv2
@@ -32,12 +31,9 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from input_manager.input_manager import InputManager
-from recognition_engine.hand_detection.hand_detector import HandDetector
-from representation.gesture_encoder import GestureEncoder
+from semantic_hgr.input_manager.input_manager import InputManager
+from semantic_hgr.recognition_engine.hand_detection.hand_detector import HandDetector
+from semantic_hgr.representation import GestureEncoder
 
 
 @dataclass
