@@ -6,6 +6,34 @@
 
 This layer maps gesture embeddings from Layer 2 (Representation) to human-interpretable semantic intents using CLIP's text encoder and cosine similarity matching. Enables zero-shot gesture understanding without training classifiers.
 
+**Mathematical Specification:** See [CLIP Mathematical Specification](../../docs/CLIP_MATHEMATICAL_SPECIFICATION.md) for authoritative formulas and probability computation details.
+
+**Key Properties:**
+
+- ✅ All confidence scores are valid probabilities: P(intent) ∈ [0, 1]
+- ✅ Probabilities sum to 1.0 across all intents
+- ✅ Softmax normalization applied (corrected Feb 11, 2026)
+
+## Mathematical Pipeline
+
+**Formula:**
+
+```
+P(intent_i | gesture) = softmax((cosine_sim(g, t_i) × logit_scale) / temperature)
+```
+
+Where:
+
+- `g` = gesture embedding (512-dim, L2-normalized)
+- `t_i` = intent text embedding (512-dim, L2-normalized)
+- `logit_scale ≈ 100` (extracted from CLIP model)
+- `temperature = 0.07` (default for semantic intent)
+- `softmax(x_i) = exp(x_i) / Σⱼ exp(x_j)`
+
+**Critical:** Softmax transformation is required to convert logits → probabilities. Without it, scores can exceed 1.0 (mathematically invalid).
+
+**See:** [CLIP Mathematical Specification](../../docs/CLIP_MATHEMATICAL_SPECIFICATION.md) for complete derivation, validation, and implementation details.
+
 ## Components
 
 ### SemanticIntentExtractor
