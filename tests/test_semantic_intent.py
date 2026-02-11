@@ -51,6 +51,12 @@ class TestSemanticIntentExtractor(unittest.TestCase):
         
         self.mock_clip_model.encode_text = mock_encode_text
         
+        # Mock logit_scale (must return tensor with .item() method)
+        mock_logit_scale_tensor = torch.tensor(np.log(100.0))
+        mock_logit_scale = MagicMock()
+        mock_logit_scale.exp.return_value = mock_logit_scale_tensor
+        self.mock_clip_model.logit_scale = mock_logit_scale
+        
         # Initialize extractor with mock model
         self.extractor = SemanticIntentExtractor(
             clip_model=self.mock_clip_model,
