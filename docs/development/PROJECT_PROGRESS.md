@@ -89,9 +89,9 @@
 
 ### Tasks (5/5)
 
-- [x] Install CLIP dependencies (`pip install -e '.[clip]'`)
-- [x] Create `src/representation/clip_encoder.py`
-- [x] Create `src/semantics/clip_intent.py`
+- [x] Install CLIP dependencies (included in `pip install -e .`)
+- [x] Create `src/semantic_hgr/representation/clip_encoder.py`
+- [x] Create `src/semantic_hgr/semantics/clip_intent.py`
 - [x] Integration test: Camera → MediaPipe → CLIP → embedding
 - [x] Validate pipeline latency <100ms
 
@@ -119,8 +119,8 @@
 
 ### Tasks (0/5)
 
-- [ ] Install SentenceTransformers (`pip install -e ".[semantic]"`)
-- [ ] Create `src/command_resolution/semantic_matcher.py`
+- [ ] Install SentenceTransformers (included in `pip install -e .`)
+- [ ] Create `src/semantic_hgr/command_resolution/semantic_matcher.py`
 - [ ] Define intent vocabulary
 - [ ] Implement cosine similarity matching
 - [ ] Test: Gesture → Intent → Command

@@ -11,13 +11,8 @@ Tests validate:
 
 import unittest
 import numpy as np
-import sys
-import os
 
-# Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-from representation.clip_encoder import CLIPEncoder
+from semantic_hgr.representation.clip_encoder import CLIPEncoder
 
 
 class TestCLIPEncoder(unittest.TestCase):
