@@ -34,6 +34,11 @@ dependencies = [
     "torchvision>=0.15.0",               # Vision preprocessing
     "open-clip-torch>=2.20.0",           # OpenCLIP implementation for semantic embeddings
     
+    # Analysis and visualization (required by console scripts)
+    "matplotlib>=3.5.0",                 # Plotting for calibration and analysis scripts
+    "seaborn>=0.11.0",                   # Statistical visualization
+    "scikit-learn>=1.0.0",               # Metrics for analysis scripts
+    
     # Utilities
     "tqdm>=4.65.0",                      # Progress bars for scripts
 ]
