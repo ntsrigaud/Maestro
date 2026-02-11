@@ -13,13 +13,8 @@ import unittest
 import numpy as np
 import torch
 from unittest.mock import MagicMock
-import sys
-import os
 
-# Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-from semantics.clip_intent import SemanticIntentExtractor
+from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
 
 
 class TestProbabilityConstraints(unittest.TestCase):
