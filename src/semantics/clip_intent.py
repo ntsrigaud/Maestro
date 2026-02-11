@@ -402,9 +402,25 @@ class SemanticIntentExtractor:
         # CLIP default: 0.07 for zero-shot classification
         similarities = similarities / self.temperature
         
-        # Validate similarities
+        # Validate logits before softmax
         if not np.isfinite(similarities).all():
-            raise RuntimeError("Similarity computation produced NaN or Inf")
+            raise RuntimeError("Logit computation produced NaN or Inf")
+        
+        # CRITICAL: Apply softmax to convert logits to probabilities
+        # This step is REQUIRED for confidence values to be valid probabilities [0,1]
+        # Reference: Radford et al., 2021, "Learning Transferable Visual Models..."
+        # Formula: P(class_i) = exp(logit_i) / sum(exp(logit_j) for all j)
+        exp_logits = np.exp(similarities - similarities.max())  # numerical stability
+        probabilities = exp_logits / exp_logits.sum()
+        
+        # Validate probabilities
+        if not np.isfinite(probabilities).all():
+            raise RuntimeError("Softmax computation produced NaN or Inf")
+        if not np.isclose(probabilities.sum(), 1.0, atol=1e-5):
+            raise RuntimeError(f"Probabilities do not sum to 1.0: {probabilities.sum():.6f}")
+        
+        # Use probabilities for filtering and ranking
+        similarities = probabilities
         
         # Filter by minimum confidence
         valid_mask = similarities >= min_confidence
@@ -497,32 +513,43 @@ class SemanticIntentExtractor:
             gesture_embeddings = gesture_embeddings / norms[:, np.newaxis]
         
         # Compute cosine similarities: (N, num_intents)
-        similarities = np.dot(gesture_embeddings, self.text_embeddings.T)
+        logits = np.dot(gesture_embeddings, self.text_embeddings.T)
         
         # CRITICAL FIX: Apply CLIP logit_scale and temperature
         if self.apply_logit_scale:
-            similarities = similarities * self.logit_scale
-        similarities = similarities / self.temperature
+            logits = logits * self.logit_scale
+        logits = logits / self.temperature
+        
+        # Apply softmax per sample to convert logits to probabilities
+        # For numerical stability: softmax(x) = exp(x - max(x)) / sum(exp(x - max(x)))
+        exp_logits = np.exp(logits - logits.max(axis=1, keepdims=True))
+        probabilities = exp_logits / exp_logits.sum(axis=1, keepdims=True)
+        
+        # Validate probabilities
+        if not np.isfinite(probabilities).all():
+            raise RuntimeError("Batch softmax computation produced NaN or Inf")
+        if not np.allclose(probabilities.sum(axis=1), 1.0, atol=1e-5):
+            raise RuntimeError("Batch probabilities do not sum to 1.0 for all samples")
         
         # Process each gesture
         results = []
         for i in range(batch_size):
-            gesture_similarities = similarities[i]
+            gesture_probabilities = probabilities[i]
             
             # Filter by minimum confidence
-            valid_mask = gesture_similarities >= min_confidence
+            valid_mask = gesture_probabilities >= min_confidence
             valid_indices = np.where(valid_mask)[0]
-            valid_similarities = gesture_similarities[valid_mask]
+            valid_probabilities = gesture_probabilities[valid_mask]
             
-            # Sort by similarity descending
-            sorted_indices = np.argsort(valid_similarities)[::-1]
+            # Sort by probability descending
+            sorted_indices = np.argsort(valid_probabilities)[::-1]
             
             # Select top-K
             top_indices = sorted_indices[:top_k]
             
             # Build result list
             gesture_intents = [
-                (self.intent_names[valid_indices[j]], float(valid_similarities[j]))
+                (self.intent_names[valid_indices[j]], float(valid_probabilities[j]))
                 for j in top_indices
             ]
             
