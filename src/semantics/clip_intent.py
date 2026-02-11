@@ -171,6 +171,12 @@ class SemanticIntentExtractor:
     Uses CLIP's joint vision-language space to match gesture embeddings
     against predefined semantic intent descriptions via cosine similarity.
     
+    CRITICAL FIXES APPLIED (Feb 11, 2026):
+    - Added CLIP logit_scale application (100x confidence boost)
+    - Added temperature scaling for sharper distributions
+    - Added structured prompt templates option
+    - Fixed high intent overlap issue
+    
     Architecture Boundary:
     - Input: NumPy array (embedding_dim,) from CLIPEncoder
     - Output: List of (intent_name, confidence) tuples
@@ -193,7 +199,10 @@ class SemanticIntentExtractor:
         self,
         clip_model,
         device: str,
-        intent_vocabulary: Dict[str, List[str]] = None
+        intent_vocabulary: Dict[str, List[str]] = None,
+        use_prompt_template: bool = True,
+        temperature: float = 0.07,
+        apply_logit_scale: bool = True
     ):
         """
         Initialize semantic intent extractor.
@@ -203,6 +212,12 @@ class SemanticIntentExtractor:
             device: Compute device ('cpu', 'cuda', 'mps')
             intent_vocabulary: Dict mapping intent names to text descriptions
                 If None, uses default SEMANTIC_INTENTS
+            use_prompt_template: Whether to use structured prompt templates
+                (e.g., "a photo of a hand performing {action}")
+            temperature: Temperature for scaling similarities (lower = sharper)
+                Default: 0.07 (CLIP default for zero-shot classification)
+            apply_logit_scale: Whether to apply CLIP's learned logit_scale
+                CRITICAL: Must be True for correct confidence scores
         
         Raises:
             ValueError: If intent_vocabulary is empty
@@ -219,10 +234,23 @@ class SemanticIntentExtractor:
         
         self.clip_model = clip_model
         self.device = device
+        self.use_prompt_template = use_prompt_template
+        self.temperature = temperature
+        self.apply_logit_scale = apply_logit_scale
+        
+        # Extract CLIP logit_scale parameter (critical for correct similarities)
+        if hasattr(clip_model, 'logit_scale'):
+            self.logit_scale = clip_model.logit_scale.exp().item()
+        else:
+            logger.warning("CLIP model has no logit_scale parameter. Using 1.0.")
+            self.logit_scale = 1.0
         
         logger.info(
             f"Initializing SemanticIntentExtractor with "
-            f"{len(self.intent_vocabulary)} intents"
+            f"{len(self.intent_vocabulary)} intents, "
+            f"prompt_template={use_prompt_template}, "
+            f"temperature={temperature:.3f}, "
+            f"logit_scale={self.logit_scale:.2f}"
         )
         
         # Precompute text embeddings for all intent descriptions
@@ -243,14 +271,28 @@ class SemanticIntentExtractor:
         
         Converts all text variations in intent vocabulary to CLIP text
         embeddings and averages them per intent for robust matching.
+        
+        IMPROVEMENT: Optionally applies structured prompt templates for
+        better semantic alignment with CLIP's training data.
         """
         self.intent_names = []
         self.text_embeddings_list = []
         
         # Tokenize and encode all text descriptions
         for intent_name, text_variations in self.intent_vocabulary.items():
+            # Apply prompt template if enabled
+            if self.use_prompt_template:
+                # Template: "a photo of a hand performing {action}"
+                # This aligns with CLIP's training distribution
+                templated_variations = [
+                    f"a photo of a hand performing {variation}"
+                    for variation in text_variations
+                ]
+            else:
+                templated_variations = text_variations
+            
             # Tokenize text variations
-            text_tokens = open_clip.tokenize(text_variations).to(self.device)
+            text_tokens = open_clip.tokenize(templated_variations).to(self.device)
             
             with torch.no_grad():
                 # Encode to text embeddings
@@ -347,6 +389,18 @@ class SemanticIntentExtractor:
         
         # Compute cosine similarities via dot product (embeddings are normalized)
         similarities = np.dot(self.text_embeddings, gesture_embedding)
+        
+        # CRITICAL FIX: Apply CLIP logit_scale
+        # CLIP learns a temperature parameter (logit_scale) during training
+        # that scales similarities to the correct range. Without this, 
+        # confidences are ~100x too low!
+        if self.apply_logit_scale:
+            similarities = similarities * self.logit_scale
+        
+        # Apply temperature scaling for sharper distributions
+        # Lower temperature = more confident predictions
+        # CLIP default: 0.07 for zero-shot classification
+        similarities = similarities / self.temperature
         
         # Validate similarities
         if not np.isfinite(similarities).all():
@@ -445,6 +499,11 @@ class SemanticIntentExtractor:
         # Compute cosine similarities: (N, num_intents)
         similarities = np.dot(gesture_embeddings, self.text_embeddings.T)
         
+        # CRITICAL FIX: Apply CLIP logit_scale and temperature
+        if self.apply_logit_scale:
+            similarities = similarities * self.logit_scale
+        similarities = similarities / self.temperature
+        
         # Process each gesture
         results = []
         for i in range(batch_size):
@@ -500,11 +559,16 @@ class SemanticIntentExtractor:
             'device': self.device,
             'intent_count': len(self.intent_names),
             'embedding_dim': self.text_embeddings.shape[1],
-            'intent_names': self.intent_names
+            'intent_names': self.intent_names,
+            'use_prompt_template': self.use_prompt_template,
+            'temperature': self.temperature,
+            'logit_scale': self.logit_scale,
+            'apply_logit_scale': self.apply_logit_scale
         }
     
     def __repr__(self) -> str:
         return (
             f"SemanticIntentExtractor(intents={len(self.intent_names)}, "
-            f"device='{self.device}')"
+            f"device='{self.device}', temp={self.temperature:.3f}, "
+            f"logit_scale={self.logit_scale:.2f})"
         )
