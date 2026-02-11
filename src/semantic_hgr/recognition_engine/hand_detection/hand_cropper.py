@@ -8,8 +8,8 @@ using bounding boxes from hand detections, with configurable padding and preproc
 import cv2
 import numpy as np
 from typing import Tuple
-from recognition_engine.hand_detection.hand_data import HandDetectionResult, HandROI
-from shared.logger import get_logger
+from semantic_hgr.recognition_engine.hand_detection.hand_data import HandDetectionResult, HandROI
+from semantic_hgr.shared.logger import get_logger
 
 # Initialize module logger
 logger = get_logger(__name__)
