@@ -22,7 +22,6 @@ authors = [
 # 1. Conda: Use `pip install -e . --no-deps` to skip opencv-python installation
 # 2. Pure pip: Use `pip install -e .` which installs opencv-python wheel
 dependencies = [
-    "opencv-python>=4.8.0,<5.0.0",       # Camera capture and image operations
     "numpy>=1.24.0,<2.0.0",              # Array operations for frame data  
     "pillow>=9.0.0,<13.0.0",             # Image format support
     "mediapipe==0.10.21",                # Hand detection (last version with solutions API)
