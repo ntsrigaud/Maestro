@@ -45,6 +45,11 @@ def test_imports():
         return False
 
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the validate-hand-detection console script."""
     success = test_imports()
     sys.exit(0 if success else 1)
+
+
+if __name__ == "__main__":
+    main()
