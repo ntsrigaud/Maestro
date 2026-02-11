@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Tuple
 from collections import deque
 
-from shared.logger import get_logger
+from semantic_hgr.shared.logger import get_logger
 
 # Initialize module logger
 logger = get_logger(__name__)

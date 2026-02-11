@@ -35,7 +35,6 @@ Controls:
     H         - Show help
 """
 
-import sys
 import json
 import time
 import argparse
@@ -47,13 +46,10 @@ from dataclasses import dataclass, field, asdict
 from collections import deque
 import warnings
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from input_manager.input_manager import InputManager
-from recognition_engine.hand_detection.hand_detector import HandDetector
-from representation.gesture_encoder import GestureEncoder
-from semantics.clip_intent import SemanticIntentExtractor
+from semantic_hgr.input_manager.input_manager import InputManager
+from semantic_hgr.recognition_engine.hand_detection.hand_detector import HandDetector
+from semantic_hgr.representation import GestureEncoder
+from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
 
 
 @dataclass

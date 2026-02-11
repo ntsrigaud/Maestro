@@ -15,18 +15,14 @@ Usage:
     python scripts/validate_input_layer.py [--duration SECONDS] [--save-artifacts]
 """
 
-import sys
 import cv2
 import numpy as np
 import time
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from input_manager.input_manager import InputManager
-from recognition_engine.hand_detection.hand_detector import HandDetector
-from recognition_engine.hand_detection.hand_cropper import HandCropper
+from semantic_hgr.input_manager.input_manager import InputManager
+from semantic_hgr.recognition_engine.hand_detection.hand_detector import HandDetector
+from semantic_hgr.recognition_engine.hand_detection.hand_cropper import HandCropper
 
 
 class InputLayerValidator:

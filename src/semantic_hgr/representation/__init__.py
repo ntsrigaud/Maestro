@@ -12,4 +12,7 @@ Architecture Compliance:
 
 from .clip_encoder import CLIPEncoder
 
-__all__ = ['CLIPEncoder']
+# Alias for backward compatibility with scripts
+GestureEncoder = CLIPEncoder
+
+__all__ = ['CLIPEncoder', 'GestureEncoder']

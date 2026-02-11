@@ -16,19 +16,15 @@ Usage:
     python scripts/validate_clip_integration.py
 """
 
-import sys
 import time
 import logging
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
-
 import numpy as np
-from representation import CLIPEncoder
-from semantics import SemanticIntentExtractor, SEMANTIC_INTENTS
-from input_manager import InputManager
-from recognition_engine.hand_detection import HandDetector
+from semantic_hgr.representation.clip_encoder import CLIPEncoder
+from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor, SEMANTIC_INTENTS
+from semantic_hgr.input_manager.input_manager import InputManager
+from semantic_hgr.recognition_engine.hand_detection.hand_detector import HandDetector
 
 # Configure logging
 logging.basicConfig(
