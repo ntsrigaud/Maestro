@@ -3,48 +3,58 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "semantic-gesture-system"
+name = "semantic-hgr"
 version = "0.1.0"
-description = "Semantic Gesture Understanding System for Computer Control"
+description = "Semantic Hand Gesture Recognition System with Vision-Language Models"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
     {name = "CSU Capstone Team"}
 ]
-# Core runtime dependencies for pip install -e .
-# Phase 1 minimal: Input layer (Layer 1: Perception) only
-# CLIP and semantic dependencies will be added in Phase 1 Week 1-2
-#
-# NOTE: opencv-python (pip) vs opencv (conda) conflict:
-# When using conda environment, opencv is installed via conda in environment.yml.
-# Running `pip install -e .` will attempt to install opencv-python wheel alongside,
-# which can cause ABI/runtime conflicts. Recommended workflows:
-# 1. Conda: Use `pip install -e . --no-deps` to skip opencv-python installation
-# 2. Pure pip: Use `pip install -e .` which installs opencv-python wheel
+license = {text = "MIT"}
+keywords = ["gesture-recognition", "computer-vision", "clip", "semantic-understanding"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+# Production dependencies - ALL required for full system functionality
+# Includes perception, representation, and semantic layers
 dependencies = [
+    # Layer 1: Perception - Camera capture and hand detection
     "numpy>=1.24.0,<2.0.0",              # Array operations for frame data  
     "pillow>=9.0.0,<13.0.0",             # Image format support
+    "opencv-python>=4.8.0",              # Camera capture and image processing
     "mediapipe==0.10.21",                # Hand detection (last version with solutions API)
+    
+    # Layer 2-3: Representation and Semantic Intent - CLIP integration
+    "torch>=2.0.0",                      # Deep learning framework
+    "torchvision>=0.15.0",               # Vision preprocessing
+    "open-clip-torch>=2.20.0",           # OpenCLIP implementation for semantic embeddings
+    
+    # Analysis and visualization (required by console scripts)
+    "matplotlib>=3.5.0",                 # Plotting for calibration and analysis scripts
+    "seaborn>=0.11.0",                   # Statistical visualization
+    "scikit-learn>=1.0.0",               # Metrics for analysis scripts
+    
+    # Utilities
+    "tqdm>=4.65.0",                      # Progress bars for scripts
 ]
 
 [project.optional-dependencies]
-# Development tools
+# Development tools and testing
 dev = [
     "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
     "black>=22.0.0",
     "flake8>=5.0.0",
-    "tqdm>=4.65.0",              # Progress bars for scripts
+    "mypy>=1.0.0",
 ]
 
-# Phase 1 Week 1-2: CLIP integration dependencies
-clip = [
-    "torch>=2.0.0",              # CLIP backbone
-    "torchvision>=0.15.0",       # Vision preprocessing
-    "open-clip-torch>=2.20.0",   # OpenCLIP implementation
-]
-
-# Phase 1 Week 2-3: Semantic command matching
-semantic = [
+# Phase 4-6: Semantic command matching (future layer)
+semantic-matching = [
     "sentence-transformers>=2.2.0",  # Command similarity matching
 ]
 
@@ -54,3 +64,14 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.txt"]
+
+# Console scripts for command-line tools
+[project.scripts]
+prepare-calibration-dataset = "semantic_hgr.scripts.prepare_calibration_dataset:main"
+calibration-study = "semantic_hgr.scripts.calibration_study:main"
+intent-overlap-analysis = "semantic_hgr.scripts.intent_overlap_analysis:main"
+realtime-demo = "semantic_hgr.scripts.realtime_demo:main"
+validate-clip-integration = "semantic_hgr.scripts.validate_clip_integration:main"
+validate-hand-detection = "semantic_hgr.scripts.validate_hand_detection:main"
+validate-input-layer = "semantic_hgr.scripts.validate_input_layer:main"
+

@@ -25,7 +25,6 @@ Usage:
         --apply-resolution
 """
 
-import sys
 import json
 import argparse
 import numpy as np
@@ -37,10 +36,7 @@ from dataclasses import dataclass, asdict
 from sklearn.metrics import confusion_matrix
 import warnings
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from semantics.clip_intent import SemanticIntentExtractor
+from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
 
 
 @dataclass

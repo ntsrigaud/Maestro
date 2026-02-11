@@ -10,8 +10,8 @@ import numpy as np
 import mediapipe as mp
 import time
 from typing import List, Optional, Tuple
-from recognition_engine.hand_detection.hand_data import HandDetectionResult
-from shared.logger import get_logger
+from semantic_hgr.recognition_engine.hand_detection.hand_data import HandDetectionResult
+from semantic_hgr.shared.logger import get_logger
 
 # Initialize module logger
 logger = get_logger(__name__)
