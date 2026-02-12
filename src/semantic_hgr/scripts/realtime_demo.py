@@ -172,9 +172,11 @@ class RealtimeGestureDemo:
         )
         
         # Share CLIP model with intent extractor for efficiency
+        # STATIC GESTURE TRACK: Default to static-only mode (9 HaGRID-aligned poses)
         self.intent_extractor = SemanticIntentExtractor(
             clip_model=self.encoder.model,
-            device=self.encoder.device
+            device=self.encoder.device,
+            static_only=True  # Production default: static gestures only
         )
         
         # State
