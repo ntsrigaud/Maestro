@@ -36,6 +36,7 @@ from dataclasses import dataclass, asdict
 from sklearn.metrics import confusion_matrix
 import warnings
 
+from semantic_hgr.representation.clip_encoder import CLIPEncoder
 from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
 
 
@@ -616,10 +617,14 @@ def main():
     
     # Initialize extractor
     print("\nInitializing semantic intent extractor...")
-    extractor = SemanticIntentExtractor(
+    encoder = CLIPEncoder(
         model_name="ViT-B-32",
         pretrained="openai",
         device="cpu"
+    )
+    extractor = SemanticIntentExtractor(
+        clip_model=encoder.model,
+        device=encoder.device
     )
     print(f"✓ Extractor initialized")
     print(f"  Intents: {len(extractor.intent_names)}")

@@ -94,7 +94,7 @@ class DatasetCollector:
             return None
         
         # Encode to CLIP embedding
-        embedding = self.encoder.encode(hand_region)
+        embedding = self.encoder.encode_image(hand_region)
         return embedding
     
     def collect_interactive(self, target_samples: int, intent_vocabulary: List[str]):

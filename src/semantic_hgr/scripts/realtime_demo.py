@@ -48,7 +48,7 @@ import warnings
 
 from semantic_hgr.input_manager.input_manager import InputManager
 from semantic_hgr.recognition_engine.hand_detection.hand_detector import HandDetector
-from semantic_hgr.representation import GestureEncoder
+from semantic_hgr.representation.clip_encoder import CLIPEncoder
 from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
 
 
@@ -152,16 +152,16 @@ class RealtimeGestureDemo:
             min_tracking_confidence=0.5
         )
         
-        self.encoder = GestureEncoder(
+        self.encoder = CLIPEncoder(
             model_name="ViT-B-32",
             pretrained="openai",
             device="cpu"  # Change to "cuda" for GPU
         )
         
+        # Share CLIP model with intent extractor for efficiency
         self.intent_extractor = SemanticIntentExtractor(
-            model_name="ViT-B-32",
-            pretrained="openai",
-            device="cpu"
+            clip_model=self.encoder.model,
+            device=self.encoder.device
         )
         
         # State
@@ -232,7 +232,7 @@ class RealtimeGestureDemo:
         
         # 2. CLIP encoding
         t1 = time.perf_counter()
-        embedding = self.encoder.encode(hand_region)
+        embedding = self.encoder.encode_image(hand_region)
         encoding_ms = (time.perf_counter() - t1) * 1000
         
         # 3. Intent extraction
