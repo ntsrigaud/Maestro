@@ -33,6 +33,7 @@ from dataclasses import dataclass, asdict
 from collections import defaultdict
 import warnings
 
+from semantic_hgr.representation.clip_encoder import CLIPEncoder
 from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
 
 
@@ -100,9 +101,10 @@ class CalibrationAnalyzer:
             top_k = []
             is_correct = False
         else:
-            predicted_intent = results[0]['intent']
-            confidence = results[0]['confidence']
-            top_k = [(r['intent'], r['confidence']) for r in results]
+            # Results are tuples: (intent_name, confidence)
+            predicted_intent = results[0][0]
+            confidence = results[0][1]
+            top_k = [(intent, conf) for intent, conf in results]
             is_correct = (predicted_intent == true_intent)
         
         sample = ValidationSample(
@@ -521,12 +523,16 @@ def main():
     validation_samples = load_validation_dataset(args.dataset)
     print(f"✓ Loaded {len(validation_samples)} samples")
     
-    # Initialize semantic intent extractor
+    # Initialize CLIP encoder and semantic intent extractor
     print("\nInitializing CLIP semantic intent extractor...")
-    extractor = SemanticIntentExtractor(
+    encoder = CLIPEncoder(
         model_name="ViT-B-32",
         pretrained="openai",
         device="cpu"  # Change to "cuda" if GPU available
+    )
+    extractor = SemanticIntentExtractor(
+        clip_model=encoder.model,
+        device=encoder.device
     )
     print(f"✓ Model initialized")
     print(f"  Available intents: {len(extractor.intent_names)}")
