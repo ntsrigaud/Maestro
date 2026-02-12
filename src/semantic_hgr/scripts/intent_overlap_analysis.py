@@ -74,8 +74,8 @@ class IntentOverlapAnalyzer:
             intent_extractor: Semantic intent extraction model
         """
         self.extractor = intent_extractor
-        self.intent_names = extractor.intent_names
-        self.text_embeddings = extractor.text_embeddings
+        self.intent_names = intent_extractor.intent_names
+        self.text_embeddings = intent_extractor.text_embeddings
         
         self.similarity_matrix: Optional[np.ndarray] = None
         self.confusion_mat: Optional[np.ndarray] = None
@@ -166,10 +166,11 @@ class IntentOverlapAnalyzer:
         pred_labels = []
         
         for i, (embedding, true_intent) in enumerate(validation_samples):
+            # extract_intent returns List[Tuple[str, float]]
             results = self.extractor.extract_intent(embedding, top_k=1, min_confidence=0.0)
             
             if results:
-                pred_intent = results[0]['intent']
+                pred_intent = results[0][0]  # Tuple index 0: intent name
             else:
                 pred_intent = "UNKNOWN"
             

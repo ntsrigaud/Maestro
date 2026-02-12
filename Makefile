@@ -139,7 +139,7 @@ calibration-run:
 	    --dataset data/calibration/validation_gestures_synthetic.json \
 	    --output results/calibration/calibration_report.json \
 	    --num-bins 10 \
-	    --plot-reliability results/calibration/reliability_diagram.png
+	    --plot results/calibration/reliability_diagram.png
 	@echo "✓ Calibration report: results/calibration/calibration_report.json"
 
 calibration: calibration-prep calibration-run
