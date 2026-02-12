@@ -107,9 +107,22 @@ class DemoSession:
         }
     
     def compute_summary(self) -> Dict:
-        """Compute summary statistics."""
+        """Compute summary statistics.
+        
+        Returns empty dict with default values if no performance metrics collected.
+        This prevents KeyError in _print_summary() when frames_processed == 0.
+        """
         if not self.performance_metrics:
-            return {}
+            return {
+                "mean_latency_ms": 0.0,
+                "std_latency_ms": 0.0,
+                "min_latency_ms": 0.0,
+                "max_latency_ms": 0.0,
+                "p50_latency_ms": 0.0,
+                "p95_latency_ms": 0.0,
+                "p99_latency_ms": 0.0,
+                "success_rate": 0.0
+            }
         
         latencies = [m.total_latency_ms for m in self.performance_metrics]
         
@@ -246,10 +259,10 @@ class RealtimeGestureDemo:
         
         total_latency_ms = hand_detection_ms + encoding_ms + intent_extraction_ms
         
-        # Determine prediction status
+        # Determine prediction status (results are List[Tuple[str, float]])
         if results:
-            top_intent = results[0]['intent']
-            top_confidence = results[0]['confidence']
+            top_intent = results[0][0]  # Tuple index 0: intent name
+            top_confidence = results[0][1]  # Tuple index 1: confidence
             status = "ACCEPTED"
             self.session.successful_predictions += 1
         else:
@@ -288,8 +301,12 @@ class RealtimeGestureDemo:
         cv2.putText(frame, label, (x, y - 10),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
     
-    def _draw_intent_results(self, frame: np.ndarray, results: List[Dict], status: str):
-        """Draw intent extraction results with confidence bars."""
+    def _draw_intent_results(self, frame: np.ndarray, results: List[Tuple[str, float]], status: str):
+        """Draw intent extraction results with confidence bars.
+        
+        Args:
+            results: List of (intent_name, confidence) tuples from extract_intent()
+        """
         h, w = frame.shape[:2]
         panel_width = 400
         panel_x = w - panel_width - 20
@@ -312,12 +329,12 @@ class RealtimeGestureDemo:
         cv2.putText(frame, status, (panel_x + 10, panel_y + 50),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, status_color, 1)
         
-        # Results
+        # Results (convert tuple to variables)
         for i, result in enumerate(results):
             y_pos = panel_y + 80 + i * 70
             
-            intent = result['intent']
-            confidence = result['confidence']
+            intent = result[0]  # Tuple index 0: intent name
+            confidence = result[1]  # Tuple index 1: confidence
             
             # Intent label
             cv2.putText(frame, f"{i+1}. {intent}", (panel_x + 10, y_pos),
