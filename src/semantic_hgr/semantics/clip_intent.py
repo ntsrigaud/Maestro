@@ -341,7 +341,8 @@ class SemanticIntentExtractor:
             apply_logit_scale: Whether to apply CLIP's learned logit_scale.
                 Default True matches CLIP's standard zero-shot formulation.
             static_only: Whether to restrict to static gesture vocabulary (default: True)
-                When True, uses STATIC_SEMANTIC_INTENTS (9 HaGRID-aligned poses)
+                When True, uses STATIC_SEMANTIC_INTENTS minus the no_hand class
+                (MediaPipe at Layer 1 already handles no-hand gating).
                 When False, uses legacy SEMANTIC_INTENTS (19 intents, includes dynamic)
         
         Raises:
@@ -365,6 +366,19 @@ class SemanticIntentExtractor:
         # Validate vocabulary is not empty
         if not self.intent_vocabulary:
             raise ValueError("Intent vocabulary cannot be empty")
+        
+        # In static_only mode MediaPipe (Layer 1) already gates the no-hand case
+        # before any crop reaches the CLIP encoder. Including no_hand in the
+        # closed-set softmax consumes probability mass from the 8 valid gesture
+        # classes and produces semantically incoherent confidence values.
+        if static_only and 'no_hand' in self.intent_vocabulary:
+            self.intent_vocabulary = {
+                k: v for k, v in self.intent_vocabulary.items() if k != 'no_hand'
+            }
+            logger.info(
+                "Removed 'no_hand' from CLIP classification vocabulary "
+                "(static_only=True: MediaPipe gates no-hand upstream at Layer 1)"
+            )
         
         self.clip_model = clip_model
         self.device = device
