@@ -282,11 +282,14 @@ class SemanticIntentExtractor:
     Uses CLIP's joint vision-language space to match gesture embeddings
     against predefined semantic intent descriptions via cosine similarity.
     
-    CRITICAL FIXES APPLIED (Feb 11, 2026):
-    - Added CLIP logit_scale application (100x confidence boost)
-    - Added temperature scaling for sharper distributions
-    - Added structured prompt templates option
-    - Fixed high intent overlap issue
+    Correctness Notes (updated Mar 2, 2026):
+    - CLIP's logit_scale is the sole temperature mechanism per Radford et al. 2021.
+      Set temperature=1.0 (default) when apply_logit_scale=True.
+    - Combining logit_scale (~100) with temperature=0.07 produces ~1428× total
+      scaling, collapsing softmax to a degenerate one-hot distribution and
+      causing catastrophic overconfidence (ECE ~0.857 observed Feb 2026).
+    - no_hand is excluded from the CLIP vocabulary in static_only mode; MediaPipe
+      gate at Layer 1 already handles the no-hand case before this layer is reached.
     
     Architecture Boundary:
     - Input: NumPy array (embedding_dim,) from CLIPEncoder
@@ -312,7 +315,7 @@ class SemanticIntentExtractor:
         device: str,
         intent_vocabulary: Dict[str, List[str]] = None,
         use_prompt_template: bool = True,
-        temperature: float = 0.07,
+        temperature: float = 1.0,
         apply_logit_scale: bool = True,
         static_only: bool = True
     ):
@@ -327,10 +330,16 @@ class SemanticIntentExtractor:
                 SEMANTIC_INTENTS (static_only=False, legacy mode)
             use_prompt_template: Whether to use structured prompt templates
                 (e.g., "a photo of a hand performing {action}")
-            temperature: Temperature for scaling similarities (lower = sharper)
-                Default: 0.07 (CLIP default for zero-shot classification)
-            apply_logit_scale: Whether to apply CLIP's learned logit_scale
-                CRITICAL: Must be True for correct confidence scores
+            temperature: Additional divisor applied to logits after logit_scale.
+                Default: 1.0 (identity — no additional scaling beyond logit_scale).
+                IMPORTANT: Do not set below 1.0 when apply_logit_scale=True.
+                CLIP's logit_scale (~100) is already the temperature inverse from
+                pretraining (Radford et al. 2021, Eq. 1). Dividing again by 0.07
+                yields ~1428× total scaling and forces all output distributions to
+                near one-hot, producing ECE > 0.85 and 4% accuracy.
+                Only tune this below 1.0 when apply_logit_scale=False.
+            apply_logit_scale: Whether to apply CLIP's learned logit_scale.
+                Default True matches CLIP's standard zero-shot formulation.
             static_only: Whether to restrict to static gesture vocabulary (default: True)
                 When True, uses STATIC_SEMANTIC_INTENTS (9 HaGRID-aligned poses)
                 When False, uses legacy SEMANTIC_INTENTS (19 intents, includes dynamic)
