@@ -12,17 +12,17 @@ def test_imports():
 
     try:
         # Test data structures
-        from recognition_engine.hand_detection import HandDetectionResult, HandROI
+        from semantic_hgr.recognition_engine.hand_detection import HandDetectionResult, HandROI
 
         print("✓ HandDetectionResult and HandROI imported")
 
         # Test detector
-        from recognition_engine.hand_detection import HandDetector
+        from semantic_hgr.recognition_engine.hand_detection import HandDetector
 
         print("✓ HandDetector imported")
 
         # Test cropper
-        from recognition_engine.hand_detection import HandCropper
+        from semantic_hgr.recognition_engine.hand_detection import HandCropper
 
         print("✓ HandCropper imported")
 
@@ -45,6 +45,11 @@ def test_imports():
         return False
 
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the validate-hand-detection console script."""
     success = test_imports()
     sys.exit(0 if success else 1)
+
+
+if __name__ == "__main__":
+    main()

@@ -24,10 +24,110 @@ import open_clip
 logger = logging.getLogger(__name__)
 
 
-# Intent Vocabulary: Semantic descriptions for gesture recognition
-# Each intent has multiple text variations to improve matching robustness
+# ==============================================================================
+# TIER-1: STATIC SEMANTIC INTENTS (HaGRID-Aligned, Single-Frame Recognizable)
+# ==============================================================================
+# Vocabulary realignment (Feb 12, 2026): Restricted to pose-based gestures
+# that can be recognized from single RGB frames without temporal modeling.
+#
+# Design Criteria:
+# 1. Recognizable from single frame (pose-based, not motion-based)
+# 2. Visually distinct hand configurations
+# 3. Corresponds to HaGRID dataset classes
+# 4. Human-interpretable semantic meaning
+#
+# See: docs/analysis/INTENT_CLASSIFICATION.md for full taxonomy
+# ==============================================================================
+
+STATIC_SEMANTIC_INTENTS = {
+    # Approval/Confirmation gestures
+    "thumbs_up": [
+        "thumbs up gesture",
+        "like gesture",
+        "approval sign",
+        "positive hand sign",
+        "thumb extended upward"
+    ],
+    "thumbs_down": [
+        "thumbs down gesture",
+        "dislike gesture",
+        "rejection sign",
+        "negative hand sign",
+        "thumb extended downward"
+    ],
+    
+    # Basic hand poses
+    "open_palm": [
+        "open palm gesture",
+        "stop gesture",
+        "flat hand facing forward",
+        "wait sign",
+        "five fingers extended"
+    ],
+    "closed_fist": [
+        "closed fist gesture",
+        "clenched hand",
+        "fist pose",
+        "neutral hand pose",
+        "all fingers closed"
+    ],
+    
+    # Symbolic gestures
+    "peace_sign": [
+        "peace sign gesture",
+        "victory sign",
+        "two fingers up in V shape",
+        "V gesture with hand",
+        "index and middle fingers extended"
+    ],
+    "ok_sign": [
+        "ok sign gesture",
+        "okay hand gesture",
+        "perfect sign",
+        "circle with thumb and index finger",
+        "OK hand pose"
+    ],
+    
+    # Pointing and action gestures
+    "pointing": [
+        "pointing gesture",
+        "index finger extended pointing",
+        "indicate with finger",
+        "point at something",
+        "one finger pointing forward"
+    ],
+    "call_gesture": [
+        "call me gesture",
+        "phone sign with hand",
+        "hang loose gesture",
+        "shaka sign",
+        "thumb and pinky extended"
+    ],
+    
+    # Idle/Background state
+    "no_hand": [
+        "no hand detected",
+        "empty frame",
+        "no gesture present",
+        "background without hand",
+        "idle state no hand"
+    ]
+}
+
+
+# ==============================================================================
+# LEGACY: ORIGINAL MIXED VOCABULARY (DEPRECATED FOR STATIC-ONLY MODE)
+# ==============================================================================
+# Contains 13 dynamic intents (68%) that require temporal modeling.
+# Preserved for backward compatibility but NOT RECOMMENDED for production use.
+#
+# CRITICAL: Dynamic intents (scroll, swipe, zoom, etc.) cannot be reliably
+# recognized from single frames. See root cause analysis:
+# docs/analysis/CALIBRATION_ROOT_CAUSE_ANALYSIS.md
+# ==============================================================================
+
 SEMANTIC_INTENTS = {
-    # Navigation
+    # Navigation (DYNAMIC - requires motion trajectories)
     "scroll_up": [
         "scroll up",
         "move up",
@@ -55,7 +155,7 @@ SEMANTIC_INTENTS = {
         "navigate right"
     ],
     
-    # Volume control
+    # Volume control (DYNAMIC - semantic actions without clear poses)
     "increase_volume": [
         "increase volume",
         "turn up sound",
@@ -77,7 +177,7 @@ SEMANTIC_INTENTS = {
         "mute audio"
     ],
     
-    # Selection and control
+    # Selection and control (AMBIGUOUS - no clear visual grounding)
     "select": [
         "select this",
         "choose this",
@@ -100,7 +200,7 @@ SEMANTIC_INTENTS = {
         "approve"
     ],
     
-    # Playback control
+    # Playback control (AMBIGUOUS - semantic actions)
     "play": [
         "play",
         "start playback",
@@ -118,7 +218,7 @@ SEMANTIC_INTENTS = {
         "terminate"
     ],
     
-    # Zoom and focus
+    # Zoom and focus (DYNAMIC - requires temporal tracking)
     "zoom_in": [
         "zoom in",
         "magnify",
@@ -133,7 +233,7 @@ SEMANTIC_INTENTS = {
         "zoom further"
     ],
     
-    # Generic actions
+    # Generic actions (STATIC - kept for backward compatibility)
     "point": [
         "point at",
         "indicate",
@@ -153,7 +253,7 @@ SEMANTIC_INTENTS = {
         "put down"
     ],
     
-    # No gesture (idle state)
+    # No gesture (STATIC - idle state)
     "no_gesture": [
         "no gesture",
         "idle",
@@ -163,6 +263,17 @@ SEMANTIC_INTENTS = {
     ]
 }
 
+# Dynamic intents that require temporal modeling (INVALID for single-frame inference)
+DYNAMIC_INTENTS = [
+    "scroll_up", "scroll_down", "swipe_left", "swipe_right",
+    "zoom_in", "zoom_out", "drag",
+    "increase_volume", "decrease_volume", "mute",
+    "play", "pause", "stop"
+]
+
+# Ambiguous intents without clear visual grounding
+AMBIGUOUS_INTENTS = ["select", "cancel", "confirm"]
+
 
 class SemanticIntentExtractor:
     """
@@ -171,11 +282,14 @@ class SemanticIntentExtractor:
     Uses CLIP's joint vision-language space to match gesture embeddings
     against predefined semantic intent descriptions via cosine similarity.
     
-    CRITICAL FIXES APPLIED (Feb 11, 2026):
-    - Added CLIP logit_scale application (100x confidence boost)
-    - Added temperature scaling for sharper distributions
-    - Added structured prompt templates option
-    - Fixed high intent overlap issue
+    Correctness Notes (updated Mar 2, 2026):
+    - CLIP's logit_scale is the sole temperature mechanism per Radford et al. 2021.
+      Set temperature=1.0 (default) when apply_logit_scale=True.
+    - Combining logit_scale (~100) with temperature=0.07 produces ~1428× total
+      scaling, collapsing softmax to a degenerate one-hot distribution and
+      causing catastrophic overconfidence (ECE ~0.857 observed Feb 2026).
+    - no_hand is excluded from the CLIP vocabulary in static_only mode; MediaPipe
+      gate at Layer 1 already handles the no-hand case before this layer is reached.
     
     Architecture Boundary:
     - Input: NumPy array (embedding_dim,) from CLIPEncoder
@@ -201,8 +315,9 @@ class SemanticIntentExtractor:
         device: str,
         intent_vocabulary: Dict[str, List[str]] = None,
         use_prompt_template: bool = True,
-        temperature: float = 0.07,
-        apply_logit_scale: bool = True
+        temperature: float = 1.0,
+        apply_logit_scale: bool = True,
+        static_only: bool = True
     ):
         """
         Initialize semantic intent extractor.
@@ -211,20 +326,40 @@ class SemanticIntentExtractor:
             clip_model: Loaded CLIP model (shared with CLIPEncoder)
             device: Compute device ('cpu', 'cuda', 'mps')
             intent_vocabulary: Dict mapping intent names to text descriptions
-                If None, uses default SEMANTIC_INTENTS
+                If None, uses STATIC_SEMANTIC_INTENTS (static_only=True) or
+                SEMANTIC_INTENTS (static_only=False, legacy mode)
             use_prompt_template: Whether to use structured prompt templates
                 (e.g., "a photo of a hand performing {action}")
-            temperature: Temperature for scaling similarities (lower = sharper)
-                Default: 0.07 (CLIP default for zero-shot classification)
-            apply_logit_scale: Whether to apply CLIP's learned logit_scale
-                CRITICAL: Must be True for correct confidence scores
+            temperature: Additional divisor applied to logits after logit_scale.
+                Default: 1.0 (identity — no additional scaling beyond logit_scale).
+                IMPORTANT: Do not set below 1.0 when apply_logit_scale=True.
+                CLIP's logit_scale (~100) is already the temperature inverse from
+                pretraining (Radford et al. 2021, Eq. 1). Dividing again by 0.07
+                yields ~1428× total scaling and forces all output distributions to
+                near one-hot, producing ECE > 0.85 and 4% accuracy.
+                Only tune this below 1.0 when apply_logit_scale=False.
+            apply_logit_scale: Whether to apply CLIP's learned logit_scale.
+                Default True matches CLIP's standard zero-shot formulation.
+            static_only: Whether to restrict to static gesture vocabulary (default: True)
+                When True, uses STATIC_SEMANTIC_INTENTS minus the no_hand class
+                (MediaPipe at Layer 1 already handles no-hand gating).
+                When False, uses legacy SEMANTIC_INTENTS (19 intents, includes dynamic)
         
         Raises:
             ValueError: If intent_vocabulary is empty
         """
-        # Set vocabulary first, before any processing
+        # Set vocabulary based on mode
         if intent_vocabulary is None:
-            self.intent_vocabulary = SEMANTIC_INTENTS
+            if static_only:
+                self.intent_vocabulary = STATIC_SEMANTIC_INTENTS
+                logger.info("Using STATIC_SEMANTIC_INTENTS (9 HaGRID-aligned poses)")
+            else:
+                self.intent_vocabulary = SEMANTIC_INTENTS
+                logger.warning(
+                    "Using legacy SEMANTIC_INTENTS (19 intents). "
+                    "WARNING: 68% are dynamic gestures invalid for single-frame inference. "
+                    "Set static_only=True for production use."
+                )
         else:
             self.intent_vocabulary = intent_vocabulary
         
@@ -232,11 +367,25 @@ class SemanticIntentExtractor:
         if not self.intent_vocabulary:
             raise ValueError("Intent vocabulary cannot be empty")
         
+        # In static_only mode MediaPipe (Layer 1) already gates the no-hand case
+        # before any crop reaches the CLIP encoder. Including no_hand in the
+        # closed-set softmax consumes probability mass from the 8 valid gesture
+        # classes and produces semantically incoherent confidence values.
+        if static_only and 'no_hand' in self.intent_vocabulary:
+            self.intent_vocabulary = {
+                k: v for k, v in self.intent_vocabulary.items() if k != 'no_hand'
+            }
+            logger.info(
+                "Removed 'no_hand' from CLIP classification vocabulary "
+                "(static_only=True: MediaPipe gates no-hand upstream at Layer 1)"
+            )
+        
         self.clip_model = clip_model
         self.device = device
         self.use_prompt_template = use_prompt_template
         self.temperature = temperature
         self.apply_logit_scale = apply_logit_scale
+        self.static_only = static_only
         
         # Extract CLIP logit_scale parameter (critical for correct similarities)
         if hasattr(clip_model, 'logit_scale'):
@@ -438,6 +587,19 @@ class SemanticIntentExtractor:
             (self.intent_names[valid_indices[i]], float(valid_similarities[i]))
             for i in top_indices
         ]
+        
+        # RUNTIME ENFORCEMENT: Filter dynamic intents in static-only mode
+        if self.static_only and hasattr(self, 'static_only'):
+            filtered_results = []
+            for intent_name, confidence in results:
+                if intent_name in DYNAMIC_INTENTS or intent_name in AMBIGUOUS_INTENTS:
+                    logger.warning(
+                        f"Rejected dynamic/ambiguous intent '{intent_name}' "
+                        f"(conf={confidence:.3f}) in static-only mode"
+                    )
+                else:
+                    filtered_results.append((intent_name, confidence))
+            results = filtered_results
         
         logger.debug(
             f"Extracted {len(results)} intents (top-{top_k}): "
