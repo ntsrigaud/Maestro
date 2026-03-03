@@ -158,13 +158,27 @@ class CLIPEncoder:
         if image.dtype == np.uint8:
             pil_image = Image.fromarray(image, mode='RGB')
         elif image.dtype in (np.float32, np.float64):
-            # Assume [0, 1] range
-            image_uint8 = (np.clip(image, 0, 1) * 255).astype(np.uint8)
+            # Validate that float input is a raw [0, 1] image, NOT a z-score
+            # normalized array. HandCropper with normalize=True produces values
+            # roughly in [-2.1, 2.6]; clipping such data to [0, 1] then re-
+            # applying CLIP's internal normalization destroys all pixel information.
+            img_min, img_max = float(image.min()), float(image.max())
+            if img_min < -0.1 or img_max > 1.1:
+                raise ValueError(
+                    f"Float32 image values are outside [0, 1] range "
+                    f"(min={img_min:.3f}, max={img_max:.3f}). "
+                    f"This indicates the image has already been z-score normalized "
+                    f"(e.g., by HandCropper with normalize=True). "
+                    f"Pass a raw uint8 image instead, or instantiate HandCropper "
+                    f"with normalize=False so CLIP's own preprocessing pipeline "
+                    f"handles normalization correctly."
+                )
+            image_uint8 = (image * 255).astype(np.uint8)
             pil_image = Image.fromarray(image_uint8, mode='RGB')
         else:
             raise ValueError(
                 f"Unsupported dtype: {image.dtype}. "
-                f"Expected uint8 or float32/float64"
+                f"Expected uint8 or float32/float64 in [0, 1] range."
             )
         
         try:

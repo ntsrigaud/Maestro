@@ -6,9 +6,9 @@ It detects hands in video frames, extracts bounding boxes, and crops hand region
 downstream gesture classification.
 """
 
-from recognition_engine.hand_detection.hand_data import HandDetectionResult, HandROI
-from recognition_engine.hand_detection.hand_detector import HandDetector
-from recognition_engine.hand_detection.hand_cropper import HandCropper
+from semantic_hgr.recognition_engine.hand_detection.hand_data import HandDetectionResult, HandROI
+from semantic_hgr.recognition_engine.hand_detection.hand_detector import HandDetector
+from semantic_hgr.recognition_engine.hand_detection.hand_cropper import HandCropper
 
 __all__ = [
     "HandDetectionResult",

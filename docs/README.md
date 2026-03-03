@@ -1,57 +1,299 @@
-# Documentation
+# Semantic HGR System Documentation
 
-This directory contains comprehensive documentation for the **Hand Gesture Recognition System** project, covering **Computer Vision**, **Machine Learning**, and **Human-Computer Interaction** components.
+**Production Documentation Index**  
+**Last Updated:** February 12, 2026
 
-## Project Documentation
+---
 
-### [Project Architecture](./Project-Architecture/)
+## 📚 Documentation Structure
 
-Complete system architecture documentation including:
+```
+docs/
+├── architecture/       # System architecture and mathematical foundations
+├── installation/       # Setup and installation guides
+├── operations/         # Production operations and maintenance
+├── development/        # Development progress and work logs
+├── research/           # Research references (active)
+└── archive/            # Historical and deprecated documentation
+```
 
-- **[Detailed System Architecture Diagram](./Project-Architecture/DETAILED_SYSTEM_ARCHITECTURE.md)** - Comprehensive visual representation of all system components
-- **[Input Manager](./Project-Architecture/Input-Manager/)** - Camera capture and frame processing
-- **[Recognition Engine](./Project-Architecture/Recognition-Engine/)** - AI/ML gesture recognition core
-- **[Action Mapper](./Project-Architecture/Action-Mapper/)** - Gesture-to-command translation
-- **[OS Controller](./Project-Architecture/OS-Controller/)** - System command execution
+---
 
-### [Topics](./Topics/)
+## 🏗️ Architecture
 
-Research and technical documentation:
+**Canonical system architecture and mathematical specifications**
 
-- **[Contribution Explanation](./Topics/contribution_explanation.md)** - Technical analysis of our semantic gesture recognition approach inspired by HAVIT and ALBEF
+### [architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md](architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md)
 
-### [Meeting Notes](./Meeting-Notes/)
+**🌟 AUTHORITATIVE ARCHITECTURE SPECIFICATION**
 
-Project development meeting records and decisions
+Complete system design covering:
 
-### [Imaging](./Imaging/)
+- 5-layer semantic architecture (Input → Detection → Representation → Semantics → Intent)
+- Zero-shot CLIP-based gesture understanding
+- MediaPipe hand detection pipeline
+- Intent extraction and confidence thresholds
+- System requirements and performance characteristics
 
-Visual assets and diagrams
+**Status:** ✅ Current and complete  
+**Use cases:** Understanding system design, architectural decisions, component interactions
 
-## Getting Started
+---
 
-For new contributors and users:
+### [architecture/CLIP_MATHEMATICAL_SPECIFICATION.md](architecture/CLIP_MATHEMATICAL_SPECIFICATION.md)
 
-1. Review the [Project Architecture Overview](./Project-Architecture/README.md)
-2. Study the [Detailed System Architecture Diagram](./Project-Architecture/DETAILED_SYSTEM_ARCHITECTURE.md)
-3. Read our [Contribution Explanation](./Topics/contribution_explanation.md) to understand the technical approach
+**Mathematical foundations of CLIP-based semantic understanding**
 
-## Research Contributions
+Detailed mathematical documentation:
 
-This project advances gesture recognition technology through:
+- Contrastive learning objectives
+- Vision and text encoder architectures
+- Embedding space geometry (cosine similarity, L2 normalization)
+- Semantic intent extraction algorithms
+- Confidence calibration and thresholds
 
-- **Semantic Understanding**: Moving beyond pattern matching to meaning comprehension
-- **Vision Transformer Integration**: Leveraging ViT for robust visual feature extraction
-- **Cross-Modal Learning**: Bridging vision and language through ALBEF-inspired architecture
-- **Zero-Shot Capability**: Enabling gesture recognition for new commands without retraining
+**Status:** ✅ Current and complete  
+**Use cases:** Understanding CLIP internals, debugging semantic extraction, calibration
 
-## Reference Materials
+---
 
-- **Computer Vision: Algorithms and Applications**, Szeliski, R., Springer
-- **Computer Vision: A Modern Approach**, Forsyth, D and Ponce, J., Prentice Hall
-- **Robot Vision**, Horn, B. K. P., MIT Press
-- **A Guided Tour of Computer Vision**, Nalwa, V., Addison-Wesley
-- **Digital Image Processing**, Gonzalez, R and Woods, R., Prentice Hall
-- **Optics**, Hecht, E., Addison-Wesley
-- **Eye and Brain**, Gregory, R., Princeton University Press
-- **Animal Eyes**, Land, M. and Nilsson, D., Oxford University Press
+## 📦 Installation
+
+### [installation/INSTALL.md](installation/INSTALL.md)
+
+**Official installation guide**
+
+Step-by-step setup instructions:
+
+- Python environment setup (Python 3.10+)
+- Dependency installation (`pip install -e .`)
+- Entry point verification
+- Common troubleshooting
+
+**Status:** ⚠️ Requires update (predates packaging refactor)  
+**Use cases:** Setting up development environment, deployment
+
+---
+
+## 🎯 Operations
+
+**Production deployment, maintenance, and technical reports**
+
+### [operations/PRODUCTION_FINALIZATION_GUIDE.md](operations/PRODUCTION_FINALIZATION_GUIDE.md)
+
+**Production readiness guide (Phases 4-6)**
+
+Comprehensive calibration and validation workflow:
+
+- Phase 4: Confidence Calibration System (user study design, data collection, threshold optimization)
+- Phase 5: Real-Time Testing (latency benchmarks, stress testing, edge case validation)
+- Phase 6: Production Freeze (final validation, documentation, deployment)
+
+**Status:** ✅ Current - 800 lines  
+**Use cases:** Deploying to production, running calibration studies, performance validation
+
+---
+
+### [operations/PACKAGING_REFACTOR_REPORT.md](operations/PACKAGING_REFACTOR_REPORT.md)
+
+**Technical report: Python packaging refactor (February 12, 2026)**
+
+Complete documentation of packaging transformation:
+
+- Root cause analysis (4 critical issues identified)
+- Solution design (unified `semantic_hgr` namespace)
+- Implementation details (pyproject.toml, imports, entry points)
+- Validation results (all tests passing)
+
+**Status:** ✅ Current - 600 lines  
+**Use cases:** Understanding packaging decisions, troubleshooting imports, package maintenance
+
+---
+
+### [operations/PRODUCTION_READINESS_ASSESSMENT.md](operations/PRODUCTION_READINESS_ASSESSMENT.md)
+
+**System readiness evaluation**
+
+Production readiness checklist covering:
+
+- Component maturity assessment
+- Test coverage review
+- Deployment preparation
+- Known issues and mitigation
+
+**Status:** ✅ Current - 600 lines  
+**Use cases:** Pre-deployment review, identifying remaining work
+
+---
+
+## 🔧 Development
+
+**Implementation progress, work logs, and development tracking**
+
+### [development/PROJECT_PROGRESS.md](development/PROJECT_PROGRESS.md)
+
+**Implementation progress tracker**
+
+Phase-by-phase completion status:
+
+- Phase 1-1: Input Layer ✅
+- Phase 1-2: CLIP Integration ✅
+- Phase 1-3: Command Matching ⏳
+- Validation results and metrics
+
+**Status:** ⚠️ Requires update (contains outdated install commands)  
+**Use cases:** Tracking implementation status, reviewing completed phases
+
+---
+
+### [development/work-logs/](development/work-logs/)
+
+**Daily implementation logs (2026-02-10 to present)**
+
+Chronological work logs documenting:
+
+- Phase 0 cleanup efforts
+- Phase 1 corrective enforcement
+- CLIP integration and dependency stabilization
+- Documentation consolidation
+- Packaging refactor execution
+
+**Status:** ✅ Current  
+**Use cases:** Understanding implementation decisions, debugging, auditing changes
+
+---
+
+## 🔬 Research
+
+**Active research references and literature surveys**
+
+### [research/Research-Notes/](research/Research-Notes/)
+
+- **`GESTOP.md`** - GESTOP system analysis
+- **`HGR_2024.md`** - Recent hand gesture recognition research (2024)
+- **`USE_CASES.md`** - Application use cases and scenarios
+
+### [research/Topics/](research/Topics/)
+
+- **`HAVIT_Gesture_Recognition.md`** - HAVIT approach analysis
+- **`ViT_and_self-attention.md`** - Vision Transformer and self-attention mechanisms
+
+**Status:** ✅ Current research references  
+**Use cases:** Literature review, related work, theoretical background
+
+---
+
+## 🗄️ Archive
+
+**Historical, deprecated, and superseded documentation**
+
+### [archive/](archive/)
+
+Complete archive with subdirectories:
+
+- **`deprecated/`** - Superseded architectures (Project-Architecture/, Recognition-Engine/)
+- **`training/`** - Training guides (not used - system uses pretrained CLIP)
+- **`research/`** - Historical research (HaGRID assessment, dataset guides)
+- **`academic/`** - Academic materials (computer vision theory, proposals)
+- **`legacy/`** - Legacy implementation documentation
+- **`clip_pre_fix_validation/`** - Pre-softmax fix documents
+- **`meeting-notes/`** - Project meeting notes (2025-09 to 2026-01)
+
+**See:** [archive/README.md](archive/README.md) for complete archive overview
+
+**Use cases:** Understanding project evolution, historical context, research decisions
+
+---
+
+## 🔗 Quick Links
+
+| Document                                                                              | Purpose                  | Status           |
+| ------------------------------------------------------------------------------------- | ------------------------ | ---------------- |
+| [SEMANTIC_SYSTEM_ARCHITECTURE.md](architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md)       | Canonical architecture   | ✅ Current       |
+| [CLIP_MATHEMATICAL_SPECIFICATION.md](architecture/CLIP_MATHEMATICAL_SPECIFICATION.md) | Mathematical foundations | ✅ Current       |
+| [INSTALL.md](installation/INSTALL.md)                                                 | Installation guide       | ⚠️ Update needed |
+| [PRODUCTION_FINALIZATION_GUIDE.md](operations/PRODUCTION_FINALIZATION_GUIDE.md)       | Calibration & deployment | ✅ Current       |
+| [PACKAGING_REFACTOR_REPORT.md](operations/PACKAGING_REFACTOR_REPORT.md)               | Packaging documentation  | ✅ Current       |
+| [PROJECT_PROGRESS.md](development/PROJECT_PROGRESS.md)                                | Implementation status    | ⚠️ Update needed |
+| [work-logs/](development/work-logs/)                                                  | Daily logs               | ✅ Current       |
+
+---
+
+## 📋 Documentation Standards
+
+### Authoritative Sources
+
+For any conflicts between documents, **DEFER TO:**
+
+1. [architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md](architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md) - Architecture decisions
+2. [architecture/CLIP_MATHEMATICAL_SPECIFICATION.md](architecture/CLIP_MATHEMATICAL_SPECIFICATION.md) - Mathematical specifications
+3. [operations/PACKAGING_REFACTOR_REPORT.md](operations/PACKAGING_REFACTOR_REPORT.md) - Packaging and imports
+
+### Current Installation Pattern
+
+```bash
+pip install -e .
+```
+
+**No extras required** (CLIP dependencies in base install)
+
+### Current Import Pattern
+
+```python
+from semantic_hgr.representation.clip_encoder import CLIPEncoder
+from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
+from semantic_hgr.input_manager.input_manager import InputManager
+```
+
+**Namespace:** `semantic_hgr.*` (PEP 420 compliant)
+
+---
+
+## 🚨 Known Issues
+
+### Documentation Updates Required
+
+1. **`installation/INSTALL.md`** - Predates packaging refactor (February 12, 2026)
+   - ❌ May reference old install patterns
+   - ✅ **Action:** Update to reflect unified install and new namespace
+
+2. **`development/PROJECT_PROGRESS.md`** - Contains outdated commands
+   - ❌ Lines 92, 122: Reference `pip install -e '.[clip]'` and `.[semantic]` extras
+   - ✅ **Action:** Update to single install command
+
+---
+
+## 📖 Archive Policy
+
+**See:** [../ARCHIVE_POLICY.md](../ARCHIVE_POLICY.md) at repository root
+
+**Key Principles:**
+
+- ✅ Archive, never delete
+- ✅ Clear status disclaimers
+- ✅ Preserve historical context
+- ✅ Link to current alternatives
+
+---
+
+## 🎓 Getting Started
+
+**New to the project?** Start here:
+
+1. **Understand the system:** [architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md](architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md)
+2. **Install dependencies:** [installation/INSTALL.md](installation/INSTALL.md)
+3. **Check implementation status:** [development/PROJECT_PROGRESS.md](development/PROJECT_PROGRESS.md)
+4. **Review recent work:** [development/work-logs/](development/work-logs/)
+
+**Deploying to production?** See:
+
+- [operations/PRODUCTION_FINALIZATION_GUIDE.md](operations/PRODUCTION_FINALIZATION_GUIDE.md)
+- [operations/PRODUCTION_READINESS_ASSESSMENT.md](operations/PRODUCTION_READINESS_ASSESSMENT.md)
+
+**Debugging packaging?** See:
+
+- [operations/PACKAGING_REFACTOR_REPORT.md](operations/PACKAGING_REFACTOR_REPORT.md)
+
+---
+
+**Last Audit:** February 12, 2026 (see [DOCUMENTATION_AUDIT_REPORT.md](DOCUMENTATION_AUDIT_REPORT.md))

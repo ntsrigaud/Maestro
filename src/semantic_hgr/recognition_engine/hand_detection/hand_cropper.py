@@ -8,8 +8,8 @@ using bounding boxes from hand detections, with configurable padding and preproc
 import cv2
 import numpy as np
 from typing import Tuple
-from recognition_engine.hand_detection.hand_data import HandDetectionResult, HandROI
-from shared.logger import get_logger
+from semantic_hgr.recognition_engine.hand_detection.hand_data import HandDetectionResult, HandROI
+from semantic_hgr.shared.logger import get_logger
 
 # Initialize module logger
 logger = get_logger(__name__)
@@ -42,7 +42,7 @@ class HandCropper:
         target_size: Tuple[int, int] = (224, 224),
         padding: float = 0.2,
         square_crop: bool = True,
-        normalize: bool = True,
+        normalize: bool = False,
         normalization_mean: Tuple[float, float, float] = (0.485, 0.456, 0.406),
         normalization_std: Tuple[float, float, float] = (0.229, 0.224, 0.225),
         bgr_to_rgb: bool = True,
@@ -54,9 +54,16 @@ class HandCropper:
             target_size: Target (width, height) for resized ROI
             padding: Padding factor around bounding box (0.2 = 20% padding)
             square_crop: Whether to crop square regions (for ViT and similar models)
-            normalize: Whether to normalize pixel values
-            normalization_mean: Mean values for normalization (ImageNet defaults)
-            normalization_std: Std values for normalization (ImageNet defaults)
+            normalize: Whether to apply ImageNet Z-score normalization.
+                Default: False. Must remain False when crops are fed into CLIPEncoder,
+                which applies its own CLIP-specific preprocessing (resize + CLIP normalization
+                constants) internally via open_clip's transform pipeline. Setting True
+                here AND using CLIPEncoder causes dual normalization with mismatched
+                constants, corrupting all image data before encoding.
+            normalization_mean: Mean values for normalization (ImageNet defaults).
+                Only relevant when normalize=True (e.g., for non-CLIP ViT models).
+            normalization_std: Std values for normalization (ImageNet defaults).
+                Only relevant when normalize=True (e.g., for non-CLIP ViT models).
             bgr_to_rgb: Whether to convert BGR (OpenCV) to RGB format
         """
         self._target_size = target_size
