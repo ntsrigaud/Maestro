@@ -53,6 +53,11 @@ dev = [
     "mypy>=1.0.0",
 ]
 
+# Dataset download (scripts/download_hagrid_subset.py)
+download = [
+    "datasets>=2.0.0",  # HuggingFace streaming download for HaGRID
+]
+
 # Phase 4-6: Semantic command matching (future layer)
 semantic-matching = [
     "sentence-transformers>=2.2.0",  # Command similarity matching
