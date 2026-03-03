@@ -11,7 +11,7 @@
 #   make demo             - Launch real-time demo
 #   make clean            - Remove temporary artifacts
 
-.PHONY: help install dev-install clip-check calibration-interactive calibration-evaluate realtime-demo test clean
+.PHONY: help install dev-install clip-check calibration-interactive calibration-evaluate realtime-demo test clean download-hagrid static-eval
 
 # Default target - show help
 help:
@@ -28,11 +28,13 @@ help:
 	@echo "  make test              Run full pytest suite (54 tests)"
 	@echo ""
 	@echo "Production Tools:"
-	@echo "  make calibration-prep  Prepare calibration dataset (synthetic)"
-	@echo "  make calibration-run   Run calibration study"
-	@echo "  make calibration       Full calibration pipeline (prep + run)"
-	@echo "  make overlap-analysis  Analyze intent semantic overlap"
-	@echo "  make demo              Launch real-time gesture demo"
+	@echo "  make download-hagrid   Download HaGRID subset (750 crops/class, 6000 total)"
+	@echo "  make static-eval       Evaluate static gestures (Top-K accuracy, confusion matrix)"
+	@echo "  make demo              Launch real-time static gesture demo"
+	@echo ""
+	@echo "Archived (Invalid for Static Track):"
+	@echo "  # make calibration     [DEPRECATED] ECE/MCE invalid without temporal modeling"
+	@echo "  # make overlap-analysis [DEPRECATED] Used synthetic data"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make clean             Remove temporary files and caches"
@@ -120,47 +122,73 @@ test:
 	@echo "✓ Test suite complete"
 
 # ============================================================================
-# PRODUCTION CALIBRATION WORKFLOW
+# STATIC GESTURE EVALUATION (REPLACES CALIBRATION)
+# ============================================================================
+# Calibration scripts archived (Feb 12, 2026) - invalid for static gestures
+# See: docs/analysis/CALIBRATION_ROOT_CAUSE_ANALYSIS.md
+#
+# New evaluation uses retrieval-style metrics appropriate for zero-shot systems:
+# - Top-K accuracy (fraction of samples with correct intent in top-K)
+# - Inter-class margin (confidence gap between top-1 and top-2)
+# - Confusion matrix (error analysis)
 # ============================================================================
 
-calibration-prep:
-	@echo "Preparing synthetic calibration dataset..."
-	@mkdir -p data/calibration
-	prepare-calibration-dataset \
-	    --synthetic \
-	    --output data/calibration/validation_gestures_synthetic.json \
-	    --samples 100
-	@echo "✓ Synthetic dataset created: data/calibration/validation_gestures_synthetic.json"
+# Download 750 hand-cropped JPEG images per class (8 classes = 6000 total)
+# from HaGRID via HuggingFace streaming. Bounding-box crops match the live
+# pipeline's HandCropper output so static-eval is distribution-consistent.
+# Requires:  pip install datasets   (done by make dev-install / environment.yml)
+download-hagrid:
+	@echo "Downloading HaGRID subset (750 crops/class × 8 classes)..."
+	@mkdir -p data/hagrid_subset
+	python scripts/download_hagrid_subset.py \
+	    --output data/hagrid_subset \
+	    --n-samples 750
+	@echo "✓ HaGRID subset ready at data/hagrid_subset"
 
-calibration-run:
-	@echo "Running calibration study..."
-	@mkdir -p results/calibration
-	calibration-study \
-	    --dataset data/calibration/validation_gestures_synthetic.json \
-	    --output results/calibration/calibration_report.json \
-	    --num-bins 10 \
-	    --plot results/calibration/reliability_diagram.png
-	@echo "✓ Calibration report: results/calibration/calibration_report.json"
+static-eval:
+	@echo "Running static gesture evaluation (Top-K retrieval accuracy)..."
+	@mkdir -p results/static_eval
+	@if [ ! -d "data/hagrid_subset" ]; then \
+	    echo "ERROR: HaGRID subset not found at data/hagrid_subset"; \
+	    echo "Run: make download-hagrid"; \
+	    exit 1; \
+	fi
+	python src/semantic_hgr/scripts/static_eval.py \
+	    --dataset data/hagrid_subset \
+	    --output results/static_eval/report.json \
+	    --top-k 1,3,5 \
+	    --device cpu
+	@echo "✓ Static evaluation complete: results/static_eval/report.json"
 
-calibration: calibration-prep calibration-run
-	@echo ""
-	@echo "✓ Full calibration pipeline complete"
-	@echo "  Dataset: data/calibration/validation_gestures_synthetic.json"
-	@echo "  Report:  results/calibration/calibration_report.json"
+# DEPRECATED: Calibration targets archived (not deleted, for reference only)
+# Original calibration was invalid due to mixed static/dynamic vocabulary
+# See realignment action plan in PROJECT_PROGRESS.md
+#
+# Archived scripts location: src/semantic_hgr/scripts/archive/
+#   - prepare_calibration_dataset.py
+#   - calibration_study.py
+#   - intent_overlap_analysis.py
+#
+# These will be reinstated when:
+#   1. Static vocabulary validated on real gesture data
+#   2. Top-1 accuracy ≥60% achieved
+#   3. Human baseline study complete (Fleiss' Kappa ≥0.80)
+#   4. Temporal modeling implemented for dynamic gestures (ActionCLIP/VideoCLIP)
 
-overlap-analysis:
-	@echo "Running intent overlap analysis..."
-	@mkdir -p results/overlap
-	intent-overlap-analysis \
-	    --dataset data/calibration/validation_gestures_synthetic.json \
-	    --output results/overlap/overlap_analysis.json \
-	    --plot-similarity results/overlap/similarity_matrix.png \
-	    --plot-confusion results/overlap/confusion_matrix.png \
-	    --similarity-threshold 0.85
-	@echo "✓ Overlap analysis: results/overlap/overlap_analysis.json"
+# DEPRECATED: Overlap analysis also archived (used synthetic data)
+# Will be replaced with confusion matrix from static_eval.py
 
 # ============================================================================
-# REAL-TIME DEMO
+# REAL-TIME STATIC GESTURE DEMO
+# ============================================================================
+# Demonstrates real-time static hand pose recognition
+# - 9 HaGRID-aligned static intents
+# - 42ms end-to-end latency
+# - MediaPipe hand detection + CLIP encoding
+#
+# CLARIFICATION (Feb 12, 2026):
+# - Proves: Static pose recognition from single frames
+# - Does NOT prove: Dynamic gesture understanding (requires temporal modeling)
 # ============================================================================
 
 demo:
