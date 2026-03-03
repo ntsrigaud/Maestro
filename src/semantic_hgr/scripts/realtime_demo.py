@@ -52,11 +52,13 @@ from semantic_hgr.representation.clip_encoder import CLIPEncoder
 from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
 
 
+TEMP_CONFIDENCE_THRESHOLD = 0.3
+
 @dataclass
 class DemoConfig:
     """Configuration for demo session."""
     gesture_definitions: Dict[str, str]  # intent -> command mapping
-    confidence_threshold: float = 0.7
+    confidence_threshold: float = TEMP_CONFIDENCE_THRESHOLD
     top_k: int = 3
     camera_index: int = 0
     frame_width: int = 1280
@@ -166,15 +168,17 @@ class RealtimeGestureDemo:
         )
         
         self.encoder = CLIPEncoder(
-            model_name="ViT-B-32",
+            model_name="ViT-B-16",
             pretrained="openai",
             device="cpu"  # Change to "cuda" for GPU
         )
         
         # Share CLIP model with intent extractor for efficiency
+        # STATIC GESTURE TRACK: Default to static-only mode (9 HaGRID-aligned poses)
         self.intent_extractor = SemanticIntentExtractor(
             clip_model=self.encoder.model,
-            device=self.encoder.device
+            device=self.encoder.device,
+            static_only=True  # Production default: static gestures only
         )
         
         # State
@@ -595,7 +599,7 @@ def load_gesture_config(config_path: Path) -> DemoConfig:
     
     return DemoConfig(
         gesture_definitions=data['gesture_definitions'],
-        confidence_threshold=data.get('confidence_threshold', 0.7),
+        confidence_threshold=data.get('confidence_threshold', TEMP_CONFIDENCE_THRESHOLD),
         top_k=data.get('top_k', 3),
         camera_index=data.get('camera_index', 0),
         frame_width=data.get('frame_width', 1280),
@@ -623,7 +627,7 @@ def create_default_config(output_path: Path):
             "volume_down": "Decrease audio volume",
             "rotate_cw": "Rotate clockwise"
         },
-        "confidence_threshold": 0.7,
+        "confidence_threshold": TEMP_CONFIDENCE_THRESHOLD,
         "top_k": 3,
         "camera_index": 0,
         "frame_width": 1280,
@@ -647,7 +651,7 @@ def main():
                         help='Create default configuration file and exit')
     parser.add_argument('--output', type=Path, default=None,
                         help='Path to save session log JSON')
-    parser.add_argument('--confidence-threshold', type=float, default=0.7,
+    parser.add_argument('--confidence-threshold', type=float, default=TEMP_CONFIDENCE_THRESHOLD,
                         help='Minimum confidence threshold for acceptance')
     parser.add_argument('--camera', type=int, default=0,
                         help='Camera index')

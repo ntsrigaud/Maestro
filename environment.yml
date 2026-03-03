@@ -38,3 +38,5 @@ dependencies:
   # Versions 0.10.22+ removed mp.solutions.hands and require migration to tasks.vision API
   - pip:
       - mediapipe==0.10.21
+      # HaGRID subset download (scripts/download_hagrid_subset.py)
+      - datasets>=2.0.0
