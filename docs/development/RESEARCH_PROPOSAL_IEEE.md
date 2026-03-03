@@ -12,7 +12,7 @@
 
 ## Abstract
 
-Traditional hand gesture recognition systems rely on closed-vocabulary classifiers that map visual patterns to predefined labels, limiting their adaptability to novel gestures and user-specific interaction styles. We propose a **semantic hand gesture recognition system** that leverages vision-language models (VLMs) to extract semantic intent from static hand poses without task-specific training. By encoding gestures in CLIP's joint vision-language embedding space, the system enables **zero-shot recognition** of gestures described through natural language, eliminating the need for extensive labeled datasets. Our approach transforms gesture recognition from rigid classification into flexible semantic understanding, where gestures are interpreted as expressions of user intent rather than discrete categories. We demonstrate a prototype implementation achieving validated perception (MediaPipe hand detection), representation (CLIP ViT-B/32 visual encoding), and semantic intent extraction across 9 static hand poses aligned with the HaGRID dataset taxonomy. The system provides a foundation for intent-driven human-computer interaction where semantic meaning, not visual appearance, drives command resolution.
+Traditional hand gesture recognition systems rely on closed-vocabulary classifiers that map visual patterns to predefined labels, limiting their adaptability to novel gestures and user-specific interaction styles. We propose a **semantic hand gesture recognition system** that leverages vision-language models (VLMs) to extract semantic intent from static hand poses without task-specific training. By encoding gestures in CLIP's joint vision-language embedding space, the system enables **zero-shot recognition** of gestures described through natural language, eliminating the need for extensive labeled datasets. Our approach transforms gesture recognition from rigid classification into flexible semantic understanding, where gestures are interpreted as expressions of user intent rather than discrete categories. We demonstrate a prototype implementation achieving validated perception (MediaPipe hand detection), representation (CLIP ViT-B/32 visual encoding), and semantic intent extraction across 8 static hand poses aligned with the HaGRID dataset taxonomy. The system provides a foundation for intent-driven human-computer interaction where semantic meaning, not visual appearance, drives command resolution.
 
 **Keywords**: Hand gesture recognition, vision-language models, CLIP, zero-shot learning, semantic understanding, human-computer interaction
 
@@ -227,9 +227,10 @@ Our system architecture adheres to the following principles:
 ┌────────────────────────────────────────────────────────────┐
 │ LAYER 3: Semantic Intent               [✅ IMPLEMENTED]    │
 │  - SemanticIntentExtractor: CLIP text encoder              │
-│  - Intent vocabulary: 9 static poses (HaGRID-aligned)      │
-│  - Cosine similarity: g · tᵢ for each intent i             │
-│  - Temperature-scaled softmax: P(intent_i | gesture)       │
+│  - Intent vocabulary: 8 static poses (HaGRID-aligned)      │
+│    (no_hand handled by MediaPipe at Layer 1, not CLIP)      │
+│  - Cosine similarity: g · tᵢ for each intent i            │
+│  - logit_scale softmax: P(intent_i | gesture)             │
 │                                                            │
 │  Output: (intent, confidence) where confidence ∈ [0,1]     │
 └────────────┬───────────────────────────────────────────────┘
@@ -333,14 +334,17 @@ Given hand crop $I \in \mathbb{R}^{224 \times 224 \times 3}$:
 **Components**:
 
 1. **SemanticIntentExtractor** (`src/semantic_hgr/semantics/clip_intent.py`)
-   - Intent vocabulary: 9 static poses (HaGRID-aligned)
+   - Intent vocabulary: 8 static poses (HaGRID-aligned)
    - Text encoder: CLIP text transformer
    - Similarity computation: Cosine similarity in joint embedding space
    - Probability calibration: Temperature-scaled softmax
 
 **Intent Vocabulary (Static Gestures Only)**:
 
-Following research correction (February 12, 2026) based on root cause analysis [see Section 4.3], vocabulary restricted to **static hand poses** recognizable from single RGB frames:
+Following research correction (February 12, 2026) and pipeline fixes (March 2, 2026),
+vocabulary restricted to **8 static hand poses** classifiable by CLIP. The `no_hand`
+state is handled upstream by MediaPipe's confidence threshold (Layer 1) and excluded
+from CLIP's closed-set softmax to avoid consuming probability mass from valid classes:
 
 1. **thumbs_up**: Thumb extended upward (approval, confirm)
 2. **thumbs_down**: Thumb extended downward (rejection, cancel)
@@ -350,7 +354,6 @@ Following research correction (February 12, 2026) based on root cause analysis [
 6. **ok_sign**: Circle with thumb and index finger
 7. **pointing**: Index finger extended forward
 8. **call_gesture**: Thumb and pinky extended (shaka/call sign)
-9. **no_hand**: No hand detected (background/idle state)
 
 Each intent has 5 natural language variations to test semantic robustness:
 
@@ -363,30 +366,30 @@ STATIC_SEMANTIC_INTENTS = {
         "positive hand sign",
         "thumb extended upward"
     ],
-    # ... (45 total text descriptions for 9 intents)
+    # ... (40 total text descriptions for 8 intents)
 }
 ```
 
 **Mathematical Formulation**:
 
-Given gesture embedding $g \in \mathbb{R}^{512}$ and intent text descriptions $\{d_1, d_2, \ldots, d_9\}$:
+Given gesture embedding $g \in \mathbb{R}^{512}$ and intent text descriptions $\{d_1, d_2, \ldots, d_8\}$:
 
 1. **Text Encoding**:
-   $$t_i = \frac{f_{text}(d_i)}{||f_{text}(d_i)||_2} \quad \text{for } i = 1, \ldots, 9$$
+   $$t_i = \frac{f_{text}(d_i)}{||f_{text}(d_i)||_2} \quad \text{for } i = 1, \ldots, 8$$
 
 2. **Cosine Similarity** (since embeddings normalized):
    $$\text{sim}(g, t_i) = g \cdot t_i = \sum_{j=1}^{512} g_j \times t_{i,j}$$
 
-3. **Logit Scaling** (CLIP learned parameter):
-   $$\text{logit}_i = \text{sim}(g, t_i) \times \text{logit\_scale}$$
-   where $\text{logit\_scale} \approx 100$ (extracted from CLIP model)
+3. **Logit Scaling** (CLIP's learned temperature inverse, per Radford et al. 2021):
+   $$\text{logit}_i = \text{sim}(g, t_i) \times e^{T}$$
+   where $e^{T} \approx 100$ is CLIP's learned `logit_scale` parameter, extracted
+   from the pretrained model. This is the **sole** temperature mechanism; no
+   additional temperature division is applied. Combining `logit_scale` with a
+   separate temperature $\tau < 1$ (e.g., $\tau = 0.05$) produces $\approx 1428\times$
+   total scaling, collapsing softmax to a degenerate one-hot distribution.
 
-4. **Temperature Scaling** (calibration):
-   $$\text{logit}_i^{\tau} = \frac{\text{logit}_i}{\tau}$$
-   where $\tau = 0.05$ (lower temperature = sharper probabilities)
-
-5. **Softmax Normalization**:
-   $$P(\text{intent}_i | \text{gesture}) = \frac{\exp(\text{logit}_i^{\tau})}{\sum_{j=1}^{9} \exp(\text{logit}_j^{\tau})}$$
+4. **Softmax Normalization**:
+   $$P(\text{intent}_i | \text{gesture}) = \frac{\exp(\text{logit}_i)}{\sum_{j=1}^{8} \exp(\text{logit}_j)}$$
 
 **Output**: $(intent, confidence)$ where:
 
@@ -396,8 +399,8 @@ Given gesture embedding $g \in \mathbb{R}^{512}$ and intent text descriptions $\
 **Probability Validation**:
 
 - 10 unit tests verifying: $\forall i: P(\text{intent}_i) \in [0, 1]$
-- Sum constraint: $\sum_{i=1}^{9} P(\text{intent}_i) = 1.0 \pm 10^{-6}$
-- Temperature effect: Lower $\tau$ increases top-1 confidence
+- Sum constraint: $\sum_{i=1}^{8} P(\text{intent}_i) = 1.0 \pm 10^{-6}$
+- Calibration: logit_scale only (no additional temperature) per CLIP's original formulation
 
 **Performance**: ~18 ms per prediction (text embeddings pre-computed at initialization)
 
@@ -461,7 +464,7 @@ where $M(G)$ is the velocity vector.
 
 #### 4.1.3 Scope Decision
 
-**Current System Scope**: Static gestures only (9 HaGRID-aligned poses)
+**Current System Scope**: Static gestures only (8 HaGRID-aligned poses)
 
 **Rationale**:
 
@@ -487,9 +490,9 @@ where $M(G)$ is the velocity vector.
 
 **Subset Selection** (for validation):
 
-- **Classes**: 9 gestures aligned with static vocabulary
+- **Classes**: 8 gestures aligned with static vocabulary
 - **Samples**: 500-1000 images per class
-- **Total**: ~4,500-9,000 images
+- **Total**: ~4,000-8,000 images
 - **Storage**: ~2.5-5 GB (512px resolution variant)
 
 **Annotation Format**: COCO-style bounding boxes + MediaPipe landmarks
@@ -504,9 +507,11 @@ where $M(G)$ is the velocity vector.
 | closed_fist   | fist         | Direct correspondence                 |
 | peace_sign    | peace        | V-shape with index and middle fingers |
 | ok_sign       | ok           | Direct correspondence                 |
-| pointing      | point        | Direct correspondence                 |
-| call_gesture  | call         | Shaka sign (thumb and pinky extended) |
-| no_hand       | no_gesture   | Background class                      |
+| pointing      | one          | "One finger up" = index extended (v1 label name) |
+| call_gesture  | call         | Shaka sign (thumb and pinky extended)            |
+
+Note: `no_hand` / `no_gesture` is excluded from the download and CLIP vocab.
+MediaPipe's confidence threshold gates this case at Layer 1.
 
 ### 4.3 Evaluation Metrics
 
@@ -559,11 +564,11 @@ Identify which static poses are confused by CLIP:
 
 1. Extract gesture crops from HaGRID test set (unseen during CLIP pre-training)
 2. Encode crops via CLIP ViT-B/32
-3. Compute similarity to 9 static intent text descriptions
+2. Compute similarity to 8 static intent text descriptions
 4. Rank intents by confidence
 5. Measure Top-1/3/5 accuracy
 
-**Baseline**: Random chance = 11.1% (9 classes)
+**Baseline**: Random chance = 12.5% (8 classes)
 
 **Expected Performance**: 60-80% top-1 accuracy based on CLIP zero-shot benchmarks
 
