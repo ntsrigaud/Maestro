@@ -11,7 +11,7 @@
 #   make demo             - Launch real-time demo
 #   make clean            - Remove temporary artifacts
 
-.PHONY: help install dev-install clip-check calibration-interactive calibration-evaluate realtime-demo test clean
+.PHONY: help install dev-install clip-check calibration-interactive calibration-evaluate realtime-demo test clean download-hagrid static-eval
 
 # Default target - show help
 help:
@@ -28,6 +28,7 @@ help:
 	@echo "  make test              Run full pytest suite (54 tests)"
 	@echo ""
 	@echo "Production Tools:"
+	@echo "  make download-hagrid   Download HaGRID subset (750 crops/class, 6000 total)"
 	@echo "  make static-eval       Evaluate static gestures (Top-K accuracy, confusion matrix)"
 	@echo "  make demo              Launch real-time static gesture demo"
 	@echo ""
@@ -132,13 +133,24 @@ test:
 # - Confusion matrix (error analysis)
 # ============================================================================
 
+# Download 750 hand-cropped JPEG images per class (8 classes = 6000 total)
+# from HaGRID via HuggingFace streaming. Bounding-box crops match the live
+# pipeline's HandCropper output so static-eval is distribution-consistent.
+# Requires:  pip install datasets   (done by make dev-install / environment.yml)
+download-hagrid:
+	@echo "Downloading HaGRID subset (750 crops/class × 8 classes)..."
+	@mkdir -p data/hagrid_subset
+	python scripts/download_hagrid_subset.py \
+	    --output data/hagrid_subset \
+	    --n-samples 750
+	@echo "✓ HaGRID subset ready at data/hagrid_subset"
+
 static-eval:
 	@echo "Running static gesture evaluation (Top-K retrieval accuracy)..."
 	@mkdir -p results/static_eval
 	@if [ ! -d "data/hagrid_subset" ]; then \
 	    echo "ERROR: HaGRID subset not found at data/hagrid_subset"; \
-	    echo "Please download HaGRID dataset first (9 static classes)"; \
-	    echo "See: docs/analysis/INTENT_CLASSIFICATION.md"; \
+	    echo "Run: make download-hagrid"; \
 	    exit 1; \
 	fi
 	python src/semantic_hgr/scripts/static_eval.py \
