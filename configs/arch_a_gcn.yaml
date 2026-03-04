@@ -1,0 +1,47 @@
+# Architecture A — Phase 1: GCN Geometry Stream Configuration
+# ==============================================================
+# Input: (21, 3) MediaPipe hand keypoint graph per sample
+# Output: 8-class logits
+# Training gate: >=65% val Top-1 before proceeding to Phase 2
+
+model:
+  type: gcn_stream
+  in_channels: 3          # (x, y, z) per keypoint node
+  hidden_channels: 128    # GCN hidden dimension
+  num_layers: 4           # Number of GCN message-passing layers
+  num_classes: 8          # HaGRID 8-class subset
+  dropout: 0.3
+
+data:
+  dataset_dir: data/hagrid_subset
+  keypoint_dir: data/keypoints
+  split_dir: data/splits
+  classes:
+    - call_gesture
+    - closed_fist
+    - ok_sign
+    - open_palm
+    - peace_sign
+    - pointing
+    - thumbs_down
+    - thumbs_up
+
+training:
+  epochs: 100
+  batch_size: 64
+  optimizer: adamw
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  scheduler: cosine
+  warmup_epochs: 5
+  early_stopping_patience: 15
+  device: auto            # auto selects mps > cuda > cpu
+
+checkpoints:
+  save_dir: checkpoints/gcn
+  save_best: true         # saves checkpoints/gcn/best.pt
+  metric: val_top1
+
+logging:
+  output_dir: results/geometry_stream
+  log_every_n_steps: 50

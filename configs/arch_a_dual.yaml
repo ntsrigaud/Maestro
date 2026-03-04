@@ -1,0 +1,81 @@
+# Architecture A — Phase 3+4: Dual-Stream Fusion Configuration
+# =============================================================
+# Phase 3: Train cross-attention fusion head with frozen streams
+# Phase 4: End-to-end fine-tune entire model
+#
+# Requires:
+#   checkpoints/gcn/best.pt   (Phase 1 artifact)
+#   checkpoints/rgb/best.pt   (Phase 2 artifact)
+
+model:
+  type: dual_stream
+  gcn_checkpoint: checkpoints/gcn/best.pt
+  rgb_checkpoint: checkpoints/rgb/best.pt
+  num_classes: 8
+
+  fusion:
+    type: cross_attention
+    embed_dim: 256            # Projection dimension for both streams
+    num_heads: 8              # Multi-head cross-attention
+    dropout: 0.1
+
+  gcn:
+    # Inherits Phase 1 architecture — loaded from gcn_checkpoint
+    in_channels: 3
+    hidden_channels: 128
+    num_layers: 4
+
+  rgb:
+    # Inherits Phase 2 architecture — loaded from rgb_checkpoint
+    backbone: vit_base_patch16_224
+
+data:
+  dataset_dir: data/hagrid_subset
+  keypoint_dir: data/keypoints
+  split_dir: data/splits
+  image_size: 224
+  normalize:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+  classes:
+    - call_gesture
+    - closed_fist
+    - ok_sign
+    - open_palm
+    - peace_sign
+    - pointing
+    - thumbs_down
+    - thumbs_up
+
+training:
+  # Phase 3: Freeze both streams; train only fusion head
+  phase3:
+    epochs: 20
+    batch_size: 32
+    optimizer: adamw
+    lr: 1.0e-3
+    freeze_streams: true
+    warmup_epochs: 2
+
+  # Phase 4: Unfreeze; end-to-end fine-tune
+  phase4:
+    epochs: 15
+    batch_size: 16
+    optimizer: adamw
+    lr: 5.0e-5
+    weight_decay: 1.0e-2
+    freeze_streams: false
+    scheduler: cosine
+    warmup_epochs: 2
+    early_stopping_patience: 8
+
+  device: auto
+
+checkpoints:
+  save_dir: checkpoints/dual
+  save_best: true         # saves checkpoints/dual/best.pt
+  metric: val_top1
+
+logging:
+  output_dir: results/dual_stream
+  log_every_n_steps: 20

@@ -304,8 +304,8 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         default=224,
         help=(
-            "Side length (px) for saved JPEGs. 224 matches CLIP ViT-B/32 input; "
-            "CLIPEncoder re-applies preprocessing internally so this is storage-only."
+            "Side length (px) for saved JPEGs. 224 matches ViT-B/16 input size "
+            "used by the Architecture A RGB stream (timm vit_base_patch16_224)."
         ),
     )
     parser.add_argument(

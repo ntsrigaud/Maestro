@@ -1,0 +1,57 @@
+# Architecture A — Phase 2: ViT-B/16 RGB Stream Configuration
+# =============================================================
+# Input: 224×224 RGB crops, ImageNet normalisation
+#        mean=[0.485, 0.456, 0.406]  std=[0.229, 0.224, 0.225]
+# Output: 8-class logits
+# Training gate: >=88% val Top-1 before proceeding to Phase 3
+
+model:
+  type: rgb_stream
+  backbone: vit_base_patch16_224  # timm model name
+  pretrained: true                # ImageNet-21k pretrained weights
+  num_classes: 8                  # HaGRID 8-class subset
+  dropout: 0.1
+
+data:
+  dataset_dir: data/hagrid_subset
+  split_dir: data/splits
+  image_size: 224
+  normalize:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+  augmentation:
+    random_horizontal_flip: true
+    random_crop_scale: [0.8, 1.0]
+    color_jitter:
+      brightness: 0.2
+      contrast: 0.2
+      saturation: 0.2
+  classes:
+    - call_gesture
+    - closed_fist
+    - ok_sign
+    - open_palm
+    - peace_sign
+    - pointing
+    - thumbs_down
+    - thumbs_up
+
+training:
+  epochs: 30
+  batch_size: 32
+  optimizer: adamw
+  lr: 1.0e-4
+  weight_decay: 1.0e-2
+  scheduler: cosine
+  warmup_epochs: 3
+  early_stopping_patience: 8
+  device: auto
+
+checkpoints:
+  save_dir: checkpoints/rgb
+  save_best: true         # saves checkpoints/rgb/best.pt
+  metric: val_top1
+
+logging:
+  output_dir: results/rgb_stream
+  log_every_n_steps: 20

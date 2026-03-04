@@ -55,15 +55,16 @@ class HandCropper:
             padding: Padding factor around bounding box (0.2 = 20% padding)
             square_crop: Whether to crop square regions (for ViT and similar models)
             normalize: Whether to apply ImageNet Z-score normalization.
-                Default: False. Must remain False when crops are fed into CLIPEncoder,
-                which applies its own CLIP-specific preprocessing (resize + CLIP normalization
-                constants) internally via open_clip's transform pipeline. Setting True
-                here AND using CLIPEncoder causes dual normalization with mismatched
-                constants, corrupting all image data before encoding.
-            normalization_mean: Mean values for normalization (ImageNet defaults).
-                Only relevant when normalize=True (e.g., for non-CLIP ViT models).
-            normalization_std: Std values for normalization (ImageNet defaults).
-                Only relevant when normalize=True (e.g., for non-CLIP ViT models).
+                Default: False. When False, crops are returned as uint8 [0, 255] RGB arrays
+                ready for torchvision.transforms or timm's default_cfg preprocessing.
+                Set True only when you want pre-normalized float32 output (e.g., for
+                direct numpy inference without a torchvision transform pipeline).
+            normalization_mean: Per-channel mean for Z-score normalization.
+                Defaults to ImageNet means (0.485, 0.456, 0.406) — correct for
+                ViT-B/16 pretrained via timm on ImageNet-21K/1K.
+            normalization_std: Per-channel std for Z-score normalization.
+                Defaults to ImageNet stds (0.229, 0.224, 0.225) — correct for
+                ViT-B/16 pretrained via timm on ImageNet-21K/1K.
             bgr_to_rgb: Whether to convert BGR (OpenCV) to RGB format
         """
         self._target_size = target_size

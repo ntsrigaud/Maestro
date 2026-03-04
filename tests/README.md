@@ -1,77 +1,56 @@
-# Tests
+# Tests — Architecture A
 
-Unit tests for the Semantic Gesture Understanding System.
+Unit and integration tests for the dual-stream supervised gesture recognition system.
+
+## Structure
+
+```
+tests/
+    test_hand_detection.py        MediaPipe hand detector + HandDetectionResult
+    test_hand_cropper.py          Bounding-box crop + ImageNet normalisation
+    test_preprocessing.py         center_crop_frame pipeline
+    test_gcn_stream.py            GCN geometry stream forward pass  (Phase 1)
+    test_rgb_stream.py            ViT-B/16 appearance stream forward pass  (Phase 2)
+    test_dual_stream.py           Dual-stream fusion model forward pass  (Phase 3+4)
+    test_dataset.py               HaGRID dataset loading and train/val/test splits
+    test_keypoint_extraction.py   Offline MediaPipe keypoint extraction
+```
 
 ## Running Tests
 
-### All Tests
-
 ```bash
-python -m unittest discover tests -v
+make test          # full suite (verbose)
+make test-fast     # stop on first failure
 ```
 
-### Specific Test Module
+Or directly:
 
 ```bash
-python -m unittest tests.test_clip_encoder -v
-python -m unittest tests.test_semantic_intent -v
+pytest tests/ -v
+pytest tests/test_hand_detection.py -v   # single file
 ```
 
-### Integration Validation
+## Test Philosophy
 
-```bash
-KMP_DUPLICATE_LIB_OK=TRUE python scripts/validate_clip_integration.py
+- **Unit tests** validate individual components in isolation with synthetic / mocked data.
+- **Integration tests** validate end-to-end pipeline behaviour.
+- All tests must pass before initiating training (`make train-gcn`).
+- Tests tagged `@pytest.mark.slow` require real model weights and are skipped in CI by default.
+
+## Writing New Tests
+
+```python
+import pytest
+import torch
+
+@pytest.fixture
+def dummy_keypoints():
+    """21 keypoints × 3 coordinates (x, y, z in [0,1])."""
+    return torch.rand(21, 3)
+
+def test_gcn_forward(dummy_keypoints):
+    from semantic_hgr.models.gcn_stream import GCNStream
+    model = GCNStream(in_channels=3, hidden_channels=128, num_classes=8)
+    out = model(dummy_keypoints.unsqueeze(0))
+    assert out.shape == (1, 8)
 ```
-
-## Test Coverage
-
-### Layer 2: Representation (`test_clip_encoder.py`)
-
-**22 tests** covering:
-
-- Model initialization and configuration
-- Image encoding (uint8, float32)
-- Batch encoding
-- Deterministic behavior
-- Input validation and error handling
-- Edge cases (small/large/non-square images)
-
-### Layer 3: Semantic Intent (`test_semantic_intent.py`)
-
-**22 tests** covering:
-
-- Intent extractor initialization
-- Semantic matching with embeddings
-- Top-K ranking and filtering
-- Batch processing
-- Input validation and error handling
-- Vocabulary structure validation
-
-## Test Principles
-
-1. **Deterministic**: All tests produce consistent results
-2. **Minimal Network**: Avoids external dependencies; CLIP weights may be downloaded once then cached
-3. **Fast**: Complete test suite runs in <1 minute
-4. **Isolated**: Each test is independent
-5. **Comprehensive**: Validates both success and failure paths
-
-## Status
-
-✅ **44/44 tests passing** (as of February 10, 2026)
-
-## Adding New Tests
-
-When adding new functionality:
-
-1. Create test file: `tests/test_<component>.py`
-2. Import component from `src/`
-3. Write test class inheriting from `unittest.TestCase`
-4. Test success paths, edge cases, and error handling
-5. Ensure deterministic behavior
-6. Run full test suite to check for regressions
-
-## Notes
-
-- Tests run on CPU for determinism
-- OpenMP conflict on macOS requires `KMP_DUPLICATE_LIB_OK=TRUE`
-- Mock CLIP model in semantic intent tests to avoid repeated model loading

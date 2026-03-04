@@ -1,34 +1,40 @@
-# Installation Guide
+# Installation Guide — Architecture A
 
-**Updated:** February 12, 2026  
-**Status:** Post-packaging refactor - unified namespace
+**Version:** 0.2.0  
+**Updated:** 2026  
+**Model:** Dual-Stream Supervised (GCN + ViT-B/16)
 
 ---
 
 ## Quick Start
 
 ```bash
-# 1. Create conda environment
+# 1. Create conda environment (Python 3.10, PyTorch, timm, torch-geometric)
 conda env create -f environment.yml
 
 # 2. Activate environment
 conda activate gesture
 
-# 3. Install package (unified install - no extras needed)
+# 3. Install package in editable mode
 pip install -e .
 
 # 4. Verify installation
-python -c "from semantic_hgr.representation.clip_encoder import CLIPEncoder; print('✅ Installation verified')"
+python scripts/verify_install.py
 ```
+
+Expected output: `Architecture A dependencies: ALL OK`
 
 ---
 
 ## Prerequisites
 
-- **Conda or Miniconda** ([download](https://docs.conda.io/en/latest/miniconda.html))
-- **10 GB disk space** (for packages + CLIP models)
-- **Python 3.10+** (automatically installed by environment.yml)
-- **Git** (for cloning repository)
+| Requirement | Notes |
+|-------------|-------|
+| Conda / Miniconda | [download](https://docs.conda.io/en/latest/miniconda.html) |
+| Python 3.10 | Automatically installed via `environment.yml` |
+| Git | For cloning the repository |
+| ~5 GB disk | For packages + HaGRID dataset |
+| Apple M1/M2 or CUDA GPU | MPS / CUDA acceleration optional; CPU works |
 
 ---
 
@@ -45,261 +51,127 @@ cd Semantic-HGR-System
 
 ```bash
 conda env create -f environment.yml
-```
-
-**What this installs:**
-
-- Python 3.10+
-- PyTorch (with GPU support if available)
-- OpenCV, MediaPipe, NumPy
-- Development tools (pytest, ruff)
-
-### 3. Activate Environment
-
-```bash
 conda activate gesture
 ```
 
-### 4. Install Package
+This installs:
+
+- Python 3.10
+- PyTorch ≥ 2.0 (pytorch channel)
+- torchvision ≥ 0.15
+- OpenCV, NumPy, MediaPipe
+- scikit-learn, matplotlib, seaborn, pandas
+- `timm ≥ 0.9.0` (ViT-B/16 appearance stream)
+- `torch-geometric ≥ 2.3.0` (GCN geometry stream)
+- pytest, ruff (development tools)
+
+### 3. Install Package
 
 ```bash
 pip install -e .
 ```
 
-**What `-e` (editable mode) does:**
+`-e` (editable mode) links to the source directory — code changes are immediately
+reflected without reinstalling.
 
-- Links to source code directory (no copying)
-- Code changes immediately available
-- No reinstall needed after modifications
-- Ideal for development
+**Installed console entry points:**
 
-**What gets installed:**
+| Command | Module |
+|---------|--------|
+| `validate-hand-detection` | `semantic_hgr.scripts.validate_hand_detection` |
+| `validate-input-layer` | `semantic_hgr.scripts.validate_input_layer` |
 
-- All dependencies from `pyproject.toml` (including CLIP)
-- `semantic_hgr` package namespace
-- 7 console entry points (CLI commands)
+### 4. Verify Installation
 
-**Important:** CLIP dependencies are now **included in base install**. No extras (`[clip]`) required.
+```bash
+python scripts/verify_install.py
+```
+
+The script checks:
+
+1. `torch`, `numpy`, `scikit-learn`
+2. `timm` import + ViT-B/16 instantiation (86M params, 8 classes)
+3. `torch_geometric` import + `GCNConv(3, 64)` instantiation
+4. `mediapipe`, `opencv-python`, `HandDetector` import
+5. `pandas`, `matplotlib`, `seaborn`
 
 ---
 
-## Verify Installation
-
-### Test 1: Import Check
-
-```python
-from semantic_hgr.representation.clip_encoder import CLIPEncoder
-from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
-from semantic_hgr.input_manager.input_manager import InputManager
-
-print("✅ All imports successful")
-```
-
-### Test 2: Entry Points
+## Download Dataset
 
 ```bash
-# Test CLI commands
-prepare-calibration-dataset --help
-calibration-study --help
-realtime-demo --help
+make download-hagrid
 ```
 
-**Available commands:**
+Downloads the HaGRID 8-class subset into `data/hagrid_subset/`:
 
-- `prepare-calibration-dataset` - Generate calibration dataset
-- `calibration-study` - Run confidence calibration
-- `intent-overlap-analysis` - Analyze intent overlaps
-- `realtime-demo` - Real-time gesture demo
-- `validate-clip-integration` - Validate CLIP setup
-- `validate-hand-detection` - Validate MediaPipe
-- `validate-input-layer` - Validate input layer
-
-### Test 3: Run Unit Tests
-
-```bash
-pytest tests/ -v
 ```
-
-**Expected:** All tests pass (22 encoder tests + 1 semantic test + others)
-
----
-
-## Namespace and Imports
-
-**Current Namespace:** `semantic_hgr` (PEP 420 compliant)
-
-**Import Pattern:**
-
-```python
-from semantic_hgr.representation.clip_encoder import CLIPEncoder
-from semantic_hgr.semantics.clip_intent import SemanticIntentExtractor
-from semantic_hgr.input_manager.input_manager import InputManager
-```
-
-**Do NOT use:**
-
-```python
-# ❌ OLD (will not work)
-from representation.clip_encoder import CLIPEncoder
-
-# ❌ OLD (will not work)
-import sys
-sys.path.insert(0, 'src')
-from representation.clip_encoder import CLIPEncoder
+data/hagrid_subset/
+    call_gesture/    thumbs_up/
+    closed_fist/     thumbs_down/
+    ok_sign/         peace_sign/
+    open_palm/       pointing/
 ```
 
 ---
 
-## Dependencies
-
-### Core Dependencies (from pyproject.toml)
-
-**Vision & ML:**
-
-- `torch` - Deep learning framework
-- `torchvision` - Vision utilities
-- `opencv-python` - Image processing
-- `mediapipe` - Hand detection
-- `pillow` - Image loading
-- `numpy` - Numerical operations
-
-**CLIP (included in base):**
-
-- `open-clip-torch` - OpenCLIP implementation for semantic embeddings
-
-**Development:**
-
-- `pytest` - Testing framework
-- `black` - Code formatting
-- `flake8` - Linting
-- `mypy` - Type checking
-
-### Optional Dependencies
-
-**Jupyter (for notebooks):**
+## Pre-Training Data Pipeline
 
 ```bash
-conda install jupyter
+# Step 1 — Offline keypoint extraction
+make extract-keypoints
+# Reads: data/hagrid_subset/  Writes: data/keypoints/  data/splits/
+
+# Step 2 — Validate keypoints (pre-training gate, Section 2.6)
+make validate-keypoints
 ```
 
-**GPU Support:**
-PyTorch with CUDA automatically installed by conda if GPU detected.
+---
+
+## Training
+
+```bash
+make train-gcn     # Phase 1: GCN geometry stream  (target ≥65% val Top-1)
+make train-rgb     # Phase 2: ViT-B/16 RGB stream  (target ≥88% val Top-1)
+make train-dual    # Phase 3+4: Cross-attention fusion + end-to-end tune
+```
+
+Config files: `configs/arch_a_gcn.yaml`, `configs/arch_a_rgb.yaml`, `configs/arch_a_dual.yaml`
+
+---
+
+## Evaluation
+
+```bash
+make eval
+# Writes: results/static_eval_report.json
+```
 
 ---
 
 ## Troubleshooting
 
-### Issue: ModuleNotFoundError: No module named 'semantic_hgr'
-
-**Cause:** Package not installed or wrong namespace
-
-**Solution:**
+### `torch_geometric` installation issues
 
 ```bash
-# Reinstall in editable mode
-pip install -e .
-
-# Verify installation
-pip show semantic-hgr
+pip install torch-geometric
+# If scatter/sparse extensions needed:
+pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-$(python -c "import torch; print(torch.__version__)").html
 ```
 
-### Issue: CLIP import fails
-
-**Cause:** CLIP not installed (shouldn't happen with new setup)
-
-**Solution:**
+### `mediapipe` on Apple Silicon
 
 ```bash
-# CLIP should already be installed, but if not:
-pip install -e .  # Reinstall (includes CLIP)
-```
-
-### Issue: Entry points not found
-
-**Cause:** Package not properly installed
-
-**Solution:**
-
-```bash
-# Reinstall
-pip uninstall semantic-hgr
-pip install -e .
-
-# Verify
-which prepare-calibration-dataset
-```
-
-### Issue: Import works in terminal but not in IDE
-
-**Cause:** IDE using wrong Python interpreter
-
-**Solution:**
-
-- Point IDE to conda environment Python: `~/miniconda3/envs/gesture/bin/python`
-- Restart IDE after changing interpreter
-
-### Issue: Tests fail with import errors
-
-**Cause:** Running tests outside package context
-
-**Solution:**
-
-```bash
-# Run from repository root
-pytest tests/ -v
-
-# Or install in editable mode first
-pip install -e .
+pip install mediapipe==0.10.21
 ```
 
 ---
 
-## Development Workflow
+## Development
 
-### Making Code Changes
-
-1. Edit source files in `src/semantic_hgr/`
-2. Changes are immediately available (editable mode)
-3. No reinstall needed
-4. Run tests to verify: `pytest tests/ -v`
-
-### Adding New Dependencies
-
-1. Add to `pyproject.toml` under `dependencies = [...]`
-2. Reinstall: `pip install -e .`
-3. Verify: `pip list | grep <package-name>`
-
-### Creating New Entry Points
-
-1. Add to `pyproject.toml` under `[project.scripts]`
-2. Reinstall: `pip install -e .`
-3. Test: `<command-name> --help`
-
----
-
-## Packaging Details
-
-**See:** [docs/operations/PACKAGING_REFACTOR_REPORT.md](../operations/PACKAGING_REFACTOR_REPORT.md)
-
-**Key Changes (February 12, 2026):**
-
-- ✅ Unified `semantic_hgr` namespace
-- ✅ CLIP moved to base dependencies (no extras)
-- ✅ 7 console entry points registered
-- ✅ PEP 420 namespace packages
-- ✅ All imports use absolute paths
-
----
-
-## Next Steps
-
-After installation:
-
-1. **Understand the system:** [docs/architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md](../architecture/SEMANTIC_SYSTEM_ARCHITECTURE.md)
-2. **Check implementation status:** [docs/development/PROJECT_PROGRESS.md](../development/PROJECT_PROGRESS.md)
-3. **Run demo:** `realtime-demo`
-4. **Review tests:** `pytest tests/ -v`
-
----
-
-**Installation complete! 🎉**
+```bash
+make lint          # ruff check
+make format        # ruff format
+make typecheck     # mypy
+make test          # pytest tests/
+```

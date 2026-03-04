@@ -1,5 +1,8 @@
 name: gesture
+# Architecture A — Dual-Stream Supervised Gesture Recognition
+# GCN (MediaPipe 21-keypoint graph) + ViT-B/16 (timm, ImageNet) + Cross-Attention Fusion
 channels:
+  - pytorch
   - conda-forge
   - defaults
 dependencies:
@@ -9,22 +12,26 @@ dependencies:
   - python=3.10
 
   # ====================
-  # Computer Vision & Input Layer (Phase 1 Layer 1: Perception)
+  # Perception Layer — hand detection
   # ====================
-  # OpenCV - camera capture and image processing
-  - conda-forge::opencv>=4.8.0
-
-  # NumPy - array operations for frame data
-  - conda-forge::numpy>=1.24.0
-
-  # Pillow - image format support
-  - conda-forge::pillow>=9.0.0
+  - conda-forge::opencv>=4.8.0       # Camera capture and image processing
+  - conda-forge::numpy>=1.24.0       # Array operations
+  - conda-forge::pillow>=9.0.0       # Image format support
+  - conda-forge::tqdm>=4.65.0        # Progress bars
+  - conda-forge::pandas>=1.5.0       # Result tables
 
   # ====================
-  # Development & Testing
+  # Deep Learning — PyTorch
   # ====================
-  # Progress bars for scripts
-  - conda-forge::tqdm>=4.65.0
+  - pytorch::pytorch>=2.0.0
+  - pytorch::torchvision>=0.15.0
+
+  # ====================
+  # Evaluation & Visualization
+  # ====================
+  - conda-forge::scikit-learn>=1.0.0  # ECE, F1, McNemar's test
+  - conda-forge::matplotlib>=3.5.0    # Reliability diagrams, confusion matrix
+  - conda-forge::seaborn>=0.11.0      # Heatmaps
 
   # ====================
   # Package Manager
@@ -34,9 +41,18 @@ dependencies:
   # ====================
   # Pip-Only Dependencies
   # ====================
-  # MediaPipe - hand detection (pin to 0.10.21 - last version with solutions API)
-  # Versions 0.10.22+ removed mp.solutions.hands and require migration to tasks.vision API
   - pip:
+      # MediaPipe — pin to 0.10.21 (last version with mp.solutions.hands API)
+      # Versions 0.10.22+ removed mp.solutions.hands; requires tasks.vision migration
       - mediapipe==0.10.21
+
+      # ViT-B/16 via timm — vit_base_patch16_224 (ImageNet-21K/1K pretrained)
+      # Do NOT use CLIP ViT weights; timm init is optimized for discriminative classification
+      - timm>=0.9.0
+
+      # GCNConv for 21-keypoint MediaPipe bone adjacency graph (Arch A geometric stream)
+      - torch-geometric>=2.3.0
+
       # HaGRID subset download (scripts/download_hagrid_subset.py)
+      # Can be removed from env after initial dataset download
       - datasets>=2.0.0

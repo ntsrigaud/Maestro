@@ -4,43 +4,46 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "semantic-hgr"
-version = "0.1.0"
-description = "Semantic Hand Gesture Recognition System with Vision-Language Models"
+version = "0.2.0"
+description = "Dual-Stream Supervised Hand Gesture Recognition — Architecture A (GCN + ViT-B/16)"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    {name = "CSU Capstone Team"}
+    {name = "Neil Chang — Colorado State University"}
 ]
 license = {text = "MIT"}
-keywords = ["gesture-recognition", "computer-vision", "clip", "semantic-understanding"]
+keywords = ["gesture-recognition", "computer-vision", "graph-neural-network",
+            "dual-stream", "geometric-inductive-bias", "mediapipe"]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
 
-# Production dependencies - ALL required for full system functionality
-# Includes perception, representation, and semantic layers
+# Architecture A dependencies
+# Dual-stream supervised model: GCN (geometric) + ViT-B/16 (RGB) + cross-attention fusion
 dependencies = [
-    # Layer 1: Perception - Camera capture and hand detection
-    "numpy>=1.24.0,<2.0.0",              # Array operations for frame data  
+    # Perception layer — hand detection and keypoint extraction
+    "numpy>=1.24.0,<2.0.0",              # Array operations
     "pillow>=9.0.0,<13.0.0",             # Image format support
     "opencv-python>=4.8.0",              # Camera capture and image processing
-    "mediapipe==0.10.21",                # Hand detection (last version with solutions API)
-    
-    # Layer 2-3: Representation and Semantic Intent - CLIP integration
-    "torch>=2.0.0",                      # Deep learning framework
-    "torchvision>=0.15.0",               # Vision preprocessing
-    "open-clip-torch>=2.20.0",           # OpenCLIP implementation for semantic embeddings
-    
-    # Analysis and visualization (required by console scripts)
-    "matplotlib>=3.5.0",                 # Plotting for calibration and analysis scripts
-    "seaborn>=0.11.0",                   # Statistical visualization
-    "scikit-learn>=1.0.0",               # Metrics for analysis scripts
-    
+    "mediapipe==0.10.21",                # Hand detection + 21-keypoint extraction (pin: solutions API)
+
+    # Deep learning core
+    "torch>=2.0.0",                      # PyTorch
+    "torchvision>=0.15.0",               # Vision transforms and datasets
+    "timm>=0.9.0",                       # ViT-B/16 (vit_base_patch16_224, ImageNet init)
+    "torch-geometric>=2.3.0",            # GCNConv for 21-keypoint skeleton graph
+
+    # Evaluation and visualization
+    "matplotlib>=3.5.0",                 # Reliability diagrams, confusion matrix plots
+    "seaborn>=0.11.0",                   # Heatmaps
+    "scikit-learn>=1.0.0",               # ECE, accuracy, F1, McNemar's test
+    "pandas>=1.5.0",                     # Result tables
+
     # Utilities
-    "tqdm>=4.65.0",                      # Progress bars for scripts
+    "tqdm>=4.65.0",                      # Progress bars
 ]
 
 [project.optional-dependencies]
@@ -58,9 +61,9 @@ download = [
     "datasets>=2.0.0",  # HuggingFace streaming download for HaGRID
 ]
 
-# Phase 4-6: Semantic command matching (future layer)
+# Architecture B (future): contrastive alignment to CLIP text encoder
 semantic-matching = [
-    "sentence-transformers>=2.2.0",  # Command similarity matching
+    "sentence-transformers>=2.2.0",  # Command similarity matching (Architecture B Stage 2)
 ]
 
 
@@ -70,13 +73,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.txt"]
 
-# Console scripts for command-line tools
+# Console scripts for Architecture A pipeline
 [project.scripts]
-prepare-calibration-dataset = "semantic_hgr.scripts.prepare_calibration_dataset:main"
-calibration-study = "semantic_hgr.scripts.calibration_study:main"
-intent-overlap-analysis = "semantic_hgr.scripts.intent_overlap_analysis:main"
-realtime-demo = "semantic_hgr.scripts.realtime_demo:main"
-validate-clip-integration = "semantic_hgr.scripts.validate_clip_integration:main"
 validate-hand-detection = "semantic_hgr.scripts.validate_hand_detection:main"
 validate-input-layer = "semantic_hgr.scripts.validate_input_layer:main"
 
