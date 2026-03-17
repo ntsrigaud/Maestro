@@ -1,0 +1,11 @@
+version: v1
+activation_gesture: open_palm_hold
+gestures:
+  - open_palm_hold
+  - swipe_right
+  - swipe_left
+  - fist_hold
+  - thumbs_up
+  - v_sign
+  - pinch_hold
+  - unknown
