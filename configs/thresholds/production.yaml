@@ -1,0 +1,12 @@
+acceptance:
+  default: 0.85
+  critical: 0.90
+class_thresholds:
+  open_palm_hold: 0.9
+  swipe_right: 0.85
+  swipe_left: 0.85
+  fist_hold: 0.9
+  thumbs_up: 0.85
+  v_sign: 0.85
+  pinch_hold: 0.9
+  unknown: 1.0
