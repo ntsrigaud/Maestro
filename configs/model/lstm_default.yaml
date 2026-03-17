@@ -1,0 +1,7 @@
+model_name: lstm_v1
+input_size: 126
+hidden_size: 128
+num_layers: 2
+dropout: 0.3
+num_classes: 8
+checkpoint_path: models/checkpoints/lstm_v1.pt
