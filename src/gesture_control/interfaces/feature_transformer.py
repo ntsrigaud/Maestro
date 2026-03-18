@@ -6,5 +6,4 @@ from gesture_control.domain.entities import FeatureFrame, LandmarkPacket
 
 
 class IFeatureTransformer(Protocol):
-    def transform(self, landmarks: LandmarkPacket) -> FeatureFrame:
-        ...
+    def transform(self, landmarks: LandmarkPacket) -> FeatureFrame: ...
