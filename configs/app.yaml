@@ -1,0 +1,6 @@
+app_name: presentation-meeting-control
+camera_index: 0
+frame_width: 1280
+frame_height: 720
+target_fps: 30
+active_app: powerpoint
