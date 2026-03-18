@@ -6,5 +6,4 @@ from gesture_control.domain.entities import FramePacket, RuntimeState
 
 
 class IFeedbackRenderer(Protocol):
-    def render(self, frame: FramePacket, state: RuntimeState) -> FramePacket:
-        ...
+    def render(self, frame: FramePacket, state: RuntimeState) -> FramePacket: ...
