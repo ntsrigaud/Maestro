@@ -6,5 +6,4 @@ from gesture_control.domain.entities import Prediction, SequenceWindow
 
 
 class IGestureModel(Protocol):
-    def predict(self, sequence: SequenceWindow) -> Prediction:
-        ...
+    def predict(self, sequence: SequenceWindow) -> Prediction: ...
