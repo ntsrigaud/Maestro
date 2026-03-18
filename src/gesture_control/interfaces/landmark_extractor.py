@@ -6,5 +6,4 @@ from gesture_control.domain.entities import FramePacket, LandmarkPacket
 
 
 class IHandLandmarkExtractor(Protocol):
-    def extract(self, frame: FramePacket) -> LandmarkPacket:
-        ...
+    def extract(self, frame: FramePacket) -> LandmarkPacket: ...

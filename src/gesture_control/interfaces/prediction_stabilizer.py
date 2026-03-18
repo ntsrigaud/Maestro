@@ -6,5 +6,4 @@ from gesture_control.domain.entities import Prediction, StabilizedPrediction
 
 
 class IPredictionStabilizer(Protocol):
-    def update(self, prediction: Prediction) -> StabilizedPrediction:
-        ...
+    def update(self, prediction: Prediction) -> StabilizedPrediction: ...

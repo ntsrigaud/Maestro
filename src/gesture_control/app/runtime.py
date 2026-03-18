@@ -9,4 +9,6 @@ class Runtime:
 
     def run(self) -> None:
         app_name = self._container.config.app.app_name
-        print(f"{app_name} scaffold is ready. Runtime pipeline will be added in later phases.")
+        print(
+            f"{app_name} scaffold is ready. Runtime pipeline will be added in later phases."
+        )
