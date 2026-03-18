@@ -6,5 +6,4 @@ from gesture_control.domain.entities import ExecutableCommand, StabilizedPredict
 
 
 class IActivationController(Protocol):
-    def route(self, prediction: StabilizedPrediction) -> ExecutableCommand | None:
-        ...
+    def route(self, prediction: StabilizedPrediction) -> ExecutableCommand | None: ...

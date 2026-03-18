@@ -6,5 +6,4 @@ from gesture_control.domain.entities import DispatchResult, ExecutableCommand
 
 
 class ICommandDispatcher(Protocol):
-    def dispatch(self, command: ExecutableCommand) -> DispatchResult:
-        ...
+    def dispatch(self, command: ExecutableCommand) -> DispatchResult: ...
