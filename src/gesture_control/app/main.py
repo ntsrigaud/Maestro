@@ -7,7 +7,9 @@ from gesture_control.app.runtime import Runtime
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Presentation and meeting control runtime scaffold")
+    parser = argparse.ArgumentParser(
+        description="Presentation and meeting control runtime scaffold"
+    )
     parser.add_argument(
         "--config",
         default="configs",

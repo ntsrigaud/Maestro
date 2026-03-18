@@ -5,7 +5,11 @@ from typing import Any
 
 import yaml
 
-from gesture_control.utils.schema_validation import AppConfig, InferenceConfig, RuntimeConfig
+from gesture_control.utils.schema_validation import (
+    AppConfig,
+    InferenceConfig,
+    RuntimeConfig,
+)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
