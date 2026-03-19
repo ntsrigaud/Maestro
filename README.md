@@ -35,4 +35,3 @@ pytest
 ## Repository Design
 
 See `ARCHITECTURE_SPECIFICATION.md` for the complete target architecture and implementation roadmap.
-See `docs/PHASE_2_CHECKLIST.md` and `docs/PHASE_2_COMPLETION_SUMMARY.md` for validated Phase 2 execution status.
