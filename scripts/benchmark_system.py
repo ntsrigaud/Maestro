@@ -10,7 +10,9 @@ from unittest.mock import patch
 import numpy as np
 
 from gesture_control.domain.entities import FramePacket
-from gesture_control.infrastructure.mediapipe.hands_extractor import MediaPipeHandsExtractor
+from gesture_control.infrastructure.mediapipe.hands_extractor import (
+    MediaPipeHandsExtractor,
+)
 
 
 @dataclass(slots=True)

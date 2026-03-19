@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 
 from gesture_control.domain.entities import FramePacket, LandmarkPacket
-from gesture_control.infrastructure.mediapipe.hands_extractor import MediaPipeHandsExtractor
+from gesture_control.infrastructure.mediapipe.hands_extractor import (
+    MediaPipeHandsExtractor,
+)
 
 
 def _frame_packet() -> FramePacket:
@@ -22,7 +24,9 @@ def _landmarks(count: int = 21) -> list[SimpleNamespace]:
     return [SimpleNamespace(x=0.5, y=0.4, z=0.0) for _ in range(count)]
 
 
-@patch("gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
 def test_extract_returns_invalid_when_no_hand(mock_hands_cls: MagicMock) -> None:
     hands_obj = MagicMock()
     hands_obj.process.return_value = SimpleNamespace(
@@ -40,8 +44,12 @@ def test_extract_returns_invalid_when_no_hand(mock_hands_cls: MagicMock) -> None
     assert result.timestamp_ms == 100
 
 
-@patch("gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
-def test_extract_returns_valid_packet_for_detected_hand(mock_hands_cls: MagicMock) -> None:
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
+def test_extract_returns_valid_packet_for_detected_hand(
+    mock_hands_cls: MagicMock,
+) -> None:
     classification = SimpleNamespace(label="Right", score=0.98)
     handedness = SimpleNamespace(classification=[classification])
     hand_landmarks = SimpleNamespace(landmark=_landmarks())
@@ -65,7 +73,9 @@ def test_extract_returns_valid_packet_for_detected_hand(mock_hands_cls: MagicMoc
     assert result.timestamp_ms == 100
 
 
-@patch("gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
 def test_extract_rejects_low_detection_confidence(mock_hands_cls: MagicMock) -> None:
     classification = SimpleNamespace(label="Left", score=0.2)
     handedness = SimpleNamespace(classification=[classification])
@@ -84,7 +94,9 @@ def test_extract_rejects_low_detection_confidence(mock_hands_cls: MagicMock) -> 
     assert result.valid is False
 
 
-@patch("gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
 def test_extract_rejects_low_tracking_confidence(mock_hands_cls: MagicMock) -> None:
     classification = SimpleNamespace(label="Right", score=0.98)
     handedness = SimpleNamespace(classification=[classification])
@@ -108,7 +120,9 @@ def test_extract_rejects_low_tracking_confidence(mock_hands_cls: MagicMock) -> N
     assert result.timestamp_ms == 100
 
 
-@patch("gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
 def test_close_calls_mediapipe_close(mock_hands_cls: MagicMock) -> None:
     hands_obj = MagicMock()
     mock_hands_cls.return_value = hands_obj
