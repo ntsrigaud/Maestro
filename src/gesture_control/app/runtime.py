@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 import logging
+from typing import Protocol
 
-from gesture_control.app.bootstrap import AppContainer
+from gesture_control.interfaces.frame_source import IFrameSource
+from gesture_control.interfaces.landmark_extractor import IHandLandmarkExtractor
+from gesture_control.utils.schema_validation import RuntimeConfig
 
 LOGGER = logging.getLogger(__name__)
 
 
+class RuntimeDependencies(Protocol):
+    config: RuntimeConfig
+    frame_source: IFrameSource
+    landmark_extractor: IHandLandmarkExtractor
+
+
 class Runtime:
-    def __init__(self, container: AppContainer) -> None:
+    def __init__(self, container: RuntimeDependencies) -> None:
         self._container = container
         self._running = False
 
