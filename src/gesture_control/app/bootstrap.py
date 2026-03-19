@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSource
-from gesture_control.infrastructure.mediapipe.hands_extractor import MediaPipeHandsExtractor
+from gesture_control.infrastructure.mediapipe.hands_extractor import (
+    MediaPipeHandsExtractor,
+)
 from gesture_control.interfaces.frame_source import IFrameSource
 from gesture_control.interfaces.landmark_extractor import IHandLandmarkExtractor
 from gesture_control.utils.config_loader import load_runtime_config
