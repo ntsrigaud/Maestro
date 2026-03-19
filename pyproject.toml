@@ -7,11 +7,13 @@ name = "presentation-meeting-control"
 version = "0.1.0"
 description = "MediaPipe + LSTM gesture control system scaffolding"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
   "pydantic>=2.6.0",
   "PyYAML>=6.0.1",
   "numpy>=1.26.0",
+  "opencv-python-headless>=4.10.0",
+  "mediapipe==0.10.14",
 ]
 
 [tool.setuptools]
@@ -30,3 +32,10 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = ["mediapipe", "mediapipe.*"]
+ignore_missing_imports = true
