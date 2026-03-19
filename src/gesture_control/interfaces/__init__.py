@@ -11,13 +11,13 @@ from gesture_control.interfaces.prediction_stabilizer import IPredictionStabiliz
 from gesture_control.interfaces.sequence_buffer import ISequenceBuffer
 
 __all__ = [
-	"IActivationController",
-	"ICommandDispatcher",
-	"IFeatureTransformer",
-	"IFrameSource",
-	"IGestureModel",
-	"IHandLandmarkExtractor",
-	"IPredictionStabilizer",
-	"IFeedbackRenderer",
-	"ISequenceBuffer",
+    "IActivationController",
+    "ICommandDispatcher",
+    "IFeatureTransformer",
+    "IFrameSource",
+    "IGestureModel",
+    "IHandLandmarkExtractor",
+    "IPredictionStabilizer",
+    "IFeedbackRenderer",
+    "ISequenceBuffer",
 ]
