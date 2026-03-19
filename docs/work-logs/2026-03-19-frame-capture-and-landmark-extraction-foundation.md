@@ -34,3 +34,24 @@ This work implements the Phase 2 runtime ingestion foundation by integrating Ope
 
 ## Outcome
 The branch delivers an operational ingestion baseline that captures webcam frames and produces confidence-gated landmark packets through the runtime pipeline, with deterministic tests and explicit resource lifecycle handling. This extends runtime functionality and infrastructure integration without introducing breaking API changes.
+
+---
+
+## Cleanup Addendum (Pre-Phase-3 Gate)
+
+### Additional Hardening Implemented
+
+- Reduced runtime coupling by replacing direct `AppContainer` typing in runtime with a protocol-based dependency contract.
+- Strengthened extractor unit tests with explicit timestamp propagation assertions.
+- Added unit test coverage for low tracking-confidence rejection path.
+- Added runtime unit test to verify resource closure when frame read raises runtime exceptions.
+- Implemented deterministic Phase 2 benchmark in `scripts/benchmark_system.py` and generated throughput/reliability report.
+
+### Verification Results
+
+- `ruff check .` -> pass
+- `pytest -v` -> pass (14 tests)
+- `mypy src/gesture_control scripts/benchmark_system.py` -> pass
+- `python scripts/benchmark_system.py --frames 3000` executed and reported:
+	- throughput: 33436.34 FPS (synthetic benchmark mode)
+	- valid ratio: 0.700 (pattern-aligned reliability)
