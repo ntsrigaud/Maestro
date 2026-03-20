@@ -1,0 +1,173 @@
+from __future__ import annotations
+
+import math
+from typing import cast
+
+from gesture_control.domain.entities import FeatureFrame, LandmarkPacket
+
+
+class LandmarkFeatureTransformer:
+    """Transforms hand landmarks into normalized position + velocity features."""
+
+    def __init__(
+        self,
+        *,
+        enable_orientation_normalization: bool = False,
+        min_scale: float = 1e-6,
+    ) -> None:
+        self._enable_orientation_normalization = enable_orientation_normalization
+        self._min_scale = min_scale
+        self._prev_normalized: list[list[float]] | None = None
+        self._prev_timestamp_ms: int | None = None
+
+    def transform(self, landmarks: LandmarkPacket) -> FeatureFrame:
+        if not landmarks.valid or len(landmarks.landmarks) != 21:
+            vector = self._zero_vector()
+            self._clear_velocity_state()
+            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
+
+        if not self._all_finite(landmarks.landmarks):
+            vector = self._zero_vector()
+            self._clear_velocity_state()
+            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
+
+        normalized = self._normalize_positions(landmarks.landmarks)
+        if normalized is None:
+            vector = self._zero_vector()
+            self._clear_velocity_state()
+            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
+
+        velocity = self._compute_velocity(normalized, landmarks.timestamp_ms)
+        vector = self._flatten(normalized) + self._flatten(velocity)
+
+        self._prev_normalized = normalized
+        self._prev_timestamp_ms = landmarks.timestamp_ms
+        return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=True)
+
+    def _clear_velocity_state(self) -> None:
+        self._prev_normalized = None
+        self._prev_timestamp_ms = None
+
+    def _normalize_positions(self, raw: list[list[float]]) -> list[list[float]] | None:
+        wrist = raw[0]
+        relative: list[list[float]] = []
+        for point in raw:
+            relative.append(
+                [
+                    float(point[0] - wrist[0]),
+                    float(point[1] - wrist[1]),
+                    float(point[2] - wrist[2]),
+                ]
+            )
+
+        scale = self._distance(relative[9], [0.0, 0.0, 0.0])
+        if scale < self._min_scale:
+            return None
+
+        normalized = [[coord / scale for coord in point] for point in relative]
+        if self._enable_orientation_normalization:
+            oriented = self._apply_orientation_normalization(normalized)
+            if oriented is not None:
+                normalized = oriented
+
+        return normalized
+
+    def _apply_orientation_normalization(
+        self, normalized: list[list[float]]
+    ) -> list[list[float]] | None:
+        palm_x = self._subtract(normalized[5], normalized[17])
+        palm_y = normalized[9]
+
+        x_hat = self._unit_vector(palm_x)
+        y_hat = self._unit_vector(palm_y)
+        if x_hat is None or y_hat is None:
+            return None
+
+        z_hat = self._unit_vector(self._cross(x_hat, y_hat))
+        if z_hat is None:
+            return None
+
+        y_orth = self._unit_vector(self._cross(z_hat, x_hat))
+        if y_orth is None:
+            return None
+
+        oriented: list[list[float]] = []
+        for point in normalized:
+            oriented.append(
+                [
+                    self._dot(point, x_hat),
+                    self._dot(point, y_orth),
+                    self._dot(point, z_hat),
+                ]
+            )
+        return oriented
+
+    def _compute_velocity(
+        self,
+        normalized: list[list[float]],
+        timestamp_ms: int,
+    ) -> list[list[float]]:
+        if self._prev_normalized is None or self._prev_timestamp_ms is None:
+            return [[0.0, 0.0, 0.0] for _ in range(21)]
+
+        delta_ms = timestamp_ms - self._prev_timestamp_ms
+        if delta_ms <= 0:
+            return [[0.0, 0.0, 0.0] for _ in range(21)]
+
+        dt = delta_ms / 1000.0
+        velocity: list[list[float]] = []
+        for curr, prev in zip(normalized, self._prev_normalized, strict=True):
+            velocity.append(
+                [
+                    (curr[0] - prev[0]) / dt,
+                    (curr[1] - prev[1]) / dt,
+                    (curr[2] - prev[2]) / dt,
+                ]
+            )
+        return velocity
+
+    @staticmethod
+    def _all_finite(points: list[list[float]]) -> bool:
+        for point in points:
+            for value in point:
+                if not math.isfinite(value):
+                    return False
+        return True
+
+    @staticmethod
+    def _distance(a: list[float], b: list[float]) -> float:
+        return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2)
+
+    @staticmethod
+    def _flatten(points: list[list[float]]) -> list[float]:
+        flat: list[float] = []
+        for point in points:
+            flat.extend(point)
+        return flat
+
+    @staticmethod
+    def _zero_vector() -> list[float]:
+        return [0.0] * (21 * 3 * 2)
+
+    @staticmethod
+    def _subtract(a: list[float], b: list[float]) -> list[float]:
+        return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+
+    @staticmethod
+    def _dot(a: list[float], b: list[float]) -> float:
+        return float(a[0] * b[0] + a[1] * b[1] + a[2] * b[2])
+
+    @staticmethod
+    def _cross(a: list[float], b: list[float]) -> list[float]:
+        return [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]
+
+    @staticmethod
+    def _unit_vector(v: list[float]) -> list[float] | None:
+        norm = math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
+        if norm <= 0.0:
+            return None
+        return cast(list[float], [v[0] / norm, v[1] / norm, v[2] / norm])
