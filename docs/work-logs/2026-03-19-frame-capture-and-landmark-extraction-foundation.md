@@ -1,9 +1,11 @@
 # Work Log - Frame Capture and Landmark Extraction Foundation
 
 ## Context
+
 This work implements the Phase 2 runtime ingestion foundation by integrating OpenCV-based frame capture and MediaPipe Hands landmark extraction into the application runtime flow, with dependency updates and test coverage to validate production-path behavior.
 
 ## Scope of Work
+
 - Initialized infrastructure package boundaries for camera and MediaPipe integrations.
 - Implemented concrete frame source and landmark extractor modules.
 - Updated interface contracts and exports to support extractor lifecycle management.
@@ -13,6 +15,7 @@ This work implements the Phase 2 runtime ingestion foundation by integrating Ope
 - Updated project scope documentation to reflect completed ingestion capabilities.
 
 ## Technical Changes
+
 - Added infrastructure modules:
 - `src/gesture_control/infrastructure/camera/opencv_source.py` for frame acquisition, FPS pacing, frame ID sequencing, and camera release handling.
 - `src/gesture_control/infrastructure/mediapipe/hands_extractor.py` for RGB conversion, hand landmark extraction, confidence evaluation, and validity gating.
@@ -25,6 +28,7 @@ This work implements the Phase 2 runtime ingestion foundation by integrating Ope
 - Updated `README.md` current capability summary and removed completed Phase 1/2 reference links.
 
 ## Testing and Validation
+
 - Added unit tests in `tests/unit/test_opencv_source.py` for camera initialization, frame read behavior, frame ID progression, capture failure handling, and close semantics.
 - Added unit tests in `tests/unit/test_mediapipe_extractor.py` for no-hand behavior, valid hand extraction, confidence rejection, and extractor close semantics.
 - Added integration tests in `tests/integration/test_phase2_pipeline.py` for frame-to-landmark ingestion behavior and no-hand pipeline handling.
@@ -33,6 +37,7 @@ This work implements the Phase 2 runtime ingestion foundation by integrating Ope
 - Build/dependency updates were validated against Python 3.11 compatibility requirements.
 
 ## Outcome
+
 The branch delivers an operational ingestion baseline that captures webcam frames and produces confidence-gated landmark packets through the runtime pipeline, with deterministic tests and explicit resource lifecycle handling. This extends runtime functionality and infrastructure integration without introducing breaking API changes.
 
 ---
@@ -53,5 +58,5 @@ The branch delivers an operational ingestion baseline that captures webcam frame
 - `pytest -v` -> pass (14 tests)
 - `mypy src/gesture_control scripts/benchmark_system.py` -> pass
 - `python scripts/benchmark_system.py --frames 3000` executed and reported:
-	- throughput: 33436.34 FPS (synthetic benchmark mode)
-	- valid ratio: 0.700 (pattern-aligned reliability)
+  - throughput: 33436.34 FPS (synthetic benchmark mode)
+  - valid ratio: 0.700 (pattern-aligned reliability)
