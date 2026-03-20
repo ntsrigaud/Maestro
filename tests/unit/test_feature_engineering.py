@@ -22,7 +22,9 @@ def _landmark_packet(
     )
 
 
-def _make_hand(base_x: float = 1.0, base_y: float = 2.0, scale: float = 1.0) -> list[list[float]]:
+def _make_hand(
+    base_x: float = 1.0, base_y: float = 2.0, scale: float = 1.0
+) -> list[list[float]]:
     points: list[list[float]] = []
     for i in range(21):
         x = base_x + scale * (i * 0.01)
@@ -49,7 +51,9 @@ def test_translation_invariance_after_normalization() -> None:
     base = _make_hand(base_x=0.2, base_y=0.3, scale=0.5)
     shifted = [[x + 10.0, y - 7.0, z + 2.0] for x, y, z in base]
 
-    base_result = transformer.transform(_landmark_packet(landmarks=base, timestamp_ms=100))
+    base_result = transformer.transform(
+        _landmark_packet(landmarks=base, timestamp_ms=100)
+    )
     shifted_result = transformer.transform(
         _landmark_packet(landmarks=shifted, timestamp_ms=133)
     )
@@ -67,8 +71,12 @@ def test_scale_invariance_after_normalization() -> None:
     small = _make_hand(base_x=0.5, base_y=0.7, scale=0.5)
     large = _make_hand(base_x=0.5, base_y=0.7, scale=2.0)
 
-    small_result = transformer.transform(_landmark_packet(landmarks=small, timestamp_ms=100))
-    large_result = transformer.transform(_landmark_packet(landmarks=large, timestamp_ms=133))
+    small_result = transformer.transform(
+        _landmark_packet(landmarks=small, timestamp_ms=100)
+    )
+    large_result = transformer.transform(
+        _landmark_packet(landmarks=large, timestamp_ms=133)
+    )
 
     small_pos = small_result.vector[:63]
     large_pos = large_result.vector[:63]
@@ -84,7 +92,9 @@ def test_velocity_features_present_on_subsequent_frames() -> None:
     second = [[x + 0.02, y + 0.01, z] for x, y, z in first]
 
     result1 = transformer.transform(_landmark_packet(landmarks=first, timestamp_ms=100))
-    result2 = transformer.transform(_landmark_packet(landmarks=second, timestamp_ms=200))
+    result2 = transformer.transform(
+        _landmark_packet(landmarks=second, timestamp_ms=200)
+    )
 
     assert all(value == 0.0 for value in result1.vector[63:])
     assert any(abs(value) > 0.0 for value in result2.vector[63:])
