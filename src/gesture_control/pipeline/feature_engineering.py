@@ -24,25 +24,33 @@ class LandmarkFeatureTransformer:
         if not landmarks.valid or len(landmarks.landmarks) != 21:
             vector = self._zero_vector()
             self._clear_velocity_state()
-            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
+            return FeatureFrame(
+                vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False
+            )
 
         if not self._all_finite(landmarks.landmarks):
             vector = self._zero_vector()
             self._clear_velocity_state()
-            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
+            return FeatureFrame(
+                vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False
+            )
 
         normalized = self._normalize_positions(landmarks.landmarks)
         if normalized is None:
             vector = self._zero_vector()
             self._clear_velocity_state()
-            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
+            return FeatureFrame(
+                vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False
+            )
 
         velocity = self._compute_velocity(normalized, landmarks.timestamp_ms)
         vector = self._flatten(normalized) + self._flatten(velocity)
 
         self._prev_normalized = normalized
         self._prev_timestamp_ms = landmarks.timestamp_ms
-        return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=True)
+        return FeatureFrame(
+            vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=True
+        )
 
     def _clear_velocity_state(self) -> None:
         self._prev_normalized = None
