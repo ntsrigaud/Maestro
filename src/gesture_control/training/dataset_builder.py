@@ -127,7 +127,9 @@ class SequenceDatasetBuilder:
 
         return emitted
 
-    def build_from_frames(self, frames: Iterable[LabeledLandmarkFrame]) -> list[SequenceSample]:
+    def build_from_frames(
+        self, frames: Iterable[LabeledLandmarkFrame]
+    ) -> list[SequenceSample]:
         for frame in frames:
             self.add_frame(frame)
         return list(self._samples)
@@ -144,12 +146,16 @@ class SequenceDatasetBuilder:
             dtype=np.float32,
         )
         labels = np.asarray([sample.label for sample in self._samples], dtype=object)
-        label_ids = np.asarray([sample.label_id for sample in self._samples], dtype=np.int64)
+        label_ids = np.asarray(
+            [sample.label_id for sample in self._samples], dtype=np.int64
+        )
         recording_ids = np.asarray(
             [sample.recording_id for sample in self._samples],
             dtype=object,
         )
-        sample_ids = np.asarray([sample.sample_id for sample in self._samples], dtype=object)
+        sample_ids = np.asarray(
+            [sample.sample_id for sample in self._samples], dtype=object
+        )
         start_ts = np.asarray(
             [sample.start_timestamp_ms for sample in self._samples],
             dtype=np.int64,
