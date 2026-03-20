@@ -41,7 +41,9 @@ class Runtime:
             while self._running:
                 frame = self._container.frame_source.read()
                 landmark_packet = self._container.landmark_extractor.extract(frame)
-                feature_frame = self._container.feature_transformer.transform(landmark_packet)
+                feature_frame = self._container.feature_transformer.transform(
+                    landmark_packet
+                )
                 self._container.sequence_buffer.push(feature_frame)
 
                 processed_frames += 1
