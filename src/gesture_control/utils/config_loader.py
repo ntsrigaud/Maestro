@@ -7,6 +7,7 @@ import yaml
 
 from gesture_control.utils.schema_validation import (
     AppConfig,
+    FeaturePipelineConfig,
     InferenceConfig,
     RuntimeConfig,
 )
@@ -28,4 +29,14 @@ def load_runtime_config(config_dir: str | Path) -> RuntimeConfig:
     root = Path(config_dir)
     app_cfg = AppConfig.model_validate(_read_yaml(root / "app.yaml"))
     infer_cfg = InferenceConfig.model_validate(_read_yaml(root / "inference.yaml"))
-    return RuntimeConfig(app=app_cfg, inference=infer_cfg)
+
+    # Load feature pipeline config with defaults if file doesn't exist
+    feature_pipeline_path = root / "model" / "feature_pipeline.yaml"
+    if feature_pipeline_path.exists():
+        feature_cfg = FeaturePipelineConfig.model_validate(
+            _read_yaml(feature_pipeline_path)["feature_pipeline"]
+        )
+    else:
+        feature_cfg = FeaturePipelineConfig()
+
+    return RuntimeConfig(app=app_cfg, inference=infer_cfg, feature_pipeline=feature_cfg)

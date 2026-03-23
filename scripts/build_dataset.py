@@ -96,9 +96,23 @@ def main() -> None:
     parser.add_argument(
         "--enable-orientation-normalization",
         action="store_true",
-        help="Enable orientation normalization in feature transformer",
+        help="Enable orientation normalization in feature transformer "
+        "(overrides config setting if provided)",
+    )
+    parser.add_argument(
+        "--disable-orientation-normalization",
+        action="store_true",
+        help="Disable orientation normalization in feature transformer "
+        "(overrides config setting if provided)",
     )
     args = parser.parse_args()
+
+    # Validate mutually exclusive flags
+    if args.enable_orientation_normalization and args.disable_orientation_normalization:
+        raise ValueError(
+            "Cannot specify both --enable-orientation-normalization and "
+            "--disable-orientation-normalization"
+        )
 
     input_path = Path(args.input_jsonl)
     output_path = Path(args.output_npz)
@@ -111,13 +125,30 @@ def main() -> None:
     vocabulary = _load_vocabulary(config_dir)
     frames = _read_jsonl_frames(input_path)
 
+    # Determine orientation normalization setting:
+    # 1. Use CLI flag if explicitly provided (backward compatibility)
+    # 2. Otherwise use config file setting (preferred method)
+    if args.enable_orientation_normalization:
+        enable_orientation_normalization = True
+    elif args.disable_orientation_normalization:
+        enable_orientation_normalization = False
+    else:
+        enable_orientation_normalization = (
+            runtime_config.feature_pipeline.orientation_normalization
+        )
+
+    print(
+        f"Building dataset with orientation_normalization="
+        f"{enable_orientation_normalization}"
+    )
+
     builder = SequenceDatasetBuilder(
         vocabulary=vocabulary,
         window_length=runtime_config.inference.window_length,
         window_step=runtime_config.inference.window_step,
         min_valid_ratio=runtime_config.inference.min_valid_ratio,
         label_strategy=args.label_strategy,
-        enable_orientation_normalization=args.enable_orientation_normalization,
+        enable_orientation_normalization=enable_orientation_normalization,
     )
     samples = builder.build_from_frames(frames)
     output_file = builder.save_npz(output_path)

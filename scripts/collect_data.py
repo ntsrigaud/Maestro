@@ -112,7 +112,10 @@ def main() -> None:
                 if args.max_frames > 0 and frame_index >= args.max_frames:
                     break
 
-                if args.max_seconds > 0 and (time.monotonic() - started_at) >= args.max_seconds:
+                if (
+                    args.max_seconds > 0
+                    and (time.monotonic() - started_at) >= args.max_seconds
+                ):
                     break
     except KeyboardInterrupt:
         print("Keyboard interrupt received; stopping collection.")
