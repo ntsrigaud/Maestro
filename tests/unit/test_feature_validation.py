@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -238,32 +237,29 @@ class TestTrainingInferenceParity:
         """SequenceDatasetBuilder should store feature config in metadata."""
         from gesture_control.training.dataset_builder import LabeledLandmarkFrame
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir) / "dataset.npz"
+        builder = SequenceDatasetBuilder(
+            vocabulary=["gesture_a"],
+            window_length=24,
+            window_step=3,
+            min_valid_ratio=0.8,
+            enable_orientation_normalization=True,
+        )
 
-            builder = SequenceDatasetBuilder(
-                vocabulary=["gesture_a"],
-                window_length=24,
-                window_step=3,
-                min_valid_ratio=0.8,
-                enable_orientation_normalization=True,
-            )
+        # Create minimal valid frame
+        _ = LabeledLandmarkFrame(
+            recording_id="rec_1",
+            timestamp_ms=0,
+            label="gesture_a",
+            landmarks=[[0.0, 0.0, 0.0]] * 21,
+            valid=True,
+        )
 
-            # Create minimal valid frame
-            frame = LabeledLandmarkFrame(
-                recording_id="rec_1",
-                timestamp_ms=0,
-                label="gesture_a",
-                landmarks=[[0.0, 0.0, 0.0]] * 21,
-                valid=True,
-            )
+        # Would need more frames to actually generate samples,
+        # so just verify metadata is correct
+        assert builder._enable_orientation_normalization is True
 
-            # Would need more frames to actually generate samples,
-            # so just verify metadata is correct
-            assert builder._enable_orientation_normalization is True
-
-            # When building from frames and saving, metadata should reflect setting
-            # This is verified by load_npz returning the flag in metadata
+        # When building from frames and saving, metadata should reflect setting
+        # This is verified by load_npz returning the flag in metadata
 
     def test_feature_pipeline_config_matches_between_train_and_inference(self):
         """Feature pipeline config should be consistent."""
