@@ -35,3 +35,24 @@ pytest
 ## Repository Design
 
 See `ARCHITECTURE_SPECIFICATION.md` for the complete target architecture and implementation roadmap.
+
+## Dataset Recording and Build
+
+Use the dataset recording workflow guide at `docs/DATASET_RECORDING_WORKFLOW.md`.
+
+Quick commands:
+
+```bash
+python scripts/collect_data.py \
+	--config configs \
+	--label swipe_right \
+	--recording-id rec-swipe-right-001 \
+	--output-jsonl data/raw/labeled_landmarks.jsonl \
+	--max-seconds 45
+
+python scripts/build_dataset.py \
+	--input-jsonl data/raw/labeled_landmarks.jsonl \
+	--output-npz data/processed/gesture_dataset_v1.npz \
+	--config-dir configs \
+	--label-strategy majority
+```
