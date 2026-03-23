@@ -25,8 +25,18 @@ class InferenceConfig(BaseModel):
     command_cooldown_ms: int = Field(ge=100, le=5000)
 
 
+class FeaturePipelineConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    wrist_relative_normalization: bool = True
+    scale_normalization: bool = True
+    orientation_normalization: bool = False
+    velocity_features: bool = True
+
+
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     app: AppConfig
     inference: InferenceConfig
+    feature_pipeline: FeaturePipelineConfig = FeaturePipelineConfig()
