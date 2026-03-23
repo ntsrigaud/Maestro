@@ -40,7 +40,7 @@ def build_container(config_path: str) -> AppContainer:
         min_tracking_confidence=0.5,
     )
     feature_transformer = LandmarkFeatureTransformer(
-        enable_orientation_normalization=False,
+        enable_orientation_normalization=config.feature_pipeline.orientation_normalization,
     )
     sequence_buffer = SlidingWindowSequenceBuffer(
         window_length=config.inference.window_length,
