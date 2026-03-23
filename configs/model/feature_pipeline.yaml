@@ -1,5 +1,5 @@
 # Feature pipeline configuration for training and inference parity
-# 
+#
 # These settings control how raw hand landmarks are transformed into feature vectors.
 # They MUST be identical between dataset generation (training) and runtime inference.
 #
