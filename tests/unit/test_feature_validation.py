@@ -79,8 +79,9 @@ class TestFeatureSchemaValidation:
         )
 
         assert is_compatible is False
-        assert any("legacy" in issue.lower() or "warning" in issue.lower() 
-                   for issue in issues)
+        assert any(
+            "legacy" in issue.lower() or "warning" in issue.lower() for issue in issues
+        )
 
     def test_feature_dimensionality_mismatch_raises_error(self):
         """Datasets with wrong feature dimensionality should raise error."""
@@ -104,7 +105,7 @@ class TestFeatureSchemaValidation:
         dataset_metadata = {
             "feature_dim": 126,
             "window_length": 32,  # Non-standard
-            "window_step": 5,     # Non-standard
+            "window_step": 5,  # Non-standard
             "enable_orientation_normalization": False,
             "vocabulary": ["gesture_a", "gesture_b"],
         }
@@ -276,6 +277,12 @@ class TestTrainingInferenceParity:
             orientation_normalization=True,
         )
 
-        assert training_config.orientation_normalization == inference_config.orientation_normalization
-        assert training_config.wrist_relative_normalization == inference_config.wrist_relative_normalization
+        assert (
+            training_config.orientation_normalization
+            == inference_config.orientation_normalization
+        )
+        assert (
+            training_config.wrist_relative_normalization
+            == inference_config.wrist_relative_normalization
+        )
         assert training_config.velocity_features == inference_config.velocity_features
