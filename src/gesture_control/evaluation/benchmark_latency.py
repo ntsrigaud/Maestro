@@ -53,8 +53,12 @@ class LatencyBenchmark:
     def record_end_to_end(self, latency_ms: float) -> None:
         self._e2e_ms.append(float(latency_ms))
 
-    def report(self, *, total_frames: int, total_seconds: float) -> LatencyBenchmarkReport:
-        throughput_fps = float(total_frames / total_seconds) if total_seconds > 0 else 0.0
+    def report(
+        self, *, total_frames: int, total_seconds: float
+    ) -> LatencyBenchmarkReport:
+        throughput_fps = (
+            float(total_frames / total_seconds) if total_seconds > 0 else 0.0
+        )
         return LatencyBenchmarkReport(
             frame_capture=self._to_metrics(self._capture_ms),
             landmark_extraction=self._to_metrics(self._extract_ms),
@@ -80,7 +84,9 @@ class LatencyBenchmark:
         )
 
 
-def write_latency_report(report: LatencyBenchmarkReport, output_path: str | Path) -> Path:
+def write_latency_report(
+    report: LatencyBenchmarkReport, output_path: str | Path
+) -> Path:
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")

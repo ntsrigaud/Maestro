@@ -40,7 +40,9 @@ def load_latest_inference_artifact(
 
     exported_path = latest.get("exported_path")
     if not isinstance(exported_path, str) or not exported_path:
-        raise ValueError(f"Missing exported_path in latest model entry: {registry_path}")
+        raise ValueError(
+            f"Missing exported_path in latest model entry: {registry_path}"
+        )
 
     return load_inference_artifact(artifact_path=exported_path, device=device)
 
@@ -86,11 +88,15 @@ def load_inference_artifact(
         model=model,
         model_version=str(payload.get("artifact_version", "unknown")),
         class_labels=[str(x) for x in class_labels],
-        feature_schema_version=str(feature_schema.get("feature_schema_version", "unknown")),
+        feature_schema_version=str(
+            feature_schema.get("feature_schema_version", "unknown")
+        ),
         feature_dim=int(feature_schema.get("feature_dim", model_config["input_size"])),
         window_length=int(feature_schema.get("window_length", 24)),
         window_step=int(feature_schema.get("window_step", 3)),
-        orientation_normalization=bool(feature_schema.get("orientation_normalization", False)),
+        orientation_normalization=bool(
+            feature_schema.get("orientation_normalization", False)
+        ),
         artifact_path=path,
     )
 

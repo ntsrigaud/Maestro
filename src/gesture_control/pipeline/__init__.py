@@ -6,8 +6,8 @@ from gesture_control.pipeline.feature_engineering import LandmarkFeatureTransfor
 from gesture_control.pipeline.stabilization import PredictionStabilizer
 
 __all__ = [
-	"GestureActivationController",
-	"LandmarkFeatureTransformer",
-	"PredictionStabilizer",
-	"SlidingWindowSequenceBuffer",
+    "GestureActivationController",
+    "LandmarkFeatureTransformer",
+    "PredictionStabilizer",
+    "SlidingWindowSequenceBuffer",
 ]
