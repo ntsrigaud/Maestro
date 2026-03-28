@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 import torch
 
@@ -37,19 +37,15 @@ def _resolve_config_path(config_arg: str) -> Path:
     # /tmp is commonly used for one-off smoke configs and gets cleaned frequently.
     if path.is_absolute() and str(path).startswith("/tmp/") and default_path.exists():
         print(
-            (
-                f"Warning: config not found at {path}. "
-                f"Falling back to default config: {default_path}"
-            ),
+            f"Warning: config not found at {path}. "
+            f"Falling back to default config: {default_path}",
             file=sys.stderr,
         )
         return default_path
 
     raise FileNotFoundError(
-        (
-            f"Config not found: {path}. "
-            "Use --config configs/model/lstm_default.yaml or omit --config to use default."
-        )
+        f"Config not found: {path}. "
+        "Use --config configs/model/lstm_default.yaml or omit --config to use default."
     )
 
 
