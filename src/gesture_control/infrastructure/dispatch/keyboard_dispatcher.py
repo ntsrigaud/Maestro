@@ -40,7 +40,10 @@ class KeyboardCommandDispatcher:
         app_shortcuts = self._SHORTCUTS.get(self._active_app, {})
         shortcut = app_shortcuts.get(command.command_id)
         if shortcut is None:
-            detail = f"No shortcut mapping for command={command.command_id} in app={self._active_app}"
+            detail = (
+                f"No shortcut mapping for command={command.command_id} "
+                f"in app={self._active_app}"
+            )
             LOGGER.warning(detail)
             return DispatchResult(
                 success=False,
