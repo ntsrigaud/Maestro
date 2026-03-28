@@ -86,9 +86,13 @@ def build_container(
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if model_artifact_path:
-        artifact = load_inference_artifact(artifact_path=model_artifact_path, device=device)
+        artifact = load_inference_artifact(
+            artifact_path=model_artifact_path, device=device
+        )
     else:
-        artifact = load_latest_inference_artifact(registry_path=registry_path, device=device)
+        artifact = load_latest_inference_artifact(
+            registry_path=registry_path, device=device
+        )
 
     validate_runtime_compatibility(runtime_config=config, artifact=artifact)
 
