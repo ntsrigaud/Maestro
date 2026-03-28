@@ -41,3 +41,7 @@ python_version = "3.11"
 [[tool.mypy.overrides]]
 module = ["mediapipe", "mediapipe.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["sklearn", "sklearn.*"]
+ignore_missing_imports = true
