@@ -128,7 +128,9 @@ def evaluate_model(
             y_true,
             y_pred,
             labels=np.arange(len(class_labels)),
-        ).astype(int).tolist(),
+        )
+        .astype(int)
+        .tolist(),
         calibration_ece=expected_calibration_error(y_conf, correct, n_bins=10),
         mean_confidence=float(np.mean(y_conf)) if y_conf.size > 0 else 0.0,
     )

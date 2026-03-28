@@ -66,8 +66,12 @@ def test_datamodule_split_is_deterministic(tmp_path: Path) -> None:
     _create_dataset(dataset_path)
 
     split = DataSplitConfig(train_ratio=0.7, val_ratio=0.15, test_ratio=0.15)
-    dm1 = GestureDataModule(dataset_path=dataset_path, batch_size=16, split=split, seed=99)
-    dm2 = GestureDataModule(dataset_path=dataset_path, batch_size=16, split=split, seed=99)
+    dm1 = GestureDataModule(
+        dataset_path=dataset_path, batch_size=16, split=split, seed=99
+    )
+    dm2 = GestureDataModule(
+        dataset_path=dataset_path, batch_size=16, split=split, seed=99
+    )
 
     dm1.setup()
     dm2.setup()
