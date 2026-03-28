@@ -12,6 +12,8 @@ dependencies = [
   "pydantic>=2.6.0",
   "PyYAML>=6.0.1",
   "numpy>=1.26.0",
+  "torch>=2.7.0",
+  "scikit-learn>=1.5.0",
   "opencv-python-headless>=4.10.0",
   "mediapipe==0.10.14",
 ]
