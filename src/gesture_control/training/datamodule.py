@@ -152,9 +152,15 @@ class GestureDataModule:
         )
 
         train_idx, val_idx, test_idx = self._split_indices(label_ids)
-        self._train_dataset = SequenceTensorDataset(sequences[train_idx], label_ids[train_idx])
-        self._val_dataset = SequenceTensorDataset(sequences[val_idx], label_ids[val_idx])
-        self._test_dataset = SequenceTensorDataset(sequences[test_idx], label_ids[test_idx])
+        self._train_dataset = SequenceTensorDataset(
+            sequences[train_idx], label_ids[train_idx]
+        )
+        self._val_dataset = SequenceTensorDataset(
+            sequences[val_idx], label_ids[val_idx]
+        )
+        self._test_dataset = SequenceTensorDataset(
+            sequences[test_idx], label_ids[test_idx]
+        )
 
     def train_dataloader(self) -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
         if self._train_dataset is None:
@@ -200,7 +206,9 @@ class GestureDataModule:
         counts = np.bincount(self._bundle.label_ids, minlength=len(labels))
         return {labels[i]: int(counts[i]) for i in range(len(labels))}
 
-    def _split_indices(self, label_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _split_indices(
+        self, label_ids: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         n = label_ids.shape[0]
         all_idx = np.arange(n)
 
