@@ -9,7 +9,10 @@ import numpy as np
 import torch
 
 from gesture_control.domain.entities import Prediction, RuntimeState, SequenceWindow
-from gesture_control.evaluation.benchmark_latency import LatencyBenchmark, write_latency_report
+from gesture_control.evaluation.benchmark_latency import (
+    LatencyBenchmark,
+    write_latency_report,
+)
 from gesture_control.infrastructure.model.checkpoint_loader import InferenceArtifact
 from gesture_control.interfaces.command_dispatcher import ICommandDispatcher
 from gesture_control.interfaces.feature_transformer import IFeatureTransformer
@@ -107,11 +110,15 @@ class Runtime:
                     if benchmark is not None:
                         benchmark.record_inference(inference_ms)
 
-                    stabilized_prediction = self._container.stabilizer.update(prediction)
+                    stabilized_prediction = self._container.stabilizer.update(
+                        prediction
+                    )
                     latest_label = stabilized_prediction.label
                     latest_conf = stabilized_prediction.confidence
 
-                    command = self._container.activation_controller.route(stabilized_prediction)
+                    command = self._container.activation_controller.route(
+                        stabilized_prediction
+                    )
                     if command is not None:
                         self._container.dispatcher.dispatch(command)
 

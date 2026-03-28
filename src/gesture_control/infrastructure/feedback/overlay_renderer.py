@@ -38,7 +38,9 @@ class OverlayRenderer:
         self._put(canvas, line4, 12, 96)
         self._put(canvas, line5, 12, 120)
 
-        return FramePacket(frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id)
+        return FramePacket(
+            frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id
+        )
 
     def _draw_landmarks(self, image: Any, landmarks: Any) -> None:
         if not isinstance(landmarks, list):
