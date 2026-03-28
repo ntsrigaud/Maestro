@@ -170,6 +170,7 @@ class SequenceDatasetBuilder:
         )
 
         metadata = {
+            "feature_schema_version": "feature-schema-v1",
             "feature_dim": int(sequences.shape[2]),
             "window_length": int(sequences.shape[1]),
             "window_step": self._window_step,
