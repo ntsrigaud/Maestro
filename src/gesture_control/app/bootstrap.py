@@ -2,17 +2,34 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+import torch
+import yaml
+
+from gesture_control.evaluation.benchmark_latency import LatencyBenchmark
 from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSource
+from gesture_control.infrastructure.dispatch.keyboard_dispatcher import (
+    KeyboardCommandDispatcher,
+)
+from gesture_control.infrastructure.feedback.overlay_renderer import OverlayRenderer
 from gesture_control.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
+)
+from gesture_control.infrastructure.model.checkpoint_loader import (
+    InferenceArtifact,
+    load_inference_artifact,
+    load_latest_inference_artifact,
+    validate_runtime_compatibility,
 )
 from gesture_control.interfaces.feature_transformer import IFeatureTransformer
 from gesture_control.interfaces.frame_source import IFrameSource
 from gesture_control.interfaces.landmark_extractor import IHandLandmarkExtractor
 from gesture_control.interfaces.sequence_buffer import ISequenceBuffer
+from gesture_control.pipeline.activation import GestureActivationController
 from gesture_control.pipeline.buffering import SlidingWindowSequenceBuffer
 from gesture_control.pipeline.feature_engineering import LandmarkFeatureTransformer
+from gesture_control.pipeline.stabilization import PredictionStabilizer
 from gesture_control.utils.config_loader import load_runtime_config
 from gesture_control.utils.feature_validation import validate_dataset_compatibility
 from gesture_control.utils.schema_validation import RuntimeConfig
@@ -25,10 +42,27 @@ class AppContainer:
     landmark_extractor: IHandLandmarkExtractor
     feature_transformer: IFeatureTransformer
     sequence_buffer: ISequenceBuffer
+    model_artifact: InferenceArtifact
+    stabilizer: PredictionStabilizer
+    activation_controller: GestureActivationController
+    dispatcher: KeyboardCommandDispatcher
+    overlay_renderer: OverlayRenderer
+    benchmark: LatencyBenchmark
+    show_window: bool
 
 
-def build_container(config_path: str) -> AppContainer:
-    config = load_runtime_config(config_path)
+def build_container(
+    config_path: str,
+    *,
+    model_artifact_path: str | None = None,
+    registry_path: str = "models/registry.json",
+    show_window: bool = True,
+) -> AppContainer:
+    config_root = Path(config_path)
+    config = load_runtime_config(config_root)
+    thresholds = _load_thresholds(config_root / "thresholds" / "production.yaml")
+    vocabulary = _load_vocabulary(config_root / "gestures" / "vocabulary_v1.yaml")
+
     frame_source = OpenCVFrameSource(
         camera_index=config.app.camera_index,
         frame_width=config.app.frame_width,
@@ -49,12 +83,50 @@ def build_container(config_path: str) -> AppContainer:
         window_step=config.inference.window_step,
         min_valid_ratio=config.inference.min_valid_ratio,
     )
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if model_artifact_path:
+        artifact = load_inference_artifact(
+            artifact_path=model_artifact_path, device=device
+        )
+    else:
+        artifact = load_latest_inference_artifact(
+            registry_path=registry_path, device=device
+        )
+
+    validate_runtime_compatibility(runtime_config=config, artifact=artifact)
+
+    stabilizer = PredictionStabilizer(
+        default_threshold=float(thresholds.get("acceptance_default", 0.85)),
+        class_thresholds=thresholds.get("class_thresholds", {}),
+        vote_window=3,
+        ema_alpha=0.4,
+        unknown_label="unknown",
+    )
+    activation_controller = GestureActivationController(
+        activation_gesture=vocabulary.get("activation_gesture", "open_palm_hold"),
+        command_map=_default_command_map(),
+        activation_hold_ms=config.inference.activation_hold_ms,
+        idle_timeout_ms=config.inference.idle_timeout_ms,
+        command_cooldown_ms=config.inference.command_cooldown_ms,
+    )
+    dispatcher = KeyboardCommandDispatcher(active_app=config.app.active_app)
+    overlay_renderer = OverlayRenderer()
+    benchmark = LatencyBenchmark()
+
     return AppContainer(
         config=config,
         frame_source=frame_source,
         landmark_extractor=landmark_extractor,
         feature_transformer=feature_transformer,
         sequence_buffer=sequence_buffer,
+        model_artifact=artifact,
+        stabilizer=stabilizer,
+        activation_controller=activation_controller,
+        dispatcher=dispatcher,
+        overlay_renderer=overlay_renderer,
+        benchmark=benchmark,
+        show_window=show_window,
     )
 
 
@@ -86,3 +158,59 @@ def validate_container_dataset(
     # Note: is_compatible=False with only warnings is acceptable
     # FeatureSchemaError will be raised inside validate_dataset_compatibility
     # if critical incompatibilities are detected
+
+
+def _load_thresholds(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {
+            "acceptance_default": 0.85,
+            "class_thresholds": {},
+        }
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, dict):
+        return {
+            "acceptance_default": 0.85,
+            "class_thresholds": {},
+        }
+
+    acceptance = payload.get("acceptance", {})
+    class_thresholds = payload.get("class_thresholds", {})
+    if not isinstance(acceptance, dict):
+        acceptance = {}
+    if not isinstance(class_thresholds, dict):
+        class_thresholds = {}
+
+    return {
+        "acceptance_default": float(acceptance.get("default", 0.85)),
+        "class_thresholds": {str(k): float(v) for k, v in class_thresholds.items()},
+    }
+
+
+def _load_vocabulary(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {
+            "activation_gesture": "open_palm_hold",
+        }
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, dict):
+        return {
+            "activation_gesture": "open_palm_hold",
+        }
+
+    activation = payload.get("activation_gesture", "open_palm_hold")
+    return {
+        "activation_gesture": str(activation),
+    }
+
+
+def _default_command_map() -> dict[str, str]:
+    return {
+        "swipe_right": "next_slide",
+        "swipe_left": "previous_slide",
+        "pinch_hold": "mute_toggle",
+        "fist_hold": "start_presentation",
+        "thumbs_up": "raise_hand",
+        "v_sign": "toggle_presenter_tools",
+    }

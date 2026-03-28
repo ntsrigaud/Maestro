@@ -62,3 +62,6 @@ class SlidingWindowSequenceBuffer:
 
         valid_count = sum(1 for item in self._features if item.valid)
         return valid_count / self._window_length
+
+    def current_valid_ratio(self) -> float:
+        return self._current_valid_ratio()
