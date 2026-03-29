@@ -3,10 +3,19 @@ acceptance:
   critical: 0.90
 class_thresholds:
   open_palm_hold: 0.9
-  swipe_right: 0.85
-  swipe_left: 0.85
+  swipe_right: 0.80
+  swipe_left: 0.80
   fist_hold: 0.9
   thumbs_up: 0.85
   v_sign: 0.85
-  pinch_hold: 0.9
+  pinch_hold: 0.85
   unknown: 1.0
+class_vote_windows:
+  open_palm_hold: 3
+  swipe_right: 1
+  swipe_left: 1
+  fist_hold: 3
+  thumbs_up: 3
+  v_sign: 3
+  pinch_hold: 2
+  unknown: 1
