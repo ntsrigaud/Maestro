@@ -112,7 +112,7 @@ def build_container(
         command_cooldown_ms=config.inference.command_cooldown_ms,
     )
     dispatcher = KeyboardCommandDispatcher(active_app=config.app.active_app)
-    overlay_renderer = OverlayRenderer()
+    overlay_renderer = OverlayRenderer(mirror_display=config.app.mirror_display)
     benchmark = LatencyBenchmark()
 
     return AppContainer(
