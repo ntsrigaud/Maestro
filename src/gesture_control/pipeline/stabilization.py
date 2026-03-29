@@ -30,7 +30,9 @@ class PredictionStabilizer:
         self._default_threshold = default_threshold
         self._class_thresholds = dict(class_thresholds)
         self._vote_window = vote_window
-        self._class_vote_windows: dict[str, int] = dict(class_vote_windows) if class_vote_windows else {}
+        self._class_vote_windows: dict[str, int] = (
+            dict(class_vote_windows) if class_vote_windows else {}
+        )
         self._ema_alpha = ema_alpha
         self._unknown_label = unknown_label
 
