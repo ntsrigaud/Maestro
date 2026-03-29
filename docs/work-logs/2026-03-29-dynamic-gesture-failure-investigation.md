@@ -556,26 +556,29 @@ After recording:
 
 ### Root Causes (Ranked by Impact)
 
-| Rank | Root Cause                                                  | Impact       | Fix Required?   |
-| ---- | ----------------------------------------------------------- | ------------ | --------------- |
-| 1    | Single-session dataset; temporal leakage in split           | CRITICAL     | Yes             |
-| 2    | Zero subject and session diversity                          | CRITICAL     | Yes             |
+| Rank | Root Cause                                                  | Impact       | Fix Required?         |
+| ---- | ----------------------------------------------------------- | ------------ | --------------------- |
+| 0    | Display non-mirrored: gesture directions inverted in UI     | HIGH         | ✅ Fixed (2026-03-29) |
+| 1    | Single-session dataset; temporal leakage in split           | CRITICAL     | Yes                   |
+| 2    | Zero subject and session diversity                          | CRITICAL     | Yes                   |
 | 3    | Stabiliser vote_window too large for brief dynamic gestures | HIGH         | ✅ Fixed (2026-03-29) |
-| 4    | No gesture segmentation in dynamic recordings               | HIGH         | Yes             |
-| 5    | Random window-level split ignores recording boundaries      | HIGH         | Yes             |
-| 6    | Training/inference frame rate divergence                    | MODERATE     | Yes             |
+| 4    | No gesture segmentation in dynamic recordings               | HIGH         | Yes                   |
+| 5    | Random window-level split ignores recording boundaries      | HIGH         | Yes                   |
+| 6    | Training/inference frame rate divergence                    | MODERATE     | Yes                   |
 | 7    | pinch_hold threshold too strict for real-time conditions    | MODERATE     | ✅ Fixed (2026-03-29) |
-| 8    | No data augmentation                                        | LOW-MODERATE | Yes             |
+| 8    | No data augmentation                                        | LOW-MODERATE | Yes                   |
 
 ### Immediate Actions (Can Fix Without New Data)
 
 These changes do not require data recollection and can be applied immediately:
 
-1. ✅ **Per-class vote windows applied** — `swipe_right` and `swipe_left` now use `vote_window=1`; `pinch_hold` uses `vote_window=2`; static hold gestures retain `vote_window=3`. Configured in `configs/thresholds/production.yaml` and consumed by `PredictionStabilizer` via the new `class_vote_windows` parameter.
+1. ✅ **Display mirroring applied** — `mirror_display: true` added to `configs/app.yaml` and `AppConfig`. `OverlayRenderer` now flips the canvas horizontally when `mirror_display=True` and inverts landmark x coordinates so dots remain correctly positioned on the mirrored frame. Text overlays are drawn after the flip and remain readable. The ML pipeline (MediaPipe extraction → feature engineering → LSTM) always operates on the original non-mirrored frame — no coordinate change to the training or inference data path.
 
-2. ✅ **Thresholds lowered** — `swipe_right` and `swipe_left` reduced from 0.85 → 0.80; `pinch_hold` reduced from 0.90 → 0.85.
+2. ✅ **Per-class vote windows applied** — `swipe_right` and `swipe_left` now use `vote_window=1`; `pinch_hold` uses `vote_window=2`; static hold gestures retain `vote_window=3`. Configured in `configs/thresholds/production.yaml` and consumed by `PredictionStabilizer` via the new `class_vote_windows` parameter.
 
-3. **Log prediction stream to file** during real-time sessions to diagnose exactly which windows are being rejected and why.
+3. ✅ **Thresholds lowered** — `swipe_right` and `swipe_left` reduced from 0.85 → 0.80; `pinch_hold` reduced from 0.90 → 0.85.
+
+4. **Log prediction stream to file** during real-time sessions to diagnose exactly which windows are being rejected and why.
 
 ### Medium-Term Actions (Require Data Recollection)
 
