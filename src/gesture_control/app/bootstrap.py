@@ -100,6 +100,7 @@ def build_container(
         default_threshold=float(thresholds.get("acceptance_default", 0.85)),
         class_thresholds=thresholds.get("class_thresholds", {}),
         vote_window=3,
+        class_vote_windows=thresholds.get("class_vote_windows") or None,
         ema_alpha=0.4,
         unknown_label="unknown",
     )
@@ -181,9 +182,14 @@ def _load_thresholds(path: Path) -> dict[str, Any]:
     if not isinstance(class_thresholds, dict):
         class_thresholds = {}
 
+    class_vote_windows = payload.get("class_vote_windows", {})
+    if not isinstance(class_vote_windows, dict):
+        class_vote_windows = {}
+
     return {
         "acceptance_default": float(acceptance.get("default", 0.85)),
         "class_thresholds": {str(k): float(v) for k, v in class_thresholds.items()},
+        "class_vote_windows": {str(k): int(v) for k, v in class_vote_windows.items()},
     }
 
 
