@@ -115,7 +115,7 @@ Static hold gestures (`open_palm_hold`, `fist_hold`, `thumbs_up`, `v_sign`) are 
 
 ---
 
-### Root Cause 3 (HIGH): Stabilisation Vote Window Incompatible with Brief Dynamic Gestures
+### Root Cause 3 (HIGH): Stabilisation Vote Window Incompatible with Brief Dynamic Gestures — ✅ FIXED
 
 **Evidence from `pipeline/stabilization.py`:**
 
@@ -151,6 +151,8 @@ For a 500 ms swipe at 15 FPS (≈7 frames of actual motion): the motion peak is 
 The stabiliser receives at most 1–2 highly confident swipe predictions and discards them as `temporal_inconsistency`. This is the proximate failure mechanism: even when the model detects the gesture correctly, the stabiliser rejects it because 3 consecutive high-confidence windows cannot be sustained for a brief dynamic event.
 
 The EMA (alpha=0.4) compounds this: after the swipe passes, the EMA retains ~36% of the historical signal (0.6^2 decay after 2 frames), blending stale motion features into the current prediction and making it harder to reach the threshold cleanly on the windows that DO contain the swipe.
+
+**Fix applied (2026-03-29):** `PredictionStabilizer` now accepts an optional `class_vote_windows` dict. `configs/thresholds/production.yaml` sets `swipe_right: 1`, `swipe_left: 1`, `pinch_hold: 2`, and `3` for all static hold classes. The history deque is sized to the maximum window across all classes; consistency is checked against only the last N entries for each candidate class.
 
 ---
 
@@ -216,7 +218,7 @@ A 500 ms swipe at the training collection rate of ~10 FPS occupies approximately
 
 ---
 
-### Root Cause 7 (MODERATE): pinch_hold Threshold Too High for Real-Time Conditions
+### Root Cause 7 (MODERATE): pinch_hold Threshold Too High for Real-Time Conditions — ✅ FIXED
 
 **Evidence from `configs/thresholds/production.yaml`:**
 
@@ -231,6 +233,8 @@ pinch_hold: vel_mean_abs=0.2778, vel_std=0.7268
 ```
 
 `pinch_hold` has the lowest velocity variance of any class. During real-time inference, natural hand tremor, breathing motion, and micro-adjustments generate velocity noise that differs from the artificially still training recording. The 0.9 confidence threshold leaves no headroom for this distribution shift. Any slight departure from the training distribution will drop confidence below the threshold.
+
+**Fix applied (2026-03-29):** `pinch_hold` threshold lowered from 0.90 to 0.85 in `configs/thresholds/production.yaml`. `swipe_right` and `swipe_left` thresholds lowered from 0.85 to 0.80.
 
 ---
 
@@ -341,10 +345,9 @@ Add augmentation in `datamodule.py` during training:
 
 Speed perturbation is particularly important for dynamic gestures: if a swipe at 10 FPS is resized to look like a 15 FPS swipe, the model learns FPS-invariant swipe patterns.
 
-### 5.4 Stabilisation Parameter Adjustment
+### 5.4 Stabilisation Parameter Adjustment — ✅ Applied (2026-03-29)
 
-**Reduce `vote_window` for dynamic gestures:**  
-The current `vote_window=3` is appropriate for static hold gestures. For dynamic gestures, a vote_window of 1 or 2 is more appropriate given their brief duration. Implement per-class vote windows:
+**Per-class vote windows and thresholds** are now configured in `configs/thresholds/production.yaml` under the `class_vote_windows` and `class_thresholds` keys, and consumed by `PredictionStabilizer` via the new optional `class_vote_windows` parameter:
 
 ```
 open_palm_hold:  vote_window=3, threshold=0.9
@@ -357,7 +360,7 @@ pinch_hold:      vote_window=2, threshold=0.85
 unknown:         vote_window=1, threshold=1.0
 ```
 
-**Reduce EMA alpha for dynamic gestures:**  
+**Reduce EMA alpha for dynamic gestures (pending):**  
 The EMA alpha=0.4 creates too much lag for gestures that must be detected within 3–5 windows. Consider alpha=0.6 or 0.7 for dynamic classes, allowing the EMA to track rapid changes more responsively.
 
 ### 5.5 Model Architecture Improvements
@@ -557,20 +560,20 @@ After recording:
 | ---- | ----------------------------------------------------------- | ------------ | --------------- |
 | 1    | Single-session dataset; temporal leakage in split           | CRITICAL     | Yes             |
 | 2    | Zero subject and session diversity                          | CRITICAL     | Yes             |
-| 3    | Stabiliser vote_window too large for brief dynamic gestures | HIGH         | Yes (immediate) |
+| 3    | Stabiliser vote_window too large for brief dynamic gestures | HIGH         | ✅ Fixed (2026-03-29) |
 | 4    | No gesture segmentation in dynamic recordings               | HIGH         | Yes             |
 | 5    | Random window-level split ignores recording boundaries      | HIGH         | Yes             |
 | 6    | Training/inference frame rate divergence                    | MODERATE     | Yes             |
-| 7    | pinch_hold threshold too strict for real-time conditions    | MODERATE     | Yes (immediate) |
+| 7    | pinch_hold threshold too strict for real-time conditions    | MODERATE     | ✅ Fixed (2026-03-29) |
 | 8    | No data augmentation                                        | LOW-MODERATE | Yes             |
 
 ### Immediate Actions (Can Fix Without New Data)
 
 These changes do not require data recollection and can be applied immediately:
 
-1. **Lower swipe thresholds to 0.75 and vote_window to 1** in `PredictionStabilizer`. Static hold gestures retain vote_window=3. These changes reduce the FP risk to acceptable levels given the current low-diversity data and will allow real-time swipe detection at the cost of slightly more false positives.
+1. ✅ **Per-class vote windows applied** — `swipe_right` and `swipe_left` now use `vote_window=1`; `pinch_hold` uses `vote_window=2`; static hold gestures retain `vote_window=3`. Configured in `configs/thresholds/production.yaml` and consumed by `PredictionStabilizer` via the new `class_vote_windows` parameter.
 
-2. **Lower pinch_hold threshold to 0.82** from 0.90.
+2. ✅ **Thresholds lowered** — `swipe_right` and `swipe_left` reduced from 0.85 → 0.80; `pinch_hold` reduced from 0.90 → 0.85.
 
 3. **Log prediction stream to file** during real-time sessions to diagnose exactly which windows are being rejected and why.
 
