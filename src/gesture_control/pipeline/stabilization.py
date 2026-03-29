@@ -14,6 +14,7 @@ class PredictionStabilizer:
         default_threshold: float,
         class_thresholds: dict[str, float],
         vote_window: int = 3,
+        class_vote_windows: dict[str, int] | None = None,
         ema_alpha: float = 0.4,
         unknown_label: str = "unknown",
     ) -> None:
@@ -21,15 +22,21 @@ class PredictionStabilizer:
             raise ValueError("vote_window must be > 0")
         if not (0.0 < ema_alpha <= 1.0):
             raise ValueError("ema_alpha must be in (0.0, 1.0]")
+        if class_vote_windows is not None:
+            for cls, w in class_vote_windows.items():
+                if w <= 0:
+                    raise ValueError(f"class_vote_windows[{cls!r}] must be > 0")
 
         self._default_threshold = default_threshold
         self._class_thresholds = dict(class_thresholds)
         self._vote_window = vote_window
+        self._class_vote_windows: dict[str, int] = dict(class_vote_windows) if class_vote_windows else {}
         self._ema_alpha = ema_alpha
         self._unknown_label = unknown_label
 
         self._ema_probs: dict[str, float] = {}
-        self._history: deque[str] = deque(maxlen=vote_window)
+        max_window = max([vote_window] + list(self._class_vote_windows.values()))
+        self._history: deque[str] = deque(maxlen=max_window)
 
     def update(self, prediction: Prediction) -> StabilizedPrediction:
         smoothed_probs = self._smooth_probs(prediction.class_probs)
@@ -67,9 +74,10 @@ class PredictionStabilizer:
         )
 
     def _is_temporally_consistent(self, candidate: str) -> bool:
-        if len(self._history) < self._vote_window:
+        window = self._class_vote_windows.get(candidate, self._vote_window)
+        if len(self._history) < window:
             return False
-        return all(label == candidate for label in self._history)
+        return all(label == candidate for label in list(self._history)[-window:])
 
     def _smooth_probs(self, probs: dict[str, float]) -> dict[str, float]:
         if not self._ema_probs:
