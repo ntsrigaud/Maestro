@@ -12,6 +12,10 @@ class AppConfig(BaseModel):
     frame_height: int = Field(ge=240)
     target_fps: int = Field(ge=1, le=120)
     active_app: str
+    # When True the display window is flipped horizontally so the preview acts
+    # like a selfie/mirror camera.  MediaPipe landmark extraction and the entire
+    # ML pipeline always operate on the original non-mirrored frame.
+    mirror_display: bool = True
 
 
 class InferenceConfig(BaseModel):
