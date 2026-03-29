@@ -8,16 +8,33 @@ from gesture_control.domain.entities import FramePacket, RuntimeState
 
 
 class OverlayRenderer:
-    """Renders non-blocking runtime diagnostics onto frames."""
+    """Renders non-blocking runtime diagnostics onto frames.
 
-    def __init__(self) -> None:
+    Coordinate orientation policy
+    --------------------------------
+    MediaPipe landmark coordinates are always in the original (non-mirrored)
+    camera coordinate space.  When ``mirror_display=True`` the canvas frame is
+    flipped horizontally *before* landmarks are drawn so that the landmark dots
+    remain correctly positioned on the mirrored image.  Text overlays are drawn
+    after the flip so they remain readable.  The ML pipeline is never affected.
+    """
+
+    def __init__(self, *, mirror_display: bool = False) -> None:
         self._font = cv2.FONT_HERSHEY_SIMPLEX
+        self._mirror_display = mirror_display
 
     def render(self, frame: FramePacket, state: RuntimeState) -> FramePacket:
-        canvas = frame.frame.copy()
+        # Flip the canvas for the display if mirror mode is active.  The flip
+        # happens before landmarks are drawn so that x coordinates can be
+        # inverted to match the mirrored pixel positions.
+        if self._mirror_display:
+            canvas = cv2.flip(frame.frame, 1)
+        else:
+            canvas = frame.frame.copy()
+
         info = state.info
 
-        self._draw_landmarks(canvas, info.get("landmarks"))
+        self._draw_landmarks(canvas, info.get("landmarks"), mirror=self._mirror_display)
 
         line1 = f"mode={state.mode}"
         line2 = f"pred={state.last_label} conf={state.last_confidence:.2f}"
@@ -42,7 +59,7 @@ class OverlayRenderer:
             frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id
         )
 
-    def _draw_landmarks(self, image: Any, landmarks: Any) -> None:
+    def _draw_landmarks(self, image: Any, landmarks: Any, *, mirror: bool = False) -> None:
         if not isinstance(landmarks, list):
             return
 
@@ -50,7 +67,11 @@ class OverlayRenderer:
         for point in landmarks:
             if not isinstance(point, list) or len(point) < 2:
                 continue
-            x = int(float(point[0]) * width)
+            raw_x = float(point[0])
+            # When the canvas is already flipped, invert the x coordinate so
+            # the landmark dot lands on the correct side of the mirrored image.
+            display_x = (1.0 - raw_x) if mirror else raw_x
+            x = int(display_x * width)
             y = int(float(point[1]) * height)
             if x < 0 or y < 0 or x >= width or y >= height:
                 continue
