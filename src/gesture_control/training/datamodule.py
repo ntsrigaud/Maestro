@@ -123,7 +123,9 @@ class GestureDataModule:
         self._augmentation = augmentation
 
         self._bundle: DatasetBundle | None = None
-        self._train_dataset: SequenceTensorDataset | AugmentedSequenceTensorDataset | None = None
+        self._train_dataset: (
+            SequenceTensorDataset | AugmentedSequenceTensorDataset | None
+        ) = None
         self._val_dataset: SequenceTensorDataset | None = None
         self._test_dataset: SequenceTensorDataset | None = None
         self._train_idx: np.ndarray | None = None
@@ -313,9 +315,7 @@ class GestureDataModule:
         gss = GroupShuffleSplit(
             n_splits=1, test_size=temp_ratio, random_state=self._seed
         )
-        train_idx, temp_idx = next(
-            gss.split(all_idx, label_ids, groups=recording_ids)
-        )
+        train_idx, temp_idx = next(gss.split(all_idx, label_ids, groups=recording_ids))
 
         temp_rec_ids = recording_ids[temp_idx]
         unique_temp = np.unique(temp_rec_ids)

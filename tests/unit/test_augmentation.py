@@ -13,6 +13,7 @@ from gesture_control.training.augmentation import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_seq(T: int = 24, F: int = 126, value: float | None = None) -> np.ndarray:
     """Return a (T, F) float32 array.  Fills with *value* or an arange."""
     if value is not None:
@@ -23,6 +24,7 @@ def _make_seq(T: int = 24, F: int = 126, value: float | None = None) -> np.ndarr
 # ---------------------------------------------------------------------------
 # Shape and dtype invariants
 # ---------------------------------------------------------------------------
+
 
 def test_augment_preserves_shape() -> None:
     config = AugmentationConfig(apply_prob=1.0, seed=0)
@@ -53,6 +55,7 @@ def test_augment_does_not_mutate_input() -> None:
 # apply_prob gating
 # ---------------------------------------------------------------------------
 
+
 def test_apply_prob_zero_returns_identical_array() -> None:
     config = AugmentationConfig(apply_prob=0.0, seed=99)
     aug = GestureAugmenter(config)
@@ -74,6 +77,7 @@ def test_apply_prob_one_modifies_input() -> None:
 # ---------------------------------------------------------------------------
 # Spatial jitter — only position dims affected
 # ---------------------------------------------------------------------------
+
 
 def test_spatial_jitter_only_modifies_position_dims() -> None:
     """Velocity features (dims 63-125) must remain unchanged after jitter."""
@@ -97,20 +101,31 @@ def test_spatial_jitter_only_modifies_position_dims() -> None:
 def test_spatial_jitter_sigma_scales_noise() -> None:
     """Larger sigma → larger mean absolute deviation in position features."""
     small = AugmentationConfig(
-        temporal_scale_range=(1.0, 1.0), spatial_jitter_sigma=0.001, apply_prob=1.0, seed=1
+        temporal_scale_range=(1.0, 1.0),
+        spatial_jitter_sigma=0.001,
+        apply_prob=1.0,
+        seed=1,
     )
     large = AugmentationConfig(
-        temporal_scale_range=(1.0, 1.0), spatial_jitter_sigma=0.5, apply_prob=1.0, seed=1
+        temporal_scale_range=(1.0, 1.0),
+        spatial_jitter_sigma=0.5,
+        apply_prob=1.0,
+        seed=1,
     )
     seq = np.zeros((24, 126), dtype=np.float32)
-    noise_small = np.abs(GestureAugmenter(small).augment(seq)[:, :_POSITION_DIMS]).mean()
-    noise_large = np.abs(GestureAugmenter(large).augment(seq)[:, :_POSITION_DIMS]).mean()
+    noise_small = np.abs(
+        GestureAugmenter(small).augment(seq)[:, :_POSITION_DIMS]
+    ).mean()
+    noise_large = np.abs(
+        GestureAugmenter(large).augment(seq)[:, :_POSITION_DIMS]
+    ).mean()
     assert noise_large > noise_small
 
 
 # ---------------------------------------------------------------------------
 # Temporal scaling
 # ---------------------------------------------------------------------------
+
 
 def test_temporal_scale_first_frame_unchanged_for_any_factor() -> None:
     """Output frame 0 always maps to input frame 0 (src_index == 0)."""
@@ -174,6 +189,7 @@ def test_temporal_scale_identity_is_noop() -> None:
 # Determinism with fixed seed
 # ---------------------------------------------------------------------------
 
+
 def test_augmenter_is_deterministic_with_fixed_seed() -> None:
     """Two augmenters with the same seed must produce identical results."""
     seq = np.random.default_rng(0).random((24, 126)).astype(np.float32)
@@ -186,6 +202,7 @@ def test_augmenter_is_deterministic_with_fixed_seed() -> None:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("T", [1, 2, 4, 24, 48])
 def test_temporal_scale_various_lengths(T: int) -> None:

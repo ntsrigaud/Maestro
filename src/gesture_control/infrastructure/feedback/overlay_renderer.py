@@ -59,7 +59,9 @@ class OverlayRenderer:
             frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id
         )
 
-    def _draw_landmarks(self, image: Any, landmarks: Any, *, mirror: bool = False) -> None:
+    def _draw_landmarks(
+        self, image: Any, landmarks: Any, *, mirror: bool = False
+    ) -> None:
         if not isinstance(landmarks, list):
             return
 

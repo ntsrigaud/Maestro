@@ -190,9 +190,7 @@ def _run_interactive_collection(
                     _finish_recording(current_recording_id, recording_frame_count)
                 else:
                     recording_count += 1
-                    current_recording_id = (
-                        f"{recording_prefix}-{recording_count:03d}"
-                    )
+                    current_recording_id = f"{recording_prefix}-{recording_count:03d}"
                     is_recording = True
                     recording_frame_count = 0
                     print(f"RECORDING_START recording_id={current_recording_id}")
