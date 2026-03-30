@@ -4,11 +4,10 @@ import numpy as np
 import pytest
 
 from gesture_control.training.augmentation import (
+    _POSITION_DIMS,
     AugmentationConfig,
     GestureAugmenter,
-    _POSITION_DIMS,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
