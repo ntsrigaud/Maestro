@@ -1,0 +1,19 @@
+{
+  "feature_schema_version": "feature-schema-v1",
+  "feature_dim": 126,
+  "window_length": 24,
+  "window_step": 3,
+  "min_valid_ratio": 0.8,
+  "label_strategy": "majority",
+  "enable_orientation_normalization": false,
+  "vocabulary": [
+    "open_palm_hold",
+    "swipe_right",
+    "swipe_left",
+    "swipe_up",
+    "swipe_down",
+    "zoom_in",
+    "zoom_out",
+    "unknown"
+  ]
+}
