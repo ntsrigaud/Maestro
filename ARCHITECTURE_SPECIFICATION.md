@@ -124,12 +124,13 @@ project_root/
           torch_lstm_model.py
           checkpoint_loader.py
         dispatch/
-          keyboard_dispatcher.py
+          keyboard_dispatcher.py   # legacy stub (superseded)
+          command_dispatcher.py    # production dispatcher with allowlist + rate limiting
           app_adapters/
-            powerpoint_adapter.py
-            keynote_adapter.py
-            zoom_adapter.py
-            teams_adapter.py
+            base.py                # IApplicationAdapter Protocol
+            keyboard_adapter.py   # low-level pyautogui key delivery with allowlist
+            powerpoint_adapter.py  # PowerPoint shortcut table
+            zoom_adapter.py        # Zoom shortcut table
         feedback/
           overlay_renderer.py
           metrics_logger.py
@@ -363,13 +364,47 @@ Outputs:
 
 - ExecutableCommand or None
 
-#### H. Command Dispatcher
+#### H. Command Dispatch Layer
 
 Responsibilities:
 
-- Map gestures to logical commands
-- Resolve app-specific shortcut adapters
-- Dispatch keyboard shortcuts safely
+- Enforce a **command allowlist**: only command IDs explicitly listed in the
+  allowlist are forwarded to adapters; unknown IDs are rejected before any
+  OS interaction occurs.
+- Apply **adapter-level rate limiting**: a sliding-window counter caps the
+  number of dispatches within a configurable time window, providing a second
+  layer of protection independent of the activation controller cooldown.
+- Delegate actual key delivery to an **application adapter** selected at
+  startup based on `active_app` config (powerpoint, zoom, …).
+- Return a structured `DispatchResult` for every call — the runtime loop
+  is never interrupted by adapter failure.
+
+**Class hierarchy**:
+
+```
+ICommandDispatcher         (interfaces/command_dispatcher.py)
+    └── CommandDispatcher  (infrastructure/dispatch/command_dispatcher.py)
+            └── IApplicationAdapter  (app_adapters/base.py  — Protocol)
+                    ├── PowerPointAdapter  (uses KeyboardAdapter)
+                    └── ZoomAdapter        (uses KeyboardAdapter)
+                            └── KeyboardAdapter  (wraps pyautogui with _SAFE_KEY_NAMES allowlist)
+```
+
+**Safety design — KeyboardAdapter**:
+
+- `_SAFE_KEY_NAMES` frozenset validates every key string before `pyautogui.hotkey` is called.
+- No user-supplied strings or command IDs ever reach `pyautogui` directly — the adapter
+  layer resolves command IDs to predefined key tuples first.
+- Raising `ValueError` for any unlisted key name prevents injection of arbitrary OS commands.
+- `pyautogui` is imported at module level with a `None` fallback, so CI / headless
+  environments can run without side-effects and the module remains patchable.
+
+**Gesture-to-command mapping**:
+
+- Loaded from `configs/gestures/command_map.yaml` at startup by `bootstrap.py`.
+- Passed to `GestureActivationController` (gesture → command_id resolution) and
+  used to build the `CommandDispatcher` allowlist (frozenset of command_id values).
+- Fallback to hardcoded defaults if the YAML is absent.
 
 Inputs:
 
@@ -377,7 +412,7 @@ Inputs:
 
 Outputs:
 
-- DispatchResult(success, command_id, target_app)
+- DispatchResult(success, command_id, target_app, detail)
 
 #### I. Real-Time Feedback System
 
