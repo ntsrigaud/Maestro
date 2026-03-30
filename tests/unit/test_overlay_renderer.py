@@ -29,6 +29,7 @@ def _make_state(**info_overrides: object) -> RuntimeState:
 # Coordinate orientation policy: landmark x positions on the rendered frame
 # ---------------------------------------------------------------------------
 
+
 class TestLandmarkMirrorPolicy:
     """
     Coordinate orientation policy:
@@ -68,6 +69,7 @@ class TestLandmarkMirrorPolicy:
     def _is_dot_pixel(self, frame: object, row: int, col: int) -> bool:
         """True if the pixel at (row, col) is a pure-green landmark dot."""
         import numpy as np  # noqa: PLC0415
+
         arr = np.asarray(frame)
         # BGR: dot = (0, 255, 0), text = (0, 255, 255)
         # Red channel (index 2) is 0 for a dot and 255 for text.
@@ -82,12 +84,12 @@ class TestLandmarkMirrorPolicy:
         result = renderer.render(frame, state)
         row = self._dot_row()
 
-        assert self._is_dot_pixel(result.frame, row, self._dot_col_raw(0.2)), (
-            "Non-mirror: dot at raw x=0.2 must appear near col 128"
-        )
-        assert not self._is_dot_pixel(result.frame, row, self._dot_col_mirror(0.2)), (
-            "Non-mirror: dot must NOT appear at the mirrored column"
-        )
+        assert self._is_dot_pixel(
+            result.frame, row, self._dot_col_raw(0.2)
+        ), "Non-mirror: dot at raw x=0.2 must appear near col 128"
+        assert not self._is_dot_pixel(
+            result.frame, row, self._dot_col_mirror(0.2)
+        ), "Non-mirror: dot must NOT appear at the mirrored column"
 
     def test_mirror_places_landmark_at_inverted_x(self) -> None:
         """With mirroring, landmark at raw x=0.2 is drawn at the inverted column."""
@@ -98,12 +100,12 @@ class TestLandmarkMirrorPolicy:
         result = renderer.render(frame, state)
         row = self._dot_row()
 
-        assert self._is_dot_pixel(result.frame, row, self._dot_col_mirror(0.2)), (
-            "Mirror: dot at raw x=0.2 must appear at mirrored col (≈512)"
-        )
-        assert not self._is_dot_pixel(result.frame, row, self._dot_col_raw(0.2)), (
-            "Mirror: dot must NOT appear at the raw column"
-        )
+        assert self._is_dot_pixel(
+            result.frame, row, self._dot_col_mirror(0.2)
+        ), "Mirror: dot at raw x=0.2 must appear at mirrored col (≈512)"
+        assert not self._is_dot_pixel(
+            result.frame, row, self._dot_col_raw(0.2)
+        ), "Mirror: dot must NOT appear at the raw column"
 
     def test_mirror_does_not_affect_frame_dimensions(self) -> None:
         renderer = OverlayRenderer(mirror_display=True)
@@ -122,6 +124,7 @@ class TestLandmarkMirrorPolicy:
 # Frame metadata is preserved
 # ---------------------------------------------------------------------------
 
+
 def test_render_preserves_timestamp_and_frame_id() -> None:
     renderer = OverlayRenderer(mirror_display=False)
     frame = FramePacket(
@@ -138,39 +141,45 @@ def test_render_preserves_timestamp_and_frame_id() -> None:
 # Original frame must not be mutated (ML pipeline reuse guard)
 # ---------------------------------------------------------------------------
 
+
 def test_render_does_not_mutate_original_frame() -> None:
     for mirror in (False, True):
         renderer = OverlayRenderer(mirror_display=mirror)
         original = np.zeros((100, 100, 3), dtype=np.uint8)
         frame = FramePacket(frame=original, timestamp_ms=0, frame_id=0)
         renderer.render(frame, _make_state(landmarks=[[0.5, 0.5, 0.0]]))
-        assert original.sum() == 0, (
-            f"Original frame must not be mutated (mirror={mirror})"
-        )
+        assert (
+            original.sum() == 0
+        ), f"Original frame must not be mutated (mirror={mirror})"
 
 
 # ---------------------------------------------------------------------------
 # Invalid / edge-case landmarks are silently ignored
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("bad_landmarks", [
-    None,
-    "not a list",
-    [None, None],
-    [[0.5]],          # only one coordinate component
-    [[]],             # empty point
-])
+
+@pytest.mark.parametrize(
+    "bad_landmarks",
+    [
+        None,
+        "not a list",
+        [None, None],
+        [[0.5]],  # only one coordinate component
+        [[]],  # empty point
+    ],
+)
 def test_render_ignores_invalid_landmarks(bad_landmarks: object) -> None:
     renderer = OverlayRenderer(mirror_display=True)
     frame = _make_frame()
     state = _make_state(landmarks=bad_landmarks)
-    result = renderer.render(frame, state)   # must not raise
+    result = renderer.render(frame, state)  # must not raise
     assert result.frame.shape == (100, 100, 3)
 
 
 # ---------------------------------------------------------------------------
 # Mirror symmetry: two landmarks mirrored about x=0.5 land on opposite pixels
 # ---------------------------------------------------------------------------
+
 
 def test_mirror_symmetry_of_two_landmarks() -> None:
     """Landmark at x=0.3 and x=0.7 should swap positions in mirror mode."""
@@ -183,27 +192,28 @@ def test_mirror_symmetry_of_two_landmarks() -> None:
     # BGR dot color (0,255,0): Red channel (idx 2) is 0 for a dot, 255 for text.
     def is_dot(frame: object, col: int) -> bool:
         import numpy as np  # noqa: PLC0415
+
         a = np.asarray(frame)
         return bool(a[dot_row, col, 1] > 0 and a[dot_row, col, 2] == 0)
 
     state_03 = _make_state(landmarks=[[0.3, 0.85, 0.0]])
-    col_03_raw = int(0.3 * WIDTH)     # 192 in raw space
+    col_03_raw = int(0.3 * WIDTH)  # 192 in raw space
     col_03_mirror = int(0.7 * WIDTH)  # 448 in mirrored space
 
     # Non-mirror: dot at x=0.3 lands at raw col 192
     raw_result = renderer_raw.render(_make_frame(WIDTH, HEIGHT), state_03)
-    assert is_dot(raw_result.frame, col_03_raw), (
-        "Non-mirror: dot at raw x=0.3 must appear at col 192"
-    )
-    assert not is_dot(raw_result.frame, col_03_mirror), (
-        "Non-mirror: dot must NOT appear at mirror col 448"
-    )
+    assert is_dot(
+        raw_result.frame, col_03_raw
+    ), "Non-mirror: dot at raw x=0.3 must appear at col 192"
+    assert not is_dot(
+        raw_result.frame, col_03_mirror
+    ), "Non-mirror: dot must NOT appear at mirror col 448"
 
     # Mirror: dot at raw x=0.3 lands at mirrored col 448
     mirror_result = renderer_mirror.render(_make_frame(WIDTH, HEIGHT), state_03)
-    assert is_dot(mirror_result.frame, col_03_mirror), (
-        "Mirror: dot at raw x=0.3 must appear at mirrored col 448"
-    )
-    assert not is_dot(mirror_result.frame, col_03_raw), (
-        "Mirror: dot must NOT appear at raw col 192"
-    )
+    assert is_dot(
+        mirror_result.frame, col_03_mirror
+    ), "Mirror: dot at raw x=0.3 must appear at mirrored col 448"
+    assert not is_dot(
+        mirror_result.frame, col_03_raw
+    ), "Mirror: dot must NOT appear at raw col 192"
