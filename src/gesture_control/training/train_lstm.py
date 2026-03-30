@@ -12,6 +12,7 @@ from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from gesture_control.training.augmentation import AugmentationConfig
 from gesture_control.training.datamodule import DataSplitConfig, GestureDataModule
 from gesture_control.training.evaluate import EvaluationReport, evaluate_model
 from gesture_control.utils.reproducibility import seed_everything
@@ -64,6 +65,7 @@ class TrainingPipelineConfig:
     split: DataSplitConfig
     scheduler: SchedulerConfig
     export: ExportConfig
+    augmentation: AugmentationConfig | None = None
 
 
 @dataclass(slots=True)
@@ -174,6 +176,22 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
                 export_data.get("feature_schema_version", "feature-schema-v1")
             ),
         ),
+        augmentation=_parse_augmentation_config(payload.get("augmentation")),
+    )
+
+
+def _parse_augmentation_config(
+    aug_data: dict | None,
+) -> AugmentationConfig | None:
+    """Return an AugmentationConfig when the YAML section is present and enabled."""
+    if not aug_data or not aug_data.get("enabled", False):
+        return None
+
+    scale_raw = aug_data.get("temporal_scale_range", [0.8, 1.2])
+    return AugmentationConfig(
+        temporal_scale_range=(float(scale_raw[0]), float(scale_raw[1])),
+        spatial_jitter_sigma=float(aug_data.get("spatial_jitter_sigma", 0.005)),
+        apply_prob=float(aug_data.get("apply_prob", 0.5)),
     )
 
 
@@ -189,6 +207,7 @@ def create_datamodule(
         seed=config.training.seed,
         num_workers=config.training.num_workers,
         pin_memory=False,
+        augmentation=config.augmentation,
     )
     datamodule.setup()
     return datamodule
