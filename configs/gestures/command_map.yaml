@@ -1,0 +1,19 @@
+version: v1
+# Gesture-to-command mapping for the v1 production vocabulary.
+#
+# Each entry maps a stabilized gesture label to a logical command ID.
+# Only gestures listed here will result in dispatched commands when the
+# system is in ARMED mode.
+#
+# The activation_gesture (open_palm_hold) is intentionally omitted here;
+# it is handled exclusively by the GestureActivationController state machine.
+#
+# Command IDs must be present in the adapter's shortcut table.  Unknown
+# command IDs are rejected by CommandDispatcher before reaching any adapter.
+gesture_commands:
+  swipe_right: next_slide
+  swipe_left: previous_slide
+  pinch_hold: mute_toggle
+  fist_hold: start_presentation
+  thumbs_up: raise_hand
+  v_sign: toggle_presenter_tools
