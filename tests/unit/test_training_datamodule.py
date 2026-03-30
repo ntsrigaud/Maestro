@@ -70,11 +70,17 @@ def test_datamodule_split_is_deterministic(tmp_path: Path) -> None:
 
     split = DataSplitConfig(train_ratio=0.7, val_ratio=0.15, test_ratio=0.15)
     dm1 = GestureDataModule(
-        dataset_path=dataset_path, batch_size=16, split=split, seed=99,
+        dataset_path=dataset_path,
+        batch_size=16,
+        split=split,
+        seed=99,
         use_group_split=False,
     )
     dm2 = GestureDataModule(
-        dataset_path=dataset_path, batch_size=16, split=split, seed=99,
+        dataset_path=dataset_path,
+        batch_size=16,
+        split=split,
+        seed=99,
         use_group_split=False,
     )
 
@@ -91,6 +97,7 @@ def test_datamodule_split_is_deterministic(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Helpers for multi-recording dataset
 # ---------------------------------------------------------------------------
+
 
 def _create_multi_recording_dataset(
     path: Path,
@@ -144,6 +151,7 @@ def _create_multi_recording_dataset(
 # ---------------------------------------------------------------------------
 # Group split — leakage prevention
 # ---------------------------------------------------------------------------
+
 
 def test_group_split_no_recording_leakage(tmp_path: Path) -> None:
     """No recording ID should appear in more than one split partition."""
@@ -228,6 +236,7 @@ def test_group_split_fallback_to_random_with_single_recording(
 # Augmentation
 # ---------------------------------------------------------------------------
 
+
 def test_augmented_training_dataset_shape(tmp_path: Path) -> None:
     """AugmentedSequenceTensorDataset must yield tensors with the expected shape."""
     dataset_path = tmp_path / "toy.npz"
@@ -274,9 +283,7 @@ def test_augmentation_not_applied_to_val_test(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("apply_prob", [0.0, 0.5, 1.0])
-def test_augmentation_apply_prob_round_trip(
-    tmp_path: Path, apply_prob: float
-) -> None:
+def test_augmentation_apply_prob_round_trip(tmp_path: Path, apply_prob: float) -> None:
     """DataModule with various apply_prob values must set up without error."""
     dataset_path = tmp_path / "toy.npz"
     _create_dataset(dataset_path)
@@ -292,4 +299,3 @@ def test_augmentation_apply_prob_round_trip(
     )
     dm.setup()
     assert len(dm.train_dataloader().dataset) > 0
-
