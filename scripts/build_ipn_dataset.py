@@ -89,16 +89,16 @@ logger = logging.getLogger(__name__)
 # negative examples under the ``unknown`` class.
 
 IPN_TO_VOCAB: dict[str, str] = {
-    "D0X": "unknown",        # non-gesture background
-    "B0A": "unknown",        # pointing with one finger → negative example
-    "B0B": "unknown",        # pointing with two fingers → negative example
-    "G03": "swipe_up",       # throw up
-    "G04": "swipe_down",     # throw down
-    "G05": "swipe_left",     # throw left
-    "G06": "swipe_right",    # throw right
-    "G07": "open_palm_hold", # open twice (closest to open-palm hold)
-    "G10": "zoom_in",        # zoom in
-    "G11": "zoom_out",       # zoom out
+    "D0X": "unknown",  # non-gesture background
+    "B0A": "unknown",  # pointing with one finger → negative example
+    "B0B": "unknown",  # pointing with two fingers → negative example
+    "G03": "swipe_up",  # throw up
+    "G04": "swipe_down",  # throw down
+    "G05": "swipe_left",  # throw left
+    "G06": "swipe_right",  # throw right
+    "G07": "open_palm_hold",  # open twice (closest to open-palm hold)
+    "G10": "zoom_in",  # zoom in
+    "G11": "zoom_out",  # zoom out
     # G01 click one finger  — skipped (no directional / hold semantic)
     # G02 click two fingers — skipped
     # G08 double click one  — skipped
@@ -115,8 +115,8 @@ class AnnotationRow:
     video: str
     ipn_label: str
     label_id: int
-    t_start: int    # 1-indexed, inclusive
-    t_end: int      # 1-indexed, inclusive
+    t_start: int  # 1-indexed, inclusive
+    t_end: int  # 1-indexed, inclusive
     n_frames: int
 
 
@@ -126,12 +126,12 @@ class VideoLandmarks:
 
     video_stem: str
     fps: float
-    frame_ids: np.ndarray        # shape (N,) int32, 1-indexed
-    valid: np.ndarray            # shape (N,) bool
-    landmarks: np.ndarray        # shape (N, 21, 3) float32
-    detect_conf: np.ndarray      # shape (N,) float32
-    track_conf: np.ndarray       # shape (N,) float32
-    handedness: list[str | None] # length N
+    frame_ids: np.ndarray  # shape (N,) int32, 1-indexed
+    valid: np.ndarray  # shape (N,) bool
+    landmarks: np.ndarray  # shape (N, 21, 3) float32
+    detect_conf: np.ndarray  # shape (N,) float32
+    track_conf: np.ndarray  # shape (N,) float32
+    handedness: list[str | None]  # length N
 
 
 # ---------------------------------------------------------------------------
@@ -267,8 +267,14 @@ def extract_all_landmarks(
         if no_cache and cache_path.exists():
             cache_path.unlink()
 
-        tasks.append((str(video_path), str(cache_path),
-                       min_detection_confidence, min_tracking_confidence))
+        tasks.append(
+            (
+                str(video_path),
+                str(cache_path),
+                min_detection_confidence,
+                min_tracking_confidence,
+            )
+        )
 
     if not tasks:
         logger.warning("No videos to process.")
@@ -296,8 +302,11 @@ def extract_all_landmarks(
                     logger.warning("[%d/%d] FAILED: %s", done, len(tasks), stem)
 
     elapsed = time.perf_counter() - t0
-    logger.info("Landmark extraction complete in %.1fs (%d videos cached).",
-                elapsed, len(result_paths))
+    logger.info(
+        "Landmark extraction complete in %.1fs (%d videos cached).",
+        elapsed,
+        len(result_paths),
+    )
     return result_paths
 
 
@@ -312,14 +321,16 @@ def parse_annotations(annot_path: Path) -> list[AnnotationRow]:
     with annot_path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for record in reader:
-            rows.append(AnnotationRow(
-                video=record["video"].strip(),
-                ipn_label=record["label"].strip(),
-                label_id=int(record["id"]),
-                t_start=int(record["t_start"]),
-                t_end=int(record["t_end"]),
-                n_frames=int(record["frames"]),
-            ))
+            rows.append(
+                AnnotationRow(
+                    video=record["video"].strip(),
+                    ipn_label=record["label"].strip(),
+                    label_id=int(record["id"]),
+                    t_start=int(record["t_start"]),
+                    t_end=int(record["t_end"]),
+                    n_frames=int(record["frames"]),
+                )
+            )
     return rows
 
 
@@ -355,7 +366,9 @@ def _subsample_unknown_segments(
             chosen = rng.sample(source_segs, max_per_source)
             logger.info(
                 "Subsampled unknown source '%s': %d → %d segments.",
-                source_label, len(source_segs), max_per_source,
+                source_label,
+                len(source_segs),
+                max_per_source,
             )
         else:
             chosen = source_segs
@@ -445,8 +458,9 @@ def assemble_dataset(
             # spans generating far more windows than short gesture segments.
             t_end_effective = seg.t_end
             if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
-                t_end_effective = min(seg.t_end,
-                                      seg.t_start + max_unknown_frames_per_segment - 1)
+                t_end_effective = min(
+                    seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1
+                )
 
             seg_windows_before = len(builder.samples)
             for frame_id in range(seg.t_start, t_end_effective + 1):
@@ -476,7 +490,9 @@ def assemble_dataset(
     if missing_cache > 0:
         logger.warning("%d video(s) had no cache and were skipped.", missing_cache)
 
-    logger.info("Assembly complete: %d sliding-window samples generated.", total_windows)
+    logger.info(
+        "Assembly complete: %d sliding-window samples generated.", total_windows
+    )
     return builder
 
 
@@ -487,6 +503,7 @@ def assemble_dataset(
 
 def _compute_class_stats(builder: SequenceDatasetBuilder) -> dict[str, Any]:
     from collections import Counter
+
     label_counts = Counter(s.label for s in builder.samples)
     return {
         "total_samples": len(builder.samples),
@@ -748,8 +765,10 @@ def main() -> None:
     )
 
     if not builder.samples:
-        logger.error("No sequence samples were generated.  Check your annotations, "
-                     "vocabulary, and window settings.")
+        logger.error(
+            "No sequence samples were generated.  Check your annotations, "
+            "vocabulary, and window settings."
+        )
         sys.exit(1)
 
     # -----------------------------------------------------------------------
@@ -763,8 +782,7 @@ def main() -> None:
     logger.info("Class distribution: %s", stats["class_distribution"])
 
     metadata_path = Path(
-        args.metadata_json if args.metadata_json
-        else str(output_npz) + ".metadata.json"
+        args.metadata_json if args.metadata_json else str(output_npz) + ".metadata.json"
     )
     _save_metadata(
         metadata_path=metadata_path,
