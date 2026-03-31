@@ -108,10 +108,10 @@ class TestPowerPointAdapter:
         assert result.success is True
         self.mock_pya.hotkey.assert_called_once_with("f5")
 
-    def test_mute_toggle_uses_ctrl_shift_m(self):
-        result = self.adapter.execute("mute_toggle")
+    def test_toggle_pointer_mode_uses_ctrl_l(self):
+        result = self.adapter.execute("toggle_pointer_mode")
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("ctrl", "shift", "m")
+        self.mock_pya.hotkey.assert_called_once_with("ctrl", "l")
 
     def test_unknown_command_returns_failure(self):
         result = self.adapter.execute("unknown_command_xyz")
@@ -145,10 +145,10 @@ class TestZoomAdapter:
     def test_target_app(self):
         assert self.adapter.target_app == "zoom"
 
-    def test_mute_toggle_uses_alt_a(self):
-        result = self.adapter.execute("mute_toggle")
+    def test_toggle_pointer_mode_uses_alt_f2(self):
+        result = self.adapter.execute("toggle_pointer_mode")
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("alt", "a")
+        self.mock_pya.hotkey.assert_called_once_with("alt", "f2")
 
     def test_raise_hand_uses_alt_y(self):
         result = self.adapter.execute("raise_hand")
@@ -177,7 +177,7 @@ def _make_dispatcher(
     mock_adapter.execute.return_value = DispatchResult(
         success=True, command_id="next_slide", target_app="test_app", detail="ok"
     )
-    cmd_set = allowed if allowed is not None else {"next_slide", "previous_slide", "mute_toggle"}
+    cmd_set = allowed if allowed is not None else {"next_slide", "previous_slide", "raise_hand"}
     dispatcher = CommandDispatcher(
         adapter=mock_adapter,
         allowed_commands=cmd_set,
