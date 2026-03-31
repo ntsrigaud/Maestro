@@ -7,30 +7,36 @@ Following the integration of the IPN Hand dataset, the system retained the origi
 ## Scope of Work
 
 **Vocabulary and Command Map Migration**
+
 - Updated `bootstrap.py` to load `vocabulary_ipn.yaml`, `command_map_ipn.yaml`, and `production_ipn.yaml` as the canonical runtime configuration sources.
 - Replaced v1 gesture entries (`fist_hold`, `thumbs_up`, `v_sign`, `pinch_hold`) with IPN entries (`swipe_up`, `swipe_down`, `zoom_in`, `zoom_out`) throughout the bootstrap default command map.
 - Fixed the command map key from `gesture_command_map` to `gesture_commands` to match the IPN YAML schema.
 - Updated `vocabulary_v1.yaml`, `command_map.yaml`, and `production.yaml` with deprecation notices and forwarded content to prevent misconfiguration if referenced accidentally.
 
 **Domain Layer Alignment**
+
 - Replaced `MUTE_TOGGLE` and `TOGGLE_PRESENTER_TOOLS` in the `CommandID` enum with `TOGGLE_POINTER_MODE` and `EXIT_PRESENTATION`.
 - Updated `powerpoint_adapter.py` and `zoom_adapter.py` shortcut tables to remove legacy entries and add `toggle_pointer_mode` and `exit_presentation` bindings.
 - Updated `KeyboardCommandDispatcher` shortcut maps for both PowerPoint and Zoom adapters.
 
 **Activation State Machine Fixes**
+
 - Corrected `GestureActivationController.route` in IDLE mode: the activation hold timer now begins on the first frame where the activation gesture label exceeds the confidence threshold, regardless of whether the stabiliser has declared `accepted=True`. This eliminates the compounding of the temporal-consistency window on top of the hold requirement.
 - Moved the ARMED idle timeout check before command dispatch, ordering it correctly in the routing logic.
 - Corrected `_last_active_ms` refresh semantics: the timestamp is now updated on any non-unknown gesture, not exclusively on accepted command gestures. This keeps the idle timer alive during natural presentation pauses.
 - Extended `idle_timeout_ms` in `configs/inference.yaml` from 3000 ms to 300 000 ms (5 minutes) and raised the schema upper bound in `InferenceConfig` from 15 000 to 600 000.
 
 **Observability**
+
 - Added structured `DEBUG` and `INFO` log statements to `GestureActivationController.route` covering every state transition, hold progress, idle expiry, command dispatch, and rejected gesture events.
 - Added `DEBUG` log statements to `runtime.py` recording stabilizer output (label, confidence, accepted, reason) and dispatch result (success, detail) for each inference cycle.
 
 **Dependencies**
+
 - Added `pyautogui>=0.9.54` to `pyproject.toml` as an explicit project dependency.
 
 **Documentation**
+
 - Updated `ARCHITECTURE_SPECIFICATION.md` to reflect the IPN gesture vocabulary and revised command semantics.
 - Clarified the `open_palm_hold` mapping to the IPN `G07` (open twice) gesture in `docs/IPN_INTEGRATION_GUIDE.md`.
 
