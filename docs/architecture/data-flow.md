@@ -31,7 +31,7 @@ graph TD
 
 **Component**: `OpenCVFrameSource`  
 **Input**: Webcam hardware stream  
-**Output**: `FramePacket`  
+**Output**: `FramePacket`
 
 | Field          | Type                           | Description                            |
 | -------------- | ------------------------------ | -------------------------------------- |
@@ -45,7 +45,7 @@ The frame source reads from `cv2.VideoCapture` with a buffer size of 1 to minimi
 
 **Component**: `MediaPipeHandsExtractor`  
 **Input**: `FramePacket`  
-**Output**: `LandmarkPacket`  
+**Output**: `LandmarkPacket`
 
 | Field          | Type                            | Description                                        |
 | -------------- | ------------------------------- | -------------------------------------------------- |
@@ -71,7 +71,7 @@ The BGR frame is converted to RGB and processed by MediaPipe Hands. The model ex
 
 **Component**: `LandmarkFeatureTransformer`  
 **Input**: `LandmarkPacket`  
-**Output**: `FeatureFrame`  
+**Output**: `FeatureFrame`
 
 | Field          | Type                       | Description                                        |
 | -------------- | -------------------------- | -------------------------------------------------- |
@@ -102,7 +102,7 @@ If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is em
 
 **Component**: `SlidingWindowSequenceBuffer`  
 **Input**: `FeatureFrame`  
-**Output**: `SequenceWindow` (when ready) or no output (buffer accumulating)  
+**Output**: `SequenceWindow` (when ready) or no output (buffer accumulating)
 
 | Field                | Type                              | Description                                 |
 | -------------------- | --------------------------------- | ------------------------------------------- |
@@ -123,7 +123,7 @@ At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The
 
 **Component**: `GestureLSTMClassifier`  
 **Input**: `SequenceWindow`  
-**Output**: `Prediction`  
+**Output**: `Prediction`
 
 | Field         | Type               | Description                          |
 | ------------- | ------------------ | ------------------------------------ |
@@ -151,7 +151,7 @@ The model runs in `torch.no_grad()` evaluation mode. The output dictionary maps 
 
 **Component**: `PredictionStabilizer`  
 **Input**: `Prediction`  
-**Output**: `StabilizedPrediction`  
+**Output**: `StabilizedPrediction`
 
 | Field        | Type          | Description                               |
 | ------------ | ------------- | ----------------------------------------- |
@@ -188,7 +188,7 @@ Dynamic gestures use vote_window=1 (immediate response). Static holds use vote_w
 
 **Component**: `GestureActivationController`  
 **Input**: `StabilizedPrediction`  
-**Output**: `ExecutableCommand | None`  
+**Output**: `ExecutableCommand | None`
 
 | Field            | Type    | Description                                      |
 | ---------------- | ------- | ------------------------------------------------ |
@@ -211,7 +211,7 @@ Most iterations produce `None` (no command). Commands are emitted approximately 
 
 **Component**: `CommandDispatcher` → `ApplicationAdapter` → `KeyboardAdapter`  
 **Input**: `ExecutableCommand`  
-**Output**: `DispatchResult`  
+**Output**: `DispatchResult`
 
 | Field        | Type   | Description                      |
 | ------------ | ------ | -------------------------------- |
@@ -230,7 +230,7 @@ The dispatch chain applies three validation stages before OS interaction:
 
 **Component**: `KeyboardAdapter`  
 **Input**: Validated key tuple from application adapter  
-**Output**: OS keyboard event  
+**Output**: OS keyboard event
 
 The keyboard adapter invokes `pyautogui.hotkey(*keys)` with the validated key names. Example command-to-key mappings:
 

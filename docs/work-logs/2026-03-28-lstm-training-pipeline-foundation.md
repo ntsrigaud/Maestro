@@ -1,9 +1,11 @@
 # Work Log - LSTM Training Pipeline Foundation
 
 ## Context
+
 This work establishes the first end-to-end LSTM training pipeline baseline, including deterministic dataset loading and split management, model training and evaluation, inference artifact export, and registry updates, while preserving feature-schema parity checks across data and runtime paths.
 
 ## Scope of Work
+
 - Implemented baseline LSTM training pipeline components and training loop orchestration.
 - Implemented data module support for deterministic train/validation/test splitting and DataLoader construction.
 - Implemented model evaluation utility with accuracy, macro-F1, confusion matrix, and calibration metrics.
@@ -15,6 +17,7 @@ This work establishes the first end-to-end LSTM training pipeline baseline, incl
 - Applied Black formatting across touched modules.
 
 ## Technical Changes
+
 - Added training core modules:
 - `src/gesture_control/training/train_lstm.py` for config parsing, model definition, training loop, early stopping, scheduler handling, checkpointing, metrics emission, and run artifact generation.
 - `src/gesture_control/training/datamodule.py` for NPZ ingestion, deterministic split logic, class distribution inspection, and Torch dataloader setup.
@@ -35,6 +38,7 @@ This work establishes the first end-to-end LSTM training pipeline baseline, incl
 - Added generated experiment artifacts under `experiment-model/lstm_v1_20260328T100850Z/` and exported inference artifact under `models/exported/`.
 
 ## Testing and Validation
+
 - Added unit tests:
 - `tests/unit/test_training_datamodule.py` for shape checks and deterministic splitting.
 - `tests/unit/test_training_export.py` for checksum and registry update behavior.
@@ -47,4 +51,5 @@ This work establishes the first end-to-end LSTM training pipeline baseline, incl
 - No test suppressions were added or removed.
 
 ## Outcome
+
 The branch delivers a production-aligned LSTM training foundation with deterministic data handling, reproducible run artifacts, model export and registry integration, and validated quality gates. The system now supports train-to-register flow for `lstm_v1` without breaking existing runtime interfaces.
