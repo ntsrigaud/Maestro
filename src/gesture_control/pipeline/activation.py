@@ -37,6 +37,34 @@ class GestureActivationController:
     not only when an accepted command gesture is recognised.  Combined with a
     generous default ``idle_timeout_ms`` (5 minutes), this prevents the system
     from dropping back to IDLE between the natural pauses of a presentation.
+
+    Edge-trigger dispatch
+    ---------------------
+    When ``edge_trigger_enabled=True`` (the default), a command gesture is only
+    dispatched when the accepted label differs from ``_last_dispatched_label``
+    — the label of the most recently executed command.  ``_last_dispatched_label``
+    is reset to ``unknown`` whenever the prediction returns to the ``unknown``
+    class (the hand goes neutral between gestures).
+
+    **Why not track the previous frame's label?**  An earlier implementation
+    advanced a ``_prev_label`` counter on *every* call to ``route()``, including
+    frames where ``accepted=False``.  The temporal-voting window (``vote_window``
+    = 3 by default) emits 2–3 unaccepted frames of the new gesture label before
+    the first ``accepted=True`` frame.  By the time that eligible frame arrived,
+    ``_prev_label`` already equalled the gesture label — so the edge check saw
+    no change and suppressed every accepted prediction of every second gesture,
+    making the system respond to only one gesture per activation.
+
+    The ``_last_dispatched_label`` approach fixes this: unaccepted frames never
+    advance the counter, so the first accepted prediction of a new gesture always
+    sees a label change relative to the last dispatched command.
+
+    The same-gesture-twice case is handled by the ``unknown`` reset: after the
+    hand returns to neutral between two identical gestures, ``_last_dispatched_label``
+    is cleared, allowing the second occurrence to fire.
+
+    The cooldown remains as a secondary guard against rapid re-triggering in
+    unusual conditions (e.g. alternating accepted/unaccepted despite short hold).
     """
 
     def __init__(
@@ -47,6 +75,7 @@ class GestureActivationController:
         activation_hold_ms: int,
         idle_timeout_ms: int,
         command_cooldown_ms: int,
+        edge_trigger_enabled: bool = True,
         unknown_label: str = "unknown",
     ) -> None:
         self._activation_gesture = activation_gesture
@@ -54,12 +83,17 @@ class GestureActivationController:
         self._activation_hold_ms = activation_hold_ms
         self._idle_timeout_ms = idle_timeout_ms
         self._command_cooldown_ms = command_cooldown_ms
+        self._edge_trigger_enabled = edge_trigger_enabled
         self._unknown_label = unknown_label
 
         self._mode: RuntimeMode = RuntimeMode.IDLE
         self._activation_started_ms: int | None = None
         self._last_active_ms: int = self._now_ms()
         self._cooldown_started_ms: int | None = None
+        # Label of the most recently dispatched command.  Reset to unknown_label
+        # whenever the prediction returns to unknown (hand goes neutral).
+        # See class docstring for the rationale over frame-by-frame label tracking.
+        self._last_dispatched_label: str = unknown_label
 
     @property
     def mode(self) -> RuntimeMode:
@@ -134,6 +168,8 @@ class GestureActivationController:
             if elapsed >= self._activation_hold_ms:
                 self._mode = RuntimeMode.ARMED
                 self._activation_started_ms = None
+                # Clear dispatch memory so that re-arming always starts fresh.
+                self._last_dispatched_label = self._unknown_label
                 LOGGER.info(
                     "activation: IDLE → ARMED  gesture=%r  held_ms=%d",
                     prediction.label,
@@ -154,10 +190,30 @@ class GestureActivationController:
                 )
                 return None
 
-            if is_unknown or is_activation:
+            if is_unknown:
+                # Hand returned to neutral — clear the dispatch memory so that
+                # performing the same gesture again (after a rest) fires normally.
+                self._last_dispatched_label = self._unknown_label
+                return None
+
+            if is_activation:
                 return None
 
             if not prediction.accepted:
+                return None
+
+            # Edge-trigger guard: dispatch only when the accepted label differs
+            # from the last dispatched command label.  Unaccepted frames never
+            # advance _last_dispatched_label, so the 2-3 unaccepted buildup frames
+            # from temporal voting do not consume the rising edge.
+            if (
+                self._edge_trigger_enabled
+                and prediction.label == self._last_dispatched_label
+            ):
+                LOGGER.debug(
+                    "activation: edge_trigger suppressed  label=%r  (same as last dispatch)",
+                    prediction.label,
+                )
                 return None
 
             command_id = self._command_map.get(prediction.label)
@@ -168,6 +224,7 @@ class GestureActivationController:
                 )
                 return None
 
+            self._last_dispatched_label = prediction.label
             self._mode = RuntimeMode.COOLDOWN
             self._cooldown_started_ms = now
             LOGGER.info(

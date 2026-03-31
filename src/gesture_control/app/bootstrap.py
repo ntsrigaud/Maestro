@@ -120,6 +120,7 @@ def build_container(
         activation_hold_ms=config.inference.activation_hold_ms,
         idle_timeout_ms=config.inference.idle_timeout_ms,
         command_cooldown_ms=config.inference.command_cooldown_ms,
+        edge_trigger_enabled=config.inference.edge_trigger_enabled,
     )
     dispatcher = _build_dispatcher(
         active_app=config.app.active_app,

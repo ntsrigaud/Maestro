@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from gesture_control.domain.entities import StabilizedPrediction
+from gesture_control.domain.entities import ExecutableCommand, StabilizedPrediction
 from gesture_control.domain.enums import RuntimeMode
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
@@ -569,3 +569,292 @@ class TestActivationPersistenceAndHold:
             cmd = controller.route(_pred(_ACTIVATION_GESTURE))
         assert cmd is None
         assert controller.mode is RuntimeMode.ARMED
+
+
+# ---------------------------------------------------------------------------
+# Test: Edge-trigger single-dispatch guarantee
+# ---------------------------------------------------------------------------
+
+
+class TestEdgeTriggerSingleDispatch:
+    """Verify the 'one gesture → one command' invariant introduced by edge-
+    trigger detection.
+
+    Scenario modelled:
+        unknown, unknown, swipe_right, swipe_right, swipe_right, unknown
+                                 ↑
+                             dispatch here (rising edge)
+                                         ↑↑↑
+                                  suppressed (same label)
+    """
+
+    def _make_armed_controller(
+        self, edge_trigger_enabled: bool = True
+    ) -> GestureActivationController:
+        ctrl = GestureActivationController(
+            activation_gesture=_ACTIVATION_GESTURE,
+            command_map=_COMMAND_MAP,
+            activation_hold_ms=_ACTIVATION_HOLD_MS,
+            idle_timeout_ms=300_000,
+            command_cooldown_ms=_COOLDOWN_MS,
+            edge_trigger_enabled=edge_trigger_enabled,
+        )
+        # Arm the controller without touching real time.
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+            ctrl.route(_pred(_ACTIVATION_GESTURE, accepted=False))
+        with patch.object(
+            type(ctrl), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
+        ):
+            ctrl.route(_pred(_ACTIVATION_GESTURE))
+        assert ctrl.mode is RuntimeMode.ARMED
+        return ctrl
+
+    # ------------------------------------------------------------------
+    # Core invariant: one swipe → one command
+    # ------------------------------------------------------------------
+
+    def test_single_swipe_dispatches_exactly_once(self):
+        """A stream of repeated swipe_right predictions (simulating overlapping
+        inference windows during a single slow swipe) yields only one command."""
+        ctrl = self._make_armed_controller()
+        t_base = _ACTIVATION_HOLD_MS + 50
+
+        commands = []
+        # Simulate 8 consecutive accepted swipe_right predictions (one per
+        # 100 ms window at step=3, 30 FPS), as produced by a 0.8-second swipe.
+        for i in range(8):
+            t = t_base + i * 100
+            with patch.object(type(ctrl), "_now_ms", staticmethod(lambda _t=t: _t)):
+                cmd = ctrl.route(_pred("swipe_right"))
+            if cmd is not None:
+                commands.append(cmd)
+
+        assert len(commands) == 1, (
+            f"Expected exactly 1 command but got {len(commands)}. "
+            "Edge-trigger failed to suppress repeated predictions."
+        )
+        assert commands[0].command_id == "next_slide"
+
+    def test_gesture_resets_after_unknown_then_redispatches(self):
+        """After the gesture transitions through 'unknown', the next accepted
+        swipe_right occurrence is treated as a new gesture and fires again."""
+        ctrl = self._make_armed_controller()
+        t = _ACTIVATION_HOLD_MS + 50
+
+        # First swipe_right — fires.
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t)):
+            cmd1 = ctrl.route(_pred("swipe_right"))
+        assert cmd1 is not None
+        assert cmd1.command_id == "next_slide"
+
+        # Hand returns to unknown — resets the edge-trigger.
+        t_unknown = t + _COOLDOWN_MS + 10
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_unknown)):
+            no_cmd = ctrl.route(_pred("unknown", accepted=False))
+        assert no_cmd is None
+
+        # Second distinct swipe_right (new gesture) — should fire again.
+        t2 = t_unknown + 50
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t2)):
+            cmd2 = ctrl.route(_pred("swipe_right"))
+        assert cmd2 is not None
+        assert cmd2.command_id == "next_slide"
+
+    def test_repeated_swipe_through_expired_cooldown_still_suppressed(self):
+        """The most critical regression: after COOLDOWN expires, if the swipe
+        gesture is still recognized (slow swipe or EMA lag), the edge-trigger
+        prevents a second dispatch because the label has not changed."""
+        ctrl = self._make_armed_controller()
+        t_base = _ACTIVATION_HOLD_MS + 50
+
+        # First swipe_right — fires, enters COOLDOWN.
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
+            cmd1 = ctrl.route(_pred("swipe_right"))
+        assert cmd1 is not None
+        assert ctrl.mode is RuntimeMode.COOLDOWN
+
+        # Cooldown expires, back to ARMED.  Gesture is still recognized
+        # (slow swipe or EMA memory — the label has not changed).
+        t_after_cool = t_base + _COOLDOWN_MS + 10
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_after_cool)):
+            cmd2 = ctrl.route(_pred("swipe_right"))
+        assert ctrl.mode is RuntimeMode.ARMED
+        assert cmd2 is None, (
+            "Edge-trigger must suppress re-dispatch when the gesture label "
+            "has not changed since the previous prediction."
+        )
+
+    def test_different_gesture_after_cooldown_does_dispatch(self):
+        """A *different* gesture after cooldown must fire normally — edge
+        triggering should not block genuinely new command gestures."""
+        ctrl = self._make_armed_controller()
+        t_base = _ACTIVATION_HOLD_MS + 50
+
+        # swipe_right fires.
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
+            cmd1 = ctrl.route(_pred("swipe_right"))
+        assert cmd1 is not None
+
+        # After cooldown, a swipe_left arrives — different label → fires.
+        t_after = t_base + _COOLDOWN_MS + 10
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_after)):
+            cmd2 = ctrl.route(_pred("swipe_left"))
+        assert cmd2 is not None
+        assert cmd2.command_id == "previous_slide"
+
+    def test_edge_trigger_disabled_falls_back_to_cooldown_only(self):
+        """When edge_trigger_enabled=False, the controller falls back to
+        legacy cooldown-only behaviour: same gesture dispatches again after
+        the cooldown window."""
+        ctrl = self._make_armed_controller(edge_trigger_enabled=False)
+        t_base = _ACTIVATION_HOLD_MS + 50
+
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
+            cmd1 = ctrl.route(_pred("swipe_right"))
+        assert cmd1 is not None
+
+        # After cooldown, same gesture fires again (legacy behaviour).
+        t_after = t_base + _COOLDOWN_MS + 10
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_after)):
+            cmd2 = ctrl.route(_pred("swipe_right"))
+        assert cmd2 is not None, (
+            "With edge_trigger_enabled=False the cooldown-only guard should "
+            "allow re-dispatch after the cooldown window expires."
+        )
+
+    # ------------------------------------------------------------------
+    # Full pipeline: prediction stream → dispatcher
+    # ------------------------------------------------------------------
+
+    def test_full_pipeline_single_swipe_one_dispatch(self):
+        """End-to-end: a realistic prediction stream for one swipe gesture
+        (unknown × 2, swipe_right × 5, unknown × 2) calls pyautogui exactly
+        once."""
+        ctrl = self._make_armed_controller()
+        kb = KeyboardAdapter()
+        adapter = PowerPointAdapter(keyboard=kb)
+        dispatcher = CommandDispatcher(
+            adapter=adapter,
+            allowed_commands=frozenset(_COMMAND_MAP.values()),
+            rate_limit_per_window=10,
+            rate_limit_window_ms=5000,
+        )
+
+        prediction_stream = [
+            _pred("unknown", accepted=False),
+            _pred("unknown", accepted=False),
+            _pred("swipe_right"),  # rising edge → dispatch
+            _pred("swipe_right"),  # suppressed by edge-trigger
+            _pred("swipe_right"),  # suppressed
+            _pred("swipe_right"),  # suppressed
+            _pred("swipe_right"),  # suppressed
+            _pred("unknown", accepted=False),
+            _pred("unknown", accepted=False),
+        ]
+
+        dispatched = []
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            t = _ACTIVATION_HOLD_MS + 50
+            for pred in prediction_stream:
+                with patch.object(type(ctrl), "_now_ms", staticmethod(lambda _t=t: _t)):
+                    cmd = ctrl.route(pred)
+                if cmd is not None:
+                    result = dispatcher.dispatch(cmd)
+                    if result.success:
+                        dispatched.append(cmd)
+                t += 100  # 100 ms per window
+
+        assert len(dispatched) == 1, f"Expected 1 dispatch but got {len(dispatched)}"
+        assert dispatched[0].command_id == "next_slide"
+        mock_pya.hotkey.assert_called_once_with("right")
+
+    def test_temporal_voting_buildup_does_not_consume_rising_edge(self):
+        """Regression test for the _prev_label / _last_dispatched_label bug.
+
+        With vote_window=3, the stabiliser emits 2 *unaccepted* frames of a
+        new gesture before the first ``accepted=True`` frame.  The old
+        ``_prev_label`` implementation advanced the tracker on every call
+        (including uanccepted calls), so by the time the first eligible
+        accepted frame arrived, ``prev_label`` already equalled the gesture
+        label and the edge-trigger suppressed it.  Every second gesture in a
+        session was silently dropped.
+
+        The fix: compare against ``_last_dispatched_label`` (only updated on
+        actual dispatch, reset to unknown on neutral prediction).  Unaccepted
+        frames must never consume the rising edge.
+        """
+        ctrl = self._make_armed_controller()
+        t_base = _ACTIVATION_HOLD_MS + 50
+
+        # --- First gesture: swipe_right fires normally ---
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
+            cmd1 = ctrl.route(_pred("swipe_right"))
+        assert cmd1 is not None
+        assert cmd1.command_id == "next_slide"
+
+        # --- COOLDOWN + reset: gesture ends, hand goes neutral ---
+        t_rest = t_base + _COOLDOWN_MS + 20
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_rest)):
+            ctrl.route(_pred("unknown", accepted=False))
+
+        # --- Second gesture: swipe_left builds up via temporal voting ---
+        # Frames 1 and 2: stabiliser not yet temporally consistent → accepted=False
+        t1 = t_rest + 50
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t1)):
+            no_cmd = ctrl.route(_pred("swipe_left", accepted=False))
+        assert no_cmd is None
+
+        t2 = t1 + 100
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t2)):
+            no_cmd = ctrl.route(_pred("swipe_left", accepted=False))
+        assert no_cmd is None
+
+        # Frame 3: vote window satisfied → accepted=True.  The rising edge
+        # must fire here; unaccepted frames must not have consumed it.
+        t3 = t2 + 100
+        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t3)):
+            cmd2 = ctrl.route(_pred("swipe_left", accepted=True))
+        assert cmd2 is not None, (
+            "Second gesture suppressed. Unaccepted temporal-voting frames "
+            "must not advance the edge-trigger counter (_prev_label regression)."
+        )
+        assert cmd2.command_id == "previous_slide"
+
+    def test_sequential_swipe_right_then_left_then_right(self):
+        """Three sequential distinct gestures must each fire exactly once,
+        regardless of whether the same label is re-used later."""
+        ctrl = self._make_armed_controller()
+        t = _ACTIVATION_HOLD_MS + 50
+
+        def _route(label: str, accepted: bool = True) -> ExecutableCommand | None:
+            nonlocal t
+            with patch.object(type(ctrl), "_now_ms", staticmethod(lambda _t=t: _t)):
+                cmd = ctrl.route(_pred(label, accepted))
+            t += 150
+            return cmd
+
+        # Gesture 1: swipe_right
+        cmd1 = _route("swipe_right")
+        assert cmd1 is not None and cmd1.command_id == "next_slide"
+
+        # Cooldown + neutral
+        for _ in range(8):
+            _route("unknown", accepted=False)
+
+        # Gesture 2: temporal buildup (2 unaccepted) then accepted
+        assert _route("swipe_left", accepted=False) is None
+        assert _route("swipe_left", accepted=False) is None
+        cmd2 = _route("swipe_left", accepted=True)
+        assert cmd2 is not None and cmd2.command_id == "previous_slide"
+
+        # Cooldown + neutral
+        for _ in range(8):
+            _route("unknown", accepted=False)
+
+        # Gesture 3: same label as gesture 1 — must fire again after neutral reset
+        assert _route("swipe_right", accepted=False) is None
+        assert _route("swipe_right", accepted=False) is None
+        cmd3 = _route("swipe_right", accepted=True)
+        assert cmd3 is not None and cmd3.command_id == "next_slide"
