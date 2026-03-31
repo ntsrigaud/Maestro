@@ -76,21 +76,7 @@ python scripts/build_ipn_dataset.py \
     --num-workers 4
 ```
 
-For custom data collection, see `docs/DATASET_RECORDING_WORKFLOW.md`:
-
-```bash
-python scripts/collect_data.py \
-    --label swipe_right \
-    --recording-id rec-swipe-right \
-    --output-jsonl data/raw/labeled_landmarks.jsonl \
-    --interactive
-
-python scripts/build_dataset.py \
-    --input-jsonl data/raw/labeled_landmarks.jsonl \
-    --output-npz data/processed/gesture_dataset.npz \
-    --config-dir configs \
-    --label-strategy majority
-```
+Legacy custom webcam collection material has been removed. Contributors should follow `docs/IPN_INTEGRATION_GUIDE.md` for the canonical dataset workflow.
 
 ## Model Training
 
@@ -101,7 +87,7 @@ python scripts/train_model.py \
     --config-dir configs
 ```
 
-The training pipeline includes group-aware data splitting (no recording leakage), data augmentation (temporal scaling + spatial jitter), early stopping, and class-weighted loss. See `docs/DATA_COLLECTION_GUIDE.md` for details.
+The training pipeline includes group-aware data splitting (no recording leakage), data augmentation (temporal scaling + spatial jitter), early stopping, and class-weighted loss.
 
 ## Implementation Status
 

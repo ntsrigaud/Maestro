@@ -18,8 +18,8 @@ This work establishes the data-collection baseline required for supervised gestu
 - Integrated recording path with application bootstrap services to reuse camera and landmark extractor infrastructure.
 - Implemented JSONL serialization for labeled landmark records with confidence, handedness, validity, frame index, and timestamp metadata.
 - Added structured terminal lifecycle markers and summary metrics for recording sessions.
-- Added `docs/DATASET_RECORDING_WORKFLOW.md` covering repository component audit, validated JSONL schema, executable recording/build command sequences, artifact verification steps, and operational recommendations.
-- Updated `README.md` with dataset recording/build section and quickstart command examples linked to the workflow guide.
+- Added a dataset recording workflow guide covering repository component audit, validated JSONL schema, executable recording/build command sequences, artifact verification steps, and operational recommendations. This guide was later retired after migration to the IPN-based training workflow.
+- Updated `README.md` with dataset recording/build section and quickstart command examples for the workflow that existed at that time.
 
 ## Testing and Validation
 
