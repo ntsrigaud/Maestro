@@ -30,6 +30,11 @@ class InferenceConfig(BaseModel):
     # use where users pause between interactions for extended periods.
     idle_timeout_ms: int = Field(ge=500, le=600_000)
     command_cooldown_ms: int = Field(ge=100, le=5000)
+    # When True (default), a command gesture is only dispatched on its rising
+    # edge — the first frame where the label *changes* from the previous label.
+    # This prevents repeated commands from a single slow gesture that produces
+    # many consecutive accepted predictions across overlapping inference windows.
+    edge_trigger_enabled: bool = True
 
 
 class FeaturePipelineConfig(BaseModel):
