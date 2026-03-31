@@ -38,13 +38,13 @@ video,label,id,t_start,t_end,frames
 1CM1_4_R__229,G06,9,2351,2391,41
 ```
 
-Both `t_start` and `t_end` are 1-indexed, inclusive frame numbers.  The
+Both `t_start` and `t_end` are 1-indexed, inclusive frame numbers. The
 `frames` column equals `t_end − t_start + 1`.
 
 ### 1.2 Video Properties
 
-| Property    | Value        |
-|-------------|-------------|
+| Property    | Value       |
+| ----------- | ----------- |
 | Format      | AVI (MJPEG) |
 | Resolution  | 640 × 480   |
 | Frame rate  | 30 FPS      |
@@ -55,7 +55,7 @@ Both `t_start` and `t_end` are 1-indexed, inclusive frame numbers.  The
 ### 1.3 Participant Diversity
 
 | Participant | Videos | Hand         |
-|-------------|--------|--------------|
+| ----------- | ------ | ------------ |
 | 1CM1        | 16     | Right (all)  |
 | 1CM42       | 64     | Right (all)  |
 | 1CV12       | 48     | Right + Left |
@@ -65,35 +65,35 @@ All 4 participants contributed across train and test splits.
 
 ### 1.4 Gesture Classes
 
-| ID  | Code | Gesture                      |
-|-----|------|------------------------------|
-| 1   | D0X  | Non-gesture                  |
-| 2   | B0A  | Pointing with one finger     |
-| 3   | B0B  | Pointing with two fingers    |
-| 4   | G01  | Click with one finger        |
-| 5   | G02  | Click with two fingers       |
-| 6   | G03  | Throw up                     |
-| 7   | G04  | Throw down                   |
-| 8   | G05  | Throw left                   |
-| 9   | G06  | Throw right                  |
-| 10  | G07  | Open twice                   |
-| 11  | G08  | Double click with one finger |
-| 12  | G09  | Double click with two fingers|
-| 13  | G10  | Zoom in                      |
-| 14  | G11  | Zoom out                     |
+| ID  | Code | Gesture                       |
+| --- | ---- | ----------------------------- |
+| 1   | D0X  | Non-gesture                   |
+| 2   | B0A  | Pointing with one finger      |
+| 3   | B0B  | Pointing with two fingers     |
+| 4   | G01  | Click with one finger         |
+| 5   | G02  | Click with two fingers        |
+| 6   | G03  | Throw up                      |
+| 7   | G04  | Throw down                    |
+| 8   | G05  | Throw left                    |
+| 9   | G06  | Throw right                   |
+| 10  | G07  | Open twice                    |
+| 11  | G08  | Double click with one finger  |
+| 12  | G09  | Double click with two fingers |
+| 13  | G10  | Zoom in                       |
+| 14  | G11  | Zoom out                      |
 
 **Class balance**: each gesture class (G01–G11) has exactly 200 instances
-across all 200 videos.  D0X has 1 431 instances; B0A and B0B each have
+across all 200 videos. D0X has 1 431 instances; B0A and B0B each have
 ~1 000 instances.
 
 **Gesture duration statistics (all mapped classes, n = 4 218)**:
 
-| Stat      | Frames | Seconds at 30 FPS |
-|-----------|--------|-------------------|
-| Min       | 9      | 0.3 s             |
-| Max       | 650    | 21.7 s            |
-| Mean      | 140    | 4.7 s             |
-| Median    | 112    | 3.7 s             |
+| Stat   | Frames | Seconds at 30 FPS |
+| ------ | ------ | ----------------- |
+| Min    | 9      | 0.3 s             |
+| Max    | 650    | 21.7 s            |
+| Mean   | 140    | 4.7 s             |
+| Median | 112    | 3.7 s             |
 
 The LSTM window is 24 frames (0.8 s), so most gesture segments comfortably
 contain multiple non-overlapping windows.
@@ -105,37 +105,50 @@ contain multiple non-overlapping windows.
 ### 2.1 IPN → Production Vocabulary
 
 The original production vocabulary targets a presentation and meeting
-controller.  The IPN dataset provides strong coverage for directional swipe
+controller. The IPN dataset provides strong coverage for directional swipe
 gestures and an open-palm hold but cannot supply data for fist, thumbs-up,
 v-sign, or pinch poses without additional custom recording.
 
 A revised vocabulary derived entirely from IPN data is defined in
 `configs/gestures/vocabulary_ipn.yaml`:
 
-| Vocabulary Class  | IPN Source | Semantic Command           | Match Quality |
-|-------------------|-----------|----------------------------|---------------|
-| `open_palm_hold`  | G07       | Activation / toggle UI     | Approximate   |
-| `swipe_right`     | G06       | Next slide                 | Direct        |
-| `swipe_left`      | G05       | Previous slide             | Direct        |
-| `swipe_up`        | G03       | Raise hand / next section  | Direct        |
-| `swipe_down`      | G04       | Start / stop presentation  | Direct        |
-| `zoom_in`         | G10       | Zoom in                    | Direct        |
-| `zoom_out`        | G11       | Zoom out                   | Direct        |
-| `unknown`         | D0X + B0A + B0B | No-gesture / noise  | Direct        |
+| Vocabulary Class | IPN Source      | Semantic Command          | Match Quality |
+| ---------------- | --------------- | ------------------------- | ------------- |
+| `open_palm_hold` | G07             | Activation / toggle UI    | Approximate   |
+| `swipe_right`    | G06             | Next slide                | Direct        |
+| `swipe_left`     | G05             | Previous slide            | Direct        |
+| `swipe_up`       | G03             | Raise hand / next section | Direct        |
+| `swipe_down`     | G04             | Start / stop presentation | Direct        |
+| `zoom_in`        | G10             | Zoom in                   | Direct        |
+| `zoom_out`       | G11             | Zoom out                  | Direct        |
+| `unknown`        | D0X + B0A + B0B | No-gesture / noise        | Direct        |
+
+> **`open_palm_hold` alias rationale** — IPN G07 is annotated as "Open twice"
+> (the performer opens their hand from a partial to fully open pose, twice in
+> quick succession). No IPN class captures a _static_ open-palm hold, so G07
+> is the nearest approximation: the double-open motion naturally involves the
+> palm facing the camera in an open state. During dataset assembly
+> (`scripts/build_ipn_dataset.py`) G07 frames are labeled `open_palm_hold`.
+> The trained model (`lstm_v1_20260330T181558Z`, `training_data_version:
+ipn_dataset`) uses this label in its `class_labels` array.
+> **Retraining is not required** — vocabulary, model, and runtime are fully
+> consistent. The "Approximate" match quality above reflects the semantic
+> distance between G07 ("Open twice") and the intended gesture ("Open palm
+> hold"), not a data or label error.
 
 ### 2.2 Omitted IPN Classes
 
-| IPN Code | Gesture                       | Reason Omitted                          |
-|----------|-------------------------------|------------------------------------------|
-| G01      | Click with one finger         | No directional or hold semantic          |
-| G02      | Click with two fingers        | No directional or hold semantic          |
-| G08      | Double click with one finger  | No directional or hold semantic          |
-| G09      | Double click with two fingers | No directional or hold semantic          |
+| IPN Code | Gesture                       | Reason Omitted                  |
+| -------- | ----------------------------- | ------------------------------- |
+| G01      | Click with one finger         | No directional or hold semantic |
+| G02      | Click with two fingers        | No directional or hold semantic |
+| G08      | Double click with one finger  | No directional or hold semantic |
+| G09      | Double click with two fingers | No directional or hold semantic |
 
 ### 2.3 Command Mapping
 
 Update `configs/app.yaml` and `configs/thresholds/production_ipn.yaml` when
-deploying a model trained on the IPN vocabulary.  The IPN threshold config
+deploying a model trained on the IPN vocabulary. The IPN threshold config
 is already provided at `configs/thresholds/production_ipn.yaml`.
 
 ---
@@ -184,7 +197,7 @@ IPN Videos (AVI, 30 FPS)
 ### 3.2 Feature Dimensions
 
 | Component       | Frames | Features per frame | Total dims |
-|-----------------|--------|--------------------|------------|
+| --------------- | ------ | ------------------ | ---------- |
 | Position (21×3) | 24     | 63                 | 126        |
 | Velocity (21×3) | 24     | 63                 | 126        |
 | **Sequence**    | 24     | **126**            |            |
@@ -196,7 +209,7 @@ This matches `input_size: 126` in `configs/model/lstm_default.yaml` exactly.
 - **No stride at extraction**: all frames are read sequentially to preserve
   MediaPipe's temporal tracking quality.
 - **Annotation boundaries**: only frames within `[t_start, t_end]` for each
-  gesture segment are fed to the dataset builder.  The rest are cached but
+  gesture segment are fed to the dataset builder. The rest are cached but
   ignored during assembly.
 - **Sliding windows**: the builder emits one window every `window_step = 3`
   frames once the buffer reaches `window_length = 24` frames.
@@ -231,7 +244,7 @@ python scripts/build_ipn_dataset.py \
 ```
 
 On a modern laptop with 4 cores, extraction takes approximately 15–30 minutes
-per run.  Subsequent runs reuse the per-video caches and complete in under
+per run. Subsequent runs reuse the per-video caches and complete in under
 5 minutes.
 
 ### 4.2 Use Original IPN Train/Test Splits
@@ -300,51 +313,52 @@ python scripts/train_model.py \
 ```
 
 The vocabulary is already embedded in the dataset NPZ by `build_ipn_dataset.py`
-(under the `vocabulary` key in `metadata_json`).  `train_model.py` reads it
+(under the `vocabulary` key in `metadata_json`). `train_model.py` reads it
 from there — no separate `--vocab-config` flag is needed or accepted.
 
 ---
 
 ## 6. Configuration Files Added
 
-| File                                          | Purpose                                |
-|-----------------------------------------------|----------------------------------------|
-| `configs/gestures/vocabulary_ipn.yaml`        | 8-class IPN-native gesture vocabulary  |
-| `configs/thresholds/production_ipn.yaml`      | Inference thresholds for IPN classes   |
-| `scripts/build_ipn_dataset.py`                | IPN video processing pipeline          |
+| File                                     | Purpose                               |
+| ---------------------------------------- | ------------------------------------- |
+| `configs/gestures/vocabulary_ipn.yaml`   | 8-class IPN-native gesture vocabulary |
+| `configs/thresholds/production_ipn.yaml` | Inference thresholds for IPN classes  |
+| `scripts/build_ipn_dataset.py`           | IPN video processing pipeline         |
 
 ---
 
 ## 7. Key Script Options Reference
 
-| Flag                                  | Default               | Description                                          |
-|---------------------------------------|-----------------------|------------------------------------------------------|
-| `--ipn-root`                          | `data/IPN`            | Dataset root directory                               |
-| `--output-npz`                        | *(required)*          | Output NPZ path                                      |
-| `--annotation-file`                   | `Annot_List.txt`      | Which annotation file to process                     |
-| `--vocab-config`                      | vocabulary_ipn.yaml   | Vocabulary definition                                |
-| `--num-workers`                       | `1`                   | Parallel extraction workers (0 = all cores)          |
-| `--no-cache`                          | off                   | Force re-extraction of all videos                    |
-| `--max-unknown-segments-per-source`   | `150`                 | Subsample unknown segments per source class          |
-| `--max-unknown-frames-per-segment`    | `60`                  | Cap unknown segment frame count                      |
-| `--window-length`                     | `24`                  | Sliding window length (frames)                       |
-| `--window-step`                       | `3`                   | Window step size (frames)                            |
-| `--min-valid-ratio`                   | `0.8`                 | Min fraction of valid frames to emit a window        |
-| `--label-strategy`                    | `majority`            | Window label assignment (`majority` or `last`)       |
-| `--min-detection-confidence`          | `0.7`                 | MediaPipe detection confidence threshold             |
-| `--min-tracking-confidence`           | `0.5`                 | MediaPipe tracking confidence threshold              |
-| `--enable-orientation-normalization`  | off                   | Enable palm orientation normalisation                |
-| `--seed`                              | `42`                  | Random seed for unknown segment sampling             |
+| Flag                                 | Default             | Description                                    |
+| ------------------------------------ | ------------------- | ---------------------------------------------- |
+| `--ipn-root`                         | `data/IPN`          | Dataset root directory                         |
+| `--output-npz`                       | _(required)_        | Output NPZ path                                |
+| `--annotation-file`                  | `Annot_List.txt`    | Which annotation file to process               |
+| `--vocab-config`                     | vocabulary_ipn.yaml | Vocabulary definition                          |
+| `--num-workers`                      | `1`                 | Parallel extraction workers (0 = all cores)    |
+| `--no-cache`                         | off                 | Force re-extraction of all videos              |
+| `--max-unknown-segments-per-source`  | `150`               | Subsample unknown segments per source class    |
+| `--max-unknown-frames-per-segment`   | `60`                | Cap unknown segment frame count                |
+| `--window-length`                    | `24`                | Sliding window length (frames)                 |
+| `--window-step`                      | `3`                 | Window step size (frames)                      |
+| `--min-valid-ratio`                  | `0.8`               | Min fraction of valid frames to emit a window  |
+| `--label-strategy`                   | `majority`          | Window label assignment (`majority` or `last`) |
+| `--min-detection-confidence`         | `0.7`               | MediaPipe detection confidence threshold       |
+| `--min-tracking-confidence`          | `0.5`               | MediaPipe tracking confidence threshold        |
+| `--enable-orientation-normalization` | off                 | Enable palm orientation normalisation          |
+| `--seed`                             | `42`                | Random seed for unknown segment sampling       |
 
 ---
 
 ## 8. Compatibility Notes
 
 The output NPZ from `build_ipn_dataset.py` is fully compatible with
-`GestureDataModule` and the existing training pipeline.  No changes to
+`GestureDataModule` and the existing training pipeline. No changes to
 `datamodule.py`, `train_lstm.py`, or the feature transformer are required.
 
 The only pipeline difference from custom-collected data is the vocabulary:
+
 - Use `configs/gestures/vocabulary_ipn.yaml` instead of `vocabulary_v1.yaml`
 - Update inference to load `configs/thresholds/production_ipn.yaml`
 - Pass the IPN vocab to `run_realtime.py` via its `--vocab-config` flag

@@ -472,41 +472,48 @@ Dependency wiring is centralized in bootstrap composition root.
 
 ---
 
-## 5. Gesture Vocabulary Design (6 to 8 Gestures)
+## 5. Gesture Vocabulary Design (IPN Dataset — 8 Gestures)
 
-### 5.1 Recommended production vocabulary (7 gestures)
+### 5.1 Production vocabulary (8 gestures, IPN dataset)
 
-1. open_palm_hold
+1. open_palm_hold (IPN: G07 — "Open twice")
 
-- Command: arm/disarm interaction
+- Command: arm/disarm interaction (activation gesture)
+- Note: `open_palm_hold` is the production vocabulary label for IPN G07
+  ("Open twice"). During dataset assembly, G07 frames (the double open-hand
+  motion) are labeled `open_palm_hold` because that motion most closely
+  approximates the open-palm activation cue in a presentation context. The
+  trained model (`lstm_v1_20260330T181558Z`) was built with this label;
+  **no retraining is required**. The mapping is marked "Approximate" in
+  `docs/IPN_INTEGRATION_GUIDE.md` § 2.1.
 
-2. swipe_right
+2. swipe_right (IPN: G06)
 
-- Command: next slide
+- Command: next_slide
 
-3. swipe_left
+3. swipe_left (IPN: G05)
 
-- Command: previous slide
+- Command: previous_slide
 
-4. fist_hold
+4. swipe_up (IPN: G03)
 
-- Command: start presentation or toggle black screen
+- Command: raise_hand
 
-5. thumbs_up
+5. swipe_down (IPN: G04)
 
-- Command: confirm/start action
+- Command: start_presentation
 
-6. v_sign
+6. zoom_in (IPN: G10)
 
-- Command: toggle presenter tools
+- Command: toggle_pointer_mode
 
-7. pinch_hold
+7. zoom_out (IPN: G11)
 
-- Command: mute/unmute microphone
+- Command: exit_presentation
 
-Optional class:
+8. unknown (IPN: D0X + B0A + B0B)
 
-- raise_hand_hold for meeting raise-hand shortcut
+- Command: none (no-gesture / noise class)
 
 ### 5.2 Vocabulary design rules
 
@@ -531,7 +538,7 @@ Optional class:
 ### 6.2 Suggested thresholds (initial production defaults)
 
 - Activation hold: 600 ms
-- Idle timeout: 3.0 s
+- Idle timeout: 300 000 ms (5 min) — configured via `idle_timeout_ms` in `configs/inference.yaml`
 - Base acceptance threshold: 0.85
 - Critical commands threshold: 0.90
 - Stability rule: same class accepted in 3 consecutive decisions
