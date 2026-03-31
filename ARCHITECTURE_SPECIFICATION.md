@@ -186,6 +186,7 @@ project_root/
       process-view.md
       physical-view.md
       data-flow.md
+      gaze-aware-activation.md
   tools/
     lint.sh
     test.sh
