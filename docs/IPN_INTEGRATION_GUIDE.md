@@ -357,12 +357,13 @@ The output NPZ from `build_ipn_dataset.py` is fully compatible with
 `GestureDataModule` and the existing training pipeline. No changes to
 `datamodule.py`, `train_lstm.py`, or the feature transformer are required.
 
-The only pipeline difference from custom-collected data is the vocabulary:
+The bootstrap module (`src/gesture_control/app/bootstrap.py`) already loads
+the IPN-specific configuration files directly:
 
-- Use `configs/gestures/vocabulary_ipn.yaml` instead of `vocabulary_v1.yaml`
-- Update inference to load `configs/thresholds/production_ipn.yaml`
-- Pass the IPN vocab to `run_realtime.py` via its `--vocab-config` flag
+- `configs/gestures/vocabulary_ipn.yaml`
+- `configs/gestures/command_map_ipn.yaml`
+- `configs/thresholds/production_ipn.yaml`
 
-For real-time inference with an IPN-trained model, the command mappings in
-`configs/app.yaml` should be updated to reflect the new class names
-(e.g., `swipe_up` → raise hand, `swipe_down` → stop presentation).
+No command-line flags are required to switch vocabularies at inference time;
+`run_realtime.py` simply calls `main()` which invokes `build_container()`,
+and the IPN configs are hardcoded in `bootstrap.py`.

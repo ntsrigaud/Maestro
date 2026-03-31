@@ -86,13 +86,15 @@ project_root/
   configs/
     app.yaml
     inference.yaml
+    logging.yaml
     model/
+      feature_pipeline.yaml
       lstm_default.yaml
     gestures/
-      vocabulary_v1.yaml
+      vocabulary_ipn.yaml
+      command_map_ipn.yaml
     thresholds/
-      production.yaml
-    logging.yaml
+      production_ipn.yaml
   src/
     gesture_control/
       __init__.py
@@ -121,7 +123,6 @@ project_root/
         mediapipe/
           hands_extractor.py
         model/
-          torch_lstm_model.py
           checkpoint_loader.py
         dispatch/
           keyboard_dispatcher.py   # legacy stub (superseded)
@@ -133,15 +134,13 @@ project_root/
             zoom_adapter.py        # Zoom shortcut table
         feedback/
           overlay_renderer.py
-          metrics_logger.py
       pipeline/
-        preprocess.py
         feature_engineering.py
         buffering.py
-        inferencer.py
         stabilization.py
         activation.py
       training/
+        augmentation.py
         dataset_builder.py
         datamodule.py
         train_lstm.py
@@ -149,10 +148,9 @@ project_root/
         export_checkpoint.py
       evaluation/
         benchmark_latency.py
-        benchmark_accuracy.py
-        false_trigger_eval.py
       utils/
         config_loader.py
+        feature_validation.py
         time_utils.py
         schema_validation.py
         reproducibility.py
@@ -167,11 +165,10 @@ project_root/
     registry.json
   experiments/
     runs/
-    reports/
-    notebooks/
   scripts/
     collect_data.py
     build_dataset.py
+    build_ipn_dataset.py
     train_model.py
     run_realtime.py
     benchmark_system.py
@@ -181,14 +178,14 @@ project_root/
     system/
     fixtures/
   docs/
+    IPN_INTEGRATION_GUIDE.md
     architecture/
-      system_design.md
-      api_contracts.md
-      decision_records/
-    operations/
-      deployment.md
-      runbook.md
-      troubleshooting.md
+      system-overview.md
+      logical-view.md
+      development-view.md
+      process-view.md
+      physical-view.md
+      data-flow.md
   tools/
     lint.sh
     test.sh
@@ -401,7 +398,7 @@ ICommandDispatcher         (interfaces/command_dispatcher.py)
 
 **Gesture-to-command mapping**:
 
-- Loaded from `configs/gestures/command_map.yaml` at startup by `bootstrap.py`.
+- Loaded from `configs/gestures/command_map_ipn.yaml` at startup by `bootstrap.py`.
 - Passed to `GestureActivationController` (gesture → command_id resolution) and
   used to build the `CommandDispatcher` allowlist (frozenset of command_id values).
 - Fallback to hardcoded defaults if the YAML is absent.
@@ -571,17 +568,17 @@ AND cooldown expired
 ```
 
 `_last_dispatched_label` is updated **only when a command is actually
-dispatched**, never on unaccepted frames.  This is critical because the
-temporal stabiliser (vote\_window=3) emits 2–3 consecutive `accepted=False`
-frames before the first dispatchable `accepted=True` frame.  An earlier
-implementation tracked `_prev_label` on *every* call, which caused those
+dispatched**, never on unaccepted frames. This is critical because the
+temporal stabiliser (vote*window=3) emits 2–3 consecutive `accepted=False`
+frames before the first dispatchable `accepted=True` frame. An earlier
+implementation tracked `_prev_label` on \_every* call, which caused those
 unaccepted buildup frames to consume the rising edge — silently dropping all
 gestures after the first.
 
 `_last_dispatched_label` is reset to `unknown` when:
 
-* the prediction returns to `unknown` (hand goes neutral), or
-* the controller re-enters the ARMED state from IDLE.
+- the prediction returns to `unknown` (hand goes neutral), or
+- the controller re-enters the ARMED state from IDLE.
 
 A new gesture fires exactly once — on its first `accepted=True` frame — after
 either a different label was last dispatched, or the hand went neutral since
@@ -793,9 +790,9 @@ Acceptance gates:
 
 ### 9.3 Gesture vocabulary and threshold definitions
 
-- Keep vocabulary in configs/gestures/vocabulary_v1.yaml.
-- Keep class-specific thresholds in configs/thresholds/production.yaml.
-- Keep command mappings in configs/app.yaml by target integration adapter.
+- Keep vocabulary in configs/gestures/vocabulary_ipn.yaml.
+- Keep class-specific thresholds in configs/thresholds/production_ipn.yaml.
+- Keep command mappings in configs/gestures/command_map_ipn.yaml by target integration adapter.
 
 ### 9.4 Reproducibility controls
 
