@@ -6,6 +6,7 @@ OS-level side-effects.  ``pyautogui`` is patched at the module level of
 ``keyboard_adapter`` so the allowlist logic still runs, but no actual
 keystrokes are sent.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -44,7 +45,9 @@ _IDLE_TIMEOUT_MS = 3000
 _COOLDOWN_MS = 800
 
 
-def _pred(label: str, accepted: bool = True, confidence: float = 0.95) -> StabilizedPrediction:
+def _pred(
+    label: str, accepted: bool = True, confidence: float = 0.95
+) -> StabilizedPrediction:
     return StabilizedPrediction(label=label, confidence=confidence, accepted=accepted)
 
 
@@ -76,7 +79,9 @@ def _make_dispatcher(
     return dispatcher, mock_pya
 
 
-def _arm_controller(controller: GestureActivationController, mock_time: MagicMock) -> None:
+def _arm_controller(
+    controller: GestureActivationController, mock_time: MagicMock
+) -> None:
     """Drive controller from IDLE → ARMED via activation hold."""
     t0 = 1000
     mock_time.return_value = t0
@@ -97,7 +102,11 @@ class TestActivationStateMachine:
             controller.route(_pred(_ACTIVATION_GESTURE))
         assert controller.mode is RuntimeMode.IDLE  # still waiting for hold
 
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 1000 + _ACTIVATION_HOLD_MS + 1)):
+        with patch.object(
+            type(controller),
+            "_now_ms",
+            staticmethod(lambda: 1000 + _ACTIVATION_HOLD_MS + 1),
+        ):
             controller.route(_pred(_ACTIVATION_GESTURE))
         assert controller.mode is RuntimeMode.ARMED
 
@@ -119,9 +128,13 @@ class TestActivationStateMachine:
         controller = _make_controller()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
             controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)):
+        with patch.object(
+            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
+        ):
             controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)):
+        with patch.object(
+            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)
+        ):
             controller.route(_pred("swipe_right"))
         assert controller.mode is RuntimeMode.COOLDOWN
 
@@ -129,11 +142,19 @@ class TestActivationStateMachine:
         controller = _make_controller()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
             controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)):
+        with patch.object(
+            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
+        ):
             controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)):
+        with patch.object(
+            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)
+        ):
             controller.route(_pred("swipe_right"))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + _COOLDOWN_MS + 10)):
+        with patch.object(
+            type(controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + _COOLDOWN_MS + 10),
+        ):
             cmd = controller.route(_pred("swipe_left"))
         assert cmd is not None
         assert cmd.command_id == "previous_slide"
@@ -142,12 +163,18 @@ class TestActivationStateMachine:
         controller = _make_controller()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
             controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 100)):
+        with patch.object(
+            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 100)
+        ):
             controller.route(_pred(_ACTIVATION_GESTURE))
         assert controller.mode is RuntimeMode.ARMED
 
         # Simulate no gesture for longer than idle timeout
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + _IDLE_TIMEOUT_MS + 200)):
+        with patch.object(
+            type(controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + _IDLE_TIMEOUT_MS + 200),
+        ):
             controller.route(_pred("unknown", accepted=False))
         assert controller.mode is RuntimeMode.IDLE
 
@@ -155,9 +182,13 @@ class TestActivationStateMachine:
         controller = _make_controller()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
             controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)):
+        with patch.object(
+            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
+        ):
             controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)):
+        with patch.object(
+            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)
+        ):
             cmd = controller.route(_pred("unknown_gesture_xyz"))
         assert cmd is None
         assert controller.mode is RuntimeMode.ARMED
@@ -192,12 +223,20 @@ class TestGestureDispatchPipeline:
     def _arm(self, t0: int = 0) -> None:
         with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: t0)):
             self.controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: t0 + _ACTIVATION_HOLD_MS + 1)):
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: t0 + _ACTIVATION_HOLD_MS + 1),
+        ):
             self.controller.route(_pred(_ACTIVATION_GESTURE))
 
     def test_swipe_right_dispatches_next_slide(self):
         self._arm()
-        with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 50)):
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
+        ):
             cmd = self.controller.route(_pred("swipe_right"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
@@ -206,7 +245,11 @@ class TestGestureDispatchPipeline:
 
     def test_swipe_left_dispatches_previous_slide(self):
         self._arm()
-        with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 50)):
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
+        ):
             cmd = self.controller.route(_pred("swipe_left"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
@@ -215,19 +258,33 @@ class TestGestureDispatchPipeline:
 
     def test_swipe_up_dispatches_raise_hand(self):
         self._arm()
-        with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 50)):
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
+        ):
             cmd = self.controller.route(_pred("swipe_up"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("ctrl", "shift", "k")  # PowerPoint raise_hand
+        self.mock_pya.hotkey.assert_called_once_with(
+            "ctrl", "shift", "k"
+        )  # PowerPoint raise_hand
 
     def test_command_dispatched_exactly_once_per_gesture(self):
         self._arm()
-        with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 50)):
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
+        ):
             cmd = self.controller.route(_pred("swipe_right"))
         # During cooldown the same gesture produces no second command
-        with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 100)):
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 100),
+        ):
             cmd2 = self.controller.route(_pred("swipe_right"))
         assert cmd is not None
         assert cmd2 is None  # cooldown suppresses repeat
@@ -236,6 +293,7 @@ class TestGestureDispatchPipeline:
         """Even if a command somehow bypasses the activation controller,
         the dispatcher allowlist is the last line of defense."""
         from gesture_control.domain.entities import ExecutableCommand
+
         bad_cmd = ExecutableCommand(
             command_id="delete_everything",
             source_gesture="unknown",
@@ -249,7 +307,11 @@ class TestGestureDispatchPipeline:
     def test_adapter_exception_does_not_crash_pipeline(self):
         self.mock_pya.hotkey.side_effect = OSError("display error")
         self._arm()
-        with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 50)):
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
+        ):
             cmd = self.controller.route(_pred("swipe_right"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
@@ -362,11 +424,15 @@ class TestActivationPersistenceAndHold:
             command_cooldown_ms=_COOLDOWN_MS,
         )
         activation_pred = StabilizedPrediction(
-            label=_ACTIVATION_GESTURE, confidence=0.93, accepted=False,
+            label=_ACTIVATION_GESTURE,
+            confidence=0.93,
+            accepted=False,
             reason="temporal_inconsistency",
         )
         unknown_pred = StabilizedPrediction(
-            label="unknown", confidence=0.40, accepted=False,
+            label="unknown",
+            confidence=0.40,
+            accepted=False,
             reason="below_threshold_or_unknown",
         )
         # Timer starts at T=0.
@@ -417,9 +483,7 @@ class TestActivationPersistenceAndHold:
 
         # 3 minutes later — only unknown predictions (no hand gesture).
         t_3min = _ACTIVATION_HOLD_MS + 180_000
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: t_3min)
-        ):
+        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_3min)):
             controller.route(_pred("unknown", accepted=False))
         assert controller.mode is RuntimeMode.ARMED  # still armed after 3 min
 
@@ -433,9 +497,7 @@ class TestActivationPersistenceAndHold:
 
         # One millisecond past the 5-minute window → IDLE.
         t_expired = _ACTIVATION_HOLD_MS + long_timeout_ms + 2
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: t_expired)
-        ):
+        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_expired)):
             controller.route(_pred("unknown", accepted=False))
         assert controller.mode is RuntimeMode.IDLE
 
@@ -460,9 +522,7 @@ class TestActivationPersistenceAndHold:
 
         # At T=4 000 ms (within 5 s timeout), user makes swipe_right → dispatch.
         t_swipe = 4_000
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: t_swipe)
-        ):
+        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_swipe)):
             controller.route(_pred("swipe_right"))
         # In cooldown now; _last_active_ms was refreshed to t_swipe.
 
@@ -476,17 +536,13 @@ class TestActivationPersistenceAndHold:
 
         # 4 999 ms after the swipe — still within the reset window.
         t_near = t_swipe + idle_timeout_ms - 1
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: t_near)
-        ):
+        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_near)):
             controller.route(_pred("unknown", accepted=False))
         assert controller.mode is RuntimeMode.ARMED
 
         # 5 001 ms after the swipe — idle timeout expires from the swipe.
         t_over = t_swipe + idle_timeout_ms + 2
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: t_over)
-        ):
+        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_over)):
             controller.route(_pred("unknown", accepted=False))
         assert controller.mode is RuntimeMode.IDLE
 
