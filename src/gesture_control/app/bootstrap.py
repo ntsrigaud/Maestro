@@ -230,10 +230,10 @@ def _load_command_map(path: Path) -> dict[str, str]:
     _defaults: dict[str, str] = {
         "swipe_right": "next_slide",
         "swipe_left": "previous_slide",
-        "swipe_up": "raise_hand",
-        "swipe_down": "start_presentation",
+        "swipe_up": "start_presentation",
+        "swipe_down": "exit_presentation",
         "zoom_in": "toggle_pointer_mode",
-        "zoom_out": "exit_presentation",
+        "zoom_out": "raise_hand",
     }
     if not path.exists():
         return _defaults

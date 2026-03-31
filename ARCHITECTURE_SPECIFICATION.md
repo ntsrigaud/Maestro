@@ -494,11 +494,11 @@ Dependency wiring is centralized in bootstrap composition root.
 
 4. swipe_up (IPN: G03)
 
-- Command: raise_hand
+- Command: start_presentation
 
 5. swipe_down (IPN: G04)
 
-- Command: start_presentation
+- Command: exit_presentation
 
 6. zoom_in (IPN: G10)
 
@@ -506,7 +506,7 @@ Dependency wiring is centralized in bootstrap composition root.
 
 7. zoom_out (IPN: G11)
 
-- Command: exit_presentation
+- Command: raise_hand
 
 8. unknown (IPN: D0X + B0A + B0B)
 
