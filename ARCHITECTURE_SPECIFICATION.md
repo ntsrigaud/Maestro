@@ -476,9 +476,16 @@ Dependency wiring is centralized in bootstrap composition root.
 
 ### 5.1 Production vocabulary (8 gestures, IPN dataset)
 
-1. open_palm_hold (IPN: G07)
+1. open_palm_hold (IPN: G07 — "Open twice")
 
 - Command: arm/disarm interaction (activation gesture)
+- Note: `open_palm_hold` is the production vocabulary label for IPN G07
+  ("Open twice"). During dataset assembly, G07 frames (the double open-hand
+  motion) are labeled `open_palm_hold` because that motion most closely
+  approximates the open-palm activation cue in a presentation context. The
+  trained model (`lstm_v1_20260330T181558Z`) was built with this label;
+  **no retraining is required**. The mapping is marked "Approximate" in
+  `docs/IPN_INTEGRATION_GUIDE.md` § 2.1.
 
 2. swipe_right (IPN: G06)
 
@@ -531,7 +538,7 @@ Dependency wiring is centralized in bootstrap composition root.
 ### 6.2 Suggested thresholds (initial production defaults)
 
 - Activation hold: 600 ms
-- Idle timeout: 3.0 s
+- Idle timeout: 300 000 ms (5 min) — configured via `idle_timeout_ms` in `configs/inference.yaml`
 - Base acceptance threshold: 0.85
 - Critical commands threshold: 0.90
 - Stability rule: same class accepted in 3 consecutive decisions
