@@ -71,4 +71,5 @@ class RuntimeState:
     mode: str
     last_label: str = "unknown"
     last_confidence: float = 0.0
+    gaze_permitted: bool = True
     info: dict[str, Any] = field(default_factory=dict)
