@@ -6,7 +6,7 @@ LOGGER = logging.getLogger(__name__)
 
 try:
     import pyautogui as pyautogui  # noqa: PLC0414  (re-exported for patching)
-except ImportError:  # pragma: no cover
+except Exception:  # pragma: no cover
     pyautogui = None  # type: ignore[assignment]
 
 # Allowlisted key names accepted by pyautogui.hotkey().
