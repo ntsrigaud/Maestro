@@ -24,7 +24,6 @@ from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

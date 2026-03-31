@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from typing import Any
 
 from gesture_control.domain.entities import DispatchResult, ExecutableCommand
 from gesture_control.infrastructure.dispatch.app_adapters.base import (

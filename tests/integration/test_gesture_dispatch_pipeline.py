@@ -11,9 +11,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from gesture_control.domain.entities import DispatchResult, StabilizedPrediction
+from gesture_control.domain.entities import StabilizedPrediction
 from gesture_control.domain.enums import RuntimeMode
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
