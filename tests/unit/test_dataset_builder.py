@@ -58,14 +58,14 @@ def test_sequence_extraction_and_shape_consistency() -> None:
 
 def test_label_alignment_majority_strategy() -> None:
     builder = SequenceDatasetBuilder(
-        vocabulary=["swipe_right", "fist_hold", "unknown"],
+        vocabulary=["swipe_right", "swipe_up", "unknown"],
         window_length=5,
         window_step=1,
         min_valid_ratio=0.8,
         label_strategy="majority",
     )
 
-    labels = ["swipe_right", "swipe_right", "fist_hold", "swipe_right", "fist_hold"]
+    labels = ["swipe_right", "swipe_right", "swipe_up", "swipe_right", "swipe_up"]
     for i, label in enumerate(labels):
         builder.add_frame(_frame(i, label=label))
 
