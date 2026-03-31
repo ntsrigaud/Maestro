@@ -1,19 +1,17 @@
-version: v1
-# Gesture-to-command mapping for the v1 production vocabulary.
+version: ipn_v1
+# DEPRECATED: Original v1 gesture vocabulary mapping.
+# This file has been updated to use the IPN gesture vocabulary.
+# The canonical mapping is configs/gestures/command_map_ipn.yaml.
 #
-# Each entry maps a stabilized gesture label to a logical command ID.
-# Only gestures listed here will result in dispatched commands when the
-# system is in ARMED mode.
+# Gesture-to-command mapping for the IPN-derived gesture vocabulary.
+# The activation_gesture (open_palm_hold / G07) is handled exclusively by
+# GestureActivationController and is intentionally omitted here.
 #
-# The activation_gesture (open_palm_hold) is intentionally omitted here;
-# it is handled exclusively by the GestureActivationController state machine.
-#
-# Command IDs must be present in the adapter's shortcut table.  Unknown
-# command IDs are rejected by CommandDispatcher before reaching any adapter.
+# Command IDs must be present in the adapter's shortcut table.
 gesture_commands:
   swipe_right: next_slide
   swipe_left: previous_slide
-  pinch_hold: mute_toggle
-  fist_hold: start_presentation
-  thumbs_up: raise_hand
-  v_sign: toggle_presenter_tools
+  swipe_up: raise_hand
+  swipe_down: start_presentation
+  zoom_in: toggle_pointer_mode
+  zoom_out: exit_presentation
