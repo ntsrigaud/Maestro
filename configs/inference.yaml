@@ -11,3 +11,21 @@ command_cooldown_ms: 1000
 # primary guard against a single slow swipe firing multiple commands across
 # consecutive overlapping inference windows.
 edge_trigger_enabled: true
+
+# Gaze-aware activation gate.  The gesture pipeline is bypassed unless the
+# head-pose estimate indicates the user is directing attention toward the
+# camera.  Set enabled: false to restore the original gesture-only behaviour.
+gaze:
+  enabled: true
+  # Maximum absolute yaw and pitch deviations (degrees) within which a face
+  # is considered camera-directed.
+  yaw_threshold_deg: 30
+  pitch_threshold_deg: 25
+  # Continuous gaze duration (ms) required before the system arms.
+  arm_ms: 500
+  # Grace period (ms) before an armed system is forced back to IDLE after
+  # gaze is lost. Default 5000 ms (5 s) tolerates natural head movements.
+  grace_ms: 5000
+  # Face Mesh sampling rate.  Call MediaPipe every N frames; cache the
+  # result for intermediate frames.  At 30 FPS, N=3 gives ~10 Hz sampling.
+  sample_interval_frames: 3
