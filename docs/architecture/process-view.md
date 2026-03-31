@@ -21,18 +21,21 @@ The runtime event loop processes one frame per iteration:
 ```mermaid
 graph TD
     Start([Loop Start]) --> Capture["1. Frame Capture<br/>OpenCVFrameSource.read()"]
-    Capture --> Extract["2. Landmark Extraction<br/>MediaPipeHandsExtractor.extract()"]
-    Extract --> Transform["3. Feature Transform<br/>LandmarkFeatureTransformer.transform()"]
-    Transform --> Buffer["4. Buffer Push<br/>SlidingWindowSequenceBuffer.push()"]
+    Capture --> Gaze["2. Gaze Estimation<br/>HeadPoseGazeDetector.update()"]
+    Gaze --> GazeOk{Gaze Permitted?}
+    GazeOk -->|No| Render
+    GazeOk -->|Yes| Extract["3. Landmark Extraction<br/>MediaPipeHandsExtractor.extract()"]
+    Extract --> Transform["4. Feature Transform<br/>LandmarkFeatureTransformer.transform()"]
+    Transform --> Buffer["5. Buffer Push<br/>SlidingWindowSequenceBuffer.push()"]
     Buffer --> Ready{Buffer Ready?}
     Ready -->|No| Render
-    Ready -->|Yes| Infer["5. LSTM Inference<br/>GestureLSTMClassifier.predict()"]
-    Infer --> Stabilize["6. Stabilize<br/>PredictionStabilizer.update()"]
-    Stabilize --> Activate["7. Activation Routing<br/>GestureActivationController.route()"]
+    Ready -->|Yes| Infer["6. LSTM Inference<br/>GestureLSTMClassifier.predict()"]
+    Infer --> Stabilize["7. Stabilize<br/>PredictionStabilizer.update()"]
+    Stabilize --> Activate["8. Activation Routing<br/>GestureActivationController.route()"]
     Activate --> HasCmd{Command?}
-    HasCmd -->|Yes| Dispatch["8. Dispatch<br/>CommandDispatcher.dispatch()"]
+    HasCmd -->|Yes| Dispatch["9. Dispatch<br/>CommandDispatcher.dispatch()"]
     HasCmd -->|No| Render
-    Dispatch --> Render["9. Render Overlay<br/>OverlayRenderer.render()"]
+    Dispatch --> Render["10. Render Overlay<br/>OverlayRenderer.render()"]
     Render --> Display["Display Frame<br/>cv2.imshow()"]
     Display --> KeyCheck{Key Press?}
     KeyCheck -->|Q / ESC| Shutdown([Graceful Shutdown])
@@ -43,32 +46,60 @@ graph TD
 
 At 30 FPS target, each loop iteration has a ~33 ms budget. The pipeline stages consume approximately:
 
-| Stage               | Typical Latency | Notes                                         |
-| ------------------- | --------------- | --------------------------------------------- |
-| Frame Capture       | 1–2 ms          | Blocks until frame available; buffer size = 1 |
-| Landmark Extraction | 15–25 ms        | MediaPipe CPU inference; primary bottleneck   |
-| Feature Transform   | < 1 ms          | NumPy array operations                        |
-| Buffer Push         | < 0.1 ms        | Deque append                                  |
-| LSTM Inference      | 20–30 ms        | PyTorch CPU forward pass (when buffer ready)  |
-| Stabilization       | < 0.1 ms        | EMA + deque lookup                            |
-| Activation Routing  | < 0.1 ms        | State machine transition                      |
-| Command Dispatch    | < 1 ms          | pyautogui call (when command emitted)         |
-| Overlay Render      | 1–2 ms          | OpenCV text/rectangle drawing                 |
+| Stage               | Typical Latency | Notes                                               |
+| ------------------- | --------------- | --------------------------------------------------- |
+| Frame Capture       | 1–2 ms          | Blocks until frame available; buffer size = 1       |
+| Gaze Estimation     | 1–2 ms          | MediaPipe Face Mesh amortized; runs at ⅓ frame rate |
+| Landmark Extraction | 15–25 ms        | MediaPipe CPU inference; skipped if gaze absent     |
+| Feature Transform   | < 1 ms          | NumPy array operations                              |
+| Buffer Push         | < 0.1 ms        | Deque append                                        |
+| LSTM Inference      | 20–30 ms        | PyTorch CPU forward pass (when buffer ready)        |
+| Stabilization       | < 0.1 ms        | EMA + deque lookup                                  |
+| Activation Routing  | < 0.1 ms        | State machine transition                            |
+| Command Dispatch    | < 1 ms          | pyautogui call (when command emitted)               |
+| Overlay Render      | 1–2 ms          | OpenCV text/rectangle drawing                       |
 
-**Total end-to-end**: ~40–60 ms per frame (without inference), ~60–80 ms when inference triggers. LSTM inference does not execute every frame—it triggers approximately every 3 frames (100 ms at 30 FPS) due to the sliding window step size.
+**Total end-to-end (gaze active)**: ~40–60 ms per frame (without LSTM inference), ~60–80 ms when inference triggers. Gaze estimation adds ~1–2 ms amortized per frame because Face Mesh is sampled at 10 Hz (every 3rd frame) and the result is cached. When gaze is absent, the per-frame cost drops to ~3–5 ms (capture + gaze check + render).
 
-## 4. Activation State Machine
+## 4. Gaze-Aware Activation Design
 
-The `GestureActivationController` implements a three-state finite state machine that governs the system's interaction protocol:
+### 4.1 Gaze Intent Detector State Machine
+
+The proposed `HeadPoseGazeDetector` maintains an independent four-state machine that acts as the outermost pipeline gate:
+
+```mermaid
+stateDiagram-v2
+    [*] --> GAZE_ABSENT
+
+    GAZE_ABSENT --> GAZE_ACQUIRING : Head pose within threshold
+    GAZE_ACQUIRING --> GAZE_ACTIVE : Stable gaze for >= 500 ms
+    GAZE_ACQUIRING --> GAZE_ABSENT : Gaze broken before threshold
+    GAZE_ACTIVE --> GAZE_LOSING : Head pose leaves threshold
+    GAZE_LOSING --> GAZE_ACTIVE : Gaze recovered within grace period
+    GAZE_LOSING --> GAZE_ABSENT : Grace period elapsed (5 s)
+```
+
+**GAZE_ABSENT**: No face detected or head pose exceeds angular thresholds. All hand landmark extraction, LSTM inference, and activation routing are bypassed. Any ongoing gesture activation hold timer is reset.
+
+**GAZE_ACQUIRING**: A qualifying head pose has been detected. An internal stability timer starts. The gesture pipeline remains inactive until the state advances to GAZE_ACTIVE, preventing instantaneous arming when the user glances briefly toward the camera.
+
+**GAZE_ACTIVE**: Head pose has been within thresholds continuously for `gaze_arm_ms` (default 500 ms). The downstream gesture pipeline is fully operational. This is the only state in which `GestureActivationController.route()` is invoked.
+
+**GAZE_LOSING**: Head pose has left the acceptance window. A grace timer starts. If the user looks back before the grace period elapses (`gaze_grace_ms`, default 5000 ms), no state change in the gesture controller occurs. This prevents disarming during natural head movements mid-presentation.
+
+### 4.2 Gesture Activation State Machine
+
+The `GestureActivationController` implements a three-state finite state machine that governs command emission. It operates only while the gaze detector is in GAZE_ACTIVE:
 
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
 
-    IDLE --> ARMED : open_palm_hold held ≥ 600 ms
+    IDLE --> ARMED : open_palm_hold held >= 600 ms
     ARMED --> COOLDOWN : Command dispatched (edge trigger)
     ARMED --> IDLE : Idle timeout (300 s without gesture)
     COOLDOWN --> ARMED : Cooldown timer expires (1000 ms)
+    ARMED --> IDLE : Gaze lost beyond grace period
 ```
 
 ### State Descriptions

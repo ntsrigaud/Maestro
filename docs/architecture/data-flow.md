@@ -8,21 +8,23 @@ This document describes the complete data flow through the real-time inference p
 
 ```mermaid
 graph TD
-    A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| B["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
-    B -->|LandmarkPacket| C["Feature Engineering<br/>(Normalize + Velocity, 126-d)"]
-    C -->|FeatureFrame| D["Temporal Buffer<br/>(Sliding Window, 24x126)"]
-    D -->|SequenceWindow| E["LSTM Classifier<br/>(2-Layer, Hidden=128, 8-Class)"]
-    E -->|Prediction| F["Prediction Stabilizer<br/>(EMA + Threshold + Voting)"]
-    F -->|StabilizedPrediction| G["Activation Controller<br/>(IDLE / ARMED / COOLDOWN)"]
-    G -->|ExecutableCommand| H["Command Dispatcher<br/>(Allowlist + Rate Limit)"]
-    H -->|DispatchResult| I["Keyboard Adapter<br/>(pyautogui)"]
-    I -->|OS Key Event| J["Target Application"]
+    A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| B["Gaze Estimation<br/>(Face Mesh + Head Pose)"]
+    B -->|gaze_permitted=false| Z["Skip to next frame"]
+    B -->|gaze_permitted=true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
+    C -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 126-d)"]
+    D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 24x126)"]
+    E -->|SequenceWindow| F["LSTM Classifier<br/>(2-Layer, Hidden=128, 8-Class)"]
+    F -->|Prediction| G["Prediction Stabilizer<br/>(EMA + Threshold + Voting)"]
+    G -->|StabilizedPrediction| H["Activation Controller<br/>(IDLE / ARMED / COOLDOWN)"]
+    H -->|ExecutableCommand| I["Command Dispatcher<br/>(Allowlist + Rate Limit)"]
+    I -->|DispatchResult| J["Keyboard Adapter<br/>(pyautogui)"]
+    J -->|OS Key Event| K["Target Application"]
 
-    D -.->|Buffer incomplete| K["Skip to next frame"]
+    E -.->|Buffer incomplete| Z
 
     style A fill:#e1f5fe
-    style J fill:#e8f5e9
-    style K fill:#fff3e0
+    style K fill:#e8f5e9
+    style Z fill:#fff3e0
 ```
 
 ## 3. Stage-by-Stage Description
