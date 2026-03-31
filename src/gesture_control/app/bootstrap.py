@@ -69,9 +69,9 @@ def build_container(
 ) -> AppContainer:
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
-    thresholds = _load_thresholds(config_root / "thresholds" / "production.yaml")
-    vocabulary = _load_vocabulary(config_root / "gestures" / "vocabulary_v1.yaml")
-    command_map = _load_command_map(config_root / "gestures" / "command_map.yaml")
+    thresholds = _load_thresholds(config_root / "thresholds" / "production_ipn.yaml")
+    vocabulary = _load_vocabulary(config_root / "gestures" / "vocabulary_ipn.yaml")
+    command_map = _load_command_map(config_root / "gestures" / "command_map_ipn.yaml")
 
     frame_source = OpenCVFrameSource(
         camera_index=config.app.camera_index,
@@ -225,21 +225,21 @@ def _load_vocabulary(path: Path) -> dict[str, Any]:
 
 
 def _load_command_map(path: Path) -> dict[str, str]:
-    """Load gesture→command_id mapping from YAML; fall back to defaults."""
+    """Load gesture→command_id mapping from YAML; fall back to IPN defaults."""
     _defaults: dict[str, str] = {
         "swipe_right": "next_slide",
         "swipe_left": "previous_slide",
-        "pinch_hold": "mute_toggle",
-        "fist_hold": "start_presentation",
-        "thumbs_up": "raise_hand",
-        "v_sign": "toggle_presenter_tools",
+        "swipe_up": "raise_hand",
+        "swipe_down": "start_presentation",
+        "zoom_in": "toggle_pointer_mode",
+        "zoom_out": "exit_presentation",
     }
     if not path.exists():
         return _defaults
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
         return _defaults
-    mapping = payload.get("gesture_command_map", {})
+    mapping = payload.get("gesture_commands", {})
     if not isinstance(mapping, dict):
         return _defaults
     return {str(k): str(v) for k, v in mapping.items() if k and v}
@@ -258,6 +258,7 @@ def _build_dispatcher(
         adapter = ZoomAdapter(keyboard=keyboard)
     else:
         import logging as _logging
+
         _logging.getLogger(__name__).warning(
             "Unknown active_app=%r — defaulting to PowerPointAdapter", active_app
         )

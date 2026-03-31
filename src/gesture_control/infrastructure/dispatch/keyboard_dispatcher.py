@@ -18,18 +18,18 @@ class KeyboardCommandDispatcher:
         "powerpoint": {
             "next_slide": "Right",
             "previous_slide": "Left",
-            "mute_toggle": "Ctrl+Shift+M",
             "raise_hand": "Ctrl+Shift+K",
             "start_presentation": "F5",
-            "toggle_presenter_tools": "Ctrl+Shift+F10",
+            "toggle_pointer_mode": "Ctrl+L",
+            "exit_presentation": "Escape",
         },
         "zoom": {
             "next_slide": "Right",
             "previous_slide": "Left",
-            "mute_toggle": "Alt+A",
             "raise_hand": "Alt+Y",
             "start_presentation": "Alt+F5",
-            "toggle_presenter_tools": "Alt+F1",
+            "toggle_pointer_mode": "Alt+F2",
+            "exit_presentation": "Escape",
         },
     }
 
