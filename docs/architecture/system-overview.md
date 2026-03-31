@@ -19,13 +19,13 @@ The system recognizes eight gesture classes derived from the IPN Hand dataset:
 | `open_palm_hold` | Static (activation) | System activation trigger |
 | `swipe_right`    | Dynamic             | Next slide                |
 | `swipe_left`     | Dynamic             | Previous slide            |
-| `swipe_up`       | Dynamic             | Raise hand                |
-| `swipe_down`     | Dynamic             | Start presentation        |
+| `swipe_up`       | Dynamic             | Start presentation        |
+| `swipe_down`     | Dynamic             | Exit presentation         |
 | `zoom_in`        | Dynamic             | Toggle pointer mode       |
-| `zoom_out`       | Dynamic             | Exit presentation         |
+| `zoom_out`       | Dynamic             | Raise hand                |
 | `unknown`        | Rejection class     | No action                 |
 
-The `open_palm_hold` gesture serves as the activation trigger: the user must hold an open palm for a configurable duration (default 600 ms) to transition the system from idle to armed mode before command gestures are accepted.
+The `open_palm_hold` gesture serves as the activation trigger: the user must hold an open palm for a configurable duration (default 600 ms) to transition the system from idle to armed mode before command gestures are accepted. Once armed, `swipe_up` enters slideshow mode, `swipe_down` exits it, and the swipe_left/right pair navigates between slides.
 
 ## 4. High-Level Architecture
 
