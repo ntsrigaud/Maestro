@@ -1,21 +1,30 @@
+# DEPRECATED: This file referenced the legacy v1 gesture vocabulary.
+# The system now uses the IPN gesture vocabulary exclusively.
+# See production_ipn.yaml for the active configuration.
+#
+# Forwarding to IPN vocabulary thresholds to prevent misconfiguration if
+# this path is referenced accidentally:
+
 acceptance:
   default: 0.85
   critical: 0.90
+
 class_thresholds:
-  open_palm_hold: 0.9
+  open_palm_hold: 0.90
   swipe_right: 0.80
   swipe_left: 0.80
-  fist_hold: 0.9
-  thumbs_up: 0.85
-  v_sign: 0.85
-  pinch_hold: 0.85
-  unknown: 1.0
+  swipe_up: 0.80
+  swipe_down: 0.80
+  zoom_in: 0.85
+  zoom_out: 0.85
+  unknown: 1.00
+
 class_vote_windows:
   open_palm_hold: 3
   swipe_right: 1
   swipe_left: 1
-  fist_hold: 3
-  thumbs_up: 3
-  v_sign: 3
-  pinch_hold: 2
+  swipe_up: 1
+  swipe_down: 1
+  zoom_in: 2
+  zoom_out: 2
   unknown: 1

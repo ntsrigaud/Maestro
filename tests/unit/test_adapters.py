@@ -3,6 +3,7 @@
 All tests run without any OS side-effects because pyautogui.hotkey is
 patched throughout.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -23,13 +24,14 @@ from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
-def _command(command_id: str = "next_slide", gesture: str = "swipe_right") -> ExecutableCommand:
+def _command(
+    command_id: str = "next_slide", gesture: str = "swipe_right"
+) -> ExecutableCommand:
     return ExecutableCommand(
         command_id=command_id,
         source_gesture=gesture,
@@ -45,13 +47,17 @@ def _command(command_id: str = "next_slide", gesture: str = "swipe_right") -> Ex
 class TestKeyboardAdapter:
     def test_valid_keys_call_pyautogui(self):
         adapter = KeyboardAdapter()
-        with patch("gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui") as mock_pya:
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
             adapter.press_hotkey("ctrl", "right")
             mock_pya.hotkey.assert_called_once_with("ctrl", "right")
 
     def test_single_valid_key(self):
         adapter = KeyboardAdapter()
-        with patch("gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui") as mock_pya:
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
             adapter.press_hotkey("f5")
             mock_pya.hotkey.assert_called_once_with("f5")
 
@@ -67,7 +73,9 @@ class TestKeyboardAdapter:
 
     def test_invalid_key_never_calls_pyautogui(self):
         adapter = KeyboardAdapter()
-        with patch("gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui") as mock_pya:
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
             with pytest.raises(ValueError):
                 adapter.press_hotkey("ctrl", "malicious")
             mock_pya.hotkey.assert_not_called()
@@ -108,10 +116,10 @@ class TestPowerPointAdapter:
         assert result.success is True
         self.mock_pya.hotkey.assert_called_once_with("f5")
 
-    def test_mute_toggle_uses_ctrl_shift_m(self):
-        result = self.adapter.execute("mute_toggle")
+    def test_toggle_pointer_mode_uses_ctrl_l(self):
+        result = self.adapter.execute("toggle_pointer_mode")
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("ctrl", "shift", "m")
+        self.mock_pya.hotkey.assert_called_once_with("ctrl", "l")
 
     def test_unknown_command_returns_failure(self):
         result = self.adapter.execute("unknown_command_xyz")
@@ -145,10 +153,10 @@ class TestZoomAdapter:
     def test_target_app(self):
         assert self.adapter.target_app == "zoom"
 
-    def test_mute_toggle_uses_alt_a(self):
-        result = self.adapter.execute("mute_toggle")
+    def test_toggle_pointer_mode_uses_alt_f2(self):
+        result = self.adapter.execute("toggle_pointer_mode")
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("alt", "a")
+        self.mock_pya.hotkey.assert_called_once_with("alt", "f2")
 
     def test_raise_hand_uses_alt_y(self):
         result = self.adapter.execute("raise_hand")
@@ -177,7 +185,11 @@ def _make_dispatcher(
     mock_adapter.execute.return_value = DispatchResult(
         success=True, command_id="next_slide", target_app="test_app", detail="ok"
     )
-    cmd_set = allowed if allowed is not None else {"next_slide", "previous_slide", "mute_toggle"}
+    cmd_set = (
+        allowed
+        if allowed is not None
+        else {"next_slide", "previous_slide", "raise_hand"}
+    )
     dispatcher = CommandDispatcher(
         adapter=mock_adapter,
         allowed_commands=cmd_set,
@@ -276,7 +288,10 @@ class TestCommandDispatcherAdapterExceptions:
     def test_adapter_returns_failure_is_passed_through(self):
         dispatcher, mock_adapter = _make_dispatcher()
         mock_adapter.execute.return_value = DispatchResult(
-            success=False, command_id="next_slide", target_app="test_app", detail="hw error"
+            success=False,
+            command_id="next_slide",
+            target_app="test_app",
+            detail="hw error",
         )
         result = dispatcher.dispatch(_command("next_slide"))
         assert result.success is False
