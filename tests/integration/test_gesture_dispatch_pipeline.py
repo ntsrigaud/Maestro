@@ -32,10 +32,10 @@ from gesture_control.pipeline.activation import GestureActivationController
 _COMMAND_MAP: dict[str, str] = {
     "swipe_right": "next_slide",
     "swipe_left": "previous_slide",
-    "pinch_hold": "mute_toggle",
-    "fist_hold": "start_presentation",
-    "thumbs_up": "raise_hand",
-    "v_sign": "toggle_presenter_tools",
+    "swipe_up": "raise_hand",
+    "swipe_down": "start_presentation",
+    "zoom_in": "toggle_pointer_mode",
+    "zoom_out": "exit_presentation",
 }
 
 _ACTIVATION_GESTURE = "open_palm_hold"
@@ -213,10 +213,10 @@ class TestGestureDispatchPipeline:
         assert result.success is True
         self.mock_pya.hotkey.assert_called_once_with("left")
 
-    def test_thumbs_up_dispatches_raise_hand(self):
+    def test_swipe_up_dispatches_raise_hand(self):
         self._arm()
         with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 50)):
-            cmd = self.controller.route(_pred("thumbs_up"))
+            cmd = self.controller.route(_pred("swipe_up"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
