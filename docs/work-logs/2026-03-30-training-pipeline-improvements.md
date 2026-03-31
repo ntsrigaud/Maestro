@@ -22,7 +22,7 @@ This work resolves a critical data leakage issue in the LSTM training pipeline b
 - Updated `src/gesture_control/training/train_lstm.py` to construct and pass the `GestureAugmenter` to the training dataset based on the `augmentation` configuration.
 - Extended `configs/model/lstm_default.yaml` with an `augmentation` section to control `enabled`, `temporal_scale_range`, `spatial_jitter_sigma`, and `apply_prob`.
 - Enhanced `scripts/collect_data.py` with an `--interactive` mode that provides a live camera preview and uses the SPACE key to start and stop individual gesture recordings, automatically creating unique `recording_id`s for each segment.
-- Created `docs/DATA_COLLECTION_GUIDE.md`, a detailed guide explaining the new data collection protocol, dataset building process, and updated training pipeline behavior.
+- Added a detailed data collection guide explaining the then-current collection protocol, dataset building process, and updated training pipeline behavior. That guide was later retired when the project standardized on the IPN Hand dataset.
 - Updated `models/registry.json` to register the new `lstm_v1_20260330T104422Z` model.
 
 ## Testing and Validation
