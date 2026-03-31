@@ -1,0 +1,17 @@
+version: ipn_v1
+# DEPRECATED: Original v1 gesture vocabulary mapping.
+# This file has been updated to use the IPN gesture vocabulary.
+# The canonical mapping is configs/gestures/command_map_ipn.yaml.
+#
+# Gesture-to-command mapping for the IPN-derived gesture vocabulary.
+# The activation_gesture (open_palm_hold / G07) is handled exclusively by
+# GestureActivationController and is intentionally omitted here.
+#
+# Command IDs must be present in the adapter's shortcut table.
+gesture_commands:
+  swipe_right: next_slide
+  swipe_left: previous_slide
+  swipe_up: raise_hand
+  swipe_down: start_presentation
+  zoom_in: toggle_pointer_mode
+  zoom_out: exit_presentation

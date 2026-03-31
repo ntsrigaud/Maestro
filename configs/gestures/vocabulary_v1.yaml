@@ -1,11 +1,15 @@
-version: v1
+version: ipn_v1
+# DEPRECATED: Original v1 custom-dataset vocabulary.
+# This file has been superseded by vocabulary_ipn.yaml.
+# The system now uses the IPN gesture vocabulary exclusively.
+# See vocabulary_ipn.yaml for the active configuration.
 activation_gesture: open_palm_hold
 gestures:
   - open_palm_hold
   - swipe_right
   - swipe_left
-  - fist_hold
-  - thumbs_up
-  - v_sign
-  - pinch_hold
+  - swipe_up
+  - swipe_down
+  - zoom_in
+  - zoom_out
   - unknown
