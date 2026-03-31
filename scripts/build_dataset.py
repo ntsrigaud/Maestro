@@ -15,7 +15,7 @@ from gesture_control.utils.config_loader import load_runtime_config
 
 
 def _load_vocabulary(config_dir: Path) -> list[str]:
-    gestures_path = config_dir / "gestures" / "vocabulary_v1.yaml"
+    gestures_path = config_dir / "gestures" / "vocabulary_ipn.yaml"
     if not gestures_path.exists():
         raise FileNotFoundError(f"Vocabulary config not found: {gestures_path}")
 

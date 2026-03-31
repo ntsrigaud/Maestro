@@ -7,6 +7,7 @@ This work establishes the end-to-end gesture activation and command dispatch pat
 ## Scope of Work
 
 **Dispatch Layer Foundation**
+
 - Introduced a dedicated dispatch adapter layer under `src/gesture_control/infrastructure/dispatch/app_adapters`.
 - Added `IApplicationAdapter` protocol to formalize application-specific command execution contracts.
 - Implemented `KeyboardAdapter` as the only OS-level key delivery path, backed by `pyautogui` and guarded by a strict safe-key allowlist.
@@ -15,28 +16,33 @@ This work establishes the end-to-end gesture activation and command dispatch pat
 - Added gesture-to-command configuration under `configs/gestures/command_map.yaml` and `configs/gestures/command_map_ipn.yaml`.
 
 **IPN Vocabulary Migration**
+
 - Migrated bootstrap configuration to `vocabulary_ipn.yaml`, `command_map_ipn.yaml`, and `production_ipn.yaml` as the canonical runtime sources.
 - Replaced the original custom-dataset gesture vocabulary (`fist_hold`, `thumbs_up`, `v_sign`, `pinch_hold`) with the IPN-derived command gestures (`swipe_up`, `swipe_down`, `zoom_in`, `zoom_out`).
 - Updated `CommandID` to retire legacy dispatch commands and align with the IPN command set (`toggle_pointer_mode`, `exit_presentation`).
 - Deprecated `vocabulary_v1.yaml`, `command_map.yaml`, and `production.yaml` with explicit forwarding content to prevent silent misconfiguration.
 
 **Activation Controller Hardening**
+
 - Corrected activation hold timing so the hold timer begins on the first above-threshold activation gesture frame, even before temporal voting marks the prediction as `accepted=True`.
 - Corrected ARMED idle-timeout semantics by refreshing activity on any non-unknown gesture, preventing the system from dropping back to IDLE during natural pauses.
 - Extended `idle_timeout_ms` from 3 seconds to 5 minutes and raised the schema upper bound accordingly.
 - Added structured observability logs across stabilization, activation, command routing, and dispatch result reporting.
 
 **Edge-Triggered Dispatch**
+
 - Implemented edge-triggered command dispatch in `GestureActivationController` using `_last_dispatched_label` rather than frame-by-frame previous-label tracking.
 - Added `edge_trigger_enabled` to inference configuration and enabled it by default.
 - Increased `command_cooldown_ms` from 500 ms to 1000 ms as a secondary guard.
 - Reset dispatch memory on `unknown` predictions and on `IDLE → ARMED` transition so repeated identical gestures dispatch correctly only after a neutral interval or re-arming.
 
 **Build and Dependency Updates**
+
 - Added `pyautogui>=0.9.54` to project dependencies.
 - Broadened the `pyautogui` import exception handling path so headless and CI environments degrade safely when the dependency is unavailable.
 
 **Documentation**
+
 - Updated `ARCHITECTURE_SPECIFICATION.md` to describe the dispatch architecture, IPN gesture vocabulary, activation semantics, and edge-trigger model.
 - Updated `docs/IPN_INTEGRATION_GUIDE.md` to clarify `open_palm_hold` mapping to the IPN open-twice gesture.
 

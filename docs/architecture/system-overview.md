@@ -1,0 +1,138 @@
+# System Overview
+
+## 1. Introduction
+
+The Gesture Control System is a real-time gesture control application that enables hands-free interaction with presentation and meeting software. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with an LSTM neural network, and dispatches operating-system-level keyboard commands to control applications such as Microsoft PowerPoint and Zoom.
+
+The architecture follows a modular, protocol-driven design with strict separation between domain logic, infrastructure adapters, and pipeline orchestration. All runtime parameters are externalized to YAML configuration files. The system is CPU-first and operates at interactive frame rates on consumer hardware.
+
+## 2. System Objective
+
+Provide reliable, low-latency gesture-based control for presentation workflows using a small, highly separable gesture vocabulary. The system prioritizes safety (low false-trigger rate) over recognition speed through multi-stage prediction stabilization and an explicit activation state machine.
+
+## 3. Gesture Vocabulary
+
+The system recognizes eight gesture classes derived from the IPN Hand dataset:
+
+| Gesture          | Type                | Mapped Command            |
+| ---------------- | ------------------- | ------------------------- |
+| `open_palm_hold` | Static (activation) | System activation trigger |
+| `swipe_right`    | Dynamic             | Next slide                |
+| `swipe_left`     | Dynamic             | Previous slide            |
+| `swipe_up`       | Dynamic             | Raise hand                |
+| `swipe_down`     | Dynamic             | Start presentation        |
+| `zoom_in`        | Dynamic             | Toggle pointer mode       |
+| `zoom_out`       | Dynamic             | Exit presentation         |
+| `unknown`        | Rejection class     | No action                 |
+
+The `open_palm_hold` gesture serves as the activation trigger: the user must hold an open palm for a configurable duration (default 600 ms) to transition the system from idle to armed mode before command gestures are accepted.
+
+## 4. High-Level Architecture
+
+The system is organized into four layers:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Application Layer                    │
+│         (Bootstrap, Runtime Loop, CLI Scripts)          │
+├─────────────────────────────────────────────────────────┤
+│                    Pipeline Layer                       │
+│  (Feature Engineering, Buffering, Stabilization,        │
+│   Activation Control)                                   │
+├─────────────────────────────────────────────────────────┤
+│                 Infrastructure Layer                    │
+│  (OpenCV Camera, MediaPipe Extractor, LSTM Model,       │
+│   Command Dispatcher, Keyboard Adapters, Overlay)       │
+├─────────────────────────────────────────────────────────┤
+│                    Domain Layer                         │
+│  (Entities, Enums, Contracts, Events)                   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Domain Layer**: Pure data structures and interface contracts with no framework dependencies. All pipeline data types (`FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`) are frozen dataclasses.
+
+**Infrastructure Layer**: Concrete implementations of domain interfaces using external libraries (OpenCV, MediaPipe, PyTorch, pyautogui). Each implementation is isolated behind a Protocol interface.
+
+**Pipeline Layer**: Stateful processing components that transform data between pipeline stages. Includes feature normalization, temporal windowing, prediction smoothing, and the activation state machine.
+
+**Application Layer**: Composition root (`bootstrap.py`) wires all dependencies from configuration. The runtime loop (`runtime.py`) orchestrates the sequential frame processing pipeline.
+
+## 5. End-to-End Pipeline Summary
+
+The real-time inference pipeline processes each camera frame through nine sequential stages:
+
+```mermaid
+graph LR
+    A[Camera Frame] --> B[Landmark Extraction]
+    B --> C[Feature Engineering]
+    C --> D[Temporal Buffering]
+    D --> E[LSTM Inference]
+    E --> F[Prediction Stabilization]
+    F --> G[Activation Controller]
+    G --> H[Command Dispatch]
+    H --> I[Keyboard Execution]
+```
+
+1. **Frame Capture**: OpenCV reads a BGR frame from the webcam at 30 FPS (1280×720).
+2. **Landmark Extraction**: MediaPipe Hands detects 21 hand landmarks with confidence filtering.
+3. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity features to produce a 126-dimensional feature vector.
+4. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
+5. **LSTM Inference**: The buffered sequence (24×126) is classified by a 2-layer LSTM into one of 8 gesture classes.
+6. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
+7. **Activation Control**: A three-state machine (IDLE → ARMED → COOLDOWN) gates command emission, requiring explicit activation and enforcing edge-triggered dispatch.
+8. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
+9. **Keyboard Execution**: The adapter translates commands to keyboard shortcuts and invokes them via pyautogui with key-name allowlist validation.
+
+## 6. Key Architectural Characteristics
+
+### 6.1 Safety-First Command Dispatch
+
+Multiple independent safety mechanisms prevent accidental command execution:
+
+- **Activation gating**: Commands are only accepted while the system is in ARMED mode.
+- **Edge-triggered dispatch**: A gesture triggers a command only on its first accepted occurrence; holding the same gesture does not re-fire.
+- **Temporal voting**: 1–3 consecutive frames must agree on the same class before acceptance.
+- **Per-class confidence thresholds**: Each gesture class has an independent acceptance threshold.
+- **Command allowlist**: Only pre-approved command IDs reach the OS keyboard layer.
+- **Rate limiting**: A sliding-window rate limiter caps dispatch frequency.
+- **Key-name allowlist**: The keyboard adapter validates every key name against a safe set before invoking pyautogui.
+
+### 6.2 Training–Inference Parity
+
+The same `LandmarkFeatureTransformer` and `SlidingWindowSequenceBuffer` classes are used in both the training dataset builder and the real-time inference pipeline. Feature schema metadata embedded in the NPZ dataset and model checkpoint enables automated compatibility validation at runtime.
+
+### 6.3 Configuration-Driven Operation
+
+All operational parameters—camera settings, inference window geometry, confidence thresholds, gesture vocabulary, command mappings, model hyperparameters—are externalized to YAML files under `configs/`. No thresholds or behavioral constants are hardcoded in source.
+
+### 6.4 Protocol-Based Modularity
+
+Nine `Protocol` interfaces define service contracts. Implementations can be swapped without modifying consuming code. This enables isolated unit testing with mock implementations and supports future extension (additional application adapters, alternative model backends).
+
+## 7. Technology Stack
+
+| Component               | Technology        | Version          |
+| ----------------------- | ----------------- | ---------------- |
+| Language                | Python            | 3.11             |
+| Hand Pose Estimation    | MediaPipe Hands   | 0.10.14 (pinned) |
+| Sequence Classification | PyTorch LSTM      | ≥2.7.0           |
+| Frame Capture           | OpenCV (headless) | ≥4.10.0          |
+| OS Keyboard Control     | pyautogui         | ≥0.9.54          |
+| Config Validation       | Pydantic          | ≥2.6.0           |
+| Array Operations        | NumPy             | ≥1.26.0          |
+| ML Metrics              | scikit-learn      | ≥1.5.0           |
+
+## 8. Training Infrastructure
+
+The offline training pipeline converts labeled video data into a trained LSTM checkpoint:
+
+1. **Data Collection**: Interactive webcam recording via `scripts/collect_data.py` produces JSONL landmark files. The IPN Hand dataset (200 videos, 8 classes) provides the primary training corpus via `scripts/build_ipn_dataset.py`.
+2. **Dataset Generation**: `scripts/build_dataset.py` transforms JSONL landmarks into NPZ sequence datasets using the same feature pipeline as inference.
+3. **Model Training**: `scripts/train_model.py` trains a 2-layer LSTM with class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
+4. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema. A JSON registry tracks all exported models.
+
+---
+
+**Document**: System Overview  
+**Suite**: Architecture Documentation (`docs/architecture/`)  
+**Last Updated**: March 2026
