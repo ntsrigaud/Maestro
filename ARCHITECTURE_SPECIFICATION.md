@@ -124,12 +124,13 @@ project_root/
           torch_lstm_model.py
           checkpoint_loader.py
         dispatch/
-          keyboard_dispatcher.py
+          keyboard_dispatcher.py   # legacy stub (superseded)
+          command_dispatcher.py    # production dispatcher with allowlist + rate limiting
           app_adapters/
-            powerpoint_adapter.py
-            keynote_adapter.py
-            zoom_adapter.py
-            teams_adapter.py
+            base.py                # IApplicationAdapter Protocol
+            keyboard_adapter.py   # low-level pyautogui key delivery with allowlist
+            powerpoint_adapter.py  # PowerPoint shortcut table
+            zoom_adapter.py        # Zoom shortcut table
         feedback/
           overlay_renderer.py
           metrics_logger.py
@@ -363,13 +364,47 @@ Outputs:
 
 - ExecutableCommand or None
 
-#### H. Command Dispatcher
+#### H. Command Dispatch Layer
 
 Responsibilities:
 
-- Map gestures to logical commands
-- Resolve app-specific shortcut adapters
-- Dispatch keyboard shortcuts safely
+- Enforce a **command allowlist**: only command IDs explicitly listed in the
+  allowlist are forwarded to adapters; unknown IDs are rejected before any
+  OS interaction occurs.
+- Apply **adapter-level rate limiting**: a sliding-window counter caps the
+  number of dispatches within a configurable time window, providing a second
+  layer of protection independent of the activation controller cooldown.
+- Delegate actual key delivery to an **application adapter** selected at
+  startup based on `active_app` config (powerpoint, zoom, …).
+- Return a structured `DispatchResult` for every call — the runtime loop
+  is never interrupted by adapter failure.
+
+**Class hierarchy**:
+
+```
+ICommandDispatcher         (interfaces/command_dispatcher.py)
+    └── CommandDispatcher  (infrastructure/dispatch/command_dispatcher.py)
+            └── IApplicationAdapter  (app_adapters/base.py  — Protocol)
+                    ├── PowerPointAdapter  (uses KeyboardAdapter)
+                    └── ZoomAdapter        (uses KeyboardAdapter)
+                            └── KeyboardAdapter  (wraps pyautogui with _SAFE_KEY_NAMES allowlist)
+```
+
+**Safety design — KeyboardAdapter**:
+
+- `_SAFE_KEY_NAMES` frozenset validates every key string before `pyautogui.hotkey` is called.
+- No user-supplied strings or command IDs ever reach `pyautogui` directly — the adapter
+  layer resolves command IDs to predefined key tuples first.
+- Raising `ValueError` for any unlisted key name prevents injection of arbitrary OS commands.
+- `pyautogui` is imported at module level with a `None` fallback, so CI / headless
+  environments can run without side-effects and the module remains patchable.
+
+**Gesture-to-command mapping**:
+
+- Loaded from `configs/gestures/command_map.yaml` at startup by `bootstrap.py`.
+- Passed to `GestureActivationController` (gesture → command_id resolution) and
+  used to build the `CommandDispatcher` allowlist (frozenset of command_id values).
+- Fallback to hardcoded defaults if the YAML is absent.
 
 Inputs:
 
@@ -377,7 +412,7 @@ Inputs:
 
 Outputs:
 
-- DispatchResult(success, command_id, target_app)
+- DispatchResult(success, command_id, target_app, detail)
 
 #### I. Real-Time Feedback System
 
@@ -437,41 +472,48 @@ Dependency wiring is centralized in bootstrap composition root.
 
 ---
 
-## 5. Gesture Vocabulary Design (6 to 8 Gestures)
+## 5. Gesture Vocabulary Design (IPN Dataset — 8 Gestures)
 
-### 5.1 Recommended production vocabulary (7 gestures)
+### 5.1 Production vocabulary (8 gestures, IPN dataset)
 
-1. open_palm_hold
+1. open_palm_hold (IPN: G07 — "Open twice")
 
-- Command: arm/disarm interaction
+- Command: arm/disarm interaction (activation gesture)
+- Note: `open_palm_hold` is the production vocabulary label for IPN G07
+  ("Open twice"). During dataset assembly, G07 frames (the double open-hand
+  motion) are labeled `open_palm_hold` because that motion most closely
+  approximates the open-palm activation cue in a presentation context. The
+  trained model (`lstm_v1_20260330T181558Z`) was built with this label;
+  **no retraining is required**. The mapping is marked "Approximate" in
+  `docs/IPN_INTEGRATION_GUIDE.md` § 2.1.
 
-2. swipe_right
+2. swipe_right (IPN: G06)
 
-- Command: next slide
+- Command: next_slide
 
-3. swipe_left
+3. swipe_left (IPN: G05)
 
-- Command: previous slide
+- Command: previous_slide
 
-4. fist_hold
+4. swipe_up (IPN: G03)
 
-- Command: start presentation or toggle black screen
+- Command: raise_hand
 
-5. thumbs_up
+5. swipe_down (IPN: G04)
 
-- Command: confirm/start action
+- Command: start_presentation
 
-6. v_sign
+6. zoom_in (IPN: G10)
 
-- Command: toggle presenter tools
+- Command: toggle_pointer_mode
 
-7. pinch_hold
+7. zoom_out (IPN: G11)
 
-- Command: mute/unmute microphone
+- Command: exit_presentation
 
-Optional class:
+8. unknown (IPN: D0X + B0A + B0B)
 
-- raise_hand_hold for meeting raise-hand shortcut
+- Command: none (no-gesture / noise class)
 
 ### 5.2 Vocabulary design rules
 
@@ -489,18 +531,61 @@ Optional class:
 - Activation gating: commands only in ARMED state.
 - Unknown class: no forced classification.
 - Temporal consistency: require stable class across consecutive windows.
-- Cooldown timer: suppress repeated rapid triggers.
+- **Edge-trigger dispatch**: a command is emitted only when the predicted
+  label _changes_ from the previous label (rising edge). Subsequent frames
+  that carry the same accepted label are ignored, regardless of whether the
+  cooldown has expired. The trigger resets as soon as the prediction returns
+  to any different label (typically `unknown` between gestures).
+- Cooldown timer: secondary guard that suppresses re-dispatch within a fixed
+  window after each command (backs up edge-trigger in unusual conditions).
 - Idle timeout: auto-return to IDLE.
 - Confirmation rule for critical actions.
 
 ### 6.2 Suggested thresholds (initial production defaults)
 
 - Activation hold: 600 ms
-- Idle timeout: 3.0 s
+- Idle timeout: 300 000 ms (5 min) — configured via `idle_timeout_ms` in `configs/inference.yaml`
 - Base acceptance threshold: 0.85
 - Critical commands threshold: 0.90
 - Stability rule: same class accepted in 3 consecutive decisions
-- Command cooldown: 500 ms
+- Command cooldown: 1 000 ms (secondary guard; primary protection is edge-trigger)
+- Edge trigger: enabled by default (`edge_trigger_enabled: true` in `configs/inference.yaml`)
+
+### 6.4 Single-dispatch guarantee (edge-trigger detail)
+
+With `window_length=24`, `window_step=3`, and a 30 FPS stream, inference
+windows arrive every ~100 ms. A single swipe lasting 0.8 s produces ~8
+consecutive accepted predictions. Prior to the edge-trigger fix, every
+time the 1 000 ms cooldown expired while the gesture was still active,
+another command was dispatched.
+
+The edge-trigger guard in `GestureActivationController.route()` resolves
+this by tracking `_last_dispatched_label` — the label of the most recently
+executed command. A command is dispatched only when:
+
+```
+prediction.label != _last_dispatched_label   ← rising-edge condition
+AND prediction.accepted == True
+AND state == ARMED
+AND cooldown expired
+```
+
+`_last_dispatched_label` is updated **only when a command is actually
+dispatched**, never on unaccepted frames.  This is critical because the
+temporal stabiliser (vote\_window=3) emits 2–3 consecutive `accepted=False`
+frames before the first dispatchable `accepted=True` frame.  An earlier
+implementation tracked `_prev_label` on *every* call, which caused those
+unaccepted buildup frames to consume the rising edge — silently dropping all
+gestures after the first.
+
+`_last_dispatched_label` is reset to `unknown` when:
+
+* the prediction returns to `unknown` (hand goes neutral), or
+* the controller re-enters the ARMED state from IDLE.
+
+A new gesture fires exactly once — on its first `accepted=True` frame — after
+either a different label was last dispatched, or the hand went neutral since
+the last dispatch.
 
 ### 6.3 False-trigger control strategy
 

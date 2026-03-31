@@ -116,11 +116,29 @@ class Runtime:
                     latest_label = stabilized_prediction.label
                     latest_conf = stabilized_prediction.confidence
 
+                    LOGGER.debug(
+                        "stabilizer: label=%r conf=%.2f accepted=%s reason=%s",
+                        stabilized_prediction.label,
+                        stabilized_prediction.confidence,
+                        stabilized_prediction.accepted,
+                        stabilized_prediction.reason,
+                    )
+
                     command = self._container.activation_controller.route(
                         stabilized_prediction
                     )
                     if command is not None:
-                        self._container.dispatcher.dispatch(command)
+                        LOGGER.info(
+                            "command: id=%r source_gesture=%r",
+                            command.command_id,
+                            command.source_gesture,
+                        )
+                        result = self._container.dispatcher.dispatch(command)
+                        LOGGER.info(
+                            "dispatch: success=%s detail=%s",
+                            result.success,
+                            result.detail,
+                        )
 
                 elapsed = time.perf_counter() - start_time
                 fps = (processed_frames / elapsed) if elapsed > 0 else 0.0
