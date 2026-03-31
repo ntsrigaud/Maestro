@@ -17,9 +17,7 @@ _SHORTCUTS: dict[str, tuple[str, ...]] = {
     "next_slide": ("right",),
     "previous_slide": ("left",),
     "start_presentation": ("f5",),
-    "mute_toggle": ("ctrl", "shift", "m"),
     "raise_hand": ("ctrl", "shift", "k"),
-    "toggle_presenter_tools": ("ctrl", "shift", "f10"),
     "toggle_pointer_mode": ("ctrl", "l"),
     "exit_presentation": ("escape",),
 }
