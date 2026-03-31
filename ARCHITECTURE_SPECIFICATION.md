@@ -531,7 +531,13 @@ Dependency wiring is centralized in bootstrap composition root.
 - Activation gating: commands only in ARMED state.
 - Unknown class: no forced classification.
 - Temporal consistency: require stable class across consecutive windows.
-- Cooldown timer: suppress repeated rapid triggers.
+- **Edge-trigger dispatch**: a command is emitted only when the predicted
+  label _changes_ from the previous label (rising edge). Subsequent frames
+  that carry the same accepted label are ignored, regardless of whether the
+  cooldown has expired. The trigger resets as soon as the prediction returns
+  to any different label (typically `unknown` between gestures).
+- Cooldown timer: secondary guard that suppresses re-dispatch within a fixed
+  window after each command (backs up edge-trigger in unusual conditions).
 - Idle timeout: auto-return to IDLE.
 - Confirmation rule for critical actions.
 
@@ -542,7 +548,44 @@ Dependency wiring is centralized in bootstrap composition root.
 - Base acceptance threshold: 0.85
 - Critical commands threshold: 0.90
 - Stability rule: same class accepted in 3 consecutive decisions
-- Command cooldown: 500 ms
+- Command cooldown: 1 000 ms (secondary guard; primary protection is edge-trigger)
+- Edge trigger: enabled by default (`edge_trigger_enabled: true` in `configs/inference.yaml`)
+
+### 6.4 Single-dispatch guarantee (edge-trigger detail)
+
+With `window_length=24`, `window_step=3`, and a 30 FPS stream, inference
+windows arrive every ~100 ms. A single swipe lasting 0.8 s produces ~8
+consecutive accepted predictions. Prior to the edge-trigger fix, every
+time the 1 000 ms cooldown expired while the gesture was still active,
+another command was dispatched.
+
+The edge-trigger guard in `GestureActivationController.route()` resolves
+this by tracking `_last_dispatched_label` — the label of the most recently
+executed command. A command is dispatched only when:
+
+```
+prediction.label != _last_dispatched_label   ← rising-edge condition
+AND prediction.accepted == True
+AND state == ARMED
+AND cooldown expired
+```
+
+`_last_dispatched_label` is updated **only when a command is actually
+dispatched**, never on unaccepted frames.  This is critical because the
+temporal stabiliser (vote\_window=3) emits 2–3 consecutive `accepted=False`
+frames before the first dispatchable `accepted=True` frame.  An earlier
+implementation tracked `_prev_label` on *every* call, which caused those
+unaccepted buildup frames to consume the rising edge — silently dropping all
+gestures after the first.
+
+`_last_dispatched_label` is reset to `unknown` when:
+
+* the prediction returns to `unknown` (hand goes neutral), or
+* the controller re-enters the ARMED state from IDLE.
+
+A new gesture fires exactly once — on its first `accepted=True` frame — after
+either a different label was last dispatched, or the hand went neutral since
+the last dispatch.
 
 ### 6.3 False-trigger control strategy
 
