@@ -31,10 +31,10 @@ from gesture_control.pipeline.activation import GestureActivationController
 _COMMAND_MAP: dict[str, str] = {
     "swipe_right": "next_slide",
     "swipe_left": "previous_slide",
-    "swipe_up": "raise_hand",
-    "swipe_down": "start_presentation",
+    "swipe_up": "start_presentation",
+    "swipe_down": "exit_presentation",
     "zoom_in": "toggle_pointer_mode",
-    "zoom_out": "exit_presentation",
+    "zoom_out": "raise_hand",
 }
 
 _ACTIVATION_GESTURE = "open_palm_hold"
@@ -254,7 +254,7 @@ class TestGestureDispatchPipeline:
         assert result.success is True
         self.mock_pya.hotkey.assert_called_once_with("left")
 
-    def test_swipe_up_dispatches_raise_hand(self):
+    def test_swipe_up_dispatches_start_presentation(self):
         self._arm()
         with patch.object(
             type(self.controller),
@@ -266,8 +266,8 @@ class TestGestureDispatchPipeline:
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
         self.mock_pya.hotkey.assert_called_once_with(
-            "ctrl", "shift", "k"
-        )  # PowerPoint raise_hand
+            "f5"
+        )  # PowerPoint start_presentation
 
     def test_command_dispatched_exactly_once_per_gesture(self):
         self._arm()
