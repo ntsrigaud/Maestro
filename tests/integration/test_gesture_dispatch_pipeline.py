@@ -974,8 +974,14 @@ class TestGazeGateIntegration:
         self.controller.force_idle()
 
         t = _ACTIVATION_HOLD_MS + 100
-        for gesture in ("swipe_right", "swipe_left", "swipe_up", "swipe_down",
-                        "zoom_in", "zoom_out"):
+        for gesture in (
+            "swipe_right",
+            "swipe_left",
+            "swipe_up",
+            "swipe_down",
+            "zoom_in",
+            "zoom_out",
+        ):
             with patch.object(
                 type(self.controller), "_now_ms", staticmethod(lambda _t=t: _t)
             ):
