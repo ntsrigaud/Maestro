@@ -22,6 +22,7 @@ from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 from gesture_control.infrastructure.feedback.overlay_renderer import OverlayRenderer
+from gesture_control.infrastructure.gaze import HeadPoseGazeDetector, NullGazeDetector
 from gesture_control.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
 )
@@ -33,6 +34,7 @@ from gesture_control.infrastructure.model.checkpoint_loader import (
 )
 from gesture_control.interfaces.feature_transformer import IFeatureTransformer
 from gesture_control.interfaces.frame_source import IFrameSource
+from gesture_control.interfaces.gaze_detector import IGazeIntentDetector
 from gesture_control.interfaces.landmark_extractor import IHandLandmarkExtractor
 from gesture_control.interfaces.sequence_buffer import ISequenceBuffer
 from gesture_control.pipeline.activation import GestureActivationController
@@ -48,6 +50,7 @@ from gesture_control.utils.schema_validation import RuntimeConfig
 class AppContainer:
     config: RuntimeConfig
     frame_source: IFrameSource
+    gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
     feature_transformer: IFeatureTransformer
     sequence_buffer: ISequenceBuffer
@@ -129,9 +132,17 @@ def build_container(
     overlay_renderer = OverlayRenderer(mirror_display=config.app.mirror_display)
     benchmark = LatencyBenchmark()
 
+    gaze_cfg = config.inference.gaze
+    if gaze_cfg.enabled:
+        gaze_detector: IGazeIntentDetector = HeadPoseGazeDetector(config=gaze_cfg)
+        gaze_detector.set_on_gaze_lost(activation_controller.force_idle)
+    else:
+        gaze_detector = NullGazeDetector()
+
     return AppContainer(
         config=config,
         frame_source=frame_source,
+        gaze_detector=gaze_detector,
         landmark_extractor=landmark_extractor,
         feature_transformer=feature_transformer,
         sequence_buffer=sequence_buffer,
