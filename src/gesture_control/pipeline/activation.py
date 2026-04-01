@@ -240,6 +240,18 @@ class GestureActivationController:
 
         return None
 
+    def force_idle(self) -> None:
+        """Reset the controller to IDLE unconditionally.
+
+        Called by the runtime loop when the gaze grace period expires while
+        the controller is not already in IDLE state.  Clears all in-progress
+        timers so that the next activation cycle starts from a clean state.
+        """
+        self._mode = RuntimeMode.IDLE
+        self._activation_started_ms = None
+        self._cooldown_started_ms = None
+        LOGGER.info("activation: forced → IDLE  (gaze lost)")
+
     @staticmethod
     def _now_ms() -> int:
         return int(time.time() * 1000)
