@@ -6,6 +6,15 @@ import cv2
 
 from gesture_control.domain.entities import FramePacket, RuntimeState
 
+# Border colours (BGR).
+# Absent  — grey:   gaze not directed toward camera; pipeline bypassed.
+# Idle    — amber:  gaze detected but system not yet armed.
+# Armed   — green:  system ready and accepting gesture commands.
+_BORDER_ABSENT: tuple[int, int, int] = (128, 128, 128)
+_BORDER_ACQUIRING: tuple[int, int, int] = (0, 165, 255)
+_BORDER_ARMED: tuple[int, int, int] = (0, 200, 0)
+_BORDER_THICKNESS = 4
+
 
 class OverlayRenderer:
     """Renders non-blocking runtime diagnostics onto frames.
@@ -17,6 +26,19 @@ class OverlayRenderer:
     flipped horizontally *before* landmarks are drawn so that the landmark dots
     remain correctly positioned on the mirrored image.  Text overlays are drawn
     after the flip so they remain readable.  The ML pipeline is never affected.
+
+    Gaze border convention
+    ----------------------
+    A coloured border is drawn around the frame to give ambient feedback about
+    the gaze-aware activation state:
+
+    - **Grey**  (``gaze_permitted=False``): gaze absent; downstream pipeline
+      bypassed entirely.
+    - **Amber** (``gaze_permitted=True``, ``mode != "armed"``): gaze active but
+      the activation gesture has not yet been performed; system is in IDLE or
+      COOLDOWN.
+    - **Green** (``gaze_permitted=True``, ``mode == "armed"``): system armed;
+      gesture commands are accepted.
     """
 
     def __init__(self, *, mirror_display: bool = False) -> None:
@@ -31,6 +53,8 @@ class OverlayRenderer:
             canvas = cv2.flip(frame.frame, 1)
         else:
             canvas = frame.frame.copy()
+
+        self._draw_gaze_border(canvas, state)
 
         info = state.info
 
@@ -58,6 +82,24 @@ class OverlayRenderer:
         return FramePacket(
             frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id
         )
+
+    def _draw_gaze_border(self, image: Any, state: RuntimeState) -> None:
+        """Draw a coloured border reflecting the current gaze + activation state."""
+        if not state.gaze_permitted:
+            colour = _BORDER_ABSENT
+        elif state.mode == "armed":
+            colour = _BORDER_ARMED
+        else:
+            colour = _BORDER_ACQUIRING
+
+        h, w = image.shape[:2]
+        t = _BORDER_THICKNESS
+        # Top and bottom bars
+        image[:t, :] = colour
+        image[h - t :, :] = colour
+        # Left and right bars
+        image[:, :t] = colour
+        image[:, w - t :] = colour
 
     def _draw_landmarks(
         self, image: Any, landmarks: Any, *, mirror: bool = False
