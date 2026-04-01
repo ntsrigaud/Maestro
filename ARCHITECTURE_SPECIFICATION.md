@@ -117,6 +117,7 @@ project_root/
         activation_controller.py
         command_dispatcher.py
         feedback_renderer.py
+        gaze_detector.py
       infrastructure/
         camera/
           opencv_source.py
@@ -134,6 +135,9 @@ project_root/
             zoom_adapter.py        # Zoom shortcut table
         feedback/
           overlay_renderer.py
+        gaze/
+          head_pose_detector.py
+          null_detector.py
       pipeline/
         feature_engineering.py
         buffering.py
