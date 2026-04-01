@@ -39,9 +39,7 @@ _MP_FACE_MESH = (
     "gesture_control.infrastructure.gaze.head_pose_detector"
     ".mp.solutions.face_mesh.FaceMesh"
 )
-_MONOTONIC = (
-    "gesture_control.infrastructure.gaze.head_pose_detector.time.monotonic"
-)
+_MONOTONIC = "gesture_control.infrastructure.gaze.head_pose_detector.time.monotonic"
 
 # ---------------------------------------------------------------------------
 # Shared test data
@@ -159,16 +157,16 @@ class TestStateMachineTransitions:
     def test_acquiring_to_absent_when_cone_interrupted(self) -> None:
         """Cone broken before arm_ms elapses resets to ABSENT."""
         det = _make_detector()
-        _update(det, within_cone=True, now_s=0.0)    # ABSENT → ACQUIRING
+        _update(det, within_cone=True, now_s=0.0)  # ABSENT → ACQUIRING
         result = _update(det, within_cone=False, now_s=0.050)  # interrupted
         assert result is False  # back to ABSENT
 
     def test_acquiring_interrupted_then_new_hold_can_succeed(self) -> None:
         """After interruption a fresh hold attempt must be able to reach ACTIVE."""
         det = _make_detector()
-        _update(det, within_cone=True, now_s=0.0)           # ACQUIRING
-        _update(det, within_cone=False, now_s=0.050)         # ABSENT
-        _update(det, within_cone=True, now_s=1.0)            # new ACQUIRING
+        _update(det, within_cone=True, now_s=0.0)  # ACQUIRING
+        _update(det, within_cone=False, now_s=0.050)  # ABSENT
+        _update(det, within_cone=True, now_s=1.0)  # new ACQUIRING
         result = _update(det, within_cone=True, now_s=1.250)  # elapsed = 250ms > 200ms
         assert result is True  # ACTIVE
 
@@ -177,14 +175,14 @@ class TestStateMachineTransitions:
     def test_acquiring_to_active_after_arm_ms_elapsed(self) -> None:
         """Pose stable for ≥ arm_ms transitions to ACTIVE (gaze_permitted = True)."""
         det = _make_detector()  # arm_ms = 200
-        _update(det, within_cone=True, now_s=0.0)             # ACQUIRING (t=0 ms)
+        _update(det, within_cone=True, now_s=0.0)  # ACQUIRING (t=0 ms)
         result = _update(det, within_cone=True, now_s=0.201)  # 201 ms ≥ 200 ms
         assert result is True
 
     def test_acquiring_before_arm_ms_stays_acquiring(self) -> None:
         """Pose within cone but arm_ms not yet elapsed remains ACQUIRING."""
         det = _make_detector()  # arm_ms = 200
-        _update(det, within_cone=True, now_s=0.0)             # ACQUIRING
+        _update(det, within_cone=True, now_s=0.0)  # ACQUIRING
         result = _update(det, within_cone=True, now_s=0.150)  # only 150 ms elapsed
         assert result is False
 
@@ -194,7 +192,7 @@ class TestStateMachineTransitions:
         """Leaving the cone from ACTIVE enters LOSING; gaze still permitted (grace)."""
         det = _make_detector()
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)            # ACTIVE
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
         result = _update(det, within_cone=False, now_s=0.202)  # ACTIVE → LOSING
         assert result is True  # grace period: still permitted
 
@@ -204,20 +202,20 @@ class TestStateMachineTransitions:
         """Re-entering cone within grace period returns to ACTIVE."""
         det = _make_detector()
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)             # ACTIVE
-        _update(det, within_cone=False, now_s=0.202)            # LOSING
-        result = _update(det, within_cone=True, now_s=0.500)    # recovered
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
+        _update(det, within_cone=False, now_s=0.202)  # LOSING
+        result = _update(det, within_cone=True, now_s=0.500)  # recovered
         assert result is True
 
     def test_recovering_from_losing_resets_grace_timer(self) -> None:
         """After LOSING → ACTIVE, a subsequent cone loss starts a fresh grace timer."""
         det = _make_detector()  # grace_ms = 1000
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)              # ACTIVE
-        _update(det, within_cone=False, now_s=0.202)             # LOSING
-        _update(det, within_cone=True, now_s=0.400)              # LOSING → ACTIVE
-        _update(det, within_cone=False, now_s=0.401)             # ACTIVE → LOSING again
-        result = _update(det, within_cone=False, now_s=0.900)    # 499 ms < 1000 ms grace
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
+        _update(det, within_cone=False, now_s=0.202)  # LOSING
+        _update(det, within_cone=True, now_s=0.400)  # LOSING → ACTIVE
+        _update(det, within_cone=False, now_s=0.401)  # ACTIVE → LOSING again
+        result = _update(det, within_cone=False, now_s=0.900)  # 499 ms < 1000 ms grace
         assert result is True  # still in grace period
 
     # -- LOSING → ABSENT ------------------------------------------------------
@@ -226,18 +224,18 @@ class TestStateMachineTransitions:
         """Grace period expiry transitions LOSING → ABSENT (gaze_permitted = False)."""
         det = _make_detector()  # grace_ms = 1000
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)              # ACTIVE
-        _update(det, within_cone=False, now_s=1.0)               # LOSING (grace_start = 1000 ms)
-        result = _update(det, within_cone=False, now_s=2.010)    # 1010 ms > 1000 ms
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
+        _update(det, within_cone=False, now_s=1.0)  # LOSING (grace_start = 1000 ms)
+        result = _update(det, within_cone=False, now_s=2.010)  # 1010 ms > 1000 ms
         assert result is False  # ABSENT
 
     def test_losing_within_grace_still_permitted(self) -> None:
         """Within the grace window the detector remains permitted."""
         det = _make_detector()  # grace_ms = 1000
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)              # ACTIVE
-        _update(det, within_cone=False, now_s=1.0)               # LOSING
-        result = _update(det, within_cone=False, now_s=1.800)    # 800 ms < grace
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
+        _update(det, within_cone=False, now_s=1.0)  # LOSING
+        result = _update(det, within_cone=False, now_s=1.800)  # 800 ms < grace
         assert result is True
 
 
@@ -252,8 +250,8 @@ class TestOnGazeLostCallback:
         cb = MagicMock()
         det = _make_detector(on_gaze_lost=cb)
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)   # ACTIVE
-        _update(det, within_cone=False, now_s=1.0)    # LOSING
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
+        _update(det, within_cone=False, now_s=1.0)  # LOSING
         _update(det, within_cone=False, now_s=2.010)  # → ABSENT
         cb.assert_called_once()
 
@@ -261,8 +259,8 @@ class TestOnGazeLostCallback:
         """Interrupting ACQUIRING before stability must not fire the callback."""
         cb = MagicMock()
         det = _make_detector(on_gaze_lost=cb)
-        _update(det, within_cone=True, now_s=0.0)    # ACQUIRING
-        _update(det, within_cone=False, now_s=0.050) # ACQUIRING → ABSENT
+        _update(det, within_cone=True, now_s=0.0)  # ACQUIRING
+        _update(det, within_cone=False, now_s=0.050)  # ACQUIRING → ABSENT
         cb.assert_not_called()
 
     def test_callback_not_fired_when_losing_recovers(self) -> None:
@@ -271,7 +269,7 @@ class TestOnGazeLostCallback:
         det = _make_detector(on_gaze_lost=cb)
         _update(det, within_cone=True, now_s=0.0)
         _update(det, within_cone=True, now_s=0.201)  # ACTIVE
-        _update(det, within_cone=False, now_s=1.0)   # LOSING
+        _update(det, within_cone=False, now_s=1.0)  # LOSING
         _update(det, within_cone=True, now_s=1.400)  # LOSING → ACTIVE (recovered)
         cb.assert_not_called()
 
@@ -280,11 +278,11 @@ class TestOnGazeLostCallback:
         cb = MagicMock()
         det = _make_detector(on_gaze_lost=cb)
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)   # ACTIVE
-        _update(det, within_cone=False, now_s=1.0)    # LOSING
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
+        _update(det, within_cone=False, now_s=1.0)  # LOSING
         _update(det, within_cone=False, now_s=2.010)  # → ABSENT (callback fires)
-        _update(det, within_cone=False, now_s=3.0)    # stays ABSENT
-        _update(det, within_cone=False, now_s=4.0)    # stays ABSENT
+        _update(det, within_cone=False, now_s=3.0)  # stays ABSENT
+        _update(det, within_cone=False, now_s=4.0)  # stays ABSENT
         cb.assert_called_once()  # still exactly one call
 
     def test_set_on_gaze_lost_replaces_previous_callback(self) -> None:
@@ -295,8 +293,8 @@ class TestOnGazeLostCallback:
         det.set_on_gaze_lost(cb_old)
         det.set_on_gaze_lost(cb_new)  # replaces
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)   # ACTIVE
-        _update(det, within_cone=False, now_s=1.0)    # LOSING
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
+        _update(det, within_cone=False, now_s=1.0)  # LOSING
         _update(det, within_cone=False, now_s=2.010)  # → ABSENT
         cb_old.assert_not_called()
         cb_new.assert_called_once()
@@ -305,8 +303,8 @@ class TestOnGazeLostCallback:
         """When on_gaze_lost is None, LOSING → ABSENT must not raise."""
         det = _make_detector(on_gaze_lost=None)
         _update(det, within_cone=True, now_s=0.0)
-        _update(det, within_cone=True, now_s=0.201)   # ACTIVE
-        _update(det, within_cone=False, now_s=1.0)    # LOSING
+        _update(det, within_cone=True, now_s=0.201)  # ACTIVE
+        _update(det, within_cone=False, now_s=1.0)  # LOSING
         _update(det, within_cone=False, now_s=2.010)  # → ABSENT  (no callback → OK)
 
 
@@ -375,7 +373,7 @@ class TestAmortizationCache:
 
         assert r0 is False
         assert r1 is False  # stale cache
-        assert r2 is True   # cache refreshed after sampling
+        assert r2 is True  # cache refreshed after sampling
 
     def test_sample_interval_one_calls_cone_every_frame(self) -> None:
         """With sample_interval_frames=1, _is_within_cone is called on every update."""
