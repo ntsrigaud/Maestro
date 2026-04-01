@@ -83,6 +83,7 @@ Semantic-HGR-System/
 | `IActivationController`  | `route(StabilizedPrediction) → ExecutableCommand \| None`           | Runtime loop                  |
 | `ICommandDispatcher`     | `dispatch(ExecutableCommand) → DispatchResult`                      | Runtime loop                  |
 | `IFeedbackRenderer`      | `render(FramePacket, RuntimeState) → FramePacket`                   | Runtime loop                  |
+| `IGazeIntentDetector`    | `update(FramePacket) → bool`, `close() → None`                      | Runtime loop, bootstrap       |
 
 **Dependency rule**: Imports only domain entities. Uses `typing.Protocol` for structural subtyping.
 
@@ -100,6 +101,8 @@ Semantic-HGR-System/
 | `dispatch/app_adapters/` | `powerpoint_adapter.py` | `PowerPointAdapter`                   | —                   |
 | `dispatch/app_adapters/` | `zoom_adapter.py`       | `ZoomAdapter`                         | —                   |
 | `feedback/`              | `overlay_renderer.py`   | `OverlayRenderer`                     | OpenCV              |
+| `gaze/`                  | `head_pose_detector.py` | `HeadPoseGazeDetector`                | MediaPipe, OpenCV   |
+| `gaze/`                  | `null_detector.py`      | `NullGazeDetector`                    | —                   |
 
 **Dependency rule**: May import domain entities, interfaces, and external libraries. Must not import from pipeline, training, or app packages.
 
@@ -241,7 +244,8 @@ tests/
 │   ├── test_feature_validation.py
 │   ├── test_latency_benchmark.py
 │   ├── test_overlay_renderer.py
-│   └── test_runtime.py
+│   ├── test_runtime.py
+│   └── test_head_pose_gaze_detector.py
 ├── integration/                             # 5 test modules
 │   ├── test_phase2_pipeline.py
 │   ├── test_phase3_feature_pipeline.py
