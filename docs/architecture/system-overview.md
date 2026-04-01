@@ -138,4 +138,4 @@ The offline training pipeline converts labeled video data into a trained LSTM ch
 
 **Document**: System Overview  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: March 2026
+**Last Updated**: April 2026
