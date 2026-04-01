@@ -217,3 +217,116 @@ def test_mirror_symmetry_of_two_landmarks() -> None:
     assert not is_dot(
         mirror_result.frame, col_03_raw
     ), "Mirror: dot must NOT appear at raw col 192"
+
+
+# ---------------------------------------------------------------------------
+# Gaze-aware border colour tests
+# ---------------------------------------------------------------------------
+
+# Border constants mirrored from the module under test so that the tests
+# remain self-contained and do not depend on module-level name access.
+_GREY = (128, 128, 128)
+_AMBER = (0, 165, 255)
+_GREEN = (0, 200, 0)
+_THICKNESS = 4
+
+
+def _border_pixel(frame: object, *, corner: str = "top-left") -> tuple[int, int, int]:
+    """Return the BGR tuple of a border pixel in the requested corner region."""
+    import numpy as np  # noqa: PLC0415
+
+    a = np.asarray(frame)
+    row, col = {
+        "top-left": (1, 1),
+        "bottom-right": (a.shape[0] - 2, a.shape[1] - 2),
+    }[corner]
+    return (int(a[row, col, 0]), int(a[row, col, 1]), int(a[row, col, 2]))
+
+
+def _make_state_with_gaze(mode: str, gaze_permitted: bool) -> RuntimeState:
+    return RuntimeState(
+        mode=mode,
+        last_label="unknown",
+        last_confidence=0.0,
+        gaze_permitted=gaze_permitted,
+        info={},
+    )
+
+
+class TestGazeBorder:
+    """Verify that the frame border reflects the gaze + activation state."""
+
+    def _render(self, mode: str, gaze_permitted: bool) -> object:
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=100, height=100)
+        state = _make_state_with_gaze(mode, gaze_permitted)
+        return renderer.render(frame, state).frame
+
+    # --- Absent state ---------------------------------------------------------
+
+    def test_gaze_absent_renders_grey_border_top(self) -> None:
+        """gaze_permitted=False → grey border regardless of mode."""
+        frame = self._render("idle", gaze_permitted=False)
+        assert _border_pixel(frame, corner="top-left") == _GREY
+
+    def test_gaze_absent_renders_grey_border_bottom(self) -> None:
+        frame = self._render("armed", gaze_permitted=False)
+        assert _border_pixel(frame, corner="bottom-right") == _GREY
+
+    def test_gaze_absent_overrides_armed_mode(self) -> None:
+        """Even in ARMED mode, absent gaze must produce grey — not green."""
+        frame = self._render("armed", gaze_permitted=False)
+        assert _border_pixel(frame, corner="top-left") == _GREY
+
+    # --- Acquiring / idle state -----------------------------------------------
+
+    def test_gaze_active_idle_mode_renders_amber_border(self) -> None:
+        """gaze_permitted=True + mode=idle → amber (gaze present, not yet armed)."""
+        frame = self._render("idle", gaze_permitted=True)
+        assert _border_pixel(frame, corner="top-left") == _AMBER
+
+    def test_gaze_active_cooldown_mode_renders_amber_border(self) -> None:
+        frame = self._render("cooldown", gaze_permitted=True)
+        assert _border_pixel(frame, corner="top-left") == _AMBER
+
+    # --- Armed state ----------------------------------------------------------
+
+    def test_gaze_active_armed_mode_renders_green_border(self) -> None:
+        """gaze_permitted=True + mode=armed → green (system ready)."""
+        frame = self._render("armed", gaze_permitted=True)
+        assert _border_pixel(frame, corner="top-left") == _GREEN
+
+    def test_gaze_active_armed_border_on_all_edges(self) -> None:
+        """All four border edges must carry the colour (spot-check top and bottom)."""
+        frame = self._render("armed", gaze_permitted=True)
+        assert _border_pixel(frame, corner="top-left") == _GREEN
+        assert _border_pixel(frame, corner="bottom-right") == _GREEN
+
+    # --- Border does not corrupt interior pixels ------------------------------
+
+    def test_border_does_not_corrupt_interior(self) -> None:
+        """Border drawing must only colour edge rows/cols, not the interior.
+
+        Uses a 400×200 canvas so text (starting at x=12, max ~310 px wide) does
+        not reach the sampled region (columns 350-390, rows 6-16 — well above
+        the first text baseline at y=24 and far right of all text columns).
+        """
+        import numpy as np  # noqa: PLC0415
+
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=400, height=200)
+        state = _make_state_with_gaze("idle", gaze_permitted=True)
+        rendered = renderer.render(frame, state).frame
+        # Rows just inside the top border, columns far to the right of all text.
+        patch = np.asarray(rendered)[_THICKNESS + 2 : _THICKNESS + 12, 350:390]
+        assert patch.sum() == 0, "Interior region far from text must remain unmodified"
+
+    # --- Default gaze_permitted=True is backward-compatible ------------------
+
+    def test_default_state_renders_amber_border(self) -> None:
+        """RuntimeState with default gaze_permitted=True and mode='idle' → amber."""
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=100, height=100)
+        state = RuntimeState(mode="idle", last_label="unknown", last_confidence=0.0)
+        result = renderer.render(frame, state).frame
+        assert _border_pixel(result, corner="top-left") == _AMBER
