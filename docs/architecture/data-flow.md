@@ -43,7 +43,24 @@ graph TD
 
 The frame source reads from `cv2.VideoCapture` with a buffer size of 1 to minimize latency. Frame timing is enforced to match the configured target FPS (default 30). Each frame is assigned a monotonic timestamp for pipeline synchronization.
 
-### Stage 2: Landmark Extraction
+### Stage 2: Gaze Estimation
+
+**Component**: `HeadPoseGazeDetector` (or `NullGazeDetector` when `gaze.enabled: false`)
+**Input**: `FramePacket`
+**Output**: `gaze_permitted: bool`
+
+| Output Value | Condition                                                                                           | Pipeline Effect                              |
+| ------------ | --------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `True`       | User head pose within ±30° yaw and ±25° pitch; gaze state is ACTIVE or LOSING (within grace period) | Downstream stages proceed normally           |
+| `False`      | No face detected, head pose outside thresholds, or gaze state is ABSENT or ACQUIRING                | All downstream stages skipped for this frame |
+
+The detector maintains a four-state machine (ABSENT → ACQUIRING → ACTIVE → LOSING). Face Mesh is sampled every `gaze_sample_interval_frames` frames (default 3) at approximately 10 Hz; the cached result is returned on intervening frames at negligible cost. When the LOSING→ABSENT transition fires, `GestureActivationController.force_idle()` is invoked to reset any in-progress gesture hold, preventing an armed system from persisting unattended.
+
+The BGR frame is converted to RGB and processed by `mediapipe.solutions.face_mesh.FaceMesh`. Head orientation is computed by fitting a Perspective-n-Point (PnP) pose using six anatomical reference landmarks (nose tip, chin, eye corners, mouth corners) and resolving Euler angles from the resulting rotation matrix.
+
+This stage does not produce a domain entity. `gaze_permitted` flows directly into the runtime loop control path and is stored in `RuntimeState` for overlay rendering.
+
+### Stage 3: Landmark Extraction
 
 **Component**: `MediaPipeHandsExtractor`  
 **Input**: `FramePacket`  
@@ -69,7 +86,7 @@ The BGR frame is converted to RGB and processed by MediaPipe Hands. The model ex
 - 13–16: Ring finger
 - 17–20: Pinky finger
 
-### Stage 3: Feature Engineering
+### Stage 4: Feature Engineering
 
 **Component**: `LandmarkFeatureTransformer`  
 **Input**: `LandmarkPacket`  
@@ -100,7 +117,7 @@ The output vector is the concatenation of all position coordinates followed by a
 
 If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is emitted to maintain buffer alignment.
 
-### Stage 4: Temporal Buffering
+### Stage 5: Temporal Buffering
 
 **Component**: `SlidingWindowSequenceBuffer`  
 **Input**: `FeatureFrame`  
@@ -121,7 +138,7 @@ The buffer is a fixed-length deque (default length 24). Feature frames are pushe
 
 At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 24-frame window spans approximately 800 ms of hand motion, capturing sufficient temporal context for dynamic gesture recognition.
 
-### Stage 5: LSTM Inference
+### Stage 6: LSTM Inference
 
 **Component**: `GestureLSTMClassifier`  
 **Input**: `SequenceWindow`  
@@ -149,7 +166,7 @@ Softmax: 8-class probability distribution
 
 The model runs in `torch.no_grad()` evaluation mode. The output dictionary maps each of the 8 gesture labels to its softmax probability.
 
-### Stage 6: Prediction Stabilization
+### Stage 7: Prediction Stabilization
 
 **Component**: `PredictionStabilizer`  
 **Input**: `Prediction`  
@@ -186,7 +203,7 @@ if not all(recent_N == candidate):
 
 Dynamic gestures use vote_window=1 (immediate response). Static holds use vote_window=3 (require 3 consecutive agreements).
 
-### Stage 7: Activation Control
+### Stage 8: Activation Control
 
 **Component**: `GestureActivationController`  
 **Input**: `StabilizedPrediction`  
@@ -209,7 +226,7 @@ A command is emitted only when:
 
 Most iterations produce `None` (no command). Commands are emitted approximately once per intentional gesture, typically separated by several seconds.
 
-### Stage 8: Command Dispatch
+### Stage 9: Command Dispatch
 
 **Component**: `CommandDispatcher` → `ApplicationAdapter` → `KeyboardAdapter`  
 **Input**: `ExecutableCommand`  
@@ -228,7 +245,7 @@ The dispatch chain applies three validation stages before OS interaction:
 2. **Rate limiting**: Sliding-window deque enforces maximum dispatch frequency.
 3. **Key name validation**: Each key in the shortcut tuple is validated against `_SAFE_KEY_NAMES`.
 
-### Stage 9: Keyboard Execution
+### Stage 10: Keyboard Execution
 
 **Component**: `KeyboardAdapter`  
 **Input**: Validated key tuple from application adapter  
@@ -304,4 +321,4 @@ The training pipeline reuses `LandmarkFeatureTransformer` and `SlidingWindowSequ
 
 **Document**: Data Flow  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: March 2026
+**Last Updated**: April 2026
