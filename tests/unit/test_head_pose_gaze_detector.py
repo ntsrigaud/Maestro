@@ -24,7 +24,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import numpy as np
-import pytest
 
 from gesture_control.domain.entities import FramePacket
 from gesture_control.infrastructure.gaze.head_pose_detector import HeadPoseGazeDetector
