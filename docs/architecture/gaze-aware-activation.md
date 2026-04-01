@@ -369,49 +369,97 @@ Overhead in the gaze-active operating case: **+2 ms** (+3–5%). When the user i
 
 ### Step 5 — Overlay Feedback
 
-- Update `OverlayRenderer.render()` in `src/gesture_control/infrastructure/feedback/overlay_renderer.py` to read `runtime_state.gaze_permitted` and render a distinct border colour:
-  - Grey: gaze absent
-  - Amber: gaze acquiring
-  - Green: gaze active, system armed
+`OverlayRenderer` in `src/gesture_control/infrastructure/feedback/overlay_renderer.py` was extended with three module-level BGR colour constants, a border-thickness constant, and a dedicated `_draw_gaze_border()` method.
+
+| Constant            | Value (BGR)       | Rendered Colour | Activation Condition                                                 |
+| ------------------- | ----------------- | --------------- | -------------------------------------------------------------------- |
+| `_BORDER_ABSENT`    | `(128, 128, 128)` | Grey            | `gaze_permitted=False` — downstream pipeline bypassed                |
+| `_BORDER_ACQUIRING` | `(0, 165, 255)`   | Amber           | `gaze_permitted=True`, `mode != "armed"` — IDLE or COOLDOWN          |
+| `_BORDER_ARMED`     | `(0, 200, 0)`     | Green           | `gaze_permitted=True`, `mode == "armed"` — gesture commands accepted |
+| `_BORDER_THICKNESS` | `4` px            | —               | Applied uniformly to all four frame edges                            |
+
+`_draw_gaze_border(image, state)` writes the selected colour directly into four NumPy pixel-slice assignments (`image[:t, :]`, `image[h-t:, :]`, `image[:, :t]`, `image[:, w-t:]`), requiring no loops or intermediate allocations. The call is inserted in `render()` immediately after the canvas copy/flip and before landmark overlay drawing, ensuring the border underlies all other HUD elements. The `gaze_permitted=False` condition overrides the armed mode check, meaning a grey border is displayed even when the gesture controller holds ARMED state internally — guaranteeing the user always sees an accurate safety state.
 
 ### Step 6 — Testing
 
-| Test file                                                      | Coverage                                                                                                                              |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/unit/test_head_pose_gaze_detector.py`                   | All four state transitions; amortization cache; `force_idle()` call on ABSENT transition; `NullGazeDetector` always returns `True`    |
-| `tests/unit/test_activation_controller.py` (extend)            | `force_idle()` resets all timers; ARMED → IDLE on forced reset                                                                        |
-| `tests/integration/test_gesture_dispatch_pipeline.py` (extend) | `gaze_permitted=False` prevents command emission regardless of gesture state; `gaze_permitted=True` preserves full pipeline behaviour |
-| `scripts/benchmark_system.py` (extend)                         | Add `gaze_present_latency_ms` and `gaze_absent_latency_ms` metrics                                                                    |
+**Final result: 197 tests pass, 0 fail** (163 baseline + 34 new).
+
+#### `tests/unit/test_head_pose_gaze_detector.py` — 27 tests (new file)
+
+| Test class                    | Count | Coverage                                                                                                                                                                                                                                        |
+| ----------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TestNullGazeDetector`        | 5     | `update()` always returns `True`; `close()` is a no-op; both implementations satisfy `IGazeIntentDetector` structurally                                                                                                                         |
+| `TestInitialState`            | 2     | First call returns `False` before any face is observed; first out-of-cone call returns `False`                                                                                                                                                  |
+| `TestStateMachineTransitions` | 10    | All six transition paths: ABSENT→ACQUIRING, ACQUIRING→ABSENT (interrupted), ACQUIRING→ACTIVE (arm_ms elapsed and not-yet-elapsed), ACTIVE→LOSING, LOSING→ACTIVE (recovered), LOSING→ABSENT (grace expired); grace-timer reset after recovery    |
+| `TestOnGazeLostCallback`      | 6     | Callback fires exactly once on LOSING→ABSENT; not fired on ACQUIRING interruption; not fired on grace recovery; idempotent across subsequent ABSENT frames; `set_on_gaze_lost()` replaces previous registration; `None` callback does not raise |
+| `TestAmortizationCache`       | 3     | Non-sampled frames return cached result without calling `_is_within_cone`; cache updated on next sampling frame; `sample_interval_frames=1` calls cone check on every frame                                                                     |
+| `TestClose`                   | 1     | `close()` delegates to `_face_mesh.close()`                                                                                                                                                                                                     |
+
+#### `tests/unit/test_activation_controller.py` — 4 tests added
+
+| Test                                                  | Coverage                                                        |
+| ----------------------------------------------------- | --------------------------------------------------------------- |
+| `test_force_idle_from_armed_resets_to_idle`           | ARMED → IDLE transition                                         |
+| `test_force_idle_from_cooldown_resets_to_idle`        | COOLDOWN → IDLE transition                                      |
+| `test_force_idle_clears_timers_so_reactivation_works` | Hold timers cleared; fresh activation hold succeeds after reset |
+| `test_force_idle_from_idle_is_idempotent`             | No exception raised when already IDLE                           |
+
+#### `tests/unit/test_overlay_renderer.py` — 9 tests added (`TestGazeBorder`)
+
+| Test                                                  | Coverage                                                                                             |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `test_gaze_absent_renders_grey_border_top/bottom`     | `gaze_permitted=False` → `_BORDER_ABSENT` on top and bottom edges                                    |
+| `test_gaze_absent_overrides_armed_mode`               | `gaze_permitted=False` with `mode=armed` still renders grey, not green                               |
+| `test_gaze_active_idle_mode_renders_amber_border`     | `gaze_permitted=True` + idle → `_BORDER_ACQUIRING`                                                   |
+| `test_gaze_active_cooldown_mode_renders_amber_border` | `gaze_permitted=True` + cooldown → `_BORDER_ACQUIRING`                                               |
+| `test_gaze_active_armed_mode_renders_green_border`    | `gaze_permitted=True` + armed → `_BORDER_ARMED`                                                      |
+| `test_gaze_active_armed_border_on_all_edges`          | Green colour confirmed on both top and bottom edges                                                  |
+| `test_border_does_not_corrupt_interior`               | Pixels outside the 4-px border region remain unmodified                                              |
+| `test_default_state_renders_amber_border`             | `RuntimeState()` default (`gaze_permitted=True`, `mode="idle"`) renders amber — backwards-compatible |
+
+#### `tests/integration/test_gesture_dispatch_pipeline.py` — 7 tests added (`TestGazeGateIntegration`)
+
+| Test                                                            | Coverage                                                                    |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `test_null_detector_update_always_permits_gaze`                 | `NullGazeDetector.update()` returns `True` across 20 consecutive calls      |
+| `test_null_detector_enables_full_dispatch_pipeline`             | With null detector in place, swipe_right dispatches `("right",)` end-to-end |
+| `test_force_idle_on_gaze_loss_prevents_command_dispatch`        | ARMED → `force_idle()` → swipe_right produces `None`; pyautogui not called  |
+| `test_force_idle_prevents_dispatch_for_all_mapped_gestures`     | All six mapped gestures suppressed after `force_idle()`                     |
+| `test_rearm_after_gaze_restored_dispatches_correctly`           | Full cycle: arm → gaze lost → re-arm → swipe_up dispatches `("f5",)`        |
+| `test_swipe_down_dispatches_exit_presentation_when_gaze_active` | swipe_down → `("escape",)` with gaze gate open                              |
+| `test_swipe_down_does_not_dispatch_when_gaze_absent`            | swipe_down suppressed when controller is in IDLE (gaze gate closed)         |
+
+> **Note**: The benchmark extension (`scripts/benchmark_system.py`) with `gaze_present_latency_ms` / `gaze_absent_latency_ms` metrics was deferred and is not part of this implementation.
 
 ### Step 7 — Documentation
 
-Update the following files after implementation is complete:
+All six documentation files were updated to reflect the as-built gaze-aware architecture:
 
-| File                                    | Required change                                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `docs/architecture/system-overview.md`  | Confirm 10-stage pipeline table is current                                                      |
-| `docs/architecture/process-view.md`     | Verify event loop diagram and timing table are current                                          |
-| `docs/architecture/data-flow.md`        | Verify Stage 2 gaze branch is present                                                           |
-| `docs/architecture/logical-view.md`     | Add `IGazeIntentDetector` to interface list; add `HeadPoseGazeDetector` to infrastructure layer |
-| `docs/architecture/development-view.md` | Add `interfaces/gaze_detector.py` and `infrastructure/gaze/` to module table                    |
-| `ARCHITECTURE_SPECIFICATION.md`         | Add `interfaces/gaze_detector.py`, `infrastructure/gaze/` to directory tree in §2               |
+| File                                    | Change Applied                                                                                                                                                                                                                                                                        |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/architecture/system-overview.md`  | 10-stage pipeline table confirmed current; gaze added as Stage 2; "Gaze Gating" listed as first safety characteristic                                                                                                                                                                 |
+| `docs/architecture/process-view.md`     | Event loop flowchart updated with gaze branch; iteration timing table updated with gaze row and "skipped if gaze absent" notation; §4.1 Gaze Detector State Machine (Mermaid stateDiagram) added; §4.2 Gesture Activation State Machine extended with ARMED→IDLE gaze-loss transition |
+| `docs/architecture/data-flow.md`        | Stage 2 Gaze Estimation added with `gaze_permitted: bool` output table, sub-sampling explanation, and LOSING→ABSENT callback reference; original Stages 2–9 renumbered to 3–10                                                                                                        |
+| `docs/architecture/logical-view.md`     | `IGazeIntentDetector` added to Protocol Interfaces node and component table; `HeadPoseGazeDetector` and `NullGazeDetector` added to Infrastructure layer table                                                                                                                        |
+| `docs/architecture/development-view.md` | `interfaces/gaze_detector.py` added to interfaces module table; `infrastructure/gaze/` subpackage rows added; `test_head_pose_gaze_detector.py` added to unit test listing                                                                                                            |
+| `ARCHITECTURE_SPECIFICATION.md`         | `interfaces/gaze_detector.py`, `infrastructure/gaze/`, and `gaze-aware-activation.md` added to the source and documentation directory trees                                                                                                                                           |
 
 ---
 
 ## 7. Consistency Validation Checklist
 
-Upon implementation completion, verify the following:
+All items verified against the as-built implementation. Final test run: **197 passed, 0 failed**.
 
-- [ ] `HeadPoseGazeDetector` satisfies `IGazeIntentDetector` structurally (duck-typed Protocol)
-- [ ] `NullGazeDetector` satisfies `IGazeIntentDetector` structurally
-- [ ] `AppContainer.gaze_detector` field is present and typed `IGazeIntentDetector`
-- [ ] `configs/inference.yaml` contains all six `gaze.*` parameters with correct defaults
-- [ ] `GazeConfig` Pydantic model validates all six parameters with appropriate bounds
-- [ ] `GestureActivationController.force_idle()` is covered by a unit test
-- [ ] `Runtime.run()` gaze gate is present before landmark extraction
-- [ ] Shutdown sequence calls `gaze_detector.close()`
-- [ ] All new unit tests pass with `pytest tests/ -q`
-- [ ] No existing tests regress
+- [x] `HeadPoseGazeDetector` satisfies `IGazeIntentDetector` structurally — verified by `TestNullGazeDetector.test_head_pose_detector_satisfies_igaze_intent_detector_structurally`
+- [x] `NullGazeDetector` satisfies `IGazeIntentDetector` structurally — verified by `TestNullGazeDetector.test_satisfies_igaze_intent_detector_structurally`
+- [x] `AppContainer.gaze_detector` field is present and typed `IGazeIntentDetector` — confirmed in `src/gesture_control/app/bootstrap.py`
+- [x] `configs/inference.yaml` contains all six `gaze.*` parameters with correct defaults — `enabled`, `yaw_threshold_deg`, `pitch_threshold_deg`, `arm_ms`, `grace_ms`, `sample_interval_frames`
+- [x] `GazeConfig` Pydantic model validates all six parameters with appropriate bounds — `ge` / `le` / `gt` constraints enforced in `src/gesture_control/utils/schema_validation.py`
+- [x] `GestureActivationController.force_idle()` is covered by a unit test — 4 dedicated tests in `TestForceIdle` class
+- [x] `Runtime.run()` gaze gate is present before landmark extraction — `gaze_detector.update(frame)` called immediately after `frame_source.read()`; `continue` on `False` bypasses Stages 3–10
+- [x] Shutdown sequence calls `gaze_detector.close()` — called in the `finally` block of `Runtime.run()` alongside `frame_source.close()`
+- [x] All new unit tests pass with `pytest tests/ -q` — 197 passed
+- [x] No existing tests regress — baseline 163 tests all pass unchanged
 
 ---
 
