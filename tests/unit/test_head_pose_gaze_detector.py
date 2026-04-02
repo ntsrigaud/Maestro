@@ -166,7 +166,7 @@ class TestStateMachineTransitions:
     def test_acquiring_single_miss_is_tolerated(self) -> None:
         """A single out-of-cone result while ACQUIRING does not reset the state."""
         det = _make_detector()
-        _update(det, within_cone=True, now_s=0.0)   # ACQUIRING
+        _update(det, within_cone=True, now_s=0.0)  # ACQUIRING
         _update(det, within_cone=False, now_s=0.050)  # 1st miss — tolerated
         # Detector is still ACQUIRING; next True at ≥ arm_ms must activate.
         result = _update(det, within_cone=True, now_s=0.201)  # elapsed 201 ms > 200 ms
@@ -175,9 +175,9 @@ class TestStateMachineTransitions:
     def test_acquiring_false_count_resets_on_true(self) -> None:
         """A True sample after a tolerated miss resets the false counter."""
         det = _make_detector()
-        _update(det, within_cone=True, now_s=0.0)    # ACQUIRING
+        _update(det, within_cone=True, now_s=0.0)  # ACQUIRING
         _update(det, within_cone=False, now_s=0.050)  # 1st miss — tolerated (count=1)
-        _update(det, within_cone=True, now_s=0.100)   # True resets count to 0
+        _update(det, within_cone=True, now_s=0.100)  # True resets count to 0
         # Now a single miss should again be tolerated.
         _update(det, within_cone=False, now_s=0.150)  # tolerated again
         result = _update(det, within_cone=True, now_s=0.201)
@@ -186,10 +186,10 @@ class TestStateMachineTransitions:
     def test_acquiring_interrupted_then_new_hold_can_succeed(self) -> None:
         """After a full interruption (2 misses) a fresh hold reaches ACTIVE."""
         det = _make_detector()
-        _update(det, within_cone=True, now_s=0.0)    # ACQUIRING
+        _update(det, within_cone=True, now_s=0.0)  # ACQUIRING
         _update(det, within_cone=False, now_s=0.050)  # 1st miss — tolerated
         _update(det, within_cone=False, now_s=0.100)  # 2nd miss → ABSENT
-        _update(det, within_cone=True, now_s=1.0)    # new ACQUIRING (fresh timer)
+        _update(det, within_cone=True, now_s=1.0)  # new ACQUIRING (fresh timer)
         result = _update(det, within_cone=True, now_s=1.250)  # 250 ms > 200 ms arm_ms
         assert result is True  # ACTIVE
 
@@ -282,7 +282,7 @@ class TestOnGazeLostCallback:
         """Interrupting ACQUIRING (2 consecutive misses) must not fire the callback."""
         cb = MagicMock()
         det = _make_detector(on_gaze_lost=cb)
-        _update(det, within_cone=True, now_s=0.0)   # ACQUIRING
+        _update(det, within_cone=True, now_s=0.0)  # ACQUIRING
         _update(det, within_cone=False, now_s=0.050)  # 1st miss — tolerated
         _update(det, within_cone=False, now_s=0.100)  # 2nd miss → ABSENT
         cb.assert_not_called()
