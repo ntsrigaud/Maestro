@@ -73,20 +73,30 @@ class _GazeState(Enum):
 
 
 def _euler_yaw_pitch(rotation_matrix: np.ndarray) -> tuple[float, float]:
-    """Return (yaw_deg, pitch_deg) from a 3×3 rotation matrix.
+    """Return (roll_deg, head_turn_deg) from a 3×3 object-to-camera rotation.
 
-    Decomposition convention: ZYX Euler angles (roll → yaw → pitch), which
-    matches the object-to-camera rotation produced by ``cv2.solvePnP`` with
-    ``SOLVEPNP_ITERATIVE``.
+    Uses the ZYX Euler decomposition of the rotation matrix R produced by
+    ``cv2.Rodrigues(rvec)`` after a ``cv2.solvePnP`` call.
 
-    For the acceptance-cone check only ``abs(yaw)`` and ``abs(pitch)`` are
-    needed; roll is computed but not returned.
+    In OpenCV camera coordinates (X right, Y down, Z forward into scene) the
+    decomposition yields:
+
+    * First angle  α (``yaw`` below)   = rotation around camera-Z (forward).
+      In practice this captures **head tilt** (ear-toward-shoulder roll).
+    * Second angle β (``pitch`` below) = rotation around camera-Y (down).
+      In practice this captures **head turn** (looking left/right, i.e. yaw
+      in world terms).  This is the critical angle for the acceptance cone.
+    * Third  angle γ (roll)            = rotation around camera-X (right).
+      Captures nodding up/down; not returned — less relevant for a camera
+      positioned at screen level.
+
+    For a face looking directly at the camera both returned angles are ≈ 0°.
 
     Returns
     -------
     (yaw_deg, pitch_deg) :
-        Yaw   — rotation about the vertical axis (positive = face turned right).
-        Pitch — rotation about the lateral  axis (positive = face tilted up).
+        yaw_deg   — head tilt / roll  (camera-Z rotation; checked vs yaw_threshold).
+        pitch_deg — head turn L/R     (camera-Y rotation; checked vs pitch_threshold).
     """
     sy = math.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
     singular = sy < 1e-6
@@ -165,6 +175,12 @@ class HeadPoseGazeDetector:
         self._frame_counter: int = 0
         self._last_permitted: bool = False
 
+        # Consecutive within_cone=False count while ACQUIRING.  A minimum of
+        # two consecutive misses is required before resetting the stability
+        # timer.  This provides hysteresis against single-frame detection
+        # noise that would otherwise prevent ACQUIRING → ACTIVE transitions.
+        self._acquiring_false_count: int = 0
+
     # ------------------------------------------------------------------
     # Public interface  (satisfies IGazeIntentDetector)
     # ------------------------------------------------------------------
@@ -173,14 +189,31 @@ class HeadPoseGazeDetector:
         """Advance the gaze state machine and return ``gaze_permitted``."""
         if self._frame_counter % self._cfg.sample_interval_frames == 0:
             h, w = frame.frame.shape[:2]
-            rgb = frame.frame[:, :, ::-1]
+            # Use cv2.cvtColor to produce a C-contiguous RGB copy.  A
+            # reversed-stride view (frame[:, :, ::-1]) can cause silent
+            # failures in some solvePnP and MediaPipe C extensions that
+            # require contiguous memory.
+            rgb = cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
             results = self._face_mesh.process(rgb)
             within_cone = self._is_within_cone(results, h, w)
             now_ms = time.monotonic() * 1000.0
             self._transition(within_cone, now_ms)
             self._last_permitted = self._state in (_GazeState.ACTIVE, _GazeState.LOSING)
+            LOGGER.debug(
+                "Gaze update: state=%s within_cone=%s permitted=%s",
+                self._state.name,
+                within_cone,
+                self._last_permitted,
+            )
 
         self._frame_counter += 1
+        if self._frame_counter % 90 == 0:
+            LOGGER.info(
+                "Gaze status: state=%s permitted=%s (frame %d)",
+                self._state.name,
+                self._last_permitted,
+                self._frame_counter,
+            )
         return self._last_permitted
 
     def close(self) -> None:
@@ -237,10 +270,17 @@ class HeadPoseGazeDetector:
         rmat, _ = cv2.Rodrigues(rvec)
         yaw_deg, pitch_deg = _euler_yaw_pitch(rmat)
 
-        return (
+        within = (
             abs(yaw_deg) <= self._cfg.yaw_threshold_deg
             and abs(pitch_deg) <= self._cfg.pitch_threshold_deg
         )
+        LOGGER.debug(
+            "Gaze pose: tilt=%.1f°(±%.0f°) turn=%.1f°(±%.0f°) → within=%s",
+            yaw_deg, self._cfg.yaw_threshold_deg,
+            pitch_deg, self._cfg.pitch_threshold_deg,
+            within,
+        )
+        return within
 
     # ------------------------------------------------------------------
     # State machine
@@ -256,18 +296,31 @@ class HeadPoseGazeDetector:
 
         elif self._state is _GazeState.ACQUIRING:
             if not within_cone:
-                self._state = _GazeState.ABSENT
-                self._stability_start_ms = None
-                LOGGER.debug("Gaze: ACQUIRING → ABSENT (pose interrupted)")
-            elif (
-                self._stability_start_ms is not None
-                and now_ms - self._stability_start_ms >= self._cfg.arm_ms
-            ):
-                self._state = _GazeState.ACTIVE
-                self._stability_start_ms = None
-                LOGGER.debug(
-                    "Gaze: ACQUIRING → ACTIVE (stable for %d ms)", self._cfg.arm_ms
-                )
+                # Hysteresis: require two consecutive out-of-cone samples
+                # before resetting the stability timer.  A single noisy
+                # Face Mesh result must not abort a valid acquisition.
+                self._acquiring_false_count += 1
+                if self._acquiring_false_count >= 2:
+                    self._state = _GazeState.ABSENT
+                    self._stability_start_ms = None
+                    self._acquiring_false_count = 0
+                    LOGGER.debug("Gaze: ACQUIRING → ABSENT (pose lost)")
+                else:
+                    LOGGER.debug(
+                        "Gaze: ACQUIRING — transient miss (%d/2); stability timer preserved",
+                        self._acquiring_false_count,
+                    )
+            else:
+                self._acquiring_false_count = 0
+                if (
+                    self._stability_start_ms is not None
+                    and now_ms - self._stability_start_ms >= self._cfg.arm_ms
+                ):
+                    self._state = _GazeState.ACTIVE
+                    self._stability_start_ms = None
+                    LOGGER.debug(
+                        "Gaze: ACQUIRING → ACTIVE (stable for %d ms)", self._cfg.arm_ms
+                    )
 
         elif self._state is _GazeState.ACTIVE:
             if not within_cone:
