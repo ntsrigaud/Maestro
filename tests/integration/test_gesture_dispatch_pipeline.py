@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import numpy as np
+
 from gesture_control.domain.entities import ExecutableCommand, StabilizedPrediction
 from gesture_control.domain.enums import RuntimeMode
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
@@ -37,10 +39,15 @@ _COMMAND_MAP: dict[str, str] = {
     "zoom_out": "raise_hand",
 }
 
-_ACTIVATION_GESTURE = "open_palm_hold"
-_ACTIVATION_HOLD_MS = 500
+# Kept as a timing base constant so that test timestamps are non-trivially
+# non-zero.  The value no longer relates to any hold duration.
+_T_BASE_MS = 500
 _IDLE_TIMEOUT_MS = 3000
 _COOLDOWN_MS = 800
+
+# Legacy alias — used in TestEdgeTriggerSingleDispatch test bodies; kept to
+# avoid touching every timestamp expression in those tests.
+_ACTIVATION_HOLD_MS = _T_BASE_MS
 
 
 def _pred(
@@ -51,9 +58,7 @@ def _pred(
 
 def _make_controller() -> GestureActivationController:
     return GestureActivationController(
-        activation_gesture=_ACTIVATION_GESTURE,
         command_map=_COMMAND_MAP,
-        activation_hold_ms=_ACTIVATION_HOLD_MS,
         idle_timeout_ms=_IDLE_TIMEOUT_MS,
         command_cooldown_ms=_COOLDOWN_MS,
     )
@@ -78,14 +83,11 @@ def _make_dispatcher(
 
 
 def _arm_controller(
-    controller: GestureActivationController, mock_time: MagicMock
+    controller: GestureActivationController, mock_time: MagicMock  # noqa: ARG001
 ) -> None:
-    """Drive controller from IDLE → ARMED via activation hold."""
-    t0 = 1000
-    mock_time.return_value = t0
-    controller.route(_pred(_ACTIVATION_GESTURE))  # start hold timer
-    mock_time.return_value = t0 + _ACTIVATION_HOLD_MS + 1
-    controller.route(_pred(_ACTIVATION_GESTURE))  # completes hold → ARMED
+    """Transition the controller from IDLE to ARMED."""
+    controller.rearm()
+    assert controller.mode is RuntimeMode.ARMED
 
 
 # ---------------------------------------------------------------------------
@@ -94,29 +96,14 @@ def _arm_controller(
 
 
 class TestActivationStateMachine:
-    def test_idle_to_armed_on_hold(self):
+    def test_starts_in_idle_state(self):
         controller = _make_controller()
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 1000)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        assert controller.mode is RuntimeMode.IDLE  # still waiting for hold
-
-        with patch.object(
-            type(controller),
-            "_now_ms",
-            staticmethod(lambda: 1000 + _ACTIVATION_HOLD_MS + 1),
-        ):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        assert controller.mode is RuntimeMode.ARMED
+        assert controller.mode is RuntimeMode.IDLE
 
     def test_armed_returns_command_for_known_gesture(self):
         controller = _make_controller()
+        controller.rearm()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 1000)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 1700)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        assert controller.mode is RuntimeMode.ARMED
-
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 1800)):
             cmd = controller.route(_pred("swipe_right"))
         assert cmd is not None
         assert cmd.command_id == "next_slide"
@@ -124,72 +111,65 @@ class TestActivationStateMachine:
 
     def test_command_triggers_cooldown(self):
         controller = _make_controller()
+        controller.rearm()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
-        ):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)
-        ):
             controller.route(_pred("swipe_right"))
         assert controller.mode is RuntimeMode.COOLDOWN
 
     def test_cooldown_expires_back_to_armed(self):
         controller = _make_controller()
+        controller.rearm()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
-        ):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)
-        ):
             controller.route(_pred("swipe_right"))
+        # Unknown resets edge trigger; after cooldown a different gesture fires.
         with patch.object(
             type(controller),
             "_now_ms",
-            staticmethod(lambda: _ACTIVATION_HOLD_MS + _COOLDOWN_MS + 10),
+            staticmethod(lambda: _COOLDOWN_MS + 10),
         ):
             cmd = controller.route(_pred("swipe_left"))
         assert cmd is not None
         assert cmd.command_id == "previous_slide"
 
     def test_idle_on_missing_hands(self):
-        controller = _make_controller()
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
+        # Patch _now_ms during construction AND rearm() so _last_active_ms starts at 0.
         with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 100)
+            GestureActivationController, "_now_ms", staticmethod(lambda: 0)
         ):
-            controller.route(_pred(_ACTIVATION_GESTURE))
+            controller = _make_controller()
+            controller.rearm()  # IDLE → ARMED; _last_active_ms = 0 while still patched
         assert controller.mode is RuntimeMode.ARMED
 
         # Simulate no gesture for longer than idle timeout
         with patch.object(
             type(controller),
             "_now_ms",
-            staticmethod(lambda: _ACTIVATION_HOLD_MS + _IDLE_TIMEOUT_MS + 200),
+            staticmethod(lambda: _IDLE_TIMEOUT_MS + 200),
         ):
             controller.route(_pred("unknown", accepted=False))
         assert controller.mode is RuntimeMode.IDLE
 
     def test_unmapped_gesture_does_not_dispatch(self):
         controller = _make_controller()
+        controller.rearm()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
-        ):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 2)
-        ):
             cmd = controller.route(_pred("unknown_gesture_xyz"))
         assert cmd is None
         assert controller.mode is RuntimeMode.ARMED
+
+    def test_force_idle_then_rearm_dispatches_normally(self):
+        """force_idle() + rearm() restores full dispatch capability."""
+        controller = _make_controller()
+        controller.force_idle()
+        assert controller.mode is RuntimeMode.IDLE
+
+        controller.rearm()
+        assert controller.mode is RuntimeMode.ARMED
+
+        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 100)):
+            cmd = controller.route(_pred("swipe_right"))
+        assert cmd is not None
+        assert cmd.command_id == "next_slide"
 
 
 # ---------------------------------------------------------------------------
@@ -218,15 +198,10 @@ class TestGestureDispatchPipeline:
     def teardown_method(self):
         self._patcher.stop()
 
-    def _arm(self, t0: int = 0) -> None:
-        with patch.object(type(self.controller), "_now_ms", staticmethod(lambda: t0)):
-            self.controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(self.controller),
-            "_now_ms",
-            staticmethod(lambda: t0 + _ACTIVATION_HOLD_MS + 1),
-        ):
-            self.controller.route(_pred(_ACTIVATION_GESTURE))
+    def _arm(self, t0: int = 0) -> None:  # noqa: ARG002
+        """Transition controller from IDLE to ARMED."""
+        self.controller.rearm()
+        assert self.controller.mode is RuntimeMode.ARMED
 
     def test_swipe_right_dispatches_next_slide(self):
         self._arm()
@@ -354,224 +329,6 @@ class TestIntegrationRateLimiting:
 
 
 # ---------------------------------------------------------------------------
-# Test: Activation hold and ARMED persistence (IPN regression fixes)
-# ---------------------------------------------------------------------------
-
-
-class TestActivationPersistenceAndHold:
-    """Verify the two regressions surfaced after IPN vocabulary migration.
-
-    Fix 1 — Hold timer starts before temporal stability:
-        ``open_palm_hold`` requires vote_window=3 in the stabiliser, meaning
-        the first two windows are always ``accepted=False``.  The controller
-        must begin the hold timer on the first above-threshold prediction,
-        not only after the first ``accepted=True``.
-
-    Fix 2 — ARMED state persists during presentation pauses:
-        With ``idle_timeout_ms=3000`` the system dropped back to IDLE after
-        only 3 seconds of inactivity.  The new default is 300 000 ms (5 min)
-        and ``_last_active_ms`` is refreshed on any non-unknown gesture.
-    """
-
-    # ------------------------------------------------------------------
-    # Fix 1: hold timer starts with accepted=False (temporal_inconsistency)
-    # ------------------------------------------------------------------
-
-    def test_hold_timer_starts_before_temporal_stability(self):
-        """Hold timer begins on the first above-threshold frame even when
-        the stabiliser marks the prediction as not yet temporally stable."""
-        controller = GestureActivationController(
-            activation_gesture=_ACTIVATION_GESTURE,
-            command_map=_COMMAND_MAP,
-            activation_hold_ms=_ACTIVATION_HOLD_MS,
-            idle_timeout_ms=_IDLE_TIMEOUT_MS,
-            command_cooldown_ms=_COOLDOWN_MS,
-        )
-        # Window 1: confidence above threshold but not yet temporally stable.
-        unaccepted = StabilizedPrediction(
-            label=_ACTIVATION_GESTURE,
-            confidence=0.93,
-            accepted=False,
-            reason="temporal_inconsistency",
-        )
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(unaccepted)
-        assert controller.mode is RuntimeMode.IDLE  # hold timer started but not expired
-
-        # Window 2 (still not accepted) — hold duration just short of threshold.
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS - 1)
-        ):
-            controller.route(unaccepted)
-        assert controller.mode is RuntimeMode.IDLE  # not yet expired
-
-        # Window 3 — hold duration exceeds threshold, still not accepted.
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
-        ):
-            controller.route(unaccepted)
-        assert controller.mode is RuntimeMode.ARMED  # armed despite never accepted=True
-
-    def test_hold_timer_resets_on_unknown_label(self):
-        """If confidence drops to unknown between frames the hold timer resets."""
-        controller = GestureActivationController(
-            activation_gesture=_ACTIVATION_GESTURE,
-            command_map=_COMMAND_MAP,
-            activation_hold_ms=_ACTIVATION_HOLD_MS,
-            idle_timeout_ms=_IDLE_TIMEOUT_MS,
-            command_cooldown_ms=_COOLDOWN_MS,
-        )
-        activation_pred = StabilizedPrediction(
-            label=_ACTIVATION_GESTURE,
-            confidence=0.93,
-            accepted=False,
-            reason="temporal_inconsistency",
-        )
-        unknown_pred = StabilizedPrediction(
-            label="unknown",
-            confidence=0.40,
-            accepted=False,
-            reason="below_threshold_or_unknown",
-        )
-        # Timer starts at T=0.
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(activation_pred)
-
-        # Confidence drops at T=200 — label becomes unknown — timer resets.
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 200)):
-            controller.route(unknown_pred)
-
-        # Activation gesture resumes at T=201 — timer must restart from here.
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 201)):
-            controller.route(activation_pred)
-
-        # One ms before the new hold window expires — still IDLE.
-        t_near = 201 + _ACTIVATION_HOLD_MS - 1
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_near)):
-            controller.route(activation_pred)
-        assert controller.mode is RuntimeMode.IDLE
-
-        # One ms after the new hold window expires — ARMED.
-        t_arm = 201 + _ACTIVATION_HOLD_MS + 1
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_arm)):
-            controller.route(activation_pred)
-        assert controller.mode is RuntimeMode.ARMED
-
-    # ------------------------------------------------------------------
-    # Fix 2: ARMED state persists through extended inactivity
-    # ------------------------------------------------------------------
-
-    def test_armed_persists_within_long_idle_timeout(self):
-        """System stays ARMED for the duration of idle_timeout without any gesture."""
-        long_timeout_ms = 300_000  # 5 minutes
-        controller = GestureActivationController(
-            activation_gesture=_ACTIVATION_GESTURE,
-            command_map=_COMMAND_MAP,
-            activation_hold_ms=_ACTIVATION_HOLD_MS,
-            idle_timeout_ms=long_timeout_ms,
-            command_cooldown_ms=_COOLDOWN_MS,
-        )
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
-        ):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        assert controller.mode is RuntimeMode.ARMED
-
-        # 3 minutes later — only unknown predictions (no hand gesture).
-        t_3min = _ACTIVATION_HOLD_MS + 180_000
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_3min)):
-            controller.route(_pred("unknown", accepted=False))
-        assert controller.mode is RuntimeMode.ARMED  # still armed after 3 min
-
-        # Just inside the 5-minute window.
-        t_5min_minus_1 = _ACTIVATION_HOLD_MS + long_timeout_ms - 1
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: t_5min_minus_1)
-        ):
-            controller.route(_pred("unknown", accepted=False))
-        assert controller.mode is RuntimeMode.ARMED  # still within timeout
-
-        # One millisecond past the 5-minute window → IDLE.
-        t_expired = _ACTIVATION_HOLD_MS + long_timeout_ms + 2
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_expired)):
-            controller.route(_pred("unknown", accepted=False))
-        assert controller.mode is RuntimeMode.IDLE
-
-    def test_any_gesture_resets_idle_timer(self):
-        """A non-unknown gesture (even if not dispatched) resets the armed timer."""
-        idle_timeout_ms = 5_000
-        controller = GestureActivationController(
-            activation_gesture=_ACTIVATION_GESTURE,
-            command_map=_COMMAND_MAP,
-            activation_hold_ms=_ACTIVATION_HOLD_MS,
-            idle_timeout_ms=idle_timeout_ms,
-            command_cooldown_ms=_COOLDOWN_MS,
-        )
-        # Arm at T=0.
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
-        ):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        assert controller.mode is RuntimeMode.ARMED
-
-        # At T=4 000 ms (within 5 s timeout), user makes swipe_right → dispatch.
-        t_swipe = 4_000
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_swipe)):
-            controller.route(_pred("swipe_right"))
-        # In cooldown now; _last_active_ms was refreshed to t_swipe.
-
-        # Cooldown ends at t_swipe + cooldown_ms.
-        t_after_cool = t_swipe + _COOLDOWN_MS + 1
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: t_after_cool)
-        ):
-            controller.route(_pred("unknown", accepted=False))
-        assert controller.mode is RuntimeMode.ARMED
-
-        # 4 999 ms after the swipe — still within the reset window.
-        t_near = t_swipe + idle_timeout_ms - 1
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_near)):
-            controller.route(_pred("unknown", accepted=False))
-        assert controller.mode is RuntimeMode.ARMED
-
-        # 5 001 ms after the swipe — idle timeout expires from the swipe.
-        t_over = t_swipe + idle_timeout_ms + 2
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: t_over)):
-            controller.route(_pred("unknown", accepted=False))
-        assert controller.mode is RuntimeMode.IDLE
-
-    def test_activation_gesture_when_armed_does_not_dispatch(self):
-        """Re-showing the activation gesture when ARMED keeps the timer alive
-        but must never emit a command."""
-        controller = GestureActivationController(
-            activation_gesture=_ACTIVATION_GESTURE,
-            command_map=_COMMAND_MAP,
-            activation_hold_ms=_ACTIVATION_HOLD_MS,
-            idle_timeout_ms=_IDLE_TIMEOUT_MS,
-            command_cooldown_ms=_COOLDOWN_MS,
-        )
-        with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
-        ):
-            controller.route(_pred(_ACTIVATION_GESTURE))
-        assert controller.mode is RuntimeMode.ARMED
-
-        # Hold palm again while already ARMED — should return None.
-        with patch.object(
-            type(controller), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 100)
-        ):
-            cmd = controller.route(_pred(_ACTIVATION_GESTURE))
-        assert cmd is None
-        assert controller.mode is RuntimeMode.ARMED
-
-
-# ---------------------------------------------------------------------------
 # Test: Edge-trigger single-dispatch guarantee
 # ---------------------------------------------------------------------------
 
@@ -592,20 +349,12 @@ class TestEdgeTriggerSingleDispatch:
         self, edge_trigger_enabled: bool = True
     ) -> GestureActivationController:
         ctrl = GestureActivationController(
-            activation_gesture=_ACTIVATION_GESTURE,
             command_map=_COMMAND_MAP,
-            activation_hold_ms=_ACTIVATION_HOLD_MS,
             idle_timeout_ms=300_000,
             command_cooldown_ms=_COOLDOWN_MS,
             edge_trigger_enabled=edge_trigger_enabled,
         )
-        # Arm the controller without touching real time.
-        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
-            ctrl.route(_pred(_ACTIVATION_GESTURE, accepted=False))
-        with patch.object(
-            type(ctrl), "_now_ms", staticmethod(lambda: _ACTIVATION_HOLD_MS + 1)
-        ):
-            ctrl.route(_pred(_ACTIVATION_GESTURE))
+        ctrl.rearm()
         assert ctrl.mode is RuntimeMode.ARMED
         return ctrl
 
@@ -858,3 +607,183 @@ class TestEdgeTriggerSingleDispatch:
         assert _route("swipe_right", accepted=False) is None
         cmd3 = _route("swipe_right", accepted=True)
         assert cmd3 is not None and cmd3.command_id == "next_slide"
+
+
+# ---------------------------------------------------------------------------
+# Test: Gaze gate integration
+# ---------------------------------------------------------------------------
+
+
+class TestGazeGateIntegration:
+    """Verify the gaze gate layer in context of the gesture dispatch chain.
+
+    The gaze gate lives in ``Runtime.run()`` and bypasses all pipeline stages
+    when gaze is absent.  These tests simulate that gate at the controller
+    boundary:
+
+    1. ``NullGazeDetector`` always returns ``True`` — pipeline behaves
+       identically to the pre-gaze baseline.
+
+    2. When ``force_idle()`` is called (simulating the runtime calling it on
+       grace-period expiry), the controller transitions to IDLE and no
+       subsequent commands are emitted from that state.
+
+    3. The transition from ARMED to IDLE on gaze loss and back to ARMED on
+       a fresh hold cycle works end-to-end with the dispatcher.
+    """
+
+    def setup_method(self) -> None:
+        self.controller = _make_controller()
+        self.kb = KeyboardAdapter()
+        self.adapter = PowerPointAdapter(keyboard=self.kb)
+        self.dispatcher = CommandDispatcher(
+            adapter=self.adapter,
+            allowed_commands=frozenset(_COMMAND_MAP.values()),
+            rate_limit_per_window=10,
+            rate_limit_window_ms=1000,
+        )
+        self._patcher = patch(
+            "gesture_control.infrastructure.dispatch.app_adapters"
+            ".keyboard_adapter.pyautogui"
+        )
+        self.mock_pya = self._patcher.start()
+
+    def teardown_method(self) -> None:
+        self._patcher.stop()
+
+    def _arm(self, t0: int = 0) -> None:  # noqa: ARG002
+        """Transition controller from IDLE to ARMED."""
+        self.controller.rearm()
+        assert self.controller.mode is RuntimeMode.ARMED
+
+    # -- NullGazeDetector -----------------------------------------------------
+
+    def test_null_detector_update_always_permits_gaze(self) -> None:
+        """NullGazeDetector.update() must return True on every call, preserving
+        the pre-gaze pipeline baseline with zero behavioural change."""
+        from gesture_control.domain.entities import FramePacket
+        from gesture_control.infrastructure.gaze.null_detector import NullGazeDetector
+
+        null_det = NullGazeDetector()
+        frame = FramePacket(
+            frame=np.zeros((480, 640, 3), dtype=np.uint8),
+            timestamp_ms=0.0,
+            frame_id=0,
+        )
+        for _ in range(20):
+            assert null_det.update(frame) is True
+
+    def test_null_detector_enables_full_dispatch_pipeline(self) -> None:
+        """With NullGazeDetector in place the command pipeline operates normally."""
+        self._arm()
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
+        ):
+            cmd = self.controller.route(_pred("swipe_right"))
+        assert cmd is not None
+        result = self.dispatcher.dispatch(cmd)
+        assert result.success is True
+        self.mock_pya.hotkey.assert_called_once_with("right")
+
+    # -- Gaze loss → force_idle -----------------------------------------------
+
+    def test_force_idle_on_gaze_loss_prevents_command_dispatch(self) -> None:
+        """Simulates runtime: controller ARMED, gaze grace expires → force_idle(),
+        gesture arrives while IDLE → no command emitted."""
+        self._arm()
+
+        # Gaze grace period expires: runtime calls force_idle().
+        self.controller.force_idle()
+        assert self.controller.mode is RuntimeMode.IDLE
+
+        # A command gesture arrives, but the pipeline is idle (gaze absent).
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 200),
+        ):
+            cmd = self.controller.route(_pred("swipe_right"))
+        assert cmd is None
+        self.mock_pya.hotkey.assert_not_called()
+
+    def test_force_idle_prevents_dispatch_for_all_mapped_gestures(self) -> None:
+        """Every mapped gesture is suppressed after force_idle(), not just
+        swipe_right."""
+        self._arm()
+        self.controller.force_idle()
+
+        t = _ACTIVATION_HOLD_MS + 100
+        for gesture in (
+            "swipe_right",
+            "swipe_left",
+            "swipe_up",
+            "swipe_down",
+            "zoom_in",
+            "zoom_out",
+        ):
+            with patch.object(
+                type(self.controller), "_now_ms", staticmethod(lambda _t=t: _t)
+            ):
+                cmd = self.controller.route(_pred(gesture))
+            assert cmd is None, f"Expected no command for {gesture} when gaze is absent"
+            t += 50
+        self.mock_pya.hotkey.assert_not_called()
+
+    # -- Re-arming after gaze restored ----------------------------------------
+
+    def test_rearm_after_gaze_restored_dispatches_correctly(self) -> None:
+        """After gaze is lost (force_idle) and the user re-establishes gaze,
+        calling rearm() transitions back to ARMED and the pipeline dispatches."""
+        self._arm()
+
+        # Gaze lost.
+        self.controller.force_idle()
+        assert self.controller.mode is RuntimeMode.IDLE
+
+        # Gaze re-established: runtime calls rearm().
+        self.controller.rearm()
+        assert self.controller.mode is RuntimeMode.ARMED
+
+        # Gesture dispatches normally after re-arming.
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: 600),
+        ):
+            cmd = self.controller.route(_pred("swipe_up"))
+        assert cmd is not None
+        result = self.dispatcher.dispatch(cmd)
+        assert result.success is True
+        self.mock_pya.hotkey.assert_called_once_with("f5")  # start_presentation
+
+    # -- New gesture mappings under gaze gate ---------------------------------
+
+    def test_swipe_down_dispatches_exit_presentation_when_gaze_active(self) -> None:
+        """swipe_down → exit_presentation (Escape) must reach pyautogui when gaze
+        is active (NullGazeDetector / gaze gate open)."""
+        self._arm()
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
+        ):
+            cmd = self.controller.route(_pred("swipe_down"))
+        assert cmd is not None
+        result = self.dispatcher.dispatch(cmd)
+        assert result.success is True
+        self.mock_pya.hotkey.assert_called_once_with("escape")
+
+    def test_swipe_down_does_not_dispatch_when_gaze_absent(self) -> None:
+        """swipe_down must be suppressed when the gaze gate is closed (IDLE)."""
+        self._arm()
+        self.controller.force_idle()
+        with patch.object(
+            type(self.controller),
+            "_now_ms",
+            staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
+        ):
+            cmd = self.controller.route(_pred("swipe_down"))
+        assert cmd is None
+        self.mock_pya.hotkey.assert_not_called()
