@@ -15,8 +15,6 @@ version: ipn_v1
 #   zoom_out        ← G11 (Zoom out)
 #   unknown         ← D0X (Non-gesture) + B0A + B0B (pointing poses)
 
-activation_gesture: open_palm_hold
-
 gestures:
   - open_palm_hold
   - swipe_right
