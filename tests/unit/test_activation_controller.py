@@ -7,7 +7,9 @@ from gesture_control.domain.enums import RuntimeMode
 from gesture_control.pipeline.activation import GestureActivationController
 
 
-def _pred(label: str, accepted: bool = True, confidence: float = 0.95) -> StabilizedPrediction:
+def _pred(
+    label: str, accepted: bool = True, confidence: float = 0.95
+) -> StabilizedPrediction:
     return StabilizedPrediction(label=label, confidence=confidence, accepted=accepted)
 
 
@@ -109,7 +111,9 @@ def test_cooldown_expires_back_to_armed() -> None:
     # Just expired, should be ARMED now, but swipe_right is the same label.
     # Unknown resets edge trigger — verify ARMED at minimum.
     assert ctrl.mode is RuntimeMode.ARMED
-    assert cmd is None  # edge-trigger: same label as last dispatch, unknown not yet seen
+    assert (
+        cmd is None
+    )  # edge-trigger: same label as last dispatch, unknown not yet seen
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +178,14 @@ def test_force_idle_prevents_dispatch_for_all_gestures() -> None:
     ctrl.force_idle()
 
     t = 100
-    for gesture in ("swipe_right", "swipe_left", "swipe_up", "swipe_down", "zoom_in", "zoom_out"):
+    for gesture in (
+        "swipe_right",
+        "swipe_left",
+        "swipe_up",
+        "swipe_down",
+        "zoom_in",
+        "zoom_out",
+    ):
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda _t=t: _t)):
             cmd = ctrl.route(_pred(gesture))
         assert cmd is None, f"Expected no command for {gesture} when IDLE"
@@ -231,5 +242,7 @@ def test_force_idle_clears_cooldown_timer_so_rearm_starts_fresh() -> None:
     # After rearm, commands must dispatch immediately (no stale cooldown).
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 100)):
         cmd2 = ctrl.route(_pred("swipe_right"))
-    assert cmd2 is not None, "Expected dispatch after force_idle+rearm; old cooldown must not block"
+    assert (
+        cmd2 is not None
+    ), "Expected dispatch after force_idle+rearm; old cooldown must not block"
     assert cmd2.command_id == "next_slide"

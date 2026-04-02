@@ -276,8 +276,10 @@ class HeadPoseGazeDetector:
         )
         LOGGER.debug(
             "Gaze pose: tilt=%.1f°(±%.0f°) turn=%.1f°(±%.0f°) → within=%s",
-            yaw_deg, self._cfg.yaw_threshold_deg,
-            pitch_deg, self._cfg.pitch_threshold_deg,
+            yaw_deg,
+            self._cfg.yaw_threshold_deg,
+            pitch_deg,
+            self._cfg.pitch_threshold_deg,
             within,
         )
         return within
