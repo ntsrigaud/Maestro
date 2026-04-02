@@ -14,18 +14,18 @@ Provide reliable, low-latency gesture-based control for presentation workflows u
 
 The system recognizes eight gesture classes derived from the IPN Hand dataset:
 
-| Gesture          | Type                | Mapped Command            |
-| ---------------- | ------------------- | ------------------------- |
-| `open_palm_hold` | Static (activation) | System activation trigger |
-| `swipe_right`    | Dynamic             | Next slide                |
-| `swipe_left`     | Dynamic             | Previous slide            |
-| `swipe_up`       | Dynamic             | Start presentation        |
-| `swipe_down`     | Dynamic             | Exit presentation         |
-| `zoom_in`        | Dynamic             | Toggle pointer mode       |
-| `zoom_out`       | Dynamic             | Raise hand                |
-| `unknown`        | Rejection class     | No action                 |
+| Gesture          | Type            | Mapped Command                      |
+| ---------------- | --------------- | ----------------------------------- |
+| `open_palm_hold` | Static          | No action (model output class only) |
+| `swipe_right`    | Dynamic         | Next slide                          |
+| `swipe_left`     | Dynamic         | Previous slide                      |
+| `swipe_up`       | Dynamic         | Start presentation                  |
+| `swipe_down`     | Dynamic         | Exit presentation                   |
+| `zoom_in`        | Dynamic         | Toggle pointer mode                 |
+| `zoom_out`       | Dynamic         | Raise hand                          |
+| `unknown`        | Rejection class | No action                           |
 
-The `open_palm_hold` gesture serves as the activation trigger: the user must hold an open palm for a configurable duration (default 600 ms) to transition the system from idle to armed mode before command gestures are accepted. Once armed, `swipe_up` enters slideshow mode, `swipe_down` exits it, and the swipe_left/right pair navigates between slides.
+The activation gate is controlled entirely by gaze detection: the system starts in ARMED state and accepts command gestures as long as the user's gaze is directed at the camera. Turning away (gaze lost beyond the grace period) transitions the system to IDLE; looking back triggers `rearm()` and resumes ARMED state. `swipe_up` enters slideshow mode, `swipe_down` exits it, and `swipe_left`/`swipe_right` navigate between slides. `open_palm_hold` is retained as a model output class but is not mapped to any command and is silently ignored by the dispatcher.
 
 ## 4. High-Level Architecture
 
@@ -59,29 +59,31 @@ The system is organized into four layers:
 
 ## 5. End-to-End Pipeline Summary
 
-The real-time inference pipeline processes each camera frame through nine sequential stages:
+The real-time inference pipeline processes each camera frame through ten sequential stages:
 
 ```mermaid
 graph LR
-    A[Camera Frame] --> B[Landmark Extraction]
-    B --> C[Feature Engineering]
-    C --> D[Temporal Buffering]
-    D --> E[LSTM Inference]
-    E --> F[Prediction Stabilization]
-    F --> G[Activation Controller]
-    G --> H[Command Dispatch]
-    H --> I[Keyboard Execution]
+    A[Camera Frame] --> B[Gaze Estimation]
+    B --> C[Landmark Extraction]
+    C --> D[Feature Engineering]
+    D --> E[Temporal Buffering]
+    E --> F[LSTM Inference]
+    F --> G[Prediction Stabilization]
+    G --> H[Activation Controller]
+    H --> I[Command Dispatch]
+    I --> J[Keyboard Execution]
 ```
 
 1. **Frame Capture**: OpenCV reads a BGR frame from the webcam at 30 FPS (1280×720).
-2. **Landmark Extraction**: MediaPipe Hands detects 21 hand landmarks with confidence filtering.
-3. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity features to produce a 126-dimensional feature vector.
-4. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
-5. **LSTM Inference**: The buffered sequence (24×126) is classified by a 2-layer LSTM into one of 8 gesture classes.
-6. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
-7. **Activation Control**: A three-state machine (IDLE → ARMED → COOLDOWN) gates command emission, requiring explicit activation and enforcing edge-triggered dispatch.
-8. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
-9. **Keyboard Execution**: The adapter translates commands to keyboard shortcuts and invokes them via pyautogui with key-name allowlist validation.
+2. **Gaze Estimation**: MediaPipe Face Mesh estimates head pose from facial landmarks. If the user's gaze is not directed toward the camera, all downstream gesture processing is bypassed for that frame.
+3. **Landmark Extraction**: MediaPipe Hands detects 21 hand landmarks with confidence filtering.
+4. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity features to produce a 126-dimensional feature vector.
+5. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
+6. **LSTM Inference**: The buffered sequence (24×126) is classified by a 2-layer LSTM into one of 8 gesture classes.
+7. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
+8. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in ARMED state; gaze loss transitions to IDLE; gaze restoration calls `rearm()` to return to ARMED. Edge-triggered dispatch is enforced throughout.
+9. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
+10. **Keyboard Execution**: The adapter translates commands to keyboard shortcuts and invokes them via pyautogui with key-name allowlist validation.
 
 ## 6. Key Architectural Characteristics
 
@@ -89,6 +91,7 @@ graph LR
 
 Multiple independent safety mechanisms prevent accidental command execution:
 
+- **Gaze gating**: The entire gesture pipeline is bypassed unless the user's head pose indicates attention toward the camera. This is the outermost safety layer and eliminates unintentional activations when the user is not facing the display.
 - **Activation gating**: Commands are only accepted while the system is in ARMED mode.
 - **Edge-triggered dispatch**: A gesture triggers a command only on its first accepted occurrence; holding the same gesture does not re-fire.
 - **Temporal voting**: 1–3 consecutive frames must agree on the same class before acceptance.
@@ -135,4 +138,4 @@ The offline training pipeline converts labeled video data into a trained LSTM ch
 
 **Document**: System Overview  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: March 2026
+**Last Updated**: April 2026

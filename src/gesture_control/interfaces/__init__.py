@@ -5,6 +5,7 @@ from gesture_control.interfaces.command_dispatcher import ICommandDispatcher
 from gesture_control.interfaces.feature_transformer import IFeatureTransformer
 from gesture_control.interfaces.feedback_renderer import IFeedbackRenderer
 from gesture_control.interfaces.frame_source import IFrameSource
+from gesture_control.interfaces.gaze_detector import IGazeIntentDetector
 from gesture_control.interfaces.gesture_model import IGestureModel
 from gesture_control.interfaces.landmark_extractor import IHandLandmarkExtractor
 from gesture_control.interfaces.prediction_stabilizer import IPredictionStabilizer
@@ -14,10 +15,11 @@ __all__ = [
     "IActivationController",
     "ICommandDispatcher",
     "IFeatureTransformer",
+    "IFeedbackRenderer",
     "IFrameSource",
+    "IGazeIntentDetector",
     "IGestureModel",
     "IHandLandmarkExtractor",
     "IPredictionStabilizer",
-    "IFeedbackRenderer",
     "ISequenceBuffer",
 ]

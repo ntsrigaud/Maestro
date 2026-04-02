@@ -117,6 +117,7 @@ project_root/
         activation_controller.py
         command_dispatcher.py
         feedback_renderer.py
+        gaze_detector.py
       infrastructure/
         camera/
           opencv_source.py
@@ -134,6 +135,9 @@ project_root/
             zoom_adapter.py        # Zoom shortcut table
         feedback/
           overlay_renderer.py
+        gaze/
+          head_pose_detector.py
+          null_detector.py
       pipeline/
         feature_engineering.py
         buffering.py
@@ -186,6 +190,7 @@ project_root/
       process-view.md
       physical-view.md
       data-flow.md
+      gaze-aware-activation.md
   tools/
     lint.sh
     test.sh
@@ -350,8 +355,8 @@ Outputs:
 Responsibilities:
 
 - Manage state machine: IDLE, ARMED, COOLDOWN
-- Activation gesture hold detection
 - Idle timeout and command cooldown
+- Expose `rearm()` for gaze-restoration events; `force_idle()` for gaze-loss events
 
 Inputs:
 
@@ -475,13 +480,15 @@ Dependency wiring is centralized in bootstrap composition root.
 
 1. open_palm_hold (IPN: G07 — "Open twice")
 
-- Command: arm/disarm interaction (activation gesture)
+- Command: **none** (model output class only; not mapped to any command)
 - Note: `open_palm_hold` is the production vocabulary label for IPN G07
   ("Open twice"). During dataset assembly, G07 frames (the double open-hand
   motion) are labeled `open_palm_hold` because that motion most closely
   approximates the open-palm activation cue in a presentation context. The
   trained model (`lstm_v1_20260330T181558Z`) was built with this label;
-  **no retraining is required**. The mapping is marked "Approximate" in
+  **no retraining is required**. The class is retained in the vocabulary so
+  the model output vector is unchanged, but the dispatcher silently ignores
+  it. The mapping is marked "Approximate" in
   `docs/IPN_INTEGRATION_GUIDE.md` § 2.1.
 
 2. swipe_right (IPN: G06)
@@ -516,7 +523,6 @@ Dependency wiring is centralized in bootstrap composition root.
 
 - Prefer high visual distance between classes.
 - Mix static and dynamic gestures carefully to reduce confusion.
-- Reserve one activation gesture not used for command dispatch.
 - Keep gesture execution duration below 700 ms for comfort.
 
 ---
@@ -540,7 +546,6 @@ Dependency wiring is centralized in bootstrap composition root.
 
 ### 6.2 Suggested thresholds (initial production defaults)
 
-- Activation hold: 600 ms
 - Idle timeout: 300 000 ms (5 min) — configured via `idle_timeout_ms` in `configs/inference.yaml`
 - Base acceptance threshold: 0.85
 - Critical commands threshold: 0.90

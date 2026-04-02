@@ -3,6 +3,28 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class GazeConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Master enable.  When False, a NullGazeDetector (always returns True) is
+    # substituted, restoring the pre-gaze behaviour without code changes.
+    enabled: bool = True
+    # Head-pose acceptance cone.  A face is considered camera-directed when
+    # both the absolute yaw and absolute pitch remain within these limits.
+    yaw_threshold_deg: float = Field(default=30.0, gt=0, le=90)
+    pitch_threshold_deg: float = Field(default=25.0, gt=0, le=90)
+    # Duration (ms) the head pose must remain within the acceptance cone
+    # continuously before the detector transitions to GAZE_ACTIVE.
+    arm_ms: int = Field(default=500, ge=100, le=5000)
+    # Grace period (ms) after the head pose leaves the acceptance cone before
+    # the system forces the activation controller back to IDLE.  Prevents
+    # false disarming during natural head movements.
+    grace_ms: int = Field(default=5000, ge=1000, le=60_000)
+    # Face Mesh is called every N frames; the cached result is returned for
+    # intermediate frames.  At 30 FPS and N=3, Face Mesh runs at ~10 Hz.
+    sample_interval_frames: int = Field(default=3, ge=1, le=30)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -24,7 +46,6 @@ class InferenceConfig(BaseModel):
     window_length: int = Field(ge=4, le=256)
     window_step: int = Field(ge=1, le=64)
     min_valid_ratio: float = Field(ge=0.0, le=1.0)
-    activation_hold_ms: int = Field(ge=100, le=5000)
     # How long the system stays ARMED with no recognised gesture before
     # dropping back to IDLE.  Default 300 000 ms (5 min) suits presentation
     # use where users pause between interactions for extended periods.
@@ -35,6 +56,8 @@ class InferenceConfig(BaseModel):
     # This prevents repeated commands from a single slow gesture that produces
     # many consecutive accepted predictions across overlapping inference windows.
     edge_trigger_enabled: bool = True
+    # Gaze-aware activation.  See GazeConfig for field documentation.
+    gaze: GazeConfig = GazeConfig()
 
 
 class FeaturePipelineConfig(BaseModel):
