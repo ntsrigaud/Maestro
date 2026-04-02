@@ -1,9 +1,9 @@
 version: v1
 # Gesture-to-command mapping for the IPN-derived gesture vocabulary.
 #
-# Maps IPN vocabulary gesture labels to logical command IDs.  The
-# activation_gesture (open_palm_hold / G07) is handled by
-# GestureActivationController and is not listed here.
+# Maps IPN vocabulary gesture labels to logical command IDs.
+# open_palm_hold is retained as a model output class but has no command
+# mapping; it is silently ignored by the dispatcher.
 gesture_commands:
   swipe_right: next_slide
   swipe_left: previous_slide
