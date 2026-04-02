@@ -14,18 +14,18 @@ Provide reliable, low-latency gesture-based control for presentation workflows u
 
 The system recognizes eight gesture classes derived from the IPN Hand dataset:
 
-| Gesture          | Type                | Mapped Command            |
-| ---------------- | ------------------- | ------------------------- |
-| `open_palm_hold` | Static (activation) | System activation trigger |
-| `swipe_right`    | Dynamic             | Next slide                |
-| `swipe_left`     | Dynamic             | Previous slide            |
-| `swipe_up`       | Dynamic             | Start presentation        |
-| `swipe_down`     | Dynamic             | Exit presentation         |
-| `zoom_in`        | Dynamic             | Toggle pointer mode       |
-| `zoom_out`       | Dynamic             | Raise hand                |
-| `unknown`        | Rejection class     | No action                 |
+| Gesture          | Type            | Mapped Command                      |
+| ---------------- | --------------- | ----------------------------------- |
+| `open_palm_hold` | Static          | No action (model output class only) |
+| `swipe_right`    | Dynamic         | Next slide                          |
+| `swipe_left`     | Dynamic         | Previous slide                      |
+| `swipe_up`       | Dynamic         | Start presentation                  |
+| `swipe_down`     | Dynamic         | Exit presentation                   |
+| `zoom_in`        | Dynamic         | Toggle pointer mode                 |
+| `zoom_out`       | Dynamic         | Raise hand                          |
+| `unknown`        | Rejection class | No action                           |
 
-The `open_palm_hold` gesture serves as the activation trigger: the user must hold an open palm for a configurable duration (default 600 ms) to transition the system from idle to armed mode before command gestures are accepted. Once armed, `swipe_up` enters slideshow mode, `swipe_down` exits it, and the swipe_left/right pair navigates between slides.
+The activation gate is controlled entirely by gaze detection: the system starts in ARMED state and accepts command gestures as long as the user's gaze is directed at the camera. Turning away (gaze lost beyond the grace period) transitions the system to IDLE; looking back triggers `rearm()` and resumes ARMED state. `swipe_up` enters slideshow mode, `swipe_down` exits it, and `swipe_left`/`swipe_right` navigate between slides. `open_palm_hold` is retained as a model output class but is not mapped to any command and is silently ignored by the dispatcher.
 
 ## 4. High-Level Architecture
 
@@ -81,7 +81,7 @@ graph LR
 5. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
 6. **LSTM Inference**: The buffered sequence (24×126) is classified by a 2-layer LSTM into one of 8 gesture classes.
 7. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
-8. **Activation Control**: A three-state machine (IDLE → ARMED → COOLDOWN) gates command emission, requiring explicit activation and enforcing edge-triggered dispatch. The system can only enter ARMED state when gaze is permitted.
+8. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in ARMED state; gaze loss transitions to IDLE; gaze restoration calls `rearm()` to return to ARMED. Edge-triggered dispatch is enforced throughout.
 9. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
 10. **Keyboard Execution**: The adapter translates commands to keyboard shortcuts and invokes them via pyautogui with key-name allowlist validation.
 
