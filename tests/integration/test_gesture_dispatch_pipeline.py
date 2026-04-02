@@ -133,7 +133,9 @@ class TestActivationStateMachine:
 
     def test_idle_on_missing_hands(self):
         # Patch _now_ms during construction AND rearm() so _last_active_ms starts at 0.
-        with patch.object(GestureActivationController, "_now_ms", staticmethod(lambda: 0)):
+        with patch.object(
+            GestureActivationController, "_now_ms", staticmethod(lambda: 0)
+        ):
             controller = _make_controller()
             controller.rearm()  # IDLE → ARMED; _last_active_ms = 0 while still patched
         assert controller.mode is RuntimeMode.ARMED
