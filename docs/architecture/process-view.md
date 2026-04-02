@@ -93,23 +93,22 @@ The `GestureActivationController` implements a three-state finite state machine 
 
 ```mermaid
 stateDiagram-v2
-    [*] --> IDLE
+    [*] --> ARMED
 
-    IDLE --> ARMED : open_palm_hold held >= 600 ms
     ARMED --> COOLDOWN : Command dispatched (edge trigger)
     ARMED --> IDLE : Idle timeout (300 s without gesture)
-    COOLDOWN --> ARMED : Cooldown timer expires (1000 ms)
     ARMED --> IDLE : Gaze lost beyond grace period
+    COOLDOWN --> ARMED : Cooldown timer expires (1000 ms)
+    IDLE --> ARMED : Gaze restored — rearm() called
 ```
 
 ### State Descriptions
 
 **IDLE**:
 
-- The system passively monitors for the activation gesture (`open_palm_hold`).
-- An internal timer starts on the first frame where the stabilized label matches the activation gesture.
-- If the activation gesture is held continuously for `activation_hold_ms` (default 600 ms), the system transitions to ARMED.
-- If the label changes before the timer expires, the timer resets.
+- The system is suspended — no commands are dispatched and gesture predictions are ignored.
+- The system enters IDLE when gaze is lost beyond the configured grace period, or when no non-unknown gesture is detected for `idle_timeout_ms`.
+- The system exits IDLE only via an explicit `rearm()` call, which is issued by the runtime when gaze is restored.
 - No commands are dispatched in this state.
 
 **ARMED**:
