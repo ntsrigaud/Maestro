@@ -73,6 +73,7 @@ class Runtime:
         inference_ms = 0.0
         latest_label = "unknown"
         latest_conf = 0.0
+        _prev_gaze_permitted: bool = False
 
         try:
             while self._running:
@@ -86,6 +87,12 @@ class Runtime:
                 # Stage 2 — gaze gate: bypass the downstream pipeline when
                 # the user is not directing attention toward the camera.
                 gaze_permitted = self._container.gaze_detector.update(frame)
+
+                # Rising edge: gaze just became permitted → transition IDLE → ARMED.
+                if gaze_permitted and not _prev_gaze_permitted:
+                    self._container.activation_controller.rearm()
+                _prev_gaze_permitted = gaze_permitted
+
                 if not gaze_permitted:
                     absent_state = RuntimeState(
                         mode=str(self._container.activation_controller.mode),

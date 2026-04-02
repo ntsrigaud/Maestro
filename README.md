@@ -16,16 +16,16 @@ Camera → MediaPipe Hands → Feature Engineering → Sliding Window Buffer
 
 **Gesture vocabulary** (IPN Hand dataset, 8 classes):
 
-| Gesture          | Command                 | IPN Source      |
-| ---------------- | ----------------------- | --------------- |
-| `open_palm_hold` | Activation (arm/disarm) | G07             |
-| `swipe_right`    | Next slide              | G06             |
-| `swipe_left`     | Previous slide          | G05             |
-| `swipe_up`       | Raise hand              | G03             |
-| `swipe_down`     | Start presentation      | G04             |
-| `zoom_in`        | Toggle pointer mode     | G10             |
-| `zoom_out`       | Exit presentation       | G11             |
-| `unknown`        | None (noise class)      | D0X + B0A + B0B |
+| Gesture          | Command                      | IPN Source      |
+| ---------------- | ---------------------------- | --------------- |
+| `open_palm_hold` | No action (model class only) | G07             |
+| `swipe_right`    | Next slide                   | G06             |
+| `swipe_left`     | Previous slide               | G05             |
+| `swipe_up`       | Raise hand                   | G03             |
+| `swipe_down`     | Start presentation           | G04             |
+| `zoom_in`        | Toggle pointer mode          | G10             |
+| `zoom_out`       | Exit presentation            | G11             |
+| `unknown`        | None (noise class)           | D0X + B0A + B0B |
 
 ## Quick Start
 
