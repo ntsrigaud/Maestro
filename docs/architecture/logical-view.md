@@ -32,7 +32,7 @@ graph TB
 
     subgraph Domain ["Domain Layer"]
         Entities["Domain Entities<br/>(FramePacket, LandmarkPacket,<br/>FeatureFrame, SequenceWindow,<br/>Prediction, StabilizedPrediction,<br/>ExecutableCommand, DispatchResult)"]
-        Interfaces["Protocol Interfaces<br/>(IFrameSource, IHandLandmarkExtractor,<br/>IFeatureTransformer, ISequenceBuffer,<br/>IGestureModel, IPredictionStabilizer,<br/>IActivationController, ICommandDispatcher,<br/>IFeedbackRenderer)"]
+        Interfaces["Protocol Interfaces<br/>(IFrameSource, IHandLandmarkExtractor,<br/>IFeatureTransformer, ISequenceBuffer,<br/>IGestureModel, IPredictionStabilizer,<br/>IActivationController, ICommandDispatcher,<br/>IFeedbackRenderer, IGazeIntentDetector)"]
         Enums["Enums & Contracts<br/>(RuntimeMode, CommandID,<br/>IRunnable, IClosable)"]
     end
 
@@ -79,7 +79,7 @@ The domain layer contains pure data structures and abstract contracts. It has no
 | Component               | Responsibility                                                                                                                                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Entities**            | Frozen dataclasses representing pipeline data at each processing stage. Each entity is immutable (`frozen=True`, `slots=True`) for thread safety and memory efficiency.                                      |
-| **Protocol Interfaces** | Nine `typing.Protocol` definitions that specify the behavioral contract for each pipeline stage. Implementations satisfy these contracts through structural subtyping.                                       |
+| **Protocol Interfaces** | Ten `typing.Protocol` definitions that specify the behavioral contract for each pipeline stage. Implementations satisfy these contracts through structural subtyping.                                        |
 | **Enums**               | `RuntimeMode` (IDLE, ARMED, COOLDOWN) and `CommandID` (next_slide, previous_slide, raise_hand, start_presentation, toggle_pointer_mode, exit_presentation) define the finite state and command vocabularies. |
 | **Contracts**           | `IRunnable` and `IClosable` protocols for lifecycle management.                                                                                                                                              |
 
@@ -95,6 +95,8 @@ The infrastructure layer provides concrete implementations of domain interfaces 
 | **CommandDispatcher**       | `ICommandDispatcher`     | Enforces command allowlist and rate limiting. Delegates to application-specific adapters. Returns `DispatchResult` with diagnostic detail.                                                                                           |
 | **Application Adapters**    | `IApplicationAdapter`    | `PowerPointAdapter` and `ZoomAdapter` translate command IDs to application-specific keyboard shortcuts. Both delegate to `KeyboardAdapter`, which validates key names against a safe allowlist before invoking `pyautogui.hotkey()`. |
 | **OverlayRenderer**         | `IFeedbackRenderer`      | Renders diagnostic information (mode, gesture label, confidence, FPS, latency) onto the video frame for real-time visual feedback.                                                                                                   |
+| **HeadPoseGazeDetector**    | `IGazeIntentDetector`    | Uses MediaPipe Face Mesh and solvePnP to estimate head pose. Implements a 4-state machine (ABSENT → ACQUIRING → ACTIVE → LOSING) gated by yaw/pitch thresholds, arm/grace timers, and a configurable sub-sampling interval.          |
+| **NullGazeDetector**        | `IGazeIntentDetector`    | Null-object implementation that always grants gaze permission. Used when `gaze.enabled = false` to eliminate all gaze-logic overhead from the runtime path.                                                                          |
 
 ### 3.3 Pipeline Layer
 

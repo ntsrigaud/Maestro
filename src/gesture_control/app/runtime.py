@@ -18,6 +18,7 @@ from gesture_control.interfaces.command_dispatcher import ICommandDispatcher
 from gesture_control.interfaces.feature_transformer import IFeatureTransformer
 from gesture_control.interfaces.feedback_renderer import IFeedbackRenderer
 from gesture_control.interfaces.frame_source import IFrameSource
+from gesture_control.interfaces.gaze_detector import IGazeIntentDetector
 from gesture_control.interfaces.landmark_extractor import IHandLandmarkExtractor
 from gesture_control.interfaces.sequence_buffer import ISequenceBuffer
 from gesture_control.pipeline.activation import GestureActivationController
@@ -30,6 +31,7 @@ LOGGER = logging.getLogger(__name__)
 class RuntimeDependencies(Protocol):
     config: RuntimeConfig
     frame_source: IFrameSource
+    gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
     feature_transformer: IFeatureTransformer
     sequence_buffer: ISequenceBuffer
@@ -71,6 +73,7 @@ class Runtime:
         inference_ms = 0.0
         latest_label = "unknown"
         latest_conf = 0.0
+        _prev_gaze_permitted: bool = False
 
         try:
             while self._running:
@@ -80,6 +83,31 @@ class Runtime:
                 frame = self._container.frame_source.read()
                 if benchmark is not None:
                     benchmark.record_capture((time.perf_counter() - t0) * 1000.0)
+
+                # Stage 2 — gaze gate: bypass the downstream pipeline when
+                # the user is not directing attention toward the camera.
+                gaze_permitted = self._container.gaze_detector.update(frame)
+
+                # Rising edge: gaze just became permitted → transition IDLE → ARMED.
+                if gaze_permitted and not _prev_gaze_permitted:
+                    self._container.activation_controller.rearm()
+                _prev_gaze_permitted = gaze_permitted
+
+                if not gaze_permitted:
+                    absent_state = RuntimeState(
+                        mode=str(self._container.activation_controller.mode),
+                        gaze_permitted=False,
+                    )
+                    overlay_frame = self._container.overlay_renderer.render(
+                        frame, absent_state
+                    )
+                    if self._container.show_window:
+                        cv2.imshow(app_name, overlay_frame.frame)
+                        key = cv2.waitKey(1) & 0xFF
+                        if key == ord("q"):
+                            self.stop()
+                    processed_frames += 1
+                    continue
 
                 t1 = time.perf_counter()
                 landmark_packet = self._container.landmark_extractor.extract(frame)
@@ -153,6 +181,7 @@ class Runtime:
                     mode=mode,
                     last_label=latest_label,
                     last_confidence=latest_conf,
+                    gaze_permitted=gaze_permitted,
                     info={
                         "landmarks": landmark_packet.landmarks,
                         "window_ready": self._container.sequence_buffer.ready(),
@@ -200,6 +229,7 @@ class Runtime:
                     LOGGER.info("Wrote latency benchmark report to %s", output_path)
 
             self._container.frame_source.close()
+            self._container.gaze_detector.close()
             self._container.landmark_extractor.close()
             cv2.destroyAllWindows()
             self._running = False

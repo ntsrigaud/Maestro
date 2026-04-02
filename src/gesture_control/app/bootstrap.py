@@ -22,6 +22,7 @@ from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 from gesture_control.infrastructure.feedback.overlay_renderer import OverlayRenderer
+from gesture_control.infrastructure.gaze import HeadPoseGazeDetector, NullGazeDetector
 from gesture_control.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
 )
@@ -33,6 +34,7 @@ from gesture_control.infrastructure.model.checkpoint_loader import (
 )
 from gesture_control.interfaces.feature_transformer import IFeatureTransformer
 from gesture_control.interfaces.frame_source import IFrameSource
+from gesture_control.interfaces.gaze_detector import IGazeIntentDetector
 from gesture_control.interfaces.landmark_extractor import IHandLandmarkExtractor
 from gesture_control.interfaces.sequence_buffer import ISequenceBuffer
 from gesture_control.pipeline.activation import GestureActivationController
@@ -48,6 +50,7 @@ from gesture_control.utils.schema_validation import RuntimeConfig
 class AppContainer:
     config: RuntimeConfig
     frame_source: IFrameSource
+    gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
     feature_transformer: IFeatureTransformer
     sequence_buffer: ISequenceBuffer
@@ -70,7 +73,6 @@ def build_container(
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
     thresholds = _load_thresholds(config_root / "thresholds" / "production_ipn.yaml")
-    vocabulary = _load_vocabulary(config_root / "gestures" / "vocabulary_ipn.yaml")
     command_map = _load_command_map(config_root / "gestures" / "command_map_ipn.yaml")
 
     frame_source = OpenCVFrameSource(
@@ -115,9 +117,7 @@ def build_container(
         unknown_label="unknown",
     )
     activation_controller = GestureActivationController(
-        activation_gesture=vocabulary.get("activation_gesture", "open_palm_hold"),
         command_map=command_map,
-        activation_hold_ms=config.inference.activation_hold_ms,
         idle_timeout_ms=config.inference.idle_timeout_ms,
         command_cooldown_ms=config.inference.command_cooldown_ms,
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
@@ -129,9 +129,17 @@ def build_container(
     overlay_renderer = OverlayRenderer(mirror_display=config.app.mirror_display)
     benchmark = LatencyBenchmark()
 
+    gaze_cfg = config.inference.gaze
+    if gaze_cfg.enabled:
+        gaze_detector: IGazeIntentDetector = HeadPoseGazeDetector(config=gaze_cfg)
+        gaze_detector.set_on_gaze_lost(activation_controller.force_idle)
+    else:
+        gaze_detector = NullGazeDetector()
+
     return AppContainer(
         config=config,
         frame_source=frame_source,
+        gaze_detector=gaze_detector,
         landmark_extractor=landmark_extractor,
         feature_transformer=feature_transformer,
         sequence_buffer=sequence_buffer,
@@ -204,24 +212,6 @@ def _load_thresholds(path: Path) -> dict[str, Any]:
         "acceptance_default": float(acceptance.get("default", 0.85)),
         "class_thresholds": {str(k): float(v) for k, v in class_thresholds.items()},
         "class_vote_windows": {str(k): int(v) for k, v in class_vote_windows.items()},
-    }
-
-
-def _load_vocabulary(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {
-            "activation_gesture": "open_palm_hold",
-        }
-
-    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(payload, dict):
-        return {
-            "activation_gesture": "open_palm_hold",
-        }
-
-    activation = payload.get("activation_gesture", "open_palm_hold")
-    return {
-        "activation_gesture": str(activation),
     }
 
 
