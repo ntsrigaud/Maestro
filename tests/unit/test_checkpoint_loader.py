@@ -103,7 +103,6 @@ def test_validate_runtime_compatibility_passes(config_dir: Path) -> None:
                 "window_length": 24,
                 "window_step": 3,
                 "min_valid_ratio": 0.8,
-                "activation_hold_ms": 600,
                 "idle_timeout_ms": 3000,
                 "command_cooldown_ms": 500,
             },
