@@ -46,7 +46,6 @@ class InferenceConfig(BaseModel):
     window_length: int = Field(ge=4, le=256)
     window_step: int = Field(ge=1, le=64)
     min_valid_ratio: float = Field(ge=0.0, le=1.0)
-    activation_hold_ms: int = Field(ge=100, le=5000)
     # How long the system stays ARMED with no recognised gesture before
     # dropping back to IDLE.  Default 300 000 ms (5 min) suits presentation
     # use where users pause between interactions for extended periods.
