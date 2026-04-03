@@ -1,0 +1,30 @@
+window_length: 24
+window_step: 3
+min_valid_ratio: 0.8
+# 300 000 ms = 5 minutes.  The system remains ARMED for this long after the
+# last recognised gesture, preventing repeated re-arming during presentations.
+idle_timeout_ms: 300000
+command_cooldown_ms: 1000
+# edge_trigger_enabled: dispatch a command gesture only when the predicted
+# label *changes* from the previous prediction (rising edge).  This is the
+# primary guard against a single slow swipe firing multiple commands across
+# consecutive overlapping inference windows.
+edge_trigger_enabled: true
+
+# Gaze-aware activation gate.  The gesture pipeline is bypassed unless the
+# head-pose estimate indicates the user is directing attention toward the
+# camera.  Set enabled: false to restore the original gesture-only behaviour.
+gaze:
+  enabled: true
+  # Maximum absolute yaw and pitch deviations (degrees) within which a face
+  # is considered camera-directed.
+  yaw_threshold_deg: 30
+  pitch_threshold_deg: 25
+  # Continuous gaze duration (ms) required before the system arms.
+  arm_ms: 500
+  # Grace period (ms) before an armed system is forced back to IDLE after
+  # gaze is lost. Default 5000 ms (5 s) tolerates natural head movements.
+  grace_ms: 5000
+  # Face Mesh sampling rate.  Call MediaPipe every N frames; cache the
+  # result for intermediate frames.  At 30 FPS, N=3 gives ~10 Hz sampling.
+  sample_interval_frames: 3

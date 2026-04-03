@@ -1,0 +1,26 @@
+version: ipn_v1
+
+# Vocabulary derived from the IPN Hand dataset gesture classes.
+# These gestures are sourced directly from the IPN dataset and provide
+# a presentation controller command set: directional swipes, zooming,
+# and an activation palm gesture, plus an unknown/no-gesture class.
+#
+# IPN source mapping:
+#   open_palm_hold  ← G07 (Open twice)
+#   swipe_right     ← G06 (Throw right)
+#   swipe_left      ← G05 (Throw left)
+#   swipe_up        ← G03 (Throw up)
+#   swipe_down      ← G04 (Throw down)
+#   zoom_in         ← G10 (Zoom in)
+#   zoom_out        ← G11 (Zoom out)
+#   unknown         ← D0X (Non-gesture) + B0A + B0B (pointing poses)
+
+gestures:
+  - open_palm_hold
+  - swipe_right
+  - swipe_left
+  - swipe_up
+  - swipe_down
+  - zoom_in
+  - zoom_out
+  - unknown
