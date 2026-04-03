@@ -161,12 +161,6 @@ python scripts/run_realtime.py --config configs --model-artifact models/exported
 ### 7.3 Training Execution
 
 ```bash
-# Build dataset from JSONL landmarks
-python scripts/build_dataset.py \
-    --input-jsonl data/raw/labeled_landmarks.jsonl \
-    --output-npz data/processed/gesture_dataset_v2.npz \
-    --config-dir configs
-
 # Train LSTM model
 python scripts/train_model.py \
     --dataset data/processed/gesture_dataset_v2.npz \
