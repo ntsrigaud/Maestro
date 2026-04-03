@@ -170,8 +170,6 @@ project_root/
   experiments/
     runs/
   scripts/
-    collect_data.py
-    build_dataset.py
     build_ipn_dataset.py
     train_model.py
     run_realtime.py
