@@ -1,0 +1,32 @@
+# Feature pipeline configuration for training and inference parity
+#
+# These settings control how raw hand landmarks are transformed into feature vectors.
+# They MUST be identical between dataset generation (training) and runtime inference.
+#
+# Changes to these settings require:
+# 1. Regenerating the training dataset
+# 2. Retraining the LSTM model
+# 3. Updating model metadata with new feature schema version
+
+feature_pipeline:
+  # Normalize positions relative to wrist (landmark 0)
+  # Always enabled; standard practice for pose-based systems
+  wrist_relative_normalization: true
+
+  # Scale normalization using palm reference distance (landmark 9)
+  # Always enabled; provides scale invariance
+  scale_normalization: true
+
+  # Optional: Canonicalize hand orientation to fixed reference frame
+  # When enabled, applies rotation matrix to align hand pose to canonical axes
+  # CAUTION: Changing this value requires dataset regeneration and model retraining
+  # Set to false to match the IPN dataset generated without orientation normalization.
+  orientation_normalization: false
+
+  # Compute temporal velocity features (derivatives of normalized positions)
+  # Always enabled; improves dynamic gesture recognition
+  velocity_features: true
+
+  # Feature vector structure with these settings enabled:
+  # [position_0, position_1, ..., position_20, velocity_0, velocity_1, ..., velocity_20]
+  # Total dimensions: 21 landmarks × 3 coords × 2 (position + velocity) = 126

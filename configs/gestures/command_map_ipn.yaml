@@ -1,0 +1,13 @@
+version: v1
+# Gesture-to-command mapping for the IPN-derived gesture vocabulary.
+#
+# Maps IPN vocabulary gesture labels to logical command IDs.
+# open_palm_hold is retained as a model output class but has no command
+# mapping; it is silently ignored by the dispatcher.
+gesture_commands:
+  swipe_right: next_slide
+  swipe_left: previous_slide
+  swipe_up: start_presentation
+  swipe_down: exit_presentation
+  zoom_in: toggle_pointer_mode
+  zoom_out: raise_hand
