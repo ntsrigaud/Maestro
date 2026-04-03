@@ -129,10 +129,9 @@ Nine `Protocol` interfaces define service contracts. Implementations can be swap
 
 The offline training pipeline converts labeled video data into a trained LSTM checkpoint:
 
-1. **Data Collection**: Interactive webcam recording via `scripts/collect_data.py` produces JSONL landmark files. The IPN Hand dataset (200 videos, 8 classes) provides the primary training corpus via `scripts/build_ipn_dataset.py`.
-2. **Dataset Generation**: `scripts/build_dataset.py` transforms JSONL landmarks into NPZ sequence datasets using the same feature pipeline as inference.
-3. **Model Training**: `scripts/train_model.py` trains a 2-layer LSTM with class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
-4. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema. A JSON registry tracks all exported models.
+1. **Data Collection**: The IPN Hand dataset (200 videos, 8 classes) is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks from IPN video files and produces NPZ sequence datasets.
+2. **Model Training**: `scripts/train_model.py` trains a 2-layer LSTM with class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
+3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema. A JSON registry tracks all exported models.
 
 ---
 
