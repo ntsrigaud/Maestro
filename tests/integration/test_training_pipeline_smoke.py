@@ -29,8 +29,12 @@ def _create_dataset(path: Path) -> None:
     # Assign at least 3 unique recording IDs per class so GestureDataModule
     # exercises the GroupShuffleSplit code path (requires len(unique_recs) >= 3).
     rec_ids = (
-        ["palm-r1"] * 22 + ["palm-r2"] * 21 + ["palm-r3"] * 21   # 64 class-0
-        + ["swipe-r1"] * 22 + ["swipe-r2"] * 21 + ["swipe-r3"] * 21  # 64 class-1
+        ["palm-r1"] * 22
+        + ["palm-r2"] * 21
+        + ["palm-r3"] * 21  # 64 class-0
+        + ["swipe-r1"] * 22
+        + ["swipe-r2"] * 21
+        + ["swipe-r3"] * 21  # 64 class-1
     )
     np.savez_compressed(
         path,
