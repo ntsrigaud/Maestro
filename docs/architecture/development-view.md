@@ -213,14 +213,12 @@ All configuration is validated at startup via Pydantic schemas. Invalid configur
 
 ## 6. Script Entry Points
 
-| Script                         | Purpose                              | Primary Dependencies                                  |
-| ------------------------------ | ------------------------------------ | ----------------------------------------------------- |
-| `scripts/run_realtime.py`      | Launch real-time gesture recognition | `app/`, `pipeline/`, `infrastructure/`                |
-| `scripts/train_model.py`       | Train LSTM from NPZ dataset          | `training/`, `utils/`                                 |
-| `scripts/build_dataset.py`     | Build NPZ from JSONL landmarks       | `training/`, `pipeline/`                              |
-| `scripts/build_ipn_dataset.py` | Convert IPN Hand dataset to NPZ      | `training/`, `pipeline/`                              |
-| `scripts/collect_data.py`      | Interactive webcam data recording    | `infrastructure/camera/`, `infrastructure/mediapipe/` |
-| `scripts/benchmark_system.py`  | Latency profiling                    | `evaluation/`                                         |
+| Script                         | Purpose                              | Primary Dependencies                   |
+| ------------------------------ | ------------------------------------ | -------------------------------------- |
+| `scripts/run_realtime.py`      | Launch real-time gesture recognition | `app/`, `pipeline/`, `infrastructure/` |
+| `scripts/train_model.py`       | Train LSTM from NPZ dataset          | `training/`, `utils/`                  |
+| `scripts/build_ipn_dataset.py` | Convert IPN Hand dataset to NPZ      | `training/`, `pipeline/`               |
+| `scripts/benchmark_system.py`  | Latency profiling                    | `evaluation/`                          |
 
 ## 7. Testing Organization
 
