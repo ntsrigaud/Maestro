@@ -22,6 +22,12 @@ dependencies = [
 training = [
   "scikit-learn>=1.5.0",
 ]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.3.0",
+  "mypy>=1.8.0",
+  "types-PyYAML>=6.0.12",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
