@@ -29,38 +29,41 @@ Camera → MediaPipe Hands → Feature Engineering → Sliding Window Buffer
 
 ## Quick Start
 
-1. Create or activate a Python 3.11 environment.
-2. Install runtime dependencies:
+**End users** (runtime inference only):
 
 ```bash
 pip install -e .
-```
-
-3. Run quality checks:
-
-```bash
-ruff check .
-pytest -m "not training"
-```
-
-4. Launch real-time inference (requires a trained model in `models/`):
-
-```bash
 python scripts/run_realtime.py --config configs
+```
+
+**Developers** (linting, type-checking, and tests):
+
+```bash
+pip install -e ".[dev]"
+ruff check .
+mypy src/
+pytest -m "not training"
 ```
 
 ## Training Setup
 
-Install the training optional dependencies to build datasets and train models:
+Install the `training` extra (scikit-learn) alongside the `dev` tools:
 
 ```bash
-pip install -e ".[training]"
+pip install -e ".[dev,training]"
 ```
 
 Then run the full test suite (including training tests):
 
 ```bash
 pytest
+```
+
+To build a dataset and train a model:
+
+```bash
+python scripts/build_ipn_dataset.py --ipn-root data/IPN --output-npz data/processed/ipn_dataset.npz
+python scripts/train_model.py --dataset data/processed/ipn_dataset.npz --config-dir configs
 ```
 
 ## Project Architecture
