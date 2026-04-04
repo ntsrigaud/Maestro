@@ -30,10 +30,9 @@ Camera → MediaPipe Hands → Feature Engineering → Sliding Window Buffer
 ## Quick Start
 
 1. Create or activate a Python 3.11 environment.
-2. Install dependencies:
+2. Install runtime dependencies:
 
 ```bash
-pip install -r requirements/dev.txt
 pip install -e .
 ```
 
@@ -41,13 +40,27 @@ pip install -e .
 
 ```bash
 ruff check .
-pytest
+pytest -m "not training"
 ```
 
 4. Launch real-time inference (requires a trained model in `models/`):
 
 ```bash
 python scripts/run_realtime.py --config configs
+```
+
+## Training Setup
+
+Install the training optional dependencies to build datasets and train models:
+
+```bash
+pip install -e ".[training]"
+```
+
+Then run the full test suite (including training tests):
+
+```bash
+pytest
 ```
 
 ## Project Architecture
