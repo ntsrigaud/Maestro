@@ -7,7 +7,7 @@ from typing import Any
 
 import torch
 
-from gesture_control.training.train_lstm import GestureLSTMClassifier
+from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
 from gesture_control.utils.schema_validation import RuntimeConfig
 
 
