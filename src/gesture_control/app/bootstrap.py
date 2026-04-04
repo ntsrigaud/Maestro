@@ -9,6 +9,7 @@ import yaml
 
 from gesture_control.evaluation.benchmark_latency import LatencyBenchmark
 from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSource
+from gesture_control.infrastructure.dispatch.app_adapters.base import IApplicationAdapter
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
 )
@@ -32,7 +33,9 @@ from gesture_control.infrastructure.model.checkpoint_loader import (
     load_latest_inference_artifact,
     validate_runtime_compatibility,
 )
+from gesture_control.interfaces.command_dispatcher import ICommandDispatcher
 from gesture_control.interfaces.feature_transformer import IFeatureTransformer
+from gesture_control.interfaces.feedback_renderer import IFeedbackRenderer
 from gesture_control.interfaces.frame_source import IFrameSource
 from gesture_control.interfaces.gaze_detector import IGazeIntentDetector
 from gesture_control.interfaces.landmark_extractor import IHandLandmarkExtractor
@@ -57,8 +60,8 @@ class AppContainer:
     model_artifact: InferenceArtifact
     stabilizer: PredictionStabilizer
     activation_controller: GestureActivationController
-    dispatcher: CommandDispatcher
-    overlay_renderer: OverlayRenderer
+    dispatcher: ICommandDispatcher
+    overlay_renderer: IFeedbackRenderer
     benchmark: LatencyBenchmark
     show_window: bool
 
@@ -244,6 +247,7 @@ def _build_dispatcher(
     """Construct the correct adapter for *active_app* and wrap it in a CommandDispatcher."""
     keyboard = KeyboardAdapter()
     app_lower = (active_app or "").strip().lower()
+    adapter: IApplicationAdapter
     if app_lower in ("powerpoint", "ppt"):
         adapter = PowerPointAdapter(keyboard=keyboard)
     elif app_lower in ("zoom",):
