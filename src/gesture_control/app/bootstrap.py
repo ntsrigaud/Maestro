@@ -9,7 +9,9 @@ import yaml
 
 from gesture_control.evaluation.benchmark_latency import LatencyBenchmark
 from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSource
-from gesture_control.infrastructure.dispatch.app_adapters.base import IApplicationAdapter
+from gesture_control.infrastructure.dispatch.app_adapters.base import (
+    IApplicationAdapter,
+)
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
 )
