@@ -6,7 +6,8 @@ on:
   pull_request:
 
 jobs:
-  test:
+  runtime:
+    name: Runtime environment
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,14 +18,36 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install runtime + dev dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements/dev.txt
-          pip install -e .
+          pip install -e ".[dev]"
 
       - name: Lint
         run: ruff check .
 
-      - name: Test
+      - name: Type check
+        run: mypy src/
+
+      - name: Runtime tests (no training extras)
+        run: pytest -m "not training"
+
+  training:
+    name: Training environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime + dev + training dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,training]"
+
+      - name: Full test suite (including training tests)
         run: pytest
