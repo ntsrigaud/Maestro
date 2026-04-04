@@ -18,14 +18,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install runtime dependencies
+      - name: Install runtime + dev dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install pytest ruff mypy types-PyYAML
+          pip install -e ".[dev]"
 
       - name: Lint
         run: ruff check .
+
+      - name: Type check
+        run: mypy src/
 
       - name: Runtime tests (no training extras)
         run: pytest -m "not training"
@@ -42,11 +44,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install runtime + training dependencies
+      - name: Install runtime + dev + training dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[training]"
-          pip install pytest ruff mypy types-PyYAML
+          pip install -e ".[dev,training]"
 
       - name: Full test suite (including training tests)
         run: pytest
