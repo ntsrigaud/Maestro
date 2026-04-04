@@ -3,10 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from gesture_control.training.export_checkpoint import (
     compute_sha256,
     update_model_registry,
 )
+
+pytestmark = pytest.mark.training
 
 
 def test_compute_sha256(tmp_path: Path) -> None:

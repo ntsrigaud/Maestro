@@ -114,16 +114,16 @@ Nine `Protocol` interfaces define service contracts. Implementations can be swap
 
 ## 7. Technology Stack
 
-| Component               | Technology        | Version          |
-| ----------------------- | ----------------- | ---------------- |
-| Language                | Python            | 3.11             |
-| Hand Pose Estimation    | MediaPipe Hands   | 0.10.14 (pinned) |
-| Sequence Classification | PyTorch LSTM      | ≥2.7.0           |
-| Frame Capture           | OpenCV (headless) | ≥4.10.0          |
-| OS Keyboard Control     | pyautogui         | ≥0.9.54          |
-| Config Validation       | Pydantic          | ≥2.6.0           |
-| Array Operations        | NumPy             | ≥1.26.0          |
-| ML Metrics              | scikit-learn      | ≥1.5.0           |
+| Component               | Technology        | Version                              |
+| ----------------------- | ----------------- | ------------------------------------ |
+| Language                | Python            | 3.11                                 |
+| Hand Pose Estimation    | MediaPipe Hands   | 0.10.14 (pinned)                     |
+| Sequence Classification | PyTorch LSTM      | ≥2.7.0                               |
+| Frame Capture           | OpenCV (headless) | ≥4.10.0                              |
+| OS Keyboard Control     | pyautogui         | ≥0.9.54                              |
+| Config Validation       | Pydantic          | ≥2.6.0                               |
+| Array Operations        | NumPy             | ≥1.26.0                              |
+| ML Metrics (training)   | scikit-learn      | ≥1.5.0 (optional `[training]` extra) |
 
 ## 8. Training Infrastructure
 

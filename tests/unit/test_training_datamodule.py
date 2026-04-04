@@ -9,6 +9,8 @@ import pytest
 from gesture_control.training.augmentation import AugmentationConfig
 from gesture_control.training.datamodule import DataSplitConfig, GestureDataModule
 
+pytestmark = pytest.mark.training
+
 
 def _create_dataset(path: Path) -> None:
     rng = np.random.default_rng(42)

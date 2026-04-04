@@ -7,7 +7,7 @@ from typing import Any
 
 import torch
 
-from gesture_control.training.train_lstm import GestureLSTMClassifier
+from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
 from gesture_control.utils.schema_validation import RuntimeConfig
 
 
@@ -91,7 +91,9 @@ def load_inference_artifact(
         feature_schema_version=str(
             feature_schema.get("feature_schema_version", "unknown")
         ),
-        feature_dim=int(feature_schema.get("feature_dim", model_config["input_size"])),
+        feature_dim=int(
+            feature_schema.get("feature_dim") or model_config["input_size"]
+        ),
         window_length=int(feature_schema.get("window_length", 24)),
         window_step=int(feature_schema.get("window_step", 3)),
         orientation_normalization=bool(
