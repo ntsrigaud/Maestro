@@ -10,7 +10,7 @@ from gesture_control.infrastructure.model.checkpoint_loader import (
     load_latest_inference_artifact,
     validate_runtime_compatibility,
 )
-from gesture_control.training.train_lstm import GestureLSTMClassifier
+from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
 from gesture_control.utils.schema_validation import RuntimeConfig
 
 
