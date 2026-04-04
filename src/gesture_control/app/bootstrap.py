@@ -131,8 +131,9 @@ def build_container(
 
     gaze_cfg = config.inference.gaze
     if gaze_cfg.enabled:
-        gaze_detector: IGazeIntentDetector = HeadPoseGazeDetector(config=gaze_cfg)
-        gaze_detector.set_on_gaze_lost(activation_controller.force_idle)
+        _hpd = HeadPoseGazeDetector(config=gaze_cfg)
+        _hpd.set_on_gaze_lost(activation_controller.force_idle)
+        gaze_detector: IGazeIntentDetector = _hpd
     else:
         gaze_detector = NullGazeDetector()
 
