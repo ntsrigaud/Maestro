@@ -13,10 +13,21 @@ dependencies = [
   "PyYAML>=6.0.1",
   "numpy>=1.26.0",
   "torch>=2.7.0",
-  "scikit-learn>=1.5.0",
   "opencv-python-headless>=4.10.0",
   "mediapipe==0.10.14",
   "pyautogui>=0.9.54",
+]
+
+[project.optional-dependencies]
+training = [
+  "scikit-learn>=1.5.0",
+]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.3.0",
+  "mypy>=1.8.0",
+  "types-PyYAML>=6.0.12",
+  "types-PyAutoGUI",
 ]
 
 [tool.setuptools]
@@ -35,6 +46,9 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+  "training: marks tests that require the training optional dependencies (scikit-learn)",
+]
 
 [tool.mypy]
 python_version = "3.11"
