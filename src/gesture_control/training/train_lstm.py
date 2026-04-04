@@ -12,6 +12,7 @@ from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
 from gesture_control.training.augmentation import AugmentationConfig
 from gesture_control.training.datamodule import DataSplitConfig, GestureDataModule
 from gesture_control.training.evaluate import EvaluationReport, evaluate_model
@@ -79,36 +80,6 @@ class TrainingResult:
     test_report: EvaluationReport
     class_labels: list[str]
     dataset_metadata: dict[str, Any]
-
-
-class GestureLSTMClassifier(nn.Module):
-    """Baseline 2-layer LSTM classifier for sequence gesture recognition."""
-
-    def __init__(
-        self,
-        *,
-        input_size: int,
-        hidden_size: int,
-        num_layers: int,
-        dropout: float,
-        num_classes: int,
-    ) -> None:
-        super().__init__()
-
-        self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            dropout=dropout if num_layers > 1 else 0.0,
-        )
-        self.dropout = nn.Dropout(p=dropout)
-        self.head = nn.Linear(hidden_size, num_classes)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        output, _ = self.lstm(x)
-        final_state = output[:, -1, :]
-        return self.head(self.dropout(final_state))
 
 
 def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
