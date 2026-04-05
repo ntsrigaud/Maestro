@@ -77,7 +77,8 @@ def main() -> None:
         description="Train LSTM gesture classifier and register model artifacts",
     )
     parser.add_argument(
-        "--dataset",
+        "--dataset-path",
+        dest="dataset",
         required=True,
         help="Path to sequence dataset NPZ artifact",
     )
