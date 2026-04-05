@@ -40,8 +40,8 @@ Compatibility
 -------------
 The output NPZ is fully compatible with ``GestureDataModule`` and the
 existing training pipeline in ``train_model.py``.  Pass the output path
-to ``--dataset-path`` and set ``--vocab-config
-configs/gestures/vocabulary_ipn.yaml``.
+to ``--dataset-path``.
+The vocabulary is embedded in the NPZ and does not need to be passed separately.
 """
 
 from __future__ import annotations
