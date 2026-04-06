@@ -84,8 +84,6 @@
                 "unknown",
                 "click_one_finger",
                 "click_two_fingers",
-                "double_click_one",
-                "double_click_two",
                 "doing_other_things_2",
                 "zooming_out_with_full_hand_2",
                 "zooming_out_with_two_fingers_2",
@@ -121,6 +119,78 @@
             "checkpoint_path": "models/checkpoints/lstm_v1_20260401T112540Z.pt",
             "exported_path": "models/exported/lstm_v1_20260401T112540Z_inference.pt",
             "created_at": "2026-04-01T11:25:40+00:00"
+        },
+        {
+            "model_version": "lstm_v1_20260406T081002Z",
+            "training_data_version": "ipn_dataset_v2",
+            "feature_schema_version": "feature-schema-v1",
+            "class_labels": [
+                "click_one_finger",
+                "click_two_fingers",
+                "double_click_one",
+                "double_click_two",
+                "open_palm_hold",
+                "stop_sign",
+                "swipe_down",
+                "swipe_left",
+                "swipe_right",
+                "swipe_up",
+                "turning_hand_clockwise",
+                "turning_hand_counterclockwise",
+                "zoom_in",
+                "zoom_out"
+            ],
+            "window_length": 24,
+            "feature_dim": 126,
+            "window_step": 3,
+            "dataset_shape": [43890, 24, 126],
+            "class_balance": {
+                "min": 1525,
+                "max": 5422,
+                "ratio": 3.56
+            },
+            "checkpoint_path": "models/checkpoints/lstm_v1_20260406T081002Z_inference.pt",
+            "exported_path": "models/exported/lstm_v1_20260406T081002Z_inference.pt",
+            "created_at": "2026-04-03T18:18:33.820197+00:00"
+        },
+        {
+            "model_version": "lstm_v1_20260406T092127Z_inference.pt",
+            "training_data_version": "ipn_jester_combined_v3",
+            "feature_schema_version": "feature-schema-v1",
+            "class_labels": [
+                "click_one_finger_ipn_1",
+                "click_two_fingers_ipn_1",
+                "double_click_one_ipn_1",
+                "double_click_two_ipn_1",
+                "open_palm_hold_ipn_1",
+                "swipe_down_ipn_1",
+                "swipe_left_ipn_1",
+                "swipe_right_ipn_1",
+                "swipe_up_ipn_1",
+                "zoom_in_ipn_1",
+                "zoom_out_ipn_1",
+                "stop_sign_jester_2",
+                "swipe_down_jester_2",
+                "swipe_left_jester_2",
+                "swipe_right_jester_2",
+                "swipe_up_jester_2",
+                "turning_hand_clockwise_jester_2",
+                "turning_hand_counterclockwise_jester_2",
+                "zoom_in_jester_2",
+                "zoom_out_jester_2"
+            ],
+            "window_length": 24,
+            "feature_dim": 126,
+            "window_step": 3,
+            "dataset_shape": [44836, 24, 126],
+            "class_balance": {
+                "min": 993,
+                "max": 3974,
+                "ratio": 4.0
+            },
+            "checkpoint_path": "models/checkpoints/lstm_v1_20260406T092127Z_inference.pt",
+            "exported_path": "models/exported/lstm_v1_20260406T092127Z_inference.pt",
+            "created_at": "2026-04-06T17:10:33.820197+00:00"
         }
     ]
 }
