@@ -16,7 +16,7 @@ _TARGET_APP = "powerpoint"
 _SHORTCUTS: dict[str, tuple[str, ...]] = {
     "next_slide": ("right",),
     "previous_slide": ("left",),
-    "start_presentation": ("f5",),
+    "start_presentation": ("shift", "f5"),
     "raise_hand": ("ctrl", "shift", "k"),
     "toggle_pointer_mode": ("ctrl", "l"),
     "exit_presentation": ("escape",),
