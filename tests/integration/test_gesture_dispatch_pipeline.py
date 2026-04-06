@@ -241,7 +241,7 @@ class TestGestureDispatchPipeline:
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
         self.mock_pya.hotkey.assert_called_once_with(
-            "f5"
+            "shift", "f5"
         )  # PowerPoint start_presentation
 
     def test_command_dispatched_exactly_once_per_gesture(self):
@@ -756,7 +756,7 @@ class TestGazeGateIntegration:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("f5")  # start_presentation
+        self.mock_pya.hotkey.assert_called_once_with("shift", "f5")  # start_presentation
 
     # -- New gesture mappings under gaze gate ---------------------------------
 
