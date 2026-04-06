@@ -117,8 +117,8 @@ A revised vocabulary derived entirely from IPN data is defined in
 | `open_palm_hold` | G07             | Activation / toggle UI    | Approximate   |
 | `swipe_right`    | G06             | Next slide                | Direct        |
 | `swipe_left`     | G05             | Previous slide            | Direct        |
-| `swipe_up`       | G03             | Raise hand / next section | Direct        |
-| `swipe_down`     | G04             | Start / stop presentation | Direct        |
+| `swipe_up`       | G03             | Start presentation        | Direct        |
+| `swipe_down`     | G04             | Exit presentation         | Direct        |
 | `zoom_in`        | G10             | Zoom in                   | Direct        |
 | `zoom_out`       | G11             | Zoom out                  | Direct        |
 | `unknown`        | D0X + B0A + B0B | No-gesture / noise        | Direct        |
