@@ -111,10 +111,10 @@ class TestPowerPointAdapter:
         assert result.success is True
         self.mock_pya.hotkey.assert_called_once_with("left")
 
-    def test_start_presentation_uses_f5(self):
+    def test_start_presentation_uses_shift_f5(self):
         result = self.adapter.execute("start_presentation")
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("f5")
+        self.mock_pya.hotkey.assert_called_once_with("shift", "f5")
 
     def test_toggle_pointer_mode_uses_ctrl_l(self):
         result = self.adapter.execute("toggle_pointer_mode")
