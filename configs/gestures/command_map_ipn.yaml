@@ -6,9 +6,7 @@ version: v1
 # mapping; it is silently ignored by the dispatcher.
 gesture_commands:
   swipe_right: next_slide
-  swiping_right_2: next_slide
   swipe_left: previous_slide
-  swiping_left_2: previous_slide
   swipe_up: start_presentation
   swipe_down: exit_presentation
   zoom_in: toggle_pointer_mode
