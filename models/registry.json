@@ -1,106 +1,73 @@
 {
-    "models": [
-        {
-            "model_version": "lstm_v1_20260328T100850Z",
-            "training_data_version": "gesture_dataset_v1",
-            "feature_schema_version": "feature-schema-v1",
-            "class_labels": [
-                "open_palm_hold",
-                "swipe_right",
-                "swipe_left",
-                "fist_hold",
-                "thumbs_up",
-                "v_sign",
-                "pinch_hold",
-                "unknown"
-            ],
-            "window_length": 24,
-            "checksum": "165a3b0e7c76f98514b1213e5a37a3eac5fca919c59bd1a5665ed9810ddd7109",
-            "feature_dim": 126,
-            "window_step": 3,
-            "checkpoint_path": "models/checkpoints/lstm_v1_20260328T100850Z.pt",
-            "exported_path": "models/exported/lstm_v1_20260328T100850Z_inference.pt",
-            "checkpoint_checksum": "87b749432611dada394b701253b22d58ea368bef10777df629ae027f56daeca5",
-            "created_at": "2026-03-28T10:08:54.318585+00:00"
-        },
-        {
-            "model_version": "lstm_v1_20260330T104422Z",
-            "training_data_version": "gesture_dataset_v2",
-            "feature_schema_version": "feature-schema-v1",
-            "class_labels": [
-                "open_palm_hold",
-                "swipe_right",
-                "swipe_left",
-                "fist_hold",
-                "thumbs_up",
-                "v_sign",
-                "pinch_hold",
-                "unknown"
-            ],
-            "window_length": 24,
-            "checksum": "e65e8fbc4be1cd4d4ea75946cc9675d7e809a3d4bf2fbf9fc42f6642c3f33bb2",
-            "feature_dim": 126,
-            "window_step": 3,
-            "checkpoint_path": "models/checkpoints/lstm_v1_20260330T104422Z.pt",
-            "exported_path": "models/exported/lstm_v1_20260330T104422Z_inference.pt",
-            "checkpoint_checksum": "c477a0fe049ea68d02160c09916e147aa03582ffc4ad5f524b2a036f2b0c1cd0",
-            "created_at": "2026-03-30T10:44:25.195371+00:00"
-        },
-        {
-            "model_version": "lstm_v1_20260330T181558Z",
-            "training_data_version": "ipn_dataset",
-            "feature_schema_version": "feature-schema-v1",
-            "class_labels": [
-                "open_palm_hold",
-                "swipe_right",
-                "swipe_left",
-                "swipe_up",
-                "swipe_down",
-                "zoom_in",
-                "zoom_out",
-                "unknown"
-            ],
-            "window_length": 24,
-            "checksum": "24cd501c0aa0ba42c45ed3c7a4db7a33859b7ab64a0d3399de1f5c00a8bd14f8",
-            "feature_dim": 126,
-            "window_step": 3,
-            "checkpoint_path": "models/checkpoints/lstm_v1_20260330T181558Z.pt",
-            "exported_path": "models/exported/lstm_v1_20260330T181558Z_inference.pt",
-            "checkpoint_checksum": "5fd11466083e26977585e2e5ef917ba70ff03494408c3f12b92423f3755153e3",
-            "created_at": "2026-03-30T18:16:50.820197+00:00"
-        },
-        {
-            "model_version": "lstm_v1_20260406T081002Z",
-            "training_data_version": "ipn_dataset_v2",
-            "feature_schema_version": "feature-schema-v1",
-            "class_labels": [
-                "click_one_finger",
-                "click_two_fingers",
-                "double_click_one",
-                "double_click_two",
-                "open_palm_hold",
-                "stop_sign",
-                "swipe_down",
-                "swipe_left",
-                "swipe_right",
-                "swipe_up",
-                "turning_hand_clockwise",
-                "turning_hand_counterclockwise",
-                "zoom_in",
-                "zoom_out"
-            ],
-            "window_length": 24,
-            "feature_dim": 126,
-            "window_step": 3,
-            "dataset_shape": [43890, 24, 126],
-            "class_balance": {
-                "min": 1525,
-                "max": 5422,
-                "ratio": 3.56
-            },
-            "checkpoint_path": "models/checkpoints/lstm_v1_20260406T081002Z_inference.pt",
-            "exported_path": "models/exported/lstm_v1_20260406T081002Z_inference.pt",
-            "created_at": "2026-04-03T18:18:33.820197+00:00"
-        }
-    ]
+  "models": [
+    {
+      "model_version": "lstm_v1_20260328T100850Z",
+      "training_data_version": "gesture_dataset_v1",
+      "feature_schema_version": "feature-schema-v1",
+      "class_labels": [
+        "open_palm_hold",
+        "swipe_right",
+        "swipe_left",
+        "fist_hold",
+        "thumbs_up",
+        "v_sign",
+        "pinch_hold",
+        "unknown"
+      ],
+      "window_length": 24,
+      "checksum": "165a3b0e7c76f98514b1213e5a37a3eac5fca919c59bd1a5665ed9810ddd7109",
+      "feature_dim": 126,
+      "window_step": 3,
+      "checkpoint_path": "models/checkpoints/lstm_v1_20260328T100850Z.pt",
+      "exported_path": "models/exported/lstm_v1_20260328T100850Z_inference.pt",
+      "checkpoint_checksum": "87b749432611dada394b701253b22d58ea368bef10777df629ae027f56daeca5",
+      "created_at": "2026-03-28T10:08:54.318585+00:00"
+    },
+    {
+      "model_version": "lstm_v1_20260330T104422Z",
+      "training_data_version": "gesture_dataset_v2",
+      "feature_schema_version": "feature-schema-v1",
+      "class_labels": [
+        "open_palm_hold",
+        "swipe_right",
+        "swipe_left",
+        "fist_hold",
+        "thumbs_up",
+        "v_sign",
+        "pinch_hold",
+        "unknown"
+      ],
+      "window_length": 24,
+      "checksum": "e65e8fbc4be1cd4d4ea75946cc9675d7e809a3d4bf2fbf9fc42f6642c3f33bb2",
+      "feature_dim": 126,
+      "window_step": 3,
+      "checkpoint_path": "models/checkpoints/lstm_v1_20260330T104422Z.pt",
+      "exported_path": "models/exported/lstm_v1_20260330T104422Z_inference.pt",
+      "checkpoint_checksum": "c477a0fe049ea68d02160c09916e147aa03582ffc4ad5f524b2a036f2b0c1cd0",
+      "created_at": "2026-03-30T10:44:25.195371+00:00"
+    },
+    {
+      "model_version": "lstm_v1_20260330T181558Z",
+      "training_data_version": "ipn_dataset",
+      "feature_schema_version": "feature-schema-v1",
+      "class_labels": [
+        "open_palm_hold",
+        "swipe_right",
+        "swipe_left",
+        "swipe_up",
+        "swipe_down",
+        "zoom_in",
+        "zoom_out",
+        "unknown"
+      ],
+      "window_length": 24,
+      "checksum": "24cd501c0aa0ba42c45ed3c7a4db7a33859b7ab64a0d3399de1f5c00a8bd14f8",
+      "feature_dim": 126,
+      "window_step": 3,
+      "checkpoint_path": "models/checkpoints/lstm_v1_20260330T181558Z.pt",
+      "exported_path": "models/exported/lstm_v1_20260330T181558Z_inference.pt",
+      "checkpoint_checksum": "5fd11466083e26977585e2e5ef917ba70ff03494408c3f12b92423f3755153e3",
+      "created_at": "2026-03-30T18:16:50.820197+00:00"
+    }
+  ]
 }
