@@ -55,11 +55,6 @@ def main() -> None:
         registry_path=args.registry,
         show_window=not args.no_display,
     )
-    artifact = getattr(container, "model_artifact", None)
-    artifact_path = getattr(artifact, "artifact_path", None)
-    model_version = getattr(artifact, "model_version", None)
-    print(f"[INFO] Loaded model artifact: {artifact_path}")
-    print(f"[INFO] Model version: {model_version}")
     runtime = Runtime(container)
     runtime.run(benchmark_output=args.benchmark_output, max_frames=args.max_frames)
 
