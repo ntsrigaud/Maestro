@@ -184,6 +184,21 @@ def create_datamodule(
     return datamodule
 
 
+def _build_criterion(
+    class_weights: torch.Tensor | None,
+    *,
+    label_smoothing: float = 0.0,
+    device: torch.device | None = None,
+) -> nn.Module:
+    """Construct CrossEntropyLoss with optional class weights and label smoothing."""
+    if class_weights is not None:
+        return nn.CrossEntropyLoss(
+            weight=class_weights,
+            label_smoothing=label_smoothing,
+        )
+    return nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+
+
 def _build_class_weights(
     datamodule: GestureDataModule, device: torch.device
 ) -> torch.Tensor:
@@ -268,9 +283,11 @@ def train_lstm(
 
     if config.training.class_weighting:
         class_weights = _build_class_weights(datamodule, device)
-        criterion: nn.Module = nn.CrossEntropyLoss(weight=class_weights)
+        criterion: nn.Module = _build_criterion(
+            class_weights, label_smoothing=0.1
+        )
     else:
-        criterion = nn.CrossEntropyLoss()
+        criterion = _build_criterion(None, label_smoothing=0.1)
 
     optimizer = Adam(
         model.parameters(),
