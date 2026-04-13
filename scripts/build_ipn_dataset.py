@@ -671,6 +671,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Random seed for unknown-segment subsampling (default: 42).",
     )
     p.add_argument(
+        "--feature-schema-version",
+        default="feature-schema-v1",
+        help=(
+            "Feature schema version tag embedded in the NPZ metadata "
+            "(default: feature-schema-v1).  Use feature-schema-v2 after "
+            "enabling spread/wrist-trajectory features."
+        ),
+    )
+    p.add_argument(
         "--metadata-json",
         default=None,
         help=(
