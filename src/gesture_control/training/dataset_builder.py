@@ -134,7 +134,12 @@ class SequenceDatasetBuilder:
             self.add_frame(frame)
         return list(self._samples)
 
-    def save_npz(self, output_path: str | Path) -> Path:
+    def save_npz(
+        self,
+        output_path: str | Path,
+        *,
+        feature_schema_version: str = "feature-schema-v1",
+    ) -> Path:
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -170,7 +175,7 @@ class SequenceDatasetBuilder:
         )
 
         metadata = {
-            "feature_schema_version": "feature-schema-v1",
+            "feature_schema_version": feature_schema_version,
             "feature_dim": int(sequences.shape[2]),
             "window_length": int(sequences.shape[1]),
             "window_step": self._window_step,
