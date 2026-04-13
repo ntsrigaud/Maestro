@@ -88,7 +88,7 @@ def test_load_latest_inference_artifact(tmp_path: Path) -> None:
     assert artifact.artifact_path == artifact_path
 
 
-def test_validate_runtime_compatibility_passes(config_dir: Path) -> None:
+def test_validate_runtime_compatibility_passes(tmp_path: Path) -> None:
     runtime = RuntimeConfig.model_validate(
         {
             "app": {
@@ -115,12 +115,8 @@ def test_validate_runtime_compatibility_passes(config_dir: Path) -> None:
         }
     )
 
-    artifact_path = (
-        config_dir.parent
-        / "models"
-        / "exported"
-        / "lstm_v1_20260328T100850Z_inference.pt"
-    )
+    artifact_path = tmp_path / "model.pt"
+    _write_artifact(artifact_path)
     artifact = load_inference_artifact(
         artifact_path=artifact_path,
         device=torch.device("cpu"),
