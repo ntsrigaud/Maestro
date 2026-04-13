@@ -5,6 +5,10 @@ from typing import cast
 
 from gesture_control.domain.entities import FeatureFrame, LandmarkPacket
 
+# MediaPipe Hand landmark indices for the 5 fingertips.
+# Used to compute spread features (distance of each fingertip from wrist origin
+# in normalised, wrist-relative space).
+_FINGERTIP_INDICES: list[int] = [4, 8, 12, 16, 20]  # thumb, index, middle, ring, pinky
 
 class LandmarkFeatureTransformer:
     """Transforms hand landmarks into normalized position + velocity features."""
@@ -19,6 +23,9 @@ class LandmarkFeatureTransformer:
         self._min_scale = min_scale
         self._prev_normalized: list[list[float]] | None = None
         self._prev_timestamp_ms: int | None = None
+        # Wrist position (raw, un-normalised) from the first valid frame, used
+        # to compute the 3-D wrist-trajectory feature (global displacement).
+        self._first_wrist: list[float] | None = None
 
     def transform(self, landmarks: LandmarkPacket) -> FeatureFrame:
         if not landmarks.valid or len(landmarks.landmarks) != 21:
@@ -44,7 +51,42 @@ class LandmarkFeatureTransformer:
             )
 
         velocity = self._compute_velocity(normalized, landmarks.timestamp_ms)
-        vector = self._flatten(normalized) + self._flatten(velocity)
+
+        # Wrist trajectory: 3-D displacement of the raw wrist position from the
+        # first valid frame.  Captures global hand movement across the whole window.
+        if self._first_wrist is None:
+            self._first_wrist = [
+                float(landmarks.landmarks[0][0]),
+                float(landmarks.landmarks[0][1]),
+                float(landmarks.landmarks[0][2]),
+            ]
+        wrist_traj: list[float] = [
+            float(landmarks.landmarks[0][0]) - self._first_wrist[0],
+            float(landmarks.landmarks[0][1]) - self._first_wrist[1],
+            float(landmarks.landmarks[0][2]) - self._first_wrist[2],
+        ]
+
+        # Fingertip spread: Euclidean distance of each fingertip from the
+        # wrist origin in normalised space.  Distinguishes open vs. closed hand.
+        spread: list[float] = [
+            self._distance(normalized[tip], [0.0, 0.0, 0.0])
+            for tip in _FINGERTIP_INDICES
+        ]
+
+        # Feature vector layout (144 dims):
+        #   [0:63]   normalised positions (21 × 3)
+        #   [63:68]  fingertip spread (5)
+        #   [68:71]  wrist trajectory (3)
+        #   [71:134] normalised velocity (21 × 3)
+        #   [134:144] joint angles (10)
+        joint_angles = self._joint_angles(normalized)
+        vector = (
+            self._flatten(normalized)
+            + spread
+            + wrist_traj
+            + self._flatten(velocity)
+            + joint_angles
+        )
 
         self._prev_normalized = normalized
         self._prev_timestamp_ms = landmarks.timestamp_ms
@@ -55,6 +97,7 @@ class LandmarkFeatureTransformer:
     def _clear_velocity_state(self) -> None:
         self._prev_normalized = None
         self._prev_timestamp_ms = None
+        self._first_wrist = None
 
     def _normalize_positions(self, raw: list[list[float]]) -> list[list[float]] | None:
         wrist = raw[0]
@@ -155,7 +198,7 @@ class LandmarkFeatureTransformer:
 
     @staticmethod
     def _zero_vector() -> list[float]:
-        return [0.0] * (21 * 3 * 2)
+        return [0.0] * 144
 
     @staticmethod
     def _subtract(a: list[float], b: list[float]) -> list[float]:
