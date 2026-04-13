@@ -775,7 +775,10 @@ def main() -> None:
     # Save NPZ and metadata.
     # -----------------------------------------------------------------------
     output_npz.parent.mkdir(parents=True, exist_ok=True)
-    builder.save_npz(output_npz)
+    builder.save_npz(
+        output_npz,
+        feature_schema_version=args.feature_schema_version,
+    )
     logger.info("Dataset saved → %s  (%d samples)", output_npz, len(builder.samples))
 
     stats = _compute_class_stats(builder)
