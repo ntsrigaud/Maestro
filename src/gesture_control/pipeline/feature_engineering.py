@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections import deque
 from typing import cast
 
 from gesture_control.domain.entities import FeatureFrame, LandmarkPacket
@@ -35,14 +36,17 @@ class LandmarkFeatureTransformer:
         *,
         enable_orientation_normalization: bool = False,
         min_scale: float = 1e-6,
+        wrist_trajectory_window: int = 24,
     ) -> None:
         self._enable_orientation_normalization = enable_orientation_normalization
         self._min_scale = min_scale
         self._prev_normalized: list[list[float]] | None = None
         self._prev_timestamp_ms: int | None = None
-        # Wrist position (raw, un-normalised) from the first valid frame, used
-        # to compute the 3-D wrist-trajectory feature (global displacement).
-        self._first_wrist: list[float] | None = None
+        # Raw wrist position history (bounded to the last *wrist_trajectory_window*
+        # frames).  The trajectory feature is always the displacement from the
+        # oldest entry in the deque, so it is bounded by the window duration and
+        # never grows unboundedly during a long inference session.
+        self._wrist_history: deque[list[float]] = deque(maxlen=wrist_trajectory_window)
 
     def transform(self, landmarks: LandmarkPacket) -> FeatureFrame:
         if not landmarks.valid or len(landmarks.landmarks) != 21:
@@ -69,18 +73,22 @@ class LandmarkFeatureTransformer:
 
         velocity = self._compute_velocity(normalized, landmarks.timestamp_ms)
 
-        # Wrist trajectory: 3-D displacement of the raw wrist position from the
-        # first valid frame.  Captures global hand movement across the whole window.
-        if self._first_wrist is None:
-            self._first_wrist = [
-                float(landmarks.landmarks[0][0]),
-                float(landmarks.landmarks[0][1]),
-                float(landmarks.landmarks[0][2]),
-            ]
+        # Wrist trajectory: 3-D displacement of the current raw wrist position
+        # from the oldest position in the bounded history deque.  Using a deque
+        # of maxlen=window_length ensures the reference point is always at most
+        # one window-duration in the past, preventing unbounded drift during
+        # long inference sessions.
+        raw_wrist = [
+            float(landmarks.landmarks[0][0]),
+            float(landmarks.landmarks[0][1]),
+            float(landmarks.landmarks[0][2]),
+        ]
+        self._wrist_history.append(raw_wrist)
+        origin = self._wrist_history[0]
         wrist_traj: list[float] = [
-            float(landmarks.landmarks[0][0]) - self._first_wrist[0],
-            float(landmarks.landmarks[0][1]) - self._first_wrist[1],
-            float(landmarks.landmarks[0][2]) - self._first_wrist[2],
+            raw_wrist[0] - origin[0],
+            raw_wrist[1] - origin[1],
+            raw_wrist[2] - origin[2],
         ]
 
         # Fingertip spread: Euclidean distance of each fingertip from the
@@ -114,7 +122,7 @@ class LandmarkFeatureTransformer:
     def _clear_velocity_state(self) -> None:
         self._prev_normalized = None
         self._prev_timestamp_ms = None
-        self._first_wrist = None
+        self._wrist_history.clear()
 
     def _normalize_positions(self, raw: list[list[float]]) -> list[list[float]] | None:
         wrist = raw[0]
