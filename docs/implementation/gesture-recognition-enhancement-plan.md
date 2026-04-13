@@ -13,6 +13,104 @@
 
 ---
 
+## Pre-flight Fixes
+
+> These three infrastructure changes must land **before any Phase 1 code changes start**.
+> They address blocking correctness gaps identified in the technical review. None of them
+> changes observable runtime behaviour — they are purely additive or refactoring changes.
+
+### Fix R1 — `save_npz()` Must Propagate `feature_schema_version` _(blocking)_
+
+**File**: `src/gesture_control/training/dataset_builder.py`
+
+`save_npz()` currently hardcodes `"feature_schema_version": "feature-schema-v1"` in the
+metadata dict regardless of which features were used to build the dataset. After Phase 1 and
+Phase 2 feature changes, the stored version will always be `v1`, silently breaking schema
+version checks during future compatibility validation.
+
+Add a keyword-only parameter with a backward-compatible default to the method signature:
+
+```python
+def save_npz(
+    self, output_path: str | Path, *, feature_schema_version: str = "feature-schema-v1"
+) -> Path:
+```
+
+Replace the hardcoded key inside the `metadata` dict:
+
+```python
+metadata = {
+    "feature_schema_version": feature_schema_version,   # was: "feature-schema-v1"
+    ...
+}
+```
+
+Update `build_ipn_dataset.py` to accept a `--feature-schema-version` CLI argument
+(default `"feature-schema-v1"`) and forward it to `save_npz()`. During Phase 1 dataset
+regeneration, pass `"feature-schema-v2"`.
+
+**Validation**: Rebuild the existing IPN dataset and assert `meta["feature_schema_version"]`
+equals the argument value passed on the command line.
+
+---
+
+### Fix R4 — Extract `_build_criterion()` in `train_lstm.py`
+
+**File**: `src/gesture_control/training/train_lstm.py`
+
+`train_lstm()` constructs `nn.CrossEntropyLoss` in two separate branches (weighted and
+unweighted). Step 1.8 adds `label_smoothing=0.1` to both; having two call sites is an
+error-prone maintenance hazard. Eliminate the duplication by adding a private helper
+before `train_lstm()`:
+
+```python
+def _build_criterion(
+    class_weights: torch.Tensor | None,
+    *,
+    label_smoothing: float = 0.0,
+) -> nn.Module:
+    return nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
+```
+
+Replace both existing `nn.CrossEntropyLoss(...)` constructions in `train_lstm()`:
+
+```python
+# weighted branch:
+criterion: nn.Module = _build_criterion(class_weights)
+# unweighted branch:
+criterion = _build_criterion(None)
+```
+
+Step 1.8 then becomes a single-parameter change at each call site.
+
+---
+
+### Fix R5 — Store `model_name` in Exported Artifact
+
+**File**: `src/gesture_control/training/export_checkpoint.py`
+
+`export_inference_artifact()` stores `model_config` but omits `model_name`. The
+`checkpoint_loader.py` factory in Step 2.0 needs to identify the architecture from stored
+data without relying on the generic `artifact_type` string alone.
+
+Add `model_name` to the `model_config` sub-dict:
+
+```python
+"model_config": {
+    "model_name": config.model.model_name,   # add this field
+    "input_size": config.model.input_size,
+    "hidden_size": config.model.hidden_size,
+    "num_layers": config.model.num_layers,
+    "dropout": config.model.dropout,
+    "num_classes": config.model.num_classes,
+},
+```
+
+This is a one-line, backward-compatible addition. Existing loaders that do not read
+`model_name` are unaffected.
+
+---
+
 ## Phase 1 — Feature & Training Hardening
 
 **Target**: val accuracy ≥ 85%, macro F1 ≥ 84%
@@ -128,27 +226,39 @@ export:
 
 **File**: `src/gesture_control/training/dataset_builder.py`
 
-**1.4.a** Add `min_label_purity` parameter to `__init__` (after `min_valid_ratio`):
+> **Implementation note**: The production dataset uses `label_strategy: "last"` (the
+> default), meaning `selected_label` is always the trailing frame's label — not a majority
+> vote. The purity check therefore measures what fraction of the 24 window frames share the
+> *trailing* label. A boundary window where the first half belongs to a different gesture
+> will score below 0.9 and be correctly discarded. The parameter name reflects this
+> semantics explicitly.
+
+**1.4.a** Add `min_trailing_label_purity` parameter to `__init__` (after `min_valid_ratio`):
 
 ```python
-min_label_purity: float = 0.9,
+min_trailing_label_purity: float = 0.9,
 ```
 
-Store it: `self._min_label_purity = min_label_purity`
+Store it: `self._min_trailing_label_purity = min_trailing_label_purity`
 
-**1.4.b** In `add_frame()`, replace the unconditional `self._samples.append(sample)` block with a purity check. After `selected_label = self._select_label(labels)`, compute and check purity before constructing `SequenceSample`:
+**1.4.b** In `add_frame()`, replace the unconditional `self._samples.append(sample)` block
+with a purity check. After `selected_label = self._select_label(labels)`, compute and check
+purity before constructing `SequenceSample`:
 
 ```python
-majority_count = labels.count(selected_label)
-purity = majority_count / len(labels)
-if purity < self._min_label_purity:
+trailing_count = labels.count(selected_label)
+purity = trailing_count / len(labels)
+if purity < self._min_trailing_label_purity:
     self._sample_index += 1
     return emitted          # discard this boundary window
 ```
 
 Place this block immediately before the `sample = SequenceSample(...)` construction.
+`self._sample_index` is intentionally incremented on discarded windows to keep sample IDs
+sparse but monotonic — this is harmless.
 
-**1.4.c** Expose the parameter in `build_dataset.py` / `build_ipn_dataset.py` if those scripts instantiate `SequenceDatasetBuilder` directly. Set `min_label_purity=0.9` at all call sites.
+**1.4.c** Expose the parameter in `build_ipn_dataset.py` where `SequenceDatasetBuilder` is
+instantiated. Set `min_trailing_label_purity=0.9` at all call sites.
 
 **Validation**: Run `python -m pytest tests/unit/ -q` — all unit tests must pass.
 
@@ -202,6 +312,19 @@ def forward(self, x: torch.Tensor) -> torch.Tensor:
 
 **Validation**: `python -m pytest tests/unit/ -q` — existing LSTM unit tests must pass with the new readout.
 
+> **⚠ Breaking checkpoint change**: The new `attn` layer adds keys `"attn.weight"` and
+> `"attn.bias"` to the model `state_dict`. Any previously exported artifact is missing these
+> keys; `load_state_dict()` (called with `strict=True`) will raise a `RuntimeError` at
+> runtime startup. Immediately after confirming tests pass, invalidate stale registry
+> entries:
+>
+> ```bash
+> echo '{"models": []}' > models/registry.json
+> ```
+>
+> Existing files under `models/checkpoints/` and `models/exported/` can be archived or
+> deleted — they are architecturally incompatible with the updated model.
+
 ---
 
 ### Step 1.7 — Add Mirror Flip Augmentation
@@ -214,15 +337,29 @@ def forward(self, x: torch.Tensor) -> torch.Tensor:
 mirror_flip_prob: float = 0.5
 ```
 
-**1.7.b** Pre-compute the x-coordinate indices at module level (update when feature dim changes):
+**1.7.b** Define named layout constants and derive `_X_COORD_DIMS` from them at module
+level. Using named constants makes the list self-documenting and prevents silent breakage
+when Phase 2 adds joint angles at dims 134–143 (rotation-invariant scalars that require no
+x-flip — the derived list naturally excludes them without any manual update):
 
 ```python
-# Indices of x-coordinates across position, velocity, and wrist-trajectory blocks.
-# Position block:     dims  0–62,  x at 0, 3, 6, ..., 60
-# Velocity block:     dims 63–125, x at 63, 66, ..., 123
-# Wrist trajectory:   dims 131–133, x at 131
-# Spread (126–130): scalar distances, sign-invariant — no flip required.
-_X_COORD_DIMS: list[int] = list(range(0, 63, 3)) + list(range(63, 126, 3)) + [131]
+# Feature layout constants — must stay in sync with LandmarkFeatureTransformer output.
+_N_LANDMARKS: int = 21
+_POS_START: int = 0
+_POS_END: int = _N_LANDMARKS * 3                    # 63 — end of position block
+_VEL_START: int = _POS_END                          # 63 — start of velocity block
+_VEL_END: int = _VEL_START + _N_LANDMARKS * 3       # 126 — end of velocity block
+_SPREAD_DIMS: int = 5                               # dims 126–130, Euclidean distances
+_WRIST_TRAJ_X_DIM: int = _VEL_END + _SPREAD_DIMS   # dim 131 — wrist trajectory x-coord
+
+# x-coordinate dims that must be negated during mirror flip.
+# Spread (126–130): sign-invariant distances — excluded.
+# Joint angles (Phase 2, dims 134–143): rotation-invariant scalars — excluded.
+_X_COORD_DIMS: list[int] = (
+    list(range(_POS_START, _POS_END, 3))    # position x: 0, 3, 6, ..., 60
+    + list(range(_VEL_START, _VEL_END, 3))  # velocity x: 63, 66, ..., 123
+    + [_WRIST_TRAJ_X_DIM]                   # wrist trajectory x: 131
+)
 ```
 
 **1.7.c** Add `_mirror_flip` method to `GestureAugmenter`:
@@ -267,27 +404,32 @@ augmentation:
 
 **Validation**: `python -m pytest tests/unit/ -q`
 
+> **Test fixture update required**: `tests/unit/test_augmentation.py` uses
+> `_make_seq(T=24, F=126)` throughout. After this step the feature dimension is 134.
+> Update the default value of the `F` parameter in `_make_seq()` to `134` and verify that
+> the `test_spatial_jitter_only_affects_position_dims` test (which asserts dims beyond
+> `_POSITION_DIMS` are unchanged by jitter) still passes — it remains correct because only
+> dims 0–62 receive noise regardless of total feature width.
+
 ---
 
 ### Step 1.8 — Add Label Smoothing
 
 **File**: `src/gesture_control/training/train_lstm.py`
 
-Locate the criterion construction block (around line 280 in `train_lstm()`):
+**Prerequisite**: Fix R4 must be applied first (introduces `_build_criterion()`).
+
+Update both `_build_criterion()` calls in `train_lstm()` to pass `label_smoothing=0.1`:
 
 ```python
-# Before:
-criterion: nn.Module = nn.CrossEntropyLoss(weight=class_weights)
-# ...
-criterion = nn.CrossEntropyLoss()
-
-# After:
-criterion: nn.Module = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
-# ...
-criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+# weighted branch:
+criterion: nn.Module = _build_criterion(class_weights, label_smoothing=0.1)
+# unweighted branch:
+criterion = _build_criterion(None, label_smoothing=0.1)
 ```
 
-Both occurrences (weighted and unweighted branch) must be updated.
+Because Fix R4 consolidated both `nn.CrossEntropyLoss` constructions into one helper, this
+is a two-call-site change with no risk of missing a third occurrence.
 
 ---
 
@@ -303,6 +445,33 @@ python -m pytest tests/ -m "not training" -q
 ```
 
 All must report zero errors/failures.
+
+Additionally run the following two spot-checks before proceeding:
+
+```bash
+# 1. Confirm _zero_vector() returns exactly 134 dimensions.
+python -c "
+from gesture_control.pipeline.feature_engineering import LandmarkFeatureTransformer
+t = LandmarkFeatureTransformer()
+assert len(t._zero_vector()) == 134, f'Expected 134, got {len(t._zero_vector())}'
+print('Feature dim OK: 134')
+"
+
+# 2. Confirm the rebuilt dataset embeds the correct schema version and orientation flag.
+python - <<'EOF'
+import numpy as np, json
+d = np.load("data/processed/ipn_dataset.npz", allow_pickle=True)
+meta = json.loads(str(d["metadata_json"].item()))
+assert meta["feature_schema_version"] == "feature-schema-v2", (
+    f"Expected feature-schema-v2, got {meta['feature_schema_version']}"
+)
+assert meta["feature_dim"] == 134, f"Expected 134, got {meta['feature_dim']}"
+assert meta["enable_orientation_normalization"] is True
+print("Dataset schema OK:", meta["feature_schema_version"], "dim:", meta["feature_dim"])
+EOF
+```
+
+Do not proceed to training if either check fails.
 
 ---
 
@@ -332,6 +501,81 @@ If **any criterion is not met**, do not proceed to Phase 2. Diagnose via the per
 
 **Prerequisite**: Phase 1 success criteria confirmed.  
 **Target**: val accuracy ≥ 88–90%
+
+### Step 2.0 — Extend `checkpoint_loader.py` for Multi-Architecture Dispatch _(blocking)_
+
+**Files**: `src/gesture_control/infrastructure/model/checkpoint_loader.py` and
+`src/gesture_control/training/export_checkpoint.py`
+
+`load_inference_artifact()` currently hardcodes `GestureLSTMClassifier`. Attempting to load
+a TCN artifact without this change applies TCN weights to an LSTM graph, raising a
+`RuntimeError` for unexpected/missing `state_dict` keys at runtime startup. This step must
+be completed before any TCN model is trained or exported.
+
+**2.0.a** Add a private factory function near the top of `checkpoint_loader.py`, after the
+imports:
+
+```python
+def _build_model_from_artifact(
+    model_config: dict,
+    artifact_type: str,
+) -> torch.nn.Module:
+    """Dispatch model construction based on stored model_name or artifact_type."""
+    from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
+    from gesture_control.infrastructure.model.tcn_model import GestureTCNClassifier
+
+    model_name = str(model_config.get("model_name", ""))
+    is_tcn = artifact_type == "tcn_inference" or model_name.startswith("tcn")
+    if is_tcn:
+        return GestureTCNClassifier(
+            input_size=int(model_config["input_size"]),
+            hidden_size=int(model_config["hidden_size"]),
+            num_classes=int(model_config["num_classes"]),
+            dropout=float(model_config["dropout"]),
+        )
+    return GestureLSTMClassifier(
+        input_size=int(model_config["input_size"]),
+        hidden_size=int(model_config["hidden_size"]),
+        num_layers=int(model_config["num_layers"]),
+        dropout=float(model_config["dropout"]),
+        num_classes=int(model_config["num_classes"]),
+    )
+```
+
+**2.0.b** Replace the hardcoded `GestureLSTMClassifier(...)` construction inside
+`load_inference_artifact()` with:
+
+```python
+artifact_type = str(payload.get("artifact_type", "lstm_inference"))
+model = _build_model_from_artifact(model_config, artifact_type).to(device)
+model.load_state_dict(state_dict)
+model.eval()
+```
+
+**2.0.c** Update `export_checkpoint.py` to set the `artifact_type` field correctly for TCN
+models (Fix R5 already stores `model_name`; this step reads it):
+
+```python
+is_tcn = config.model.model_name.startswith("tcn")
+artifact_type = "tcn_inference" if is_tcn else "lstm_inference"
+payload: dict[str, Any] = {
+    "artifact_type": artifact_type,
+    ...
+}
+```
+
+**Validation**: `python -m pytest tests/unit/test_checkpoint_loader.py -q` — confirm all
+existing loader tests still pass (they test LSTM loading; the factory falls back to LSTM for
+unrecognised model names). Then verify a Phase 1 LSTM artifact still loads cleanly:
+
+```bash
+python -c "
+from gesture_control.infrastructure.model.checkpoint_loader import load_inference_artifact
+print('Loader import OK')
+"
+```
+
+---
 
 ### Step 2.1 — Implement `GestureTCNClassifier`
 
@@ -627,26 +871,38 @@ python scripts/train_model.py \
 ## Dependency Graph
 
 ```
-Step 1.1  feature_engineering.py  ─┐
-Step 1.2  feature_pipeline.yaml    ├──► Step 1.5  build_dataset.py (regen, dim=134)
-Step 1.3  lstm_default.yaml       ─┘
+Pre-flight R1  dataset_builder.py   save_npz() param  ─┐
+Pre-flight R4  train_lstm.py        _build_criterion() ─┼──► Phase 1 starts
+Pre-flight R5  export_checkpoint.py model_name field   ─┘
 
-Step 1.4  dataset_builder.py ──────────► Step 1.5  (purity applied at build time)
+Step 1.1  feature_engineering.py  ─┐
+Step 1.2  feature_pipeline.yaml    ├──► Step 1.5  build_dataset.py
+Step 1.3  lstm_default.yaml       ─┘          (regen, dim=134, schema-v2)
+
+Step 1.4  dataset_builder.py ──────────► Step 1.5  (purity filter applied at build time)
 
 Steps 1.6, 1.7, 1.8 are independent of each other
 (lstm_model.py, augmentation.py, train_lstm.py)
+Step 1.6 requires models/registry.json reset immediately after.
 All must complete before Step 1.9 quality gate.
 
+                    ▼
+          Step 1.9  quality gate (ruff + mypy + pytest + dim + schema assertions)
                     ▼
              Step 1.10  train (dim=134, LSTM+attn)
                     ▼
            Phase 1 gate: val ≥ 85%
                     ▼
-Step 2.2  +joint angles → dim=144
-Step 2.3  tcn_default.yaml
-Step 2.4  train_lstm.py model dispatch
+Step 2.0  checkpoint_loader.py + export_checkpoint.py  ← blocking for Phase 2
                     ▼
-             Step 2.5  build_dataset.py (regen, dim=144)
+Step 2.1  tcn_model.py             (new file)
+Step 2.2  feature_engineering.py  +joint angles → dim=144
+Step 2.3  tcn_default.yaml        (new file)
+Step 2.4  train_lstm.py           _build_model() dispatch
+                    ▼
+             Step 2.5  build_dataset.py (regen, dim=144, schema-v3)
+                    ▼
+             Step 2.6  quality gate
                     ▼
              Step 2.7  train (dim=144, TCN+attn)
                     ▼
@@ -657,20 +913,24 @@ Step 2.4  train_lstm.py model dispatch
 
 ## Change Summary per File
 
-| File                                                     | Phase | Change                                             |
-| -------------------------------------------------------- | ----- | -------------------------------------------------- |
-| `src/gesture_control/pipeline/feature_engineering.py`    | 1 + 2 | Add spread, wrist traj (→134), joint angles (→144) |
-| `src/gesture_control/training/augmentation.py`           | 1     | Add mirror flip; update `_X_COORD_DIMS`            |
-| `src/gesture_control/training/dataset_builder.py`        | 1     | Add `min_label_purity=0.9` filter                  |
-| `src/gesture_control/training/train_lstm.py`             | 1 + 2 | `label_smoothing=0.1`; model factory dispatch      |
-| `src/gesture_control/infrastructure/model/lstm_model.py` | 1     | Replace final-step with attention-weighted readout |
-| `src/gesture_control/infrastructure/model/tcn_model.py`  | 2     | New — `GestureTCNClassifier`                       |
-| `configs/model/feature_pipeline.yaml`                    | 1     | `orientation_normalization: true`                  |
-| `configs/model/lstm_default.yaml`                        | 1     | `input_size: 134`, schema v2                       |
-| `configs/model/tcn_default.yaml`                         | 2     | New — TCN training config, `input_size: 144`       |
+| File                                                            | Phase      | Change                                                                      |
+| --------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------- |
+| `src/gesture_control/training/dataset_builder.py`               | Pre-flight | R1: `save_npz()` `feature_schema_version` param; Step 1.4 purity filter     |
+| `src/gesture_control/training/train_lstm.py`                    | Pre-flight | R4: `_build_criterion()` helper; Step 1.8 `label_smoothing=0.1`; Step 2.4 dispatch |
+| `src/gesture_control/training/export_checkpoint.py`             | Pre-flight | R5: `model_name` in artifact; Step 2.0 `artifact_type` for TCN              |
+| `src/gesture_control/pipeline/feature_engineering.py`           | 1 + 2      | Add spread + wrist traj (→134), joint angles (→144)                         |
+| `src/gesture_control/training/augmentation.py`                  | 1          | Add mirror flip; derive `_X_COORD_DIMS` from named layout constants         |
+| `src/gesture_control/infrastructure/model/lstm_model.py`        | 1          | Replace final-step readout with attention-weighted pooling                  |
+| `src/gesture_control/infrastructure/model/checkpoint_loader.py` | 2          | Step 2.0: `_build_model_from_artifact()` multi-arch dispatch factory        |
+| `src/gesture_control/infrastructure/model/tcn_model.py`         | 2          | New — `GestureTCNClassifier` (residual dilated TCN + self-attention)        |
+| `configs/model/feature_pipeline.yaml`                           | 1          | `orientation_normalization: true`                                           |
+| `configs/model/lstm_default.yaml`                               | 1          | `input_size: 134`, schema v2, `mirror_flip_prob: 0.5`                       |
+| `configs/model/tcn_default.yaml`                                | 2          | New — TCN training config, `input_size: 144`, schema v3                     |
+| `scripts/build_ipn_dataset.py`                                  | 1          | `--feature-schema-version` CLI arg forwarded to `save_npz()`                |
+| `tests/unit/test_augmentation.py`                               | 1          | Update `_make_seq()` default from `F=126` to `F=134`                        |
 
 ---
 
 **Document**: Gesture Recognition Enhancement — Implementation Plan  
 **Suite**: Implementation Documentation (`docs/implementation/`)  
-**Last Updated**: April 2026
+**Last Updated**: April 2026 (revised with pre-execution technical review findings)
