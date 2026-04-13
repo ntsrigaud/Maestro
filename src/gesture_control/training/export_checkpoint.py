@@ -47,6 +47,16 @@ def export_inference_artifact(
             "num_layers": config.model.num_layers,
             "dropout": config.model.dropout,
             "num_classes": config.model.num_classes,
+            # TCN-specific fields — saved so the loader can reconstruct the exact
+            # architecture without relying on defaults.  Absent for LSTM artifacts.
+            **(
+                {
+                    "num_channels": config.model.num_channels,
+                    "kernel_size": config.model.kernel_size,
+                }
+                if config.model.model_name.startswith("tcn")
+                else {}
+            ),
         },
         "class_labels": result.class_labels,
         "feature_schema": {
