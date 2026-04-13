@@ -4,13 +4,35 @@ from dataclasses import dataclass
 
 import numpy as np
 
-# Feature layout produced by LandmarkFeatureTransformer:
-#   dims  0-62  — 21 wrist-relative, scale-normalised landmark positions (x, y, z)
-#   dims 63-125 — 21 time-normalised velocity vectors (x, y, z)
-# Augmentation noise is applied only to the position dims so the velocity
-# structure (already derived from position differences) is not independently
-# corrupted.
-_POSITION_DIMS: int = 63
+# ---------------------------------------------------------------------------
+# Feature layout constants for the 134-dim vector produced by
+# LandmarkFeatureTransformer (feature-schema-v2).
+#
+#   [_POS_START : _POS_END]         21 wrist-relative, scale-normalised positions
+#   [_POS_END   : _SPREAD_END]      5  fingertip spread (Euclidean distances)
+#   [_SPREAD_END: _WRIST_TRAJ_END]  3  wrist trajectory (raw 3-D displacement)
+#   [_VEL_START : _VEL_END]         21 time-normalised velocity vectors
+# ---------------------------------------------------------------------------
+_N_LANDMARKS: int = 21
+_POS_START: int = 0
+_POS_END: int = _N_LANDMARKS * 3          # 63
+_SPREAD_END: int = _POS_END + 5           # 68  (5 fingertip distances)
+_WRIST_TRAJ_END: int = _SPREAD_END + 3   # 71  (3 wrist-trajectory dims)
+_VEL_START: int = _WRIST_TRAJ_END        # 71
+_VEL_END: int = _VEL_START + _N_LANDMARKS * 3  # 134
+
+# Convenience alias kept for backward-compat with tests that imported it.
+_POSITION_DIMS: int = _POS_END  # 63
+
+# X-coordinate indices to negate when performing a horizontal mirror flip.
+# Positions x: every 3rd dim from _POS_START (landmark x-coords).
+# Wrist traj x: the first dim of the wrist-trajectory block (_SPREAD_END).
+# Velocity x:   every 3rd dim from _VEL_START (landmark velocity x-coords).
+_X_COORD_DIMS: list[int] = (
+    list(range(_POS_START, _POS_END, 3))   # 21 position x-coords
+    + [_SPREAD_END]                         # 1  wrist-traj x
+    + list(range(_VEL_START, _VEL_END, 3)) # 21 velocity x-coords
+)
 
 
 @dataclass(slots=True)
@@ -39,13 +61,18 @@ class AugmentationConfig:
     # Optional fixed seed for reproducible augmentation (useful in unit tests).
     seed: int | None = None
 
+    # Probability of applying horizontal mirror flip per sample.
+    # Negates all x-coordinate dims (positions, wrist-traj x, velocities x)
+    # to simulate the opposite handedness / viewing angle.
+    mirror_flip_prob: float = 0.5
+
 
 class GestureAugmenter:
-    """Applies temporal-speed and spatial-jitter augmentation to gesture sequences.
+    """Applies temporal-speed, spatial-jitter, and mirror-flip augmentation.
 
     Each call to :meth:`augment` returns a new array; the input is never mutated.
-    Both augmentations are applied independently with probability *apply_prob*,
-    making it possible for neither, one, or both to trigger on any given sample.
+    All augmentations are applied independently with probability *apply_prob*
+    (mirror flip uses *mirror_flip_prob*).
     """
 
     def __init__(self, config: AugmentationConfig) -> None:
@@ -55,15 +82,16 @@ class GestureAugmenter:
     def augment(self, sequence: np.ndarray) -> np.ndarray:
         """Return an augmented copy of *sequence* (shape ``(T, F)``).
 
-        The input array is never mutated.  Both augmentations are gated by
-        :attr:`AugmentationConfig.apply_prob` and applied in the order:
-        temporal scale → spatial jitter.
+        The input array is never mutated.  Augmentations are applied in order:
+        temporal scale → spatial jitter → mirror flip.
         """
         result = sequence.copy()
         if self._rng.random() < self._config.apply_prob:
             result = self._temporal_scale(result)
         if self._rng.random() < self._config.apply_prob:
             result = self._spatial_jitter(result)
+        if self._rng.random() < self._config.mirror_flip_prob:
+            result = self._mirror_flip(result)
         return result
 
     # ------------------------------------------------------------------
@@ -106,8 +134,8 @@ class GestureAugmenter:
     def _spatial_jitter(self, seq: np.ndarray) -> np.ndarray:
         """Add small Gaussian noise to the position features of the sequence.
 
-        Velocity features (dims 63–125) are intentionally unchanged so that
-        the derived motion signal is not independently distorted.
+        Velocity features are intentionally unchanged so that the derived
+        motion signal is not independently distorted.
         """
         result = seq.copy()
         noise = self._rng.normal(
@@ -116,4 +144,14 @@ class GestureAugmenter:
             size=(seq.shape[0], _POSITION_DIMS),
         )
         result[:, :_POSITION_DIMS] += noise.astype(seq.dtype)
+        return result
+
+    def _mirror_flip(self, seq: np.ndarray) -> np.ndarray:
+        """Horizontally mirror the gesture by negating all x-coordinate dims.
+
+        Position x, wrist-trajectory x, and velocity x dims are negated.
+        Fingertip spread dims are unsigned distances and are left unchanged.
+        """
+        result = seq.copy()
+        result[:, _X_COORD_DIMS] *= -1
         return result
