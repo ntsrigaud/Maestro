@@ -29,6 +29,11 @@ def _build_model_from_artifact(
     if artifact_type.startswith("tcn") or model_name.startswith("tcn"):
         from gesture_control.infrastructure.model.tcn_model import GestureTCNClassifier  # noqa: PLC0415
 
+        if "num_channels" not in model_config:
+            raise ValueError(
+                "TCN artifact is missing 'num_channels' in model_config. "
+                "Re-export the artifact with the updated export_checkpoint.py."
+            )
         return GestureTCNClassifier(
             input_size=int(model_config["input_size"]),
             num_channels=list(model_config.get("num_channels", [64, 64, 64])),
