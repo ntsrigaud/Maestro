@@ -310,9 +310,7 @@ def train_lstm(
 
     if config.training.class_weighting:
         class_weights = _build_class_weights(datamodule, device)
-        criterion: nn.Module = _build_criterion(
-            class_weights, label_smoothing=0.1
-        )
+        criterion: nn.Module = _build_criterion(class_weights, label_smoothing=0.1)
     else:
         criterion = _build_criterion(None, label_smoothing=0.1)
 

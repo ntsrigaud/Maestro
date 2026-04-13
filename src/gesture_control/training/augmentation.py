@@ -15,10 +15,10 @@ import numpy as np
 # ---------------------------------------------------------------------------
 _N_LANDMARKS: int = 21
 _POS_START: int = 0
-_POS_END: int = _N_LANDMARKS * 3          # 63
-_SPREAD_END: int = _POS_END + 5           # 68  (5 fingertip distances)
-_WRIST_TRAJ_END: int = _SPREAD_END + 3   # 71  (3 wrist-trajectory dims)
-_VEL_START: int = _WRIST_TRAJ_END        # 71
+_POS_END: int = _N_LANDMARKS * 3  # 63
+_SPREAD_END: int = _POS_END + 5  # 68  (5 fingertip distances)
+_WRIST_TRAJ_END: int = _SPREAD_END + 3  # 71  (3 wrist-trajectory dims)
+_VEL_START: int = _WRIST_TRAJ_END  # 71
 _VEL_END: int = _VEL_START + _N_LANDMARKS * 3  # 134
 
 # Convenience alias kept for backward-compat with tests that imported it.
@@ -29,9 +29,9 @@ _POSITION_DIMS: int = _POS_END  # 63
 # Wrist traj x: the first dim of the wrist-trajectory block (_SPREAD_END).
 # Velocity x:   every 3rd dim from _VEL_START (landmark velocity x-coords).
 _X_COORD_DIMS: list[int] = (
-    list(range(_POS_START, _POS_END, 3))   # 21 position x-coords
-    + [_SPREAD_END]                         # 1  wrist-traj x
-    + list(range(_VEL_START, _VEL_END, 3)) # 21 velocity x-coords
+    list(range(_POS_START, _POS_END, 3))  # 21 position x-coords
+    + [_SPREAD_END]  # 1  wrist-traj x
+    + list(range(_VEL_START, _VEL_END, 3))  # 21 velocity x-coords
 )
 
 
