@@ -218,6 +218,34 @@ class LandmarkFeatureTransformer:
         return [0.0] * 144
 
     @staticmethod
+    def _joint_angles(normalized: list[list[float]]) -> list[float]:
+        """Compute 10 key joint-bend angles (in radians) in normalised space.
+
+        For each (parent, joint, child) triplet the angle at *joint* is the
+        arccos of the cosine between vectors (parent→joint) and (child→joint).
+        Returns zero for degenerate (coincident) landmarks.
+        """
+        angles: list[float] = []
+        for parent, joint, child in _JOINT_TRIPLETS:
+            a = normalized[parent]
+            b = normalized[joint]
+            c = normalized[child]
+            # Vectors from joint outward
+            ba = [a[i] - b[i] for i in range(3)]
+            bc = [c[i] - b[i] for i in range(3)]
+            norm_ba = math.sqrt(ba[0] ** 2 + ba[1] ** 2 + ba[2] ** 2)
+            norm_bc = math.sqrt(bc[0] ** 2 + bc[1] ** 2 + bc[2] ** 2)
+            if norm_ba < 1e-8 or norm_bc < 1e-8:
+                angles.append(0.0)
+            else:
+                cos_angle = (ba[0] * bc[0] + ba[1] * bc[1] + ba[2] * bc[2]) / (
+                    norm_ba * norm_bc
+                )
+                # Clamp to [-1, 1] for numerical safety before arccos.
+                angles.append(math.acos(max(-1.0, min(1.0, cos_angle))))
+        return angles
+
+    @staticmethod
     def _subtract(a: list[float], b: list[float]) -> list[float]:
         return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 
