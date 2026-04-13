@@ -6,10 +6,10 @@ model:
   dropout: 0.2
   num_classes: 8
   num_channels:
-  - 64
-  - 64
-  - 64
-  - 64
+    - 64
+    - 64
+    - 64
+    - 64
   kernel_size: 3
 training:
   epochs: 30
