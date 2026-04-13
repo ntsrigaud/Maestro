@@ -112,16 +112,16 @@ v-sign, or pinch poses without additional custom recording.
 A revised vocabulary derived entirely from IPN data is defined in
 `configs/gestures/vocabulary_ipn.yaml`:
 
-| Vocabulary Class | IPN Source      | Semantic Command          | Match Quality |
-| ---------------- | --------------- | ------------------------- | ------------- |
-| `open_palm_hold` | G07             | Activation / toggle UI    | Approximate   |
-| `swipe_right`    | G06             | Next slide                | Direct        |
-| `swipe_left`     | G05             | Previous slide            | Direct        |
-| `swipe_up`       | G03             | Start presentation        | Direct        |
-| `swipe_down`     | G04             | Exit presentation         | Direct        |
-| `zoom_in`        | G10             | Zoom in                   | Direct        |
-| `zoom_out`       | G11             | Zoom out                  | Direct        |
-| `unknown`        | D0X + B0A + B0B | No-gesture / noise        | Direct        |
+| Vocabulary Class | IPN Source      | Semantic Command       | Match Quality |
+| ---------------- | --------------- | ---------------------- | ------------- |
+| `open_palm_hold` | G07             | Activation / toggle UI | Approximate   |
+| `swipe_right`    | G06             | Next slide             | Direct        |
+| `swipe_left`     | G05             | Previous slide         | Direct        |
+| `swipe_up`       | G03             | Start presentation     | Direct        |
+| `swipe_down`     | G04             | Exit presentation      | Direct        |
+| `zoom_in`        | G10             | Zoom in                | Direct        |
+| `zoom_out`       | G11             | Zoom out               | Direct        |
+| `unknown`        | D0X + B0A + B0B | No-gesture / noise     | Direct        |
 
 > **`open_palm_hold` alias rationale** — IPN G07 is annotated as "Open twice"
 > (the performer opens their hand from a partial to fully open pose, twice in
