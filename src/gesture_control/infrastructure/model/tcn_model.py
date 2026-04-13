@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 
 
@@ -117,5 +116,5 @@ class GestureTCNClassifier(nn.Module):
         # x: (B, T, F) → conv expects (B, F, T)
         out = self.network(x.transpose(1, 2))  # (B, C_last, T)
         # Global average pooling over the time dimension.
-        context = out.mean(dim=2)              # (B, C_last)
+        context = out.mean(dim=2)  # (B, C_last)
         return self.head(self.dropout(context))

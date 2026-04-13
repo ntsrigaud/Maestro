@@ -15,16 +15,16 @@ _FINGERTIP_INDICES: list[int] = [4, 8, 12, 16, 20]  # thumb, index, middle, ring
 # Angles are computed in normalised (wrist-relative, scale-normalised) space.
 # Covers the primary flexion/extension angles at MCP and PIP joints of each finger.
 _JOINT_TRIPLETS: list[tuple[int, int, int]] = [
-    (0, 1, 2),    # thumb  CMC → MCP → IP
-    (1, 2, 3),    # thumb  MCP → IP  → TIP
-    (0, 5, 6),    # index  wrist→ MCP → PIP
-    (5, 6, 7),    # index  MCP → PIP → DIP
-    (0, 9, 10),   # middle wrist→ MCP → PIP
+    (0, 1, 2),  # thumb  CMC → MCP → IP
+    (1, 2, 3),  # thumb  MCP → IP  → TIP
+    (0, 5, 6),  # index  wrist→ MCP → PIP
+    (5, 6, 7),  # index  MCP → PIP → DIP
+    (0, 9, 10),  # middle wrist→ MCP → PIP
     (9, 10, 11),  # middle MCP → PIP → DIP
     (0, 13, 14),  # ring   wrist→ MCP → PIP
-    (13, 14, 15), # ring   MCP → PIP → DIP
+    (13, 14, 15),  # ring   MCP → PIP → DIP
     (0, 17, 18),  # pinky  wrist→ MCP → PIP
-    (17, 18, 19), # pinky  MCP → PIP → DIP
+    (17, 18, 19),  # pinky  MCP → PIP → DIP
 ]
 
 
