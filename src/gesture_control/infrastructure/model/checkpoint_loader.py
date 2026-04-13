@@ -13,6 +13,39 @@ from gesture_control.utils.schema_validation import RuntimeConfig
 
 _logger = logging.getLogger(__name__)
 
+
+def _build_model_from_artifact(
+    model_config: dict[str, Any],
+    artifact_type: str,
+    device: torch.device,
+) -> torch.nn.Module:
+    """Instantiate the correct model class based on *artifact_type* / *model_name*.
+
+    Dispatches:
+    * artifact_type starts with ``"tcn"`` → :class:`GestureTCNClassifier`
+    * everything else → :class:`GestureLSTMClassifier`
+    """
+    model_name = str(model_config.get("model_name", ""))
+    if artifact_type.startswith("tcn") or model_name.startswith("tcn"):
+        from gesture_control.infrastructure.model.tcn_model import GestureTCNClassifier  # noqa: PLC0415
+
+        return GestureTCNClassifier(
+            input_size=int(model_config["input_size"]),
+            num_channels=list(model_config.get("num_channels", [64, 64, 64])),
+            kernel_size=int(model_config.get("kernel_size", 3)),
+            dropout=float(model_config["dropout"]),
+            num_classes=int(model_config["num_classes"]),
+        ).to(device)
+
+    return GestureLSTMClassifier(
+        input_size=int(model_config["input_size"]),
+        hidden_size=int(model_config["hidden_size"]),
+        num_layers=int(model_config["num_layers"]),
+        dropout=float(model_config["dropout"]),
+        num_classes=int(model_config["num_classes"]),
+    ).to(device)
+
+
 @dataclass(slots=True)
 class InferenceArtifact:
     model: torch.nn.Module
@@ -86,13 +119,6 @@ def load_inference_artifact(
             path.name,
             incompatible.missing_keys,
         )
-    model = GestureLSTMClassifier(
-        input_size=int(model_config["input_size"]),
-        hidden_size=int(model_config["hidden_size"]),
-        num_layers=int(model_config["num_layers"]),
-        dropout=float(model_config["dropout"]),
-        num_classes=int(model_config["num_classes"]),
-    ).to(device)
     model.eval()
 
     return InferenceArtifact(
