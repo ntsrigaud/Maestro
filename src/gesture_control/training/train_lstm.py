@@ -163,6 +163,7 @@ def _parse_augmentation_config(
         temporal_scale_range=(float(scale_raw[0]), float(scale_raw[1])),
         spatial_jitter_sigma=float(aug_data.get("spatial_jitter_sigma", 0.005)),
         apply_prob=float(aug_data.get("apply_prob", 0.5)),
+        mirror_flip_prob=float(aug_data.get("mirror_flip_prob", 0.5)),
     )
 
 
