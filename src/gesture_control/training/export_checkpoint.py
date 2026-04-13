@@ -30,12 +30,18 @@ def export_inference_artifact(
     path.mkdir(parents=True, exist_ok=True)
 
     artifact_path = path / f"{result.model_version}_inference.pt"
+    artifact_type = (
+        "tcn_inference"
+        if config.model.model_name.startswith("tcn")
+        else "lstm_inference"
+    )
     payload: dict[str, Any] = {
-        "artifact_type": "lstm_inference",
+        "artifact_type": artifact_type,
         "artifact_version": result.model_version,
         "created_at": datetime.now(UTC).isoformat(),
         "model_state_dict": result.model.state_dict(),
         "model_config": {
+            "model_name": config.model.model_name,
             "input_size": config.model.input_size,
             "hidden_size": config.model.hidden_size,
             "num_layers": config.model.num_layers,
