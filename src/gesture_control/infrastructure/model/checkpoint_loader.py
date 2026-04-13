@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ import torch
 from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
 from gesture_control.utils.schema_validation import RuntimeConfig
 
+_logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class InferenceArtifact:
@@ -74,6 +76,16 @@ def load_inference_artifact(
     if state_dict is None:
         raise ValueError(f"Artifact missing model_state_dict: {path}")
 
+    artifact_type = str(payload.get("artifact_type", "lstm_inference"))
+    model = _build_model_from_artifact(model_config, artifact_type, device)
+    incompatible = model.load_state_dict(state_dict, strict=False)
+    if incompatible.missing_keys:
+        _logger.warning(
+            "Artifact %s is missing keys (old architecture?): %s.  "
+            "Consider retraining with the current model definition.",
+            path.name,
+            incompatible.missing_keys,
+        )
     model = GestureLSTMClassifier(
         input_size=int(model_config["input_size"]),
         hidden_size=int(model_config["hidden_size"]),
@@ -81,7 +93,6 @@ def load_inference_artifact(
         dropout=float(model_config["dropout"]),
         num_classes=int(model_config["num_classes"]),
     ).to(device)
-    model.load_state_dict(state_dict)
     model.eval()
 
     return InferenceArtifact(
