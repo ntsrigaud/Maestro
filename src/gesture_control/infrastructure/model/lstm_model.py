@@ -32,9 +32,9 @@ class GestureLSTMClassifier(nn.Module):
         self.head = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        output, _ = self.lstm(x)            # (B, T, H)
+        output, _ = self.lstm(x)  # (B, T, H)
         # Compute per-step attention scores and form a weighted context vector.
-        scores = self.attn(output)          # (B, T, 1)
+        scores = self.attn(output)  # (B, T, 1)
         weights = F.softmax(scores, dim=1)  # (B, T, 1)
         context = (weights * output).sum(dim=1)  # (B, H)
         return self.head(self.dropout(context))

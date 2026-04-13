@@ -27,7 +27,9 @@ def _build_model_from_artifact(
     """
     model_name = str(model_config.get("model_name", ""))
     if artifact_type.startswith("tcn") or model_name.startswith("tcn"):
-        from gesture_control.infrastructure.model.tcn_model import GestureTCNClassifier  # noqa: PLC0415
+        from gesture_control.infrastructure.model.tcn_model import (
+            GestureTCNClassifier,  # noqa: PLC0415
+        )
 
         if "num_channels" not in model_config:
             raise ValueError(
@@ -36,7 +38,7 @@ def _build_model_from_artifact(
             )
         return GestureTCNClassifier(
             input_size=int(model_config["input_size"]),
-            num_channels=list(model_config.get("num_channels", [64, 64, 64])),
+            num_channels=list(model_config["num_channels"]),
             kernel_size=int(model_config.get("kernel_size", 3)),
             dropout=float(model_config["dropout"]),
             num_classes=int(model_config["num_classes"]),
@@ -116,14 +118,7 @@ def load_inference_artifact(
 
     artifact_type = str(payload.get("artifact_type", "lstm_inference"))
     model = _build_model_from_artifact(model_config, artifact_type, device)
-    incompatible = model.load_state_dict(state_dict, strict=False)
-    if incompatible.missing_keys:
-        _logger.warning(
-            "Artifact %s is missing keys (old architecture?): %s.  "
-            "Consider retraining with the current model definition.",
-            path.name,
-            incompatible.missing_keys,
-        )
+    model.load_state_dict(state_dict)
     model.eval()
 
     return InferenceArtifact(

@@ -121,11 +121,10 @@ class SequenceDatasetBuilder:
             # whose trailing frames are predominantly a different class (noisy
             # boundary samples).  For "majority" strategy the label is chosen by
             # vote, so trailing purity is not the right quality signal.
-            if (
-                self._label_strategy == "last"
-                and self._min_trailing_label_purity > 0.0
-            ):
-                trailing_n = max(1, round(self._window_length * self._min_trailing_label_purity))
+            if self._label_strategy == "last" and self._min_trailing_label_purity > 0.0:
+                trailing_n = max(
+                    1, round(self._window_length * self._min_trailing_label_purity)
+                )
                 trailing_labels = labels[-trailing_n:]
                 trailing_purity = trailing_labels.count(selected_label) / trailing_n
                 if trailing_purity < self._min_trailing_label_purity:
