@@ -229,7 +229,7 @@ export:
 > **Implementation note**: The production dataset uses `label_strategy: "last"` (the
 > default), meaning `selected_label` is always the trailing frame's label — not a majority
 > vote. The purity check therefore measures what fraction of the 24 window frames share the
-> *trailing* label. A boundary window where the first half belongs to a different gesture
+> _trailing_ label. A boundary window where the first half belongs to a different gesture
 > will score below 0.9 and be correctly discarded. The parameter name reflects this
 > semantics explicitly.
 
@@ -913,21 +913,21 @@ Step 2.4  train_lstm.py           _build_model() dispatch
 
 ## Change Summary per File
 
-| File                                                            | Phase      | Change                                                                      |
-| --------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------- |
-| `src/gesture_control/training/dataset_builder.py`               | Pre-flight | R1: `save_npz()` `feature_schema_version` param; Step 1.4 purity filter     |
+| File                                                            | Phase      | Change                                                                             |
+| --------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------- |
+| `src/gesture_control/training/dataset_builder.py`               | Pre-flight | R1: `save_npz()` `feature_schema_version` param; Step 1.4 purity filter            |
 | `src/gesture_control/training/train_lstm.py`                    | Pre-flight | R4: `_build_criterion()` helper; Step 1.8 `label_smoothing=0.1`; Step 2.4 dispatch |
-| `src/gesture_control/training/export_checkpoint.py`             | Pre-flight | R5: `model_name` in artifact; Step 2.0 `artifact_type` for TCN              |
-| `src/gesture_control/pipeline/feature_engineering.py`           | 1 + 2      | Add spread + wrist traj (→134), joint angles (→144)                         |
-| `src/gesture_control/training/augmentation.py`                  | 1          | Add mirror flip; derive `_X_COORD_DIMS` from named layout constants         |
-| `src/gesture_control/infrastructure/model/lstm_model.py`        | 1          | Replace final-step readout with attention-weighted pooling                  |
-| `src/gesture_control/infrastructure/model/checkpoint_loader.py` | 2          | Step 2.0: `_build_model_from_artifact()` multi-arch dispatch factory        |
-| `src/gesture_control/infrastructure/model/tcn_model.py`         | 2          | New — `GestureTCNClassifier` (residual dilated TCN + self-attention)        |
-| `configs/model/feature_pipeline.yaml`                           | 1          | `orientation_normalization: true`                                           |
-| `configs/model/lstm_default.yaml`                               | 1          | `input_size: 134`, schema v2, `mirror_flip_prob: 0.5`                       |
-| `configs/model/tcn_default.yaml`                                | 2          | New — TCN training config, `input_size: 144`, schema v3                     |
-| `scripts/build_ipn_dataset.py`                                  | 1          | `--feature-schema-version` CLI arg forwarded to `save_npz()`                |
-| `tests/unit/test_augmentation.py`                               | 1          | Update `_make_seq()` default from `F=126` to `F=134`                        |
+| `src/gesture_control/training/export_checkpoint.py`             | Pre-flight | R5: `model_name` in artifact; Step 2.0 `artifact_type` for TCN                     |
+| `src/gesture_control/pipeline/feature_engineering.py`           | 1 + 2      | Add spread + wrist traj (→134), joint angles (→144)                                |
+| `src/gesture_control/training/augmentation.py`                  | 1          | Add mirror flip; derive `_X_COORD_DIMS` from named layout constants                |
+| `src/gesture_control/infrastructure/model/lstm_model.py`        | 1          | Replace final-step readout with attention-weighted pooling                         |
+| `src/gesture_control/infrastructure/model/checkpoint_loader.py` | 2          | Step 2.0: `_build_model_from_artifact()` multi-arch dispatch factory               |
+| `src/gesture_control/infrastructure/model/tcn_model.py`         | 2          | New — `GestureTCNClassifier` (residual dilated TCN + self-attention)               |
+| `configs/model/feature_pipeline.yaml`                           | 1          | `orientation_normalization: true`                                                  |
+| `configs/model/lstm_default.yaml`                               | 1          | `input_size: 134`, schema v2, `mirror_flip_prob: 0.5`                              |
+| `configs/model/tcn_default.yaml`                                | 2          | New — TCN training config, `input_size: 144`, schema v3                            |
+| `scripts/build_ipn_dataset.py`                                  | 1          | `--feature-schema-version` CLI arg forwarded to `save_npz()`                       |
+| `tests/unit/test_augmentation.py`                               | 1          | Update `_make_seq()` default from `F=126` to `F=134`                               |
 
 ---
 
