@@ -172,6 +172,24 @@ class GestureDataModule:
         labels = self.class_labels
         return len(labels)
 
+    @property
+    def train_indices(self) -> np.ndarray:
+        if self._train_idx is None:
+            raise RuntimeError("DataModule not initialized. Call setup() first.")
+        return self._train_idx
+
+    @property
+    def val_indices(self) -> np.ndarray:
+        if self._val_idx is None:
+            raise RuntimeError("DataModule not initialized. Call setup() first.")
+        return self._val_idx
+
+    @property
+    def test_indices(self) -> np.ndarray:
+        if self._test_idx is None:
+            raise RuntimeError("DataModule not initialized. Call setup() first.")
+        return self._test_idx
+
     def setup(self) -> None:
         self._split.validate()
 
