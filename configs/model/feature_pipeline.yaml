@@ -20,8 +20,11 @@ feature_pipeline:
   # Optional: Canonicalize hand orientation to fixed reference frame
   # When enabled, applies rotation matrix to align hand pose to canonical axes
   # CAUTION: Changing this value requires dataset regeneration and model retraining
-  # Enabled for feature-schema-v2 (spread + wrist-trajectory features).
-  orientation_normalization: true
+  # Disabled for feature-schema-v4: orientation normalization re-expresses velocity in a
+  # palm-local frame that rotates between frames, adding inter-class noise for directional
+  # gestures (swipe_right / swipe_up / swipe_down) and reducing recall by 13–22%.
+  # Camera-space positions provide an implicit directional cue that is lost when enabled.
+  orientation_normalization: false
 
   # Compute temporal velocity features (derivatives of normalized positions)
   # Always enabled; improves dynamic gesture recognition

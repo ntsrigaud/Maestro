@@ -94,10 +94,12 @@ def validate_feature_schema_parity(
     # feature-schema-v1: 126 (21×3 positions + 21×3 velocities)
     # feature-schema-v2: 134 (positions + 5 spread + 3 wrist_traj + velocities)
     # feature-schema-v3: 144 (v2 + 10 joint angles)
+    # feature-schema-v4: 144 (same dims as v3, orientation_normalization disabled)
     _SCHEMA_DIM: dict[str, int] = {
         "feature-schema-v1": 126,
         "feature-schema-v2": 134,
         "feature-schema-v3": 144,
+        "feature-schema-v4": 144,
     }
     dataset_feature_dim = dataset_metadata.get("feature_dim")
     schema_ver = dataset_metadata.get("feature_schema_version", "feature-schema-v1")

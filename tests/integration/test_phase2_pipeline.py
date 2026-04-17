@@ -12,9 +12,9 @@ from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifie
 
 
 def _mock_artifact() -> InferenceArtifact:
-    """Create a dummy InferenceArtifact matching the current feature-schema-v2 config."""
+    """Create a dummy InferenceArtifact matching the current feature-schema-v4 config."""
     model = GestureLSTMClassifier(
-        input_size=134,
+        input_size=144,
         hidden_size=32,
         num_layers=1,
         dropout=0.0,
@@ -22,7 +22,7 @@ def _mock_artifact() -> InferenceArtifact:
     )
     return InferenceArtifact(
         model=model,
-        model_version="test_v2",
+        model_version="test_v4",
         class_labels=[
             "swipe_up",
             "swipe_down",
@@ -33,11 +33,11 @@ def _mock_artifact() -> InferenceArtifact:
             "zoom_out",
             "unknown",
         ],
-        feature_schema_version="feature-schema-v2",
-        feature_dim=134,
+        feature_schema_version="feature-schema-v4",
+        feature_dim=144,
         window_length=24,
         window_step=3,
-        orientation_normalization=True,
+        orientation_normalization=False,
         artifact_path=Path("/dev/null"),
     )
 
