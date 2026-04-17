@@ -532,13 +532,14 @@ def _save_metadata(
     window_length: int,
     window_step: int,
     stats: dict[str, Any],
+    feature_schema_version: str = "feature-schema-v1",
 ) -> None:
     metadata = {
         "ipn_label_mapping": IPN_TO_VOCAB,
         "vocabulary": vocabulary,
         "window_length": window_length,
         "window_step": window_step,
-        "feature_schema_version": "feature-schema-v1",
+        "feature_schema_version": feature_schema_version,
         "annotation_rows_used": annotations_used,
         "videos_processed": len(cache_paths),
         "dataset_stats": stats,
@@ -617,6 +618,17 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "Maximum frames consumed from each unknown-class segment.  "
             "Long background spans (D0X) can otherwise generate hundreds of "
             "windows per segment.  Set to 0 to disable the cap.  Default: 60."
+        ),
+    )
+    p.add_argument(
+        "--unknown-subsample-ratio",
+        type=float,
+        default=1.0,
+        metavar="R",
+        help=(
+            "Fraction of unknown-class sequences to keep in the final dataset "
+            "(0.0\u20131.0).  Applied after all other filtering.  "
+            "Default: 1.0 (keep all)."
         ),
     )
     p.add_argument(
@@ -780,6 +792,25 @@ def main() -> None:
         )
         sys.exit(1)
 
+    # Post-build unknown-class subsampling (sequence level).
+    if args.unknown_subsample_ratio < 1.0:
+        rng_sub = random.Random(args.seed)
+        all_samples = builder.samples
+        unknown_samples = [s for s in all_samples if s.label == "unknown"]
+        keep_n = max(1, int(len(unknown_samples) * args.unknown_subsample_ratio))
+        rng_sub.shuffle(unknown_samples)
+        kept_ids = {id(s) for s in unknown_samples[:keep_n]}
+        builder._samples = [
+            s for s in builder._samples
+            if s.label != "unknown" or id(s) in kept_ids
+        ]
+        logger.info(
+            "Unknown subsample (ratio=%.2f): %d \u2192 %d sequences",
+            args.unknown_subsample_ratio,
+            len(unknown_samples),
+            len([s for s in builder._samples if s.label == "unknown"]),
+        )
+
     # -----------------------------------------------------------------------
     # Save NPZ and metadata.
     # -----------------------------------------------------------------------
@@ -804,6 +835,7 @@ def main() -> None:
         window_length=args.window_length,
         window_step=args.window_step,
         stats=stats,
+        feature_schema_version=args.feature_schema_version,
     )
 
 
