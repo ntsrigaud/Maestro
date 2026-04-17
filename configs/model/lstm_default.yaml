@@ -1,6 +1,6 @@
 model:
   model_name: lstm_v1
-  input_size: 134
+  input_size: 144
   hidden_size: 128
   num_layers: 2
   dropout: 0.3
@@ -34,7 +34,7 @@ export:
   checkpoint_dir: models/checkpoints
   exported_dir: models/exported
   registry_path: models/registry.json
-  feature_schema_version: feature-schema-v2
+  feature_schema_version: feature-schema-v4
 
 # Augmentation is disabled by default for the initial dataset.
 # Enable when you have ≥10 recordings per class and want regularisation.
