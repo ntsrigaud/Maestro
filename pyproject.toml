@@ -22,6 +22,17 @@ dependencies = [
 training = [
   "scikit-learn>=1.5.0",
 ]
+notebooks = [
+  "scikit-learn>=1.5.0",
+  "matplotlib>=3.8.0",
+  "seaborn>=0.13.0",
+  "pandas>=2.2.0",
+  "jupyter>=1.0.0",
+  "ipykernel>=6.29.0",
+]
+huggingface = [
+  "huggingface_hub>=0.22.0",
+]
 dev = [
   "pytest>=8.0.0",
   "ruff>=0.3.0",
@@ -59,4 +70,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["sklearn", "sklearn.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["huggingface_hub", "huggingface_hub.*"]
 ignore_missing_imports = true
