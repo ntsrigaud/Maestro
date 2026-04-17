@@ -179,8 +179,8 @@
       "checksum": "65ad6a593f9373eceec314d0138c205a92997f3f700613bccf4b9c3a34337d76",
       "feature_dim": 144,
       "window_step": 3,
-      "checkpoint_path": "/home/rachel/.Neil/Gesture-Control-System/models/checkpoints/lstm_v1_20260417T144813Z.pt",
-      "exported_path": "/home/rachel/.Neil/Gesture-Control-System/models/exported/lstm_v1_20260417T144813Z_inference.pt",
+      "checkpoint_path": "models/checkpoints/lstm_v1_20260417T144813Z.pt",
+      "exported_path": "models/exported/lstm_v1_20260417T144813Z_inference.pt",
       "checkpoint_checksum": "5d8097aa2520e299ca09978098231c9af71206cf879b2d743e40ea520f47ddcc",
       "created_at": "2026-04-17T14:50:30.627275+00:00"
     },
@@ -202,8 +202,8 @@
       "checksum": "104c53733058f6c35c17860032425cb4fb23b97bddd8932adcaeca11867a7d4b",
       "feature_dim": 144,
       "window_step": 3,
-      "checkpoint_path": "/home/rachel/.Neil/Gesture-Control-System/models/checkpoints/lstm_v1_20260417T150356Z.pt",
-      "exported_path": "/home/rachel/.Neil/Gesture-Control-System/models/exported/lstm_v1_20260417T150356Z_inference.pt",
+      "checkpoint_path": "models/checkpoints/lstm_v1_20260417T150356Z.pt",
+      "exported_path": "models/exported/lstm_v1_20260417T150356Z_inference.pt",
       "checkpoint_checksum": "74253d025871ba10bac30574ac771cbe1ce3e47f25761cc5cc0a9353c706f7a3",
       "created_at": "2026-04-17T15:05:51.471916+00:00"
     },
@@ -225,8 +225,8 @@
       "checksum": "43f61a9420e5571399119c0f58ba50da7d741da143db31abeb7ae85fcf87e80e",
       "feature_dim": 144,
       "window_step": 3,
-      "checkpoint_path": "/home/rachel/.Neil/Gesture-Control-System/models/checkpoints/lstm_v1_20260417T150952Z.pt",
-      "exported_path": "/home/rachel/.Neil/Gesture-Control-System/models/exported/lstm_v1_20260417T150952Z_inference.pt",
+      "checkpoint_path": "models/checkpoints/lstm_v1_20260417T150952Z.pt",
+      "exported_path": "models/exported/lstm_v1_20260417T150952Z_inference.pt",
       "checkpoint_checksum": "e8a55bac12c87b54505211087e5cc132876c352223ab4bbca75e77b0cd3a9516",
       "created_at": "2026-04-17T15:10:26.068234+00:00"
     },
@@ -248,8 +248,8 @@
       "checksum": "2e8bdc4fe06bff00a2745c00305f3292ff96c6ea1667d6422aacc698d8273a9e",
       "feature_dim": 144,
       "window_step": 3,
-      "checkpoint_path": "/home/rachel/.Neil/Gesture-Control-System/models/checkpoints/lstm_v1_20260417T151450Z.pt",
-      "exported_path": "/home/rachel/.Neil/Gesture-Control-System/models/exported/lstm_v1_20260417T151450Z_inference.pt",
+      "checkpoint_path": "models/checkpoints/lstm_v1_20260417T151450Z.pt",
+      "exported_path": "models/exported/lstm_v1_20260417T151450Z_inference.pt",
       "checkpoint_checksum": "24e6925f09169a3dfb935b32b6d8e81d3ad09ea814c9da181510e37138dbc6a5",
       "created_at": "2026-04-17T15:15:13.480684+00:00"
     },
@@ -271,8 +271,8 @@
       "checksum": "326ee19de8421ee35f7fa64dd1622233113490e39dd06eda0f49ff1ae394321f",
       "feature_dim": 144,
       "window_step": 3,
-      "checkpoint_path": "/home/rachel/.Neil/Gesture-Control-System/models/checkpoints/lstm_v1_20260417T152606Z.pt",
-      "exported_path": "/home/rachel/.Neil/Gesture-Control-System/models/exported/lstm_v1_20260417T152606Z_inference.pt",
+      "checkpoint_path": "models/checkpoints/lstm_v1_20260417T152606Z.pt",
+      "exported_path": "models/exported/lstm_v1_20260417T152606Z_inference.pt",
       "checkpoint_checksum": "7702dde98445d890dbfe344955489d0ddb374dbd034300814fd4e76d720b962a",
       "created_at": "2026-04-17T15:26:34.501481+00:00"
     }
