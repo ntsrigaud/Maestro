@@ -86,7 +86,13 @@ def load_latest_inference_artifact(
             f"Missing exported_path in latest model entry: {registry_path}"
         )
 
-    return load_inference_artifact(artifact_path=exported_path, device=device)
+    # Resolve relative paths against the registry file's directory so the
+    # loader works regardless of the process working directory.
+    resolved_path = Path(exported_path)
+    if not resolved_path.is_absolute():
+        resolved_path = Path(registry_path).resolve().parent.parent / resolved_path
+
+    return load_inference_artifact(artifact_path=resolved_path, device=device)
 
 
 def load_inference_artifact(
