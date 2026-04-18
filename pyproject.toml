@@ -16,6 +16,7 @@ dependencies = [
   "opencv-python-headless>=4.10.0",
   "mediapipe==0.10.14",
   "pyautogui>=0.9.54",
+  "huggingface_hub>=0.22.0",
 ]
 
 [project.optional-dependencies]
@@ -29,9 +30,6 @@ notebooks = [
   "pandas>=2.2.0",
   "jupyter>=1.0.0",
   "ipykernel>=6.29.0",
-]
-huggingface = [
-  "huggingface_hub>=0.22.0",
 ]
 dev = [
   "pytest>=8.0.0",
