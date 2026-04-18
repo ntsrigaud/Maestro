@@ -72,7 +72,8 @@ def build_container(
     config_path: str,
     *,
     model_artifact_path: str | None = None,
-    registry_path: str = "models/registry.json",
+    registry_path: str | None = None,
+    hf_revision_override: str | None = None,
     show_window: bool = True,
 ) -> AppContainer:
     config_root = Path(config_path)
@@ -107,8 +108,11 @@ def build_container(
             artifact_path=model_artifact_path, device=device
         )
     else:
-        artifact = load_latest_inference_artifact(
-            registry_path=registry_path, device=device
+        artifact = _load_model_from_source(
+            config=config,
+            registry_path_override=registry_path,
+            hf_revision_override=hf_revision_override,
+            device=device,
         )
 
     validate_runtime_compatibility(runtime_config=config, artifact=artifact)
@@ -187,6 +191,38 @@ def validate_container_dataset(
     # Note: is_compatible=False with only warnings is acceptable
     # FeatureSchemaError will be raised inside validate_dataset_compatibility
     # if critical incompatibilities are detected
+
+
+def _load_model_from_source(
+    *,
+    config: Any,
+    registry_path_override: str | None,
+    hf_revision_override: str | None,
+    device: torch.device,
+) -> InferenceArtifact:
+    """Load a model artifact according to ``config.model_source.backend``.
+
+    When *registry_path_override* is provided it takes precedence over the
+    ``registry_path`` field in ``model_source`` (supports legacy CLI usage).
+    When *hf_revision_override* is provided it overrides ``model_source.revision``
+    (supports the ``--hf-revision`` CLI flag).
+    """
+    src = config.model_source
+    if src.backend == "huggingface":
+        from gesture_control.infrastructure.model.hf_loader import load_artifact_from_hub
+
+        return load_artifact_from_hub(
+            repo_id=src.repo_id,
+            filename=src.filename,
+            revision=hf_revision_override or src.revision,
+            cache_dir=src.cache_dir,
+            device=device,
+        )
+    # backend == "local"
+    effective_registry = registry_path_override or src.registry_path
+    return load_latest_inference_artifact(
+        registry_path=effective_registry, device=device
+    )
 
 
 def _load_thresholds(path: Path) -> dict[str, Any]:
