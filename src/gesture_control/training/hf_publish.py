@@ -124,11 +124,18 @@ standard webcam using MediaPipe for landmark extraction.
 
 ```python
 import torch
+from huggingface_hub import hf_hub_download
 from gesture_control.infrastructure.model.checkpoint_loader import load_inference_artifact
+
+# Download the artifact (cached after first call)
+local_path = hf_hub_download(
+    repo_id="{repo_id}",
+    filename="{model_version}_inference.pt",
+)
 
 # Load the artifact (includes model, class labels, and feature schema)
 artifact = load_inference_artifact(
-    artifact_path="{model_version}_inference.pt",
+    artifact_path=local_path,
     device=torch.device("cpu"),
 )
 artifact.model.eval()
@@ -230,6 +237,7 @@ def _build_model_card(
     result: TrainingResult,
     config: TrainingPipelineConfig,
     test_report: EvaluationReport,
+    repo_id: str = "ntsrigaud/gesture-control-lstm",
 ) -> str:
     arch_name = config.model.model_name
     is_tcn = arch_name.startswith("tcn")
@@ -250,6 +258,7 @@ def _build_model_card(
     return _MODEL_CARD_TEMPLATE.format(
         arch_tag=arch_tag,
         model_version=result.model_version,
+        repo_id=repo_id,
         architecture=architecture,
         num_params=num_params,
         feature_dim=config.model.input_size,
@@ -282,9 +291,10 @@ def build_model_card(
     result: TrainingResult,
     config: TrainingPipelineConfig,
     test_report: EvaluationReport,
+    repo_id: str = "ntsrigaud/gesture-control-lstm",
 ) -> str:
     """Return the rendered Markdown model card string without uploading."""
-    return _build_model_card(result=result, config=config, test_report=test_report)
+    return _build_model_card(result=result, config=config, test_report=test_report, repo_id=repo_id)
 
 
 def publish_to_huggingface(
@@ -358,7 +368,7 @@ def publish_to_huggingface(
     api.create_repo(repo_id=repo_id, repo_type="model", private=private, exist_ok=True)
 
     model_card_text = _build_model_card(
-        result=result, config=config, test_report=test_report
+        result=result, config=config, test_report=test_report, repo_id=repo_id
     )
 
     config_snapshot: dict[str, Any] = {
