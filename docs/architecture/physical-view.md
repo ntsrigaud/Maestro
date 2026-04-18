@@ -72,16 +72,17 @@ GPU acceleration is **optional and not required**. If a CUDA-capable GPU or Appl
 
 ### 4.2 Runtime Dependencies
 
-| Library                | Version   | Role                                                  |
-| ---------------------- | --------- | ----------------------------------------------------- |
-| mediapipe              | ==0.10.14 | Hand landmark extraction (pinned for reproducibility) |
-| torch                  | ≥2.7.0    | LSTM inference and training                           |
-| opencv-python-headless | ≥4.10.0   | Webcam capture and image rendering                    |
-| pyautogui              | ≥0.9.54   | OS keyboard event injection                           |
-| pydantic               | ≥2.6.0    | Configuration schema validation                       |
-| numpy                  | ≥1.26.0   | Array operations                                      |
-| scikit-learn           | ≥1.5.0    | Dataset splitting and metrics                         |
-| PyYAML                 | ≥6.0.1    | Configuration file parsing                            |
+| Library                | Version   | Role                                                               |
+| ---------------------- | --------- | ------------------------------------------------------------------ |
+| mediapipe              | ==0.10.14 | Hand landmark extraction (pinned for reproducibility)              |
+| torch                  | ≥2.7.0    | LSTM inference and training                                        |
+| opencv-python-headless | ≥4.10.0   | Webcam capture and image rendering                                 |
+| pyautogui              | ≥0.9.54   | OS keyboard event injection                                        |
+| pydantic               | ≥2.6.0    | Configuration schema validation                                    |
+| numpy                  | ≥1.26.0   | Array operations                                                   |
+| PyYAML                 | ≥6.0.1    | Configuration file parsing                                         |
+| huggingface_hub        | ≥0.22.0   | Model download from HF Hub (`[huggingface]` optional extra; required for the default `backend: huggingface` in `model_source.yaml`) |
+| scikit-learn           | ≥1.5.0    | Dataset splitting and training metrics (`[training]` optional extra; not required at inference runtime) |
 
 ### 4.3 OS Permissions
 
@@ -119,17 +120,16 @@ The system requires the following OS-level permissions:
 
 The system reads from and writes to the local file system:
 
-| Path                   | Access     | Purpose                                                           |
-| ---------------------- | ---------- | ----------------------------------------------------------------- |
-| `configs/`             | Read       | YAML configuration files loaded at startup                        |
-| `models/registry.json` | Read/Write | Model version registry; read at inference, updated after training |
-| `models/exported/`     | Read       | Inference artifacts (`.pt` files) loaded at runtime               |
-| `models/checkpoints/`  | Write      | Training checkpoints saved during model training                  |
-| `data/raw/`            | Read/Write | JSONL landmark recordings from data collection                    |
-| `data/processed/`      | Read/Write | NPZ sequence datasets built from raw data                         |
-| `experiments/runs/`    | Write      | Training run logs and metrics                                     |
+| Path                         | Access     | Purpose                                                                   |
+| ---------------------------- | ---------- | ------------------------------------------------------------------------- |
+| `configs/`                   | Read       | YAML configuration files loaded at startup                                |
+| `models/checkpoints/`        | Write      | Training checkpoints saved during model training (.gitignored)            |
+| `data/raw/`                  | Read/Write | JSONL landmark recordings from data collection                            |
+| `data/processed/`            | Read/Write | NPZ sequence datasets built from raw data                                 |
+| `experiments/runs/`          | Write      | Training run logs and metrics                                             |
+| `~/.cache/huggingface/hub/`  | Read/Write | Hugging Face Hub download cache (first-use download of production model)  |
 
-All file paths are relative to the repository root directory and resolved at runtime using the configuration directory argument.
+Trained inference artifacts are **not tracked in VCS**. The production model (`lstm_v1_20260418T023120Z_inference.pt`) is hosted on the Hugging Face Hub (`ntsrigaud/gesture-control-lstm`) and downloaded on first use by `hf_hub_download()`. The backend is controlled by `configs/model_source.yaml`.
 
 ## 7. Deployment Procedure
 
@@ -145,17 +145,21 @@ conda create -n gesture-control python=3.11
 conda activate gesture-control
 
 # Install package with dependencies
-pip install -e .
+# Include [huggingface] extra for the default Hugging Face Hub model backend
+pip install -e ".[huggingface]"
 ```
 
 ### 7.2 Inference Execution
 
 ```bash
-# Run real-time gesture recognition with default configuration
+# Run real-time gesture recognition (default: model downloaded from Hugging Face Hub)
 python scripts/run_realtime.py --config configs
 
-# Run with explicit model artifact
-python scripts/run_realtime.py --config configs --model-artifact models/exported/<artifact>.pt
+# Override HF revision
+python scripts/run_realtime.py --config configs --hf-revision main
+
+# Use an explicit local artifact instead of HF backend
+python scripts/run_realtime.py --config configs --model-artifact path/to/artifact.pt
 ```
 
 ### 7.3 Training Execution
@@ -184,4 +188,4 @@ The current system is designed for single-user, single-camera operation. The arc
 
 **Document**: Physical View  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: March 2026
+**Last Updated**: April 2026
