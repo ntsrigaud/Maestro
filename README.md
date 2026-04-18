@@ -77,7 +77,7 @@ Key directories:
 | `src/gesture_control/` | Core package (domain, interfaces, infrastructure, pipeline, training)  |
 | `configs/`             | YAML configuration (app, inference, model, gestures, thresholds)       |
 | `scripts/`             | CLI entry points (data collection, dataset build, training, inference) |
-| `models/`              | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/gesture-lstm-v5) |
+| `models/`              | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/gesture-control-lstm) |
 | `tests/`               | Unit, integration, and system tests                                    |
 | `docs/`                | Architecture docs, guides, and decision records                        |
 
