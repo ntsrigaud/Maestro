@@ -51,7 +51,7 @@ def test_sequence_extraction_and_shape_consistency() -> None:
     assert len(samples) == 3
     for sample in samples:
         assert len(sample.sequence) == 4
-        assert len(sample.sequence[0]) == 144
+        assert len(sample.sequence[0]) == 147
         assert sample.label == "swipe_right"
         assert sample.label_id == 0
 
@@ -97,10 +97,10 @@ def test_dataset_serialization_roundtrip(tmp_path: Path) -> None:
     output = builder.save_npz(tmp_path / "train_dataset.npz")
     payload = SequenceDatasetBuilder.load_npz(output)
 
-    assert payload["sequences"].shape == (3, 4, 144)
+    assert payload["sequences"].shape == (3, 4, 147)
     assert payload["label_ids"].shape == (3,)
     assert payload["metadata"]["window_length"] == 4
-    assert payload["metadata"]["feature_dim"] == 144
+    assert payload["metadata"]["feature_dim"] == 147
     np.testing.assert_array_equal(
         payload["labels"], np.asarray(["swipe_right"] * 3, dtype=object)
     )
