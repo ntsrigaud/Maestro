@@ -801,8 +801,7 @@ def main() -> None:
         rng_sub.shuffle(unknown_samples)
         kept_ids = {id(s) for s in unknown_samples[:keep_n]}
         builder._samples = [
-            s for s in builder._samples
-            if s.label != "unknown" or id(s) in kept_ids
+            s for s in builder._samples if s.label != "unknown" or id(s) in kept_ids
         ]
         logger.info(
             "Unknown subsample (ratio=%.2f): %d \u2192 %d sequences",

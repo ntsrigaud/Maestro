@@ -215,9 +215,7 @@ def _build_class_table(class_labels: list[str]) -> str:
 
 
 def _build_per_class_table(per_class_recall: dict[str, float]) -> str:
-    rows = [
-        f"| `{cls}` | {recall:.1%} |" for cls, recall in per_class_recall.items()
-    ]
+    rows = [f"| `{cls}` | {recall:.1%} |" for cls, recall in per_class_recall.items()]
     return "\n".join(rows)
 
 
@@ -413,9 +411,7 @@ def publish_to_huggingface(
         readme_path.write_text(model_card_text, encoding="utf-8")
 
         config_path = tmp / "config.json"
-        config_path.write_text(
-            json.dumps(config_snapshot, indent=2), encoding="utf-8"
-        )
+        config_path.write_text(json.dumps(config_snapshot, indent=2), encoding="utf-8")
 
         api.upload_folder(
             folder_path=str(tmp),
