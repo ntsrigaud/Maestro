@@ -9,6 +9,7 @@ from gesture_control.utils.schema_validation import (
     AppConfig,
     FeaturePipelineConfig,
     InferenceConfig,
+    ModelSourceConfig,
     RuntimeConfig,
 )
 
@@ -39,4 +40,16 @@ def load_runtime_config(config_dir: str | Path) -> RuntimeConfig:
     else:
         feature_cfg = FeaturePipelineConfig()
 
-    return RuntimeConfig(app=app_cfg, inference=infer_cfg, feature_pipeline=feature_cfg)
+    # Load model source config with defaults if file doesn't exist
+    model_source_path = root / "model_source.yaml"
+    if model_source_path.exists():
+        model_source_cfg = ModelSourceConfig.model_validate(_read_yaml(model_source_path))
+    else:
+        model_source_cfg = ModelSourceConfig()
+
+    return RuntimeConfig(
+        app=app_cfg,
+        inference=infer_cfg,
+        feature_pipeline=feature_cfg,
+        model_source=model_source_cfg,
+    )
