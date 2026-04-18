@@ -344,6 +344,29 @@
       "exported_path": "exported/lstm_v1_20260418T004149Z_inference.pt",
       "checkpoint_checksum": "b02ca744eb6553632018edea9ed84b49fe057f8a65d0818ee4136bfdf633d93e",
       "created_at": "2026-04-18T00:42:15.498114+00:00"
+    },
+    {
+      "model_version": "lstm_v1_20260418T023120Z",
+      "training_data_version": "unknown",
+      "feature_schema_version": "feature-schema-v5",
+      "class_labels": [
+        "open_palm_hold",
+        "swipe_right",
+        "swipe_left",
+        "swipe_up",
+        "swipe_down",
+        "zoom_in",
+        "zoom_out",
+        "unknown"
+      ],
+      "window_length": 24,
+      "checksum": "5c8bfaed0908385d9a84e64d810fcce3951c4d280cf3bcb7b35715dd3d416800",
+      "feature_dim": 147,
+      "window_step": 3,
+      "checkpoint_path": "checkpoints/lstm_v1_20260418T023120Z.pt",
+      "exported_path": "exported/lstm_v1_20260418T023120Z_inference.pt",
+      "checkpoint_checksum": "e4ea48b95921735fc3c21ef4b3f310964e45258a7b774ed08ae1a33da51a1c9c",
+      "created_at": "2026-04-18T02:31:43.911779+00:00"
     }
   ]
 }
