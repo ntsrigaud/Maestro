@@ -131,7 +131,7 @@ The offline training pipeline converts labeled video data into a trained LSTM ch
 
 1. **Data Collection**: The IPN Hand dataset (200 videos, 8 classes) is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks from IPN video files and produces NPZ sequence datasets.
 2. **Model Training**: `scripts/train_model.py` trains a 2-layer LSTM with class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
-3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/gesture-lstm-v5`). At runtime the artifact is downloaded on first use and served from the local Hugging Face cache.
+3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/gesture-control-lstm`). At runtime the artifact is downloaded on first use and served from the local Hugging Face cache.
 
 ---
 
