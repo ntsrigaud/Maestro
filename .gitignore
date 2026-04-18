@@ -170,7 +170,6 @@ Desktop.ini
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
-Makefile
 compile_commands.json
 
 # C/C++ build artifacts
@@ -179,6 +178,13 @@ compile_commands.json
 *.lib
 *.out
 *.app
+
+# Model artifacts — production model is hosted on Hugging Face Hub.
+# Local training outputs are transient and must not be committed.
+models/exported/*.pt
+models/checkpoints/*.pt
+models/registry.json
+models/stage/
 *.exe
 *.dll
 *.dylib
@@ -196,3 +202,6 @@ data/webcam_test_frames
 notebooks/best_lstm_model75.h5
 notebooks/best_lstm_model77.h5
 notebooks/best_lstm_model79.h5
+/validation_output.txt
+/data/
+/results

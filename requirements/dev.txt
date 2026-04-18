@@ -1,0 +1,3 @@
+# Convenience file for local development.
+# Equivalent to: pip install -e ".[dev,training]"
+-e ".[dev,training]"
