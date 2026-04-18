@@ -12,6 +12,7 @@ Semantic-HGR-System/
 │   ├── app.yaml                      # Camera, FPS, active application
 │   ├── inference.yaml                # Window geometry, activation timing, thresholds
 │   ├── logging.yaml                  # Logging configuration
+│   ├── model_source.yaml             # Model backend: huggingface or local
 │   ├── gestures/
 │   │   ├── vocabulary_ipn.yaml       # Gesture class vocabulary (8 classes)
 │   │   └── command_map_ipn.yaml      # Gesture-to-command mapping
@@ -35,22 +36,26 @@ Semantic-HGR-System/
 │   ├── integration/                  # Multi-component pipeline tests
 │   ├── system/                       # End-to-end system tests
 │   └── fixtures/                     # Test data and configurations
-├── models/                           # Trained model artifacts
-│   ├── checkpoints/                  # Training checkpoints
-│   ├── exported/                     # Inference-ready artifacts
-│   └── registry.json                 # Model version registry
+├── models/                           # Local training artifacts (excluded from VCS)
+│   └── checkpoints/                  # Training checkpoints (.pt, .gitignored)
 ├── data/                             # Dataset files
 │   ├── raw/                          # JSONL landmark recordings
 │   └── processed/                    # NPZ sequence datasets
 ├── experiments/
 │   └── runs/                         # Training run logs
+├── notebooks/                        # Jupyter ML workflow notebooks
+│   ├── 01_dataset_preparation.ipynb  # Layer 1: IPN → NPZ dataset build
+│   └── 02_model_training.ipynb       # Layer 2: train, eval, export, HF publish
 ├── docs/                             # Project documentation
 │   ├── architecture/                 # Architecture documentation suite
-│   └── work-logs/                    # Development session logs
+│   ├── ml-system/                    # ML-specific reference (feature schema, etc.)
+│   ├── development/                  # Engineering plans and refactoring notes
+│   ├── IPN_INTEGRATION_GUIDE.md      # IPN Hand dataset pipeline guide
+│   └── archive/
+│       └── work-logs/                # Development session logs (authoritative history)
 ├── tools/                            # Development scripts (lint, test, profile)
 ├── requirements/                     # Dependency specifications
-├── pyproject.toml                    # Project metadata and build configuration
-└── ARCHITECTURE_SPECIFICATION.md     # System architecture specification
+└── pyproject.toml                    # Project metadata and build configuration
 ```
 
 ## 3. Package Decomposition
@@ -59,12 +64,12 @@ Semantic-HGR-System/
 
 **Purpose**: Pure business concepts with no external dependencies.
 
-| Module         | Contents                                                                                                                                                       | Responsibility                                                            |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `entities.py`  | `FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState` | Immutable data transfer objects representing pipeline state at each stage |
-| `enums.py`     | `RuntimeMode`, `CommandID`                                                                                                                                     | Finite state and command vocabularies as `StrEnum` types                  |
-| `events.py`    | `DomainEvent`                                                                                                                                                  | Structured event type for telemetry and logging                           |
-| `contracts.py` | `IRunnable`, `IClosable`                                                                                                                                       | Minimal lifecycle protocols                                               |
+| Module         | Contents                                                                                                                                                       | Responsibility                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `entities.py`  | `FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState` | Dataclasses (`slots=True`) representing pipeline state at each processing stage |
+| `enums.py`     | `RuntimeMode`, `CommandID`                                                                                                                                     | Finite state and command vocabularies as `StrEnum` types                        |
+| `events.py`    | `DomainEvent`                                                                                                                                                  | Structured event type for telemetry and logging                                 |
+| `contracts.py` | `IRunnable`, `IClosable`                                                                                                                                       | Minimal lifecycle protocols                                                     |
 
 **Dependency rule**: This package imports only from the Python standard library. No other package in the system may be imported here.
 
@@ -126,11 +131,12 @@ Semantic-HGR-System/
 | Module                 | Key Classes                                              | Responsibility                                                                  |
 | ---------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `dataset_builder.py`   | `SequenceDatasetBuilder`, `LabeledLandmarkFrame`         | Converts JSONL landmark recordings to NPZ sequence datasets                     |
-| `datamodule.py`        | `GestureDataModule`, `SequenceTensorDataset`             | PyTorch dataset wrappers with stratified/group splits and optional augmentation |
+| `datamodule.py`        | `GestureDataModule`, `SequenceTensorDataset`             | PyTorch dataset wrappers with recording-level group splits and optional augmentation |
 | `augmentation.py`      | `GestureAugmenter`, `AugmentationConfig`                 | Temporal scaling and spatial jitter for training regularization                 |
 | `train_lstm.py`        | `GestureLSTMClassifier`, `train_lstm()`                  | LSTM model definition and training loop with early stopping                     |
 | `evaluate.py`          | `evaluate_model()`, `EvaluationReport`                   | Per-class precision, recall, F1; confusion matrix                               |
-| `export_checkpoint.py` | `export_inference_artifact()`, `update_model_registry()` | Checkpoint serialization and registry update                                    |
+| `export_checkpoint.py` | `export_inference_artifact()`, `update_model_registry()` | Checkpoint serialization and local registry update                              |
+| `hf_publish.py`        | `publish_to_huggingface()`, `build_model_card()`         | Publish trained artifacts to Hugging Face Hub with auto-generated model card    |
 
 **Dependency rule**: Imports pipeline components (`LandmarkFeatureTransformer`, `SlidingWindowSequenceBuffer`) for training–inference parity. Imports PyTorch and scikit-learn. Not imported by the runtime inference path.
 
@@ -203,9 +209,10 @@ Configuration files are organized by concern:
 | --------------- | -------------------------------- | ------------------------------------------------------------------- |
 | **Application** | `app.yaml`                       | `AppConfig` — camera index, resolution, FPS, active application     |
 | **Inference**   | `inference.yaml`                 | `InferenceConfig` — window length/step, activation timing, cooldown |
+| **Model source**| `model_source.yaml`              | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename |
 | **Model**       | `model/lstm_default.yaml`        | Training hyperparameters, model architecture, augmentation settings |
 | **Features**    | `model/feature_pipeline.yaml`    | `FeaturePipelineConfig` — normalization and velocity toggles        |
-| **Vocabulary**  | `gestures/vocabulary_ipn.yaml`   | Gesture class list and activation gesture designation               |
+| **Vocabulary**  | `gestures/vocabulary_ipn.yaml`   | Gesture class list (8 classes)                                      |
 | **Commands**    | `gestures/command_map_ipn.yaml`  | Gesture-to-`CommandID` mapping                                      |
 | **Thresholds**  | `thresholds/production_ipn.yaml` | Per-class confidence thresholds and temporal vote window sizes      |
 
@@ -243,6 +250,7 @@ tests/
 │   ├── test_latency_benchmark.py
 │   ├── test_overlay_renderer.py
 │   ├── test_runtime.py
+│   ├── test_hf_loader.py
 │   └── test_head_pose_gaze_detector.py
 ├── integration/                             # 5 test modules
 │   ├── test_phase2_pipeline.py
@@ -260,4 +268,4 @@ tests/
 
 **Document**: Development View  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: March 2026
+**Last Updated**: April 2026
