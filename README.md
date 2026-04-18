@@ -1,194 +1,118 @@
-# Hand Gesture Recognition System
+# Presentation and Meeting Control System
 
-A deep learning gesture recognition system using Vision Transformers (ViT-B/16) for robust hand gesture classification.
+Production-grade webcam-based gesture control system using MediaPipe Hands and an LSTM classifier for presentation and meeting workflows.
 
-## Overview
+## System Overview
 
-This project implements a **gesture recognition system** trained on the HaGRID dataset using Vision Transformers. The system processes full-frame images through a pre-trained ViT-B/16 model fine-tuned for 18 gesture classes.
+The system recognizes 8 hand gestures from a live webcam feed and maps them to application commands (slide navigation, raise hand, mute, etc.). It runs in real time on consumer laptops without a GPU.
 
-**Key Features**:
-
-- **Vision Transformer**: Uses ViT-B/16 pre-trained on ImageNet-21k for rich visual feature extraction
-- **HaGRID Dataset**: Trained on 30K+ hand gesture images across 18 gesture classes
-- **Full-frame Processing**: Direct image classification without hand detection preprocessing
-- **Transfer Learning**: Leverages ImageNet pre-training for efficient learning
-- **Production Ready**: Trained model available on Hugging Face Hub
-
-### System Architecture
+**Core pipeline:**
 
 ```
-┌──────────┐    ┌──────────────┐    ┌──────────────────┐    ┌────────────┐    ┌──────────┐
-│  Camera  │───▶│Input Manager │───▶│Recognition Engine│───▶│Action Mapper│───▶│OS Control│
-└──────────┘    └──────────────┘    └──────────────────┘    └────────────┘    └──────────┘
-                                            │
-                                            └── ViT-B/16 Gesture Classifier
+Camera → MediaPipe Hands → Feature Engineering → Sliding Window Buffer
+→ LSTM Inference → Prediction Stabilization → Activation Controller
+→ Command Dispatch → Application Adapter → OS Keyboard Events
 ```
 
-**Components**:
+**Gesture vocabulary** (IPN Hand dataset, 8 classes):
 
-- **Input Manager** ✅ - Camera capture and frame preprocessing
-- **Recognition Engine** 🔬 - ViT-B/16 gesture classification (training complete, inference in development)
-- **Action Mapper** 📋 - Planned
-- **OS Controller** 📋 - Planned
-
-### Technical Approach
-
-**Architecture**:
-
-```
-Input Image (224x224) → ViT-B/16 Encoder → Classification Head → Gesture Label
-```
-
-The model processes images by:
-
-1. Dividing input into 16×16 patches (196 patches total)
-2. Applying patch embeddings with positional encoding
-3. Processing through 12 transformer encoder layers
-4. Classifying via a linear head to 18 gesture classes
+| Gesture          | Command                      | IPN Source      |
+| ---------------- | ---------------------------- | --------------- |
+| `open_palm_hold` | No action (model class only) | G07             |
+| `swipe_right`    | Next slide                   | G06             |
+| `swipe_left`     | Previous slide               | G05             |
+| `swipe_up`       | Raise hand                   | G03             |
+| `swipe_down`     | Start presentation           | G04             |
+| `zoom_in`        | Toggle pointer mode          | G10             |
+| `zoom_out`       | Exit presentation            | G11             |
+| `unknown`        | None (noise class)           | D0X + B0A + B0B |
 
 ## Quick Start
 
-### Installation
+**End users** (runtime inference only):
 
 ```bash
-# Create conda environment
-conda env create -f environment.yml
-conda activate gesture
-
-# Install project in editable mode
 pip install -e .
-
-# Verify installation
-python scripts/verify_install.py
+python scripts/run_realtime.py --config configs
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed instructions.
-
-### Train a Gesture Recognition Model
-
-The training pipeline uses the [neilrigaud/hagrid-subset](https://huggingface.co/datasets/neilrigaud/hagrid-subset) dataset hosted on Hugging Face.
+**Developers** (linting, type-checking, and tests):
 
 ```bash
-# 1. Install dependencies
-conda env create -f environment.yml
-conda activate gesture
-pip install -e .
-
-# 2. Open training notebook
-jupyter notebook notebooks/finetune_vit_hagrid.ipynb
-
-# 3. Run all cells to train ViT-B/16 model (~30-60 min on GPU)
+pip install -e ".[dev]"
+ruff check .
+mypy src/
+pytest -m "not training"
 ```
 
-**Training Configuration**:
+## Training Setup
 
-- Model: ViT-B/16 (timm, ImageNet-21k pre-trained)
-- Dataset: HaGRID subset (30K+ images, 18 classes)
-- Expected accuracy: 85-90% after 10 epochs
-- Trained model: Available at [neilrigaud/hagrid-vit-gesture](https://huggingface.co/neilrigaud/hagrid-vit-gesture)
+Install the `training` extra (scikit-learn) alongside the `dev` tools:
 
-### Use Pre-trained Model
-
-```python
-from transformers import AutoModelForImageClassification, AutoImageProcessor
-
-model = AutoModelForImageClassification.from_pretrained("neilrigaud/hagrid-vit-gesture")
-processor = AutoImageProcessor.from_pretrained("neilrigaud/hagrid-vit-gesture")
-
-# Process image and classify
-inputs = processor(images=image, return_tensors="pt")
-outputs = model(**inputs)
-predicted_class = outputs.logits.argmax(-1)
+```bash
+pip install -e ".[dev,training]"
 ```
 
-## Documentation
+Then run the full test suite (including training tests):
 
-### Setup & Development
-
-- **[Development Guide](DEVELOPMENT_GUIDE.md)** - Complete development workflow and common tasks
-- **[Installation Guide](INSTALL.md)** - Detailed setup instructions
-- **[Architecture Overview](docs/Project-Architecture/README.md)** - System design
-- **[API Documentation](docs/)** - Module-level documentation
-
-### Model Training
-
-- **[Training Guide](docs/MODEL_TRAINING_GUIDE.md)** - ViT fine-tuning details
-- **[Dataset Guide](docs/HAGRID_DOWNLOAD_GUIDE.md)** - HaGRID dataset access
-- **[Training Notebook](notebooks/finetune_vit_hagrid.ipynb)** - Complete training workflow
-- **[HaGRID Dataset Assessment](docs/HaGRID_DATASET_ASSESSMENT.md)** - Dataset analysis
-
-## Project Structure
-
-```
-├── src/                          # Core implementation
-│   ├── input_manager/            # Camera capture (✅ Complete)
-│   ├── recognition_engine/       # Gesture recognition (🔬 In Development)
-│   │   ├── preprocessing.py      # Image preprocessing utilities
-│   │   └── temporal/             # LSTM temporal modeling (🔬 Experimental)
-│   └── shared/                   # Logging and utilities (✅ Complete)
-├── notebooks/                    # Training and research
-│   ├── finetune_vit_hagrid.ipynb       # ViT training workflow (✅ Complete)
-│   ├── semantic_gesture_learning.ipynb # Semantic understanding research
-│   └── vit_lstm_gesture_training.ipynb # Temporal modeling experiments
-├── scripts/                      # Demos and utilities
-│   ├── demo_gesture_recognition.py     # Gesture inference demo
-│   ├── download_hagrid_subset.py       # Dataset downloader
-│   └── verify_install.py               # Installation verification
-├── docs/                         # Documentation
-│   ├── Project-Architecture/     # Design documents
-│   ├── Topics/                   # Research references
-│   └── HaGRID_DATASET_ASSESSMENT.md # Dataset analysis
-├── checkpoints/                  # Model checkpoints
-│   └── best_model.pth           # Trained ViT model
-├── environment.yml               # Conda environment
-├── pyproject.toml                # Package configuration
-└── README.md                     # This file
+```bash
+pytest
 ```
 
-## Research Foundation
+To build a dataset and train a model:
 
-This project explores gesture recognition using Vision Transformers, drawing inspiration from:
+```bash
+python scripts/build_ipn_dataset.py --ipn-root data/IPN --output-npz data/processed/ipn_dataset.npz
+python scripts/train_model.py --dataset data/processed/ipn_dataset.npz --config-dir configs
+```
 
-- **Vision Transformer (ViT)**: Patch-based image understanding with self-attention
-- **Transfer Learning**: Leveraging ImageNet-21k pre-training for gesture classification
-- **HaGRID Dataset**: Large-scale hand gesture dataset with 18 gesture classes
-- **HAVIT & ALBEF**: Vision-language research inspiring future semantic understanding work
+## Project Architecture
 
-See [docs/Topics/](docs/Topics/) for detailed research documentation.
+See `docs/architecture/` for the full system specification, module contracts, and design rationale.
 
-## Current Status
+Key directories:
 
-### Completed ✅
+| Directory              | Purpose                                                                |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `src/gesture_control/` | Core package (domain, interfaces, infrastructure, pipeline, training)  |
+| `configs/`             | YAML configuration (app, inference, model, gestures, thresholds)       |
+| `scripts/`             | CLI entry points (data collection, dataset build, training, inference) |
+| `models/`              | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/gesture-control-lstm) |
+| `tests/`               | Unit, integration, and system tests                                    |
+| `docs/`                | Architecture docs, guides, and decision records                        |
 
-- Input Manager: Camera capture, frame buffering, timestamp management
-- ViT Fine-tuning: Gesture classification model trained on HaGRID (85-90% accuracy)
-- Training Pipeline: Complete notebook workflow with Hugging Face integration
-- Model Deployment: Trained model published to Hugging Face Hub
-- Logging System: Centralized logging with rotation
+## Dataset Generation
 
-### In Progress 🔬
+The training dataset is built from the IPN Hand dataset (200 videos, 14 gesture classes). See `docs/IPN_INTEGRATION_GUIDE.md` for the full pipeline.
 
-- Recognition Engine: Inference pipeline for real-time gesture classification
-- Temporal Modeling: LSTM-based dynamic gesture recognition (experimental)
-- End-to-end Integration: Connecting all system components
+```bash
+python scripts/build_ipn_dataset.py \
+    --ipn-root data/IPN \
+    --output-npz data/processed/ipn_dataset.npz \
+    --num-workers 4
+```
 
-### Planned 📋
+Legacy custom webcam collection material has been removed. Contributors should follow `docs/IPN_INTEGRATION_GUIDE.md` for the canonical dataset workflow.
 
-- Action Mapper: Gesture-to-command translation layer
-- OS Controller: System command execution module
-- Real-time Demo: Complete application with UI
-- Semantic Understanding: Vision-language alignment for zero-shot learning (research)
+## Model Training
 
-## Team
+```bash
+python scripts/train_model.py \
+    --dataset data/processed/ipn_dataset.npz \
+    --config configs/model/lstm_default.yaml \
+    --config-dir configs
+```
 
-- Sley Hortes
-- Neil Taison Rigaud
-- Neil Taison Rigaud
-- Khishig Tuguldur
-- Eder Guerrero
+The training pipeline includes group-aware data splitting (no recording leakage), data augmentation (temporal scaling + spatial jitter), early stopping, and class-weighted loss.
 
-- Eder Guerrero
+## Implementation Status
 
-## License
+All architectural phases are implemented and validated:
 
-This is an academic capstone project for National Dong Hwa University.
+- Phase 1: Project scaffolding, interface contracts, configuration system
+- Phase 2: OpenCV frame source, MediaPipe landmark extraction
+- Phase 3: Feature engineering, temporal buffering, dataset generation
+- Phase 4: LSTM training pipeline with augmentation and evaluation
+- Phase 5: Real-time inference pipeline with latency benchmarking
+- Phase 6: Activation state machine, command dispatch, application adapters
+- Phase 7: Prediction stabilization, edge-trigger dispatch, safety hardening
