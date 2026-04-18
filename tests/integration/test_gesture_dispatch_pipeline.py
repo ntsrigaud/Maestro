@@ -756,7 +756,9 @@ class TestGazeGateIntegration:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("shift", "f5")  # start_presentation
+        self.mock_pya.hotkey.assert_called_once_with(
+            "shift", "f5"
+        )  # start_presentation
 
     # -- New gesture mappings under gaze gate ---------------------------------
 

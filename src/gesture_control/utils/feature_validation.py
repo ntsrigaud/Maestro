@@ -90,15 +90,26 @@ def validate_feature_schema_parity(
             f"Detected in: {dataset_metadata}"
         )
 
-    # Check feature dimensionality
+    # Check feature dimensionality — allowed dims per schema version.
+    # feature-schema-v1: 126 (21×3 positions + 21×3 velocities)
+    # feature-schema-v2: 134 (positions + 5 spread + 3 wrist_traj + velocities)
+    # feature-schema-v3: 144 (v2 + 10 joint angles)
+    # feature-schema-v4: 144 (same dims as v3, orientation_normalization disabled)
+    _SCHEMA_DIM: dict[str, int] = {
+        "feature-schema-v1": 126,
+        "feature-schema-v2": 134,
+        "feature-schema-v3": 144,
+        "feature-schema-v4": 144,
+    }
     dataset_feature_dim = dataset_metadata.get("feature_dim")
-    expected_feature_dim = 126  # 21 landmarks * 3 coords * 2 (position + velocity)
+    schema_ver = dataset_metadata.get("feature_schema_version", "feature-schema-v1")
+    expected_feature_dim = _SCHEMA_DIM.get(schema_ver, 126)
 
     if dataset_feature_dim is not None and dataset_feature_dim != expected_feature_dim:
         raise FeatureSchemaError(
             f"Feature dimensionality mismatch: "
             f"Dataset has {dataset_feature_dim} dims, "
-            f"expected {expected_feature_dim}. "
+            f"expected {expected_feature_dim} for schema {schema_ver!r}. "
             f"Dataset may have been built with incompatible feature schema."
         )
 
