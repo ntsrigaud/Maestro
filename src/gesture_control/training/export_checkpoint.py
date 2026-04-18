@@ -99,6 +99,23 @@ def update_model_registry(
     checkpoint_checksum = compute_sha256(checkpoint_path)
     exported_checksum = compute_sha256(exported_path)
 
+    # Store paths relative to the registry file so the registry is portable
+    # across machines.  The loader resolves them back to absolute paths at
+    # runtime using the registry file's own location as the anchor.
+    registry_dir = path.parent
+    try:
+        rel_checkpoint = str(
+            Path(checkpoint_path).resolve().relative_to(registry_dir.resolve())
+        )
+    except ValueError:
+        rel_checkpoint = str(checkpoint_path)
+    try:
+        rel_exported = str(
+            Path(exported_path).resolve().relative_to(registry_dir.resolve())
+        )
+    except ValueError:
+        rel_exported = str(exported_path)
+
     entry = {
         "model_version": model_version,
         "training_data_version": training_data_version,
@@ -108,8 +125,8 @@ def update_model_registry(
         "checksum": exported_checksum,
         "feature_dim": int(dataset_metadata.get("feature_dim", 126)),
         "window_step": int(dataset_metadata.get("window_step", 3)),
-        "checkpoint_path": str(checkpoint_path),
-        "exported_path": str(exported_path),
+        "checkpoint_path": rel_checkpoint,
+        "exported_path": rel_exported,
         "checkpoint_checksum": checkpoint_checksum,
         "created_at": datetime.now(UTC).isoformat(),
     }

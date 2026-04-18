@@ -47,6 +47,9 @@ class LandmarkFeatureTransformer:
         # oldest entry in the deque, so it is bounded by the window duration and
         # never grows unboundedly during a long inference session.
         self._wrist_history: deque[list[float]] = deque(maxlen=wrist_trajectory_window)
+        # Previous raw wrist position used to compute per-frame global wrist
+        # velocity in camera-normalized coordinates (feature-schema-v5).
+        self._prev_raw_wrist: list[float] | None = None
 
     def transform(self, landmarks: LandmarkPacket) -> FeatureFrame:
         if not landmarks.valid or len(landmarks.landmarks) != 21:
@@ -83,6 +86,25 @@ class LandmarkFeatureTransformer:
             float(landmarks.landmarks[0][1]),
             float(landmarks.landmarks[0][2]),
         ]
+
+        # Global wrist velocity in camera-normalized coordinates.
+        # Computed BEFORE updating history so self._prev_raw_wrist and
+        # self._prev_timestamp_ms refer to the immediately preceding frame.
+        # Unlike velocity (dims 71-133), which is computed in wrist-relative
+        # space and therefore near-zero for pure translations, this feature
+        # directly encodes the direction and speed of overall hand movement.
+        if self._prev_raw_wrist is not None and self._prev_timestamp_ms is not None:
+            dt_vel = (landmarks.timestamp_ms - self._prev_timestamp_ms) / 1000.0
+            if dt_vel > 0:
+                wrist_vel_raw: list[float] = [
+                    (raw_wrist[i] - self._prev_raw_wrist[i]) / dt_vel for i in range(3)
+                ]
+            else:
+                wrist_vel_raw = [0.0, 0.0, 0.0]
+        else:
+            wrist_vel_raw = [0.0, 0.0, 0.0]
+        self._prev_raw_wrist = raw_wrist
+
         self._wrist_history.append(raw_wrist)
         origin = self._wrist_history[0]
         wrist_traj: list[float] = [
@@ -98,12 +120,19 @@ class LandmarkFeatureTransformer:
             for tip in _FINGERTIP_INDICES
         ]
 
-        # Feature vector layout (144 dims):
-        #   [0:63]   normalised positions (21 × 3)
-        #   [63:68]  fingertip spread (5)
-        #   [68:71]  wrist trajectory (3)
-        #   [71:134] normalised velocity (21 × 3)
+        # Feature vector layout (147 dims):
+        #   [0:63]    normalised positions (21 × 3)
+        #   [63:68]   fingertip spread (5)
+        #   [68:71]   wrist trajectory — net displacement from oldest frame (3)
+        #   [71:134]  normalised velocity in wrist-relative space (21 × 3)
         #   [134:144] joint angles (10)
+        #   [144:147] wrist velocity in camera-normalized coordinates (3)  ← v5
+        #
+        # Dims 144-146 are the instantaneous velocity of the wrist landmark
+        # in MediaPipe's camera-normalized coordinate system (NOT wrist-relative).
+        # For a pure lateral swipe the wrist-relative velocity (dims 71-133) is
+        # near-zero because all landmarks translate together; this block provides
+        # the missing directional signal.
         joint_angles = self._joint_angles(normalized)
         vector = (
             self._flatten(normalized)
@@ -111,6 +140,7 @@ class LandmarkFeatureTransformer:
             + wrist_traj
             + self._flatten(velocity)
             + joint_angles
+            + wrist_vel_raw
         )
 
         self._prev_normalized = normalized
@@ -122,6 +152,7 @@ class LandmarkFeatureTransformer:
     def _clear_velocity_state(self) -> None:
         self._prev_normalized = None
         self._prev_timestamp_ms = None
+        self._prev_raw_wrist = None
         self._wrist_history.clear()
 
     def _normalize_positions(self, raw: list[list[float]]) -> list[list[float]] | None:
@@ -223,7 +254,7 @@ class LandmarkFeatureTransformer:
 
     @staticmethod
     def _zero_vector() -> list[float]:
-        return [0.0] * 144
+        return [0.0] * 147
 
     @staticmethod
     def _joint_angles(normalized: list[list[float]]) -> list[float]:

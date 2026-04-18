@@ -41,7 +41,7 @@ def test_transform_returns_zero_vector_for_invalid_packet() -> None:
     result = transformer.transform(packet)
 
     assert result.valid is False
-    assert len(result.vector) == 144
+    assert len(result.vector) == 147
     assert all(value == 0.0 for value in result.vector)
 
 
