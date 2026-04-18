@@ -68,7 +68,7 @@ python scripts/train_model.py --dataset data/processed/ipn_dataset.npz --config-
 
 ## Project Architecture
 
-See `ARCHITECTURE_SPECIFICATION.md` for the full system specification, module contracts, and design rationale.
+See `docs/architecture/` for the full system specification, module contracts, and design rationale.
 
 Key directories:
 
@@ -77,7 +77,7 @@ Key directories:
 | `src/gesture_control/` | Core package (domain, interfaces, infrastructure, pipeline, training)  |
 | `configs/`             | YAML configuration (app, inference, model, gestures, thresholds)       |
 | `scripts/`             | CLI entry points (data collection, dataset build, training, inference) |
-| `models/`              | Checkpoints, exported artifacts, and model registry                    |
+| `models/`              | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/gesture-control-lstm) |
 | `tests/`               | Unit, integration, and system tests                                    |
 | `docs/`                | Architecture docs, guides, and decision records                        |
 

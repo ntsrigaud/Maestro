@@ -1,0 +1,18 @@
+# Model source configuration.
+#
+# Controls where the inference artifact is loaded from at runtime.
+#
+# backend: local       — load from the local artifact registry (registry.json)
+# backend: huggingface — download from Hugging Face Hub (cached after first use)
+#
+# Switch to "huggingface" after validating end-to-end with run_realtime.py.
+backend: huggingface
+
+# Hugging Face Hub settings (active when backend == "huggingface").
+repo_id: ntsrigaud/gesture-control-lstm
+revision: main
+filename: lstm_v1_20260418T023120Z_inference.pt
+cache_dir: null         # null = HF default (~/.cache/huggingface/hub)
+
+# Local registry settings (active when backend == "local").
+registry_path: models/registry.json
