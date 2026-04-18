@@ -43,10 +43,10 @@ _FEATURE_SCHEMA_DESCRIPTION = """\
 |-------|------|-------------|
 | `position` | 0–62 | 21 wrist-relative, scale-normalised landmark positions (x, y, z) |
 | `fingertip_spread` | 63–67 | 5 inter-fingertip Euclidean distances |
-| `wrist_trajectory` | 68–70 | Net wrist displacement from oldest frame in current window (x, y, z) |
+| `wrist_trajectory` | 68–70 | Net wrist displacement from oldest frame in the window |
 | `velocity` | 71–133 | 21 per-landmark wrist-relative velocity vectors (Δposition per unit time) |
 | `joint_angles` | 134–143 | 10 MCP + PIP joint angles in radians |
-| `wrist_vel_raw` | 144–146 | Instantaneous wrist velocity in camera-normalised coordinates (x, y, z) — primary directional signal for swipe/scroll gestures |
+| `wrist_vel_raw` | 144–146 | Camera-normalised wrist velocity (x, y, z) — key directional signal |
 """
 
 _CLASS_DESCRIPTIONS: dict[str, str] = {
@@ -127,13 +127,17 @@ import torch
 from gesture_control.infrastructure.model.checkpoint_loader import load_inference_artifact
 
 # Load the artifact (includes model, class labels, and feature schema)
-artifact = load_inference_artifact(artifact_path="{model_version}_inference.pt", device=torch.device("cpu"))
+artifact = load_inference_artifact(
+    artifact_path="{model_version}_inference.pt",
+    device=torch.device("cpu"),
+)
 artifact.model.eval()
 
 # Build a {feature_dim}-dim feature vector using LandmarkFeatureTransformer
 # and fill a 24-frame SlidingWindowSequenceBuffer, then:
 with torch.no_grad():
-    window_tensor = torch.tensor(window_np, dtype=torch.float32).unsqueeze(0)  # (1, 24, {feature_dim})
+    # tensor shape: (batch=1, T=24, F={feature_dim})
+    window_tensor = torch.tensor(window_np, dtype=torch.float32).unsqueeze(0)
     logits = artifact.model(window_tensor)
     pred_class = artifact.class_labels[logits.argmax(dim=1).item()]
 ```
@@ -144,7 +148,8 @@ with torch.no_grad():
 - **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
 - **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
 - **Sequences**: ~22,973 sliding windows × 24 frames × {feature_dim} features
-- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005; label-aware offline horizontal mirror (swipe_left ↔ swipe_right, applied before training to ensure correct directional labels)
+- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
+  label-aware offline horizontal mirror (swipe_left ↔ swipe_right)
 
 ## Training Configuration
 
