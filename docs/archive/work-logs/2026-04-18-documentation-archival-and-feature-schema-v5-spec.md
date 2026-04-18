@@ -100,7 +100,7 @@ All three plans have been fully implemented and superseded by the current archit
   types and reference `feature-schema-v5`.
 - LSTM Inference step (step 6): sequence shape updated to `(24×147)`.
 - Model Export step (step 3): description updated to reference the Hugging Face Hub
-  (`ntsrigaud/gesture-lstm-v5`) as the publication target and describe the
+  (`ntsrigaud/gesture-control-lstm`) as the publication target and describe the
   download-on-first-use runtime behaviour.
 
 **File:** `README.md`
@@ -108,7 +108,7 @@ All three plans have been fully implemented and superseded by the current archit
 - Architecture reference: `ARCHITECTURE_SPECIFICATION.md` → `docs/architecture/`
 - Models directory description updated to note local artifacts are `.gitignore`d and
   the production model is hosted on
-  [Hugging Face](https://huggingface.co/ntsrigaud/gesture-lstm-v5).
+  [Hugging Face](https://huggingface.co/ntsrigaud/gesture-control-lstm).
 
 ### New: Canonical Feature Schema v5 Specification
 
