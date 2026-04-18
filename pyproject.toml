@@ -31,11 +31,6 @@ notebooks = [
   "jupyter>=1.0.0",
   "ipykernel>=6.29.0",
 ]
-huggingface = [
-  # huggingface_hub is now a core runtime dependency.
-  # This extra is retained for backwards compatibility with existing install
-  # commands that reference it (e.g. pip install -e ".[huggingface]").
-]
 dev = [
   "pytest>=8.0.0",
   "ruff>=0.3.0",

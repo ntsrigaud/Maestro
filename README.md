@@ -21,10 +21,10 @@ Camera → MediaPipe Hands → Feature Engineering → Sliding Window Buffer
 | `open_palm_hold` | No action (model class only) | G07             |
 | `swipe_right`    | Next slide                   | G06             |
 | `swipe_left`     | Previous slide               | G05             |
-| `swipe_up`       | Raise hand                   | G03             |
-| `swipe_down`     | Start presentation           | G04             |
+| `swipe_up`       | Start presentation           | G03             |
+| `swipe_down`     | Exit presentation            | G04             |
 | `zoom_in`        | Toggle pointer mode          | G10             |
-| `zoom_out`       | Exit presentation            | G11             |
+| `zoom_out`       | Raise hand                   | G11             |
 | `unknown`        | None (noise class)           | D0X + B0A + B0B |
 
 ## Quick Start
@@ -32,9 +32,11 @@ Camera → MediaPipe Hands → Feature Engineering → Sliding Window Buffer
 **End users** (runtime inference only):
 
 ```bash
-pip install -e .
+pip install -e ".[huggingface]"
 python scripts/run_realtime.py --config configs
 ```
+
+The default configuration (`configs/model_source.yaml`) loads the production model from [Hugging Face Hub](https://huggingface.co/ntsrigaud/gesture-control-lstm) on first run. The artifact is cached locally by `huggingface_hub` and requires no re-download on subsequent runs.
 
 **Developers** (linting, type-checking, and tests):
 
@@ -47,10 +49,10 @@ pytest -m "not training"
 
 ## Training Setup
 
-Install the `training` extra (scikit-learn) alongside the `dev` tools:
+Install the `training` and `dev` extras (adds scikit-learn and dev tools):
 
 ```bash
-pip install -e ".[dev,training]"
+pip install -e ".[dev,training,huggingface]"
 ```
 
 Then run the full test suite (including training tests):
@@ -59,7 +61,21 @@ Then run the full test suite (including training tests):
 pytest
 ```
 
-To build a dataset and train a model:
+The recommended training workflow uses the Jupyter notebooks under `notebooks/`:
+
+| Notebook | Purpose |
+| -------- | ------- |
+| `01_dataset_preparation.ipynb` | Build the NPZ dataset from IPN Hand video landmarks |
+| `02_model_training.ipynb` | Train, evaluate, export, and publish to Hugging Face Hub |
+
+Install the notebook extra and launch Jupyter:
+
+```bash
+pip install -e ".[notebooks,training,huggingface]"
+jupyter lab
+```
+
+Alternatively, use the CLI scripts:
 
 ```bash
 python scripts/build_ipn_dataset.py --ipn-root data/IPN --output-npz data/processed/ipn_dataset.npz
@@ -105,14 +121,15 @@ python scripts/train_model.py \
 
 The training pipeline includes group-aware data splitting (no recording leakage), data augmentation (temporal scaling + spatial jitter), early stopping, and class-weighted loss.
 
-## Implementation Status
+## Current System State
 
-All architectural phases are implemented and validated:
+| Metric | Value |
+| ------ | ----- |
+| Inference feature schema | `feature-schema-v5` (147-dim) |
+| Production model | [`ntsrigaud/gesture-control-lstm`](https://huggingface.co/ntsrigaud/gesture-control-lstm) — Macro-F1 **0.96** |
+| Model loading | Hugging Face Hub (cached, no training required) |
+| Gaze activation | `HeadPoseGazeDetector` — sole arming mechanism |
+| Test suite | ≥ 250 tests, 0 failures |
+| Tracked binary weights | **0 MB** — all `.pt` artifacts excluded from VCS |
 
-- Phase 1: Project scaffolding, interface contracts, configuration system
-- Phase 2: OpenCV frame source, MediaPipe landmark extraction
-- Phase 3: Feature engineering, temporal buffering, dataset generation
-- Phase 4: LSTM training pipeline with augmentation and evaluation
-- Phase 5: Real-time inference pipeline with latency benchmarking
-- Phase 6: Activation state machine, command dispatch, application adapters
-- Phase 7: Prediction stabilization, edge-trigger dispatch, safety hardening
+The complete development history is recorded in [docs/architecture/](docs/architecture/) and [docs/archive/work-logs/](docs/archive/work-logs/).
