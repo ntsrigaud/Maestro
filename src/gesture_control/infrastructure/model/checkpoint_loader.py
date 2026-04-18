@@ -71,15 +71,6 @@ def load_latest_inference_artifact(
     registry_path: str | Path,
     device: torch.device,
 ) -> InferenceArtifact:
-    """Load the most recent artifact from a local registry JSON.
-
-    .. deprecated::
-        Use :func:`gesture_control.infrastructure.model.hf_loader.load_artifact_from_hub`
-        with ``backend: huggingface`` configured in ``configs/model_source.yaml``.
-        This function is retained for the local development workflow while the HF
-        migration is validated.  It will be removed once ``backend: huggingface``
-        is the default.
-    """
     registry = _load_registry(registry_path)
     models = registry.get("models")
     if not isinstance(models, list) or not models:
@@ -96,11 +87,10 @@ def load_latest_inference_artifact(
         )
 
     # Resolve relative paths against the registry file's directory so the
-    # loader works regardless of the process working directory and across
-    # machines (registry stores paths relative to its own parent folder).
+    # loader works regardless of the process working directory.
     resolved_path = Path(exported_path)
     if not resolved_path.is_absolute():
-        resolved_path = Path(registry_path).resolve().parent / resolved_path
+        resolved_path = Path(registry_path).resolve().parent.parent / resolved_path
 
     return load_inference_artifact(artifact_path=resolved_path, device=device)
 
