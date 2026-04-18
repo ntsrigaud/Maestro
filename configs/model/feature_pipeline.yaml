@@ -30,6 +30,14 @@ feature_pipeline:
   # Always enabled; improves dynamic gesture recognition
   velocity_features: true
 
-  # Feature vector structure with these settings enabled:
-  # [position_0, position_1, ..., position_20, velocity_0, velocity_1, ..., velocity_20]
-  # Total dimensions: 21 landmarks × 3 coords × 2 (position + velocity) = 126
+  # Feature vector structure (feature-schema-v5, 147 dims):
+  # [0:63]    normalised positions (21 × 3)
+  # [63:68]   fingertip spread (5)
+  # [68:71]   wrist trajectory — net displacement from oldest frame (3)
+  # [71:134]  wrist-relative velocity (21 × 3)
+  # [134:144] joint angles (10)
+  # [144:147] wrist velocity in camera-normalized coordinates (3)  ← v5
+  #
+  # The wrist velocity block (v5) encodes the instantaneous translational speed
+  # of the wrist in camera space, providing an explicit directional signal for
+  # swipe and scroll gestures that is absent in the wrist-relative velocity block.
