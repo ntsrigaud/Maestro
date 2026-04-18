@@ -20,13 +20,25 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Path to exported inference artifact (.pt). "
-            "If omitted, latest model in registry is used."
+            "If omitted, the model source configured in configs/model_source.yaml is used."
+        ),
+    )
+    parser.add_argument(
+        "--hf-revision",
+        default=None,
+        help=(
+            "Hugging Face revision (branch, tag, or commit hash) to override "
+            "the revision set in configs/model_source.yaml. "
+            "Only effective when backend is 'huggingface'."
         ),
     )
     parser.add_argument(
         "--registry",
-        default="models/registry.json",
-        help="Model registry path used when --model-artifact is omitted.",
+        default=None,
+        help=(
+            "[Deprecated] Local model registry path for backend=local. "
+            "Configure model_source in configs/model_source.yaml instead."
+        ),
     )
     parser.add_argument(
         "--no-display",
@@ -53,6 +65,7 @@ def main() -> None:
         args.config,
         model_artifact_path=args.model_artifact,
         registry_path=args.registry,
+        hf_revision_override=args.hf_revision,
         show_window=not args.no_display,
     )
     runtime = Runtime(container)

@@ -16,6 +16,7 @@ dependencies = [
   "opencv-python-headless>=4.10.0",
   "mediapipe==0.10.14",
   "pyautogui>=0.9.54",
+  "huggingface_hub>=0.22.0",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +32,9 @@ notebooks = [
   "ipykernel>=6.29.0",
 ]
 huggingface = [
-  "huggingface_hub>=0.22.0",
+  # huggingface_hub is now a core runtime dependency.
+  # This extra is retained for backwards compatibility with existing install
+  # commands that reference it (e.g. pip install -e ".[huggingface]").
 ]
 dev = [
   "pytest>=8.0.0",
