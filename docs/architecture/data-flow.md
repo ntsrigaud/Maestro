@@ -11,8 +11,8 @@ graph TD
     A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| B["Gaze Estimation<br/>(Face Mesh + Head Pose)"]
     B -->|gaze_permitted=false| Z["Skip to next frame"]
     B -->|gaze_permitted=true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
-    C -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 126-d)"]
-    D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 24x126)"]
+    C -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
+    D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 24x147)"]
     E -->|SequenceWindow| F["LSTM Classifier<br/>(2-Layer, Hidden=128, 8-Class)"]
     F -->|Prediction| G["Prediction Stabilizer<br/>(EMA + Threshold + Voting)"]
     G -->|StabilizedPrediction| H["Activation Controller<br/>(IDLE / ARMED / COOLDOWN)"]
@@ -94,7 +94,7 @@ The BGR frame is converted to RGB and processed by MediaPipe Hands. The model ex
 
 | Field          | Type                       | Description                                        |
 | -------------- | -------------------------- | -------------------------------------------------- |
-| `vector`       | `list[float]` (length 126) | Normalized position + velocity features            |
+| `vector`       | `list[float]` (length 147) | Normalized position + velocity features            |
 | `timestamp_ms` | `float`                    | Inherited from input                               |
 | `valid`        | `bool`                     | `False` if input was invalid (zero vector emitted) |
 
@@ -108,11 +108,17 @@ The transformation pipeline applies four sequential operations:
 
 4. **Velocity computation**: Per-landmark velocity is computed as the difference between current and previous frame landmarks divided by the time delta: `v_i = (l_i_current - l_i_previous) / Δt`.
 
-The output vector is the concatenation of all position coordinates followed by all velocity coordinates:
+The output vector is the concatenation of six feature blocks (feature-schema-v5):
 
 ```
-[x₀, y₀, z₀, x₁, y₁, z₁, ..., x₂₀, y₂₀, z₂₀,     ← 63 position dims
- vx₀, vy₀, vz₀, vx₁, vy₁, vz₁, ..., vx₂₀, vy₂₀, vz₂₀]  ← 63 velocity dims
+[x₀…z₂₀]                        ← 63 dims  (positions)
+[d₀₁, d₀₂, d₀₃, d₀₄, d₀₅]      ←  5 dims  (fingertip spread)
+[Δwx, Δwy, Δwz]                 ←  3 dims  (wrist trajectory in window)
+[vx₀…vz₂₀]                      ← 63 dims  (velocity)
+[θ₀…θ₉]                         ← 10 dims  (MCP + PIP joint angles)
+[vwx, vwy, vwz]                 ←  3 dims  (wrist velocity, camera-normalised)
+                                 ─────────
+                                   147 dims total (feature-schema-v5)
 ```
 
 If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is emitted to maintain buffer alignment.
@@ -125,7 +131,7 @@ If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is em
 
 | Field                | Type                              | Description                                 |
 | -------------------- | --------------------------------- | ------------------------------------------- |
-| `features`           | `numpy.ndarray` (24×126, float32) | Stacked feature vectors                     |
+| `features`           | `numpy.ndarray` (24×147, float32) | Stacked feature vectors                     |
 | `start_timestamp_ms` | `float`                           | Timestamp of the oldest frame in the window |
 | `end_timestamp_ms`   | `float`                           | Timestamp of the newest frame in the window |
 | `valid_ratio`        | `float`                           | Fraction of frames with `valid=True`        |
@@ -153,9 +159,9 @@ At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The
 The LSTM model architecture:
 
 ```
-Input tensor: (1, 24, 126)  — batch=1, sequence=24 frames, features=126
+Input tensor: (1, 24, 147)  — batch=1, sequence=24 frames, features=147
     ↓
-LSTM: input_size=126, hidden_size=128, num_layers=2, dropout=0.3
+LSTM: input_size=147, hidden_size=128, num_layers=2, dropout=0.3
     ↓
 Final hidden state: (1, 128)
     ↓
