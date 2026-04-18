@@ -69,9 +69,24 @@ class FeaturePipelineConfig(BaseModel):
     velocity_features: bool = True
 
 
+class ModelSourceConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # "local" loads from the local registry JSON; "huggingface" downloads from HF Hub.
+    backend: str = Field(default="local", pattern="^(local|huggingface)$")
+    # Hugging Face Hub settings (required when backend == "huggingface").
+    repo_id: str = "ntsrigaud/gesture-control-lstm"
+    revision: str = "main"
+    filename: str = "lstm_v1_inference.pt"
+    cache_dir: str | None = None
+    # Local registry settings (used when backend == "local").
+    registry_path: str = "models/registry.json"
+
+
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     app: AppConfig
     inference: InferenceConfig
-    feature_pipeline: FeaturePipelineConfig = FeaturePipelineConfig()
+    feature_pipeline: FeaturePipelineConfig = Field(default_factory=FeaturePipelineConfig)
+    model_source: ModelSourceConfig = Field(default_factory=ModelSourceConfig)
