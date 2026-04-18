@@ -275,6 +275,52 @@
       "exported_path": "models/exported/lstm_v1_20260417T152606Z_inference.pt",
       "checkpoint_checksum": "7702dde98445d890dbfe344955489d0ddb374dbd034300814fd4e76d720b962a",
       "created_at": "2026-04-17T15:26:34.501481+00:00"
+    },
+    {
+      "model_version": "lstm_v1_20260417T233919Z",
+      "training_data_version": "unknown",
+      "feature_schema_version": "feature-schema-v4",
+      "class_labels": [
+        "open_palm_hold",
+        "swipe_right",
+        "swipe_left",
+        "swipe_up",
+        "swipe_down",
+        "zoom_in",
+        "zoom_out",
+        "unknown"
+      ],
+      "window_length": 24,
+      "checksum": "2b4d15e293849012722a7004f1b62d44edbc511855640a19db6ec8d168c15ada",
+      "feature_dim": 144,
+      "window_step": 3,
+      "checkpoint_path": "/home/rachel/.Neil/Gesture-Control-System/models/checkpoints/lstm_v1_20260417T233919Z.pt",
+      "exported_path": "/home/rachel/.Neil/Gesture-Control-System/models/exported/lstm_v1_20260417T233919Z_inference.pt",
+      "checkpoint_checksum": "95c6e827fd7613eff02382080cc3ff9ab86807b8b28d2194615340eb3dc7b3be",
+      "created_at": "2026-04-17T23:39:39.715002+00:00"
+    },
+    {
+      "model_version": "lstm_v1_20260418T002927Z",
+      "training_data_version": "unknown",
+      "feature_schema_version": "feature-schema-v5",
+      "class_labels": [
+        "open_palm_hold",
+        "swipe_right",
+        "swipe_left",
+        "swipe_up",
+        "swipe_down",
+        "zoom_in",
+        "zoom_out",
+        "unknown"
+      ],
+      "window_length": 24,
+      "checksum": "b3b699acef605b1f32e614c95282306d5bec079bd3a6905ea56f191bab8baf8a",
+      "feature_dim": 147,
+      "window_step": 3,
+      "checkpoint_path": "/home/rachel/.Neil/Gesture-Control-System/models/checkpoints/lstm_v1_20260418T002927Z.pt",
+      "exported_path": "/home/rachel/.Neil/Gesture-Control-System/models/exported/lstm_v1_20260418T002927Z_inference.pt",
+      "checkpoint_checksum": "6355fada9f1b2e29fea16f5ee6e31ff705c66e276c11a1302e964790c4a3b194",
+      "created_at": "2026-04-18T00:30:25.262872+00:00"
     }
   ]
 }
