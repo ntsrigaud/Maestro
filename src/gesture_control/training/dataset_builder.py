@@ -223,14 +223,34 @@ class SequenceDatasetBuilder:
         path = Path(dataset_path)
         with np.load(path, allow_pickle=True) as data:
             metadata = json.loads(str(data["metadata_json"].item()))
+            files = set(data.files)
+            n = len(data["sequences"])
+            # sample_ids / timestamps are absent in derived datasets (e.g. mirror-augmented
+            # NPZs built by the dataset notebook). Provide zero/empty defaults so the loader
+            # remains backward-compatible with any NPZ that only has the core fields.
+            sample_ids = (
+                data["sample_ids"]
+                if "sample_ids" in files
+                else np.empty(n, dtype=object)
+            )
+            start_ts = (
+                data["start_timestamp_ms"]
+                if "start_timestamp_ms" in files
+                else np.zeros(n, dtype=np.int64)
+            )
+            end_ts = (
+                data["end_timestamp_ms"]
+                if "end_timestamp_ms" in files
+                else np.zeros(n, dtype=np.int64)
+            )
             return {
                 "sequences": data["sequences"],
                 "labels": data["labels"],
                 "label_ids": data["label_ids"],
                 "recording_ids": data["recording_ids"],
-                "sample_ids": data["sample_ids"],
-                "start_timestamp_ms": data["start_timestamp_ms"],
-                "end_timestamp_ms": data["end_timestamp_ms"],
+                "sample_ids": sample_ids,
+                "start_timestamp_ms": start_ts,
+                "end_timestamp_ms": end_ts,
                 "valid_ratio": data["valid_ratio"],
                 "metadata": metadata,
             }

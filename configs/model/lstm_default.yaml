@@ -1,6 +1,6 @@
 model:
   model_name: lstm_v1
-  input_size: 144
+  input_size: 147
   hidden_size: 128
   num_layers: 2
   dropout: 0.3
@@ -34,7 +34,7 @@ export:
   checkpoint_dir: models/checkpoints
   exported_dir: models/exported
   registry_path: models/registry.json
-  feature_schema_version: feature-schema-v4
+  feature_schema_version: feature-schema-v5
 
 # Augmentation is disabled by default for the initial dataset.
 # Enable when you have ≥10 recordings per class and want regularisation.
@@ -47,5 +47,7 @@ augmentation:
   spatial_jitter_sigma: 0.005
   # Probability each augmentation fires independently on a given sample.
   apply_prob: 0.5
-  # Probability of applying horizontal mirror flip per sample.
-  mirror_flip_prob: 0.5
+  # Mirror flip is intentionally disabled here.
+  # Applying it without label remapping injects label noise into swipe_left/right.
+  # Use the label-aware mirror augmentation in 01_dataset_preparation.ipynb instead.
+  mirror_flip_prob: 0.0
