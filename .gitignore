@@ -178,6 +178,13 @@ compile_commands.json
 *.lib
 *.out
 *.app
+
+# Model artifacts — production model is hosted on Hugging Face Hub.
+# Local training outputs are transient and must not be committed.
+models/exported/*.pt
+models/checkpoints/*.pt
+models/registry.json
+models/stage/
 *.exe
 *.dll
 *.dylib

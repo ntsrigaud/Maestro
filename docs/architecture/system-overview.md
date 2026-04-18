@@ -77,9 +77,9 @@ graph LR
 1. **Frame Capture**: OpenCV reads a BGR frame from the webcam at 30 FPS (1280×720).
 2. **Gaze Estimation**: MediaPipe Face Mesh estimates head pose from facial landmarks. If the user's gaze is not directed toward the camera, all downstream gesture processing is bypassed for that frame.
 3. **Landmark Extraction**: MediaPipe Hands detects 21 hand landmarks with confidence filtering.
-4. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity features to produce a 126-dimensional feature vector.
+4. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity, joint angles, fingertip spread, and wrist trajectory features to produce a 147-dimensional feature vector (feature-schema-v5).
 5. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
-6. **LSTM Inference**: The buffered sequence (24×126) is classified by a 2-layer LSTM into one of 8 gesture classes.
+6. **LSTM Inference**: The buffered sequence (24×147) is classified by a 2-layer LSTM into one of 8 gesture classes.
 7. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
 8. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in ARMED state; gaze loss transitions to IDLE; gaze restoration calls `rearm()` to return to ARMED. Edge-triggered dispatch is enforced throughout.
 9. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
@@ -131,7 +131,7 @@ The offline training pipeline converts labeled video data into a trained LSTM ch
 
 1. **Data Collection**: The IPN Hand dataset (200 videos, 8 classes) is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks from IPN video files and produces NPZ sequence datasets.
 2. **Model Training**: `scripts/train_model.py` trains a 2-layer LSTM with class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
-3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema. A JSON registry tracks all exported models.
+3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/gesture-control-lstm`). At runtime the artifact is downloaded on first use and served from the local Hugging Face cache.
 
 ---
 

@@ -532,13 +532,14 @@ def _save_metadata(
     window_length: int,
     window_step: int,
     stats: dict[str, Any],
+    feature_schema_version: str = "feature-schema-v1",
 ) -> None:
     metadata = {
         "ipn_label_mapping": IPN_TO_VOCAB,
         "vocabulary": vocabulary,
         "window_length": window_length,
         "window_step": window_step,
-        "feature_schema_version": "feature-schema-v1",
+        "feature_schema_version": feature_schema_version,
         "annotation_rows_used": annotations_used,
         "videos_processed": len(cache_paths),
         "dataset_stats": stats,
@@ -620,6 +621,17 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--unknown-subsample-ratio",
+        type=float,
+        default=1.0,
+        metavar="R",
+        help=(
+            "Fraction of unknown-class sequences to keep in the final dataset "
+            "(0.0\u20131.0).  Applied after all other filtering.  "
+            "Default: 1.0 (keep all)."
+        ),
+    )
+    p.add_argument(
         "--window-length",
         type=int,
         default=24,
@@ -669,6 +681,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         default=42,
         help="Random seed for unknown-segment subsampling (default: 42).",
+    )
+    p.add_argument(
+        "--feature-schema-version",
+        default="feature-schema-v1",
+        help=(
+            "Feature schema version tag embedded in the NPZ metadata "
+            "(default: feature-schema-v1).  Use feature-schema-v2 after "
+            "enabling spread/wrist-trajectory features."
+        ),
     )
     p.add_argument(
         "--metadata-json",
@@ -771,11 +792,32 @@ def main() -> None:
         )
         sys.exit(1)
 
+    # Post-build unknown-class subsampling (sequence level).
+    if args.unknown_subsample_ratio < 1.0:
+        rng_sub = random.Random(args.seed)
+        all_samples = builder.samples
+        unknown_samples = [s for s in all_samples if s.label == "unknown"]
+        keep_n = max(1, int(len(unknown_samples) * args.unknown_subsample_ratio))
+        rng_sub.shuffle(unknown_samples)
+        kept_ids = {id(s) for s in unknown_samples[:keep_n]}
+        builder._samples = [
+            s for s in builder._samples if s.label != "unknown" or id(s) in kept_ids
+        ]
+        logger.info(
+            "Unknown subsample (ratio=%.2f): %d \u2192 %d sequences",
+            args.unknown_subsample_ratio,
+            len(unknown_samples),
+            len([s for s in builder._samples if s.label == "unknown"]),
+        )
+
     # -----------------------------------------------------------------------
     # Save NPZ and metadata.
     # -----------------------------------------------------------------------
     output_npz.parent.mkdir(parents=True, exist_ok=True)
-    builder.save_npz(output_npz)
+    builder.save_npz(
+        output_npz,
+        feature_schema_version=args.feature_schema_version,
+    )
     logger.info("Dataset saved → %s  (%d samples)", output_npz, len(builder.samples))
 
     stats = _compute_class_stats(builder)
@@ -792,6 +834,7 @@ def main() -> None:
         window_length=args.window_length,
         window_step=args.window_step,
         stats=stats,
+        feature_schema_version=args.feature_schema_version,
     )
 
 

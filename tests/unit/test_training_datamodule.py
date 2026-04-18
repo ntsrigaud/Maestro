@@ -14,14 +14,14 @@ pytestmark = pytest.mark.training
 
 def _create_dataset(path: Path) -> None:
     rng = np.random.default_rng(42)
-    n, t, f = 120, 24, 126
+    n, t, f = 120, 24, 147
 
     sequences = rng.normal(size=(n, t, f)).astype(np.float32)
     labels = np.array(["a"] * 60 + ["b"] * 60, dtype=object)
     label_ids = np.array([0] * 60 + [1] * 60, dtype=np.int64)
 
     metadata = {
-        "feature_schema_version": "feature-schema-v1",
+        "feature_schema_version": "feature-schema-v3",
         "feature_dim": f,
         "window_length": t,
         "window_step": 3,
@@ -56,13 +56,13 @@ def test_datamodule_setup_and_shapes(tmp_path: Path) -> None:
     )
     dm.setup()
 
-    assert dm.feature_dim == 126
+    assert dm.feature_dim == 147
     assert dm.sequence_length == 24
     assert dm.num_classes == 2
 
     train_batch_x, train_batch_y = next(iter(dm.train_dataloader()))
     assert train_batch_x.ndim == 3
-    assert train_batch_x.shape[-1] == 126
+    assert train_batch_x.shape[-1] == 147
     assert train_batch_y.ndim == 1
 
 
@@ -110,7 +110,7 @@ def _create_multi_recording_dataset(
 ) -> None:
     """NPZ with *recordings_per_class* unique recording IDs per class."""
     rng = np.random.default_rng(7)
-    T, F = 24, 126
+    T, F = 24, 147
 
     sequences_list, labels_list, label_ids_list, rec_ids_list = [], [], [], []
     for cls in range(n_classes):
@@ -129,7 +129,7 @@ def _create_multi_recording_dataset(
     recording_ids = np.array(rec_ids_list, dtype=object)
 
     metadata = {
-        "feature_schema_version": "feature-schema-v1",
+        "feature_schema_version": "feature-schema-v3",
         "feature_dim": F,
         "window_length": T,
         "window_step": 3,
@@ -256,7 +256,7 @@ def test_augmented_training_dataset_shape(tmp_path: Path) -> None:
     dm.setup()
 
     x, y = next(iter(dm.train_dataloader()))
-    assert x.shape[-1] == 126
+    assert x.shape[-1] == 147
     assert x.ndim == 3
     assert y.ndim == 1
 

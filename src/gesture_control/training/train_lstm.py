@@ -27,6 +27,9 @@ class ModelConfig:
     num_layers: int
     dropout: float
     num_classes: int
+    # TCN-specific (ignored when model_name does not start with "tcn")
+    num_channels: list[int] | None = None
+    kernel_size: int = 3
 
 
 @dataclass(slots=True)
@@ -112,6 +115,12 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             num_layers=int(model_data.get("num_layers", 2)),
             dropout=float(model_data.get("dropout", 0.3)),
             num_classes=int(model_data.get("num_classes", 8)),
+            num_channels=(
+                [int(c) for c in model_data["num_channels"]]
+                if "num_channels" in model_data
+                else None
+            ),
+            kernel_size=int(model_data.get("kernel_size", 3)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
@@ -163,7 +172,31 @@ def _parse_augmentation_config(
         temporal_scale_range=(float(scale_raw[0]), float(scale_raw[1])),
         spatial_jitter_sigma=float(aug_data.get("spatial_jitter_sigma", 0.005)),
         apply_prob=float(aug_data.get("apply_prob", 0.5)),
+        mirror_flip_prob=float(aug_data.get("mirror_flip_prob", 0.5)),
     )
+
+
+def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
+    """Instantiate the correct model architecture based on ``config.model_name``."""
+    if config.model_name.startswith("tcn"):
+        from gesture_control.infrastructure.model.tcn_model import GestureTCNClassifier
+
+        num_channels = config.num_channels or [64, 64, 64, 64]
+        return GestureTCNClassifier(
+            input_size=config.input_size,
+            num_channels=num_channels,
+            kernel_size=config.kernel_size,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+        ).to(device)
+
+    return GestureLSTMClassifier(
+        input_size=config.input_size,
+        hidden_size=config.hidden_size,
+        num_layers=config.num_layers,
+        dropout=config.dropout,
+        num_classes=config.num_classes,
+    ).to(device)
 
 
 def create_datamodule(
@@ -182,6 +215,21 @@ def create_datamodule(
     )
     datamodule.setup()
     return datamodule
+
+
+def _build_criterion(
+    class_weights: torch.Tensor | None,
+    *,
+    label_smoothing: float = 0.0,
+    device: torch.device | None = None,
+) -> nn.Module:
+    """Construct CrossEntropyLoss with optional class weights and label smoothing."""
+    if class_weights is not None:
+        return nn.CrossEntropyLoss(
+            weight=class_weights,
+            label_smoothing=label_smoothing,
+        )
+    return nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
 
 def _build_class_weights(
@@ -258,19 +306,13 @@ def train_lstm(
             f"num_classes={config.model.num_classes}, dataset_classes={datamodule.num_classes}"
         )
 
-    model = GestureLSTMClassifier(
-        input_size=config.model.input_size,
-        hidden_size=config.model.hidden_size,
-        num_layers=config.model.num_layers,
-        dropout=config.model.dropout,
-        num_classes=config.model.num_classes,
-    ).to(device)
+    model = _build_model(config.model, device)
 
     if config.training.class_weighting:
         class_weights = _build_class_weights(datamodule, device)
-        criterion: nn.Module = nn.CrossEntropyLoss(weight=class_weights)
+        criterion: nn.Module = _build_criterion(class_weights, label_smoothing=0.1)
     else:
-        criterion = nn.CrossEntropyLoss()
+        criterion = _build_criterion(None, label_smoothing=0.1)
 
     optimizer = Adam(
         model.parameters(),

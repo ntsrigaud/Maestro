@@ -30,17 +30,33 @@ def export_inference_artifact(
     path.mkdir(parents=True, exist_ok=True)
 
     artifact_path = path / f"{result.model_version}_inference.pt"
+    artifact_type = (
+        "tcn_inference"
+        if config.model.model_name.startswith("tcn")
+        else "lstm_inference"
+    )
     payload: dict[str, Any] = {
-        "artifact_type": "lstm_inference",
+        "artifact_type": artifact_type,
         "artifact_version": result.model_version,
         "created_at": datetime.now(UTC).isoformat(),
         "model_state_dict": result.model.state_dict(),
         "model_config": {
+            "model_name": config.model.model_name,
             "input_size": config.model.input_size,
             "hidden_size": config.model.hidden_size,
             "num_layers": config.model.num_layers,
             "dropout": config.model.dropout,
             "num_classes": config.model.num_classes,
+            # TCN-specific fields — saved so the loader can reconstruct the exact
+            # architecture without relying on defaults.  Absent for LSTM artifacts.
+            **(
+                {
+                    "num_channels": config.model.num_channels,
+                    "kernel_size": config.model.kernel_size,
+                }
+                if config.model.model_name.startswith("tcn")
+                else {}
+            ),
         },
         "class_labels": result.class_labels,
         "feature_schema": {
@@ -83,6 +99,23 @@ def update_model_registry(
     checkpoint_checksum = compute_sha256(checkpoint_path)
     exported_checksum = compute_sha256(exported_path)
 
+    # Store paths relative to the registry file so the registry is portable
+    # across machines.  The loader resolves them back to absolute paths at
+    # runtime using the registry file's own location as the anchor.
+    registry_dir = path.parent
+    try:
+        rel_checkpoint = str(
+            Path(checkpoint_path).resolve().relative_to(registry_dir.resolve())
+        )
+    except ValueError:
+        rel_checkpoint = str(checkpoint_path)
+    try:
+        rel_exported = str(
+            Path(exported_path).resolve().relative_to(registry_dir.resolve())
+        )
+    except ValueError:
+        rel_exported = str(exported_path)
+
     entry = {
         "model_version": model_version,
         "training_data_version": training_data_version,
@@ -92,8 +125,8 @@ def update_model_registry(
         "checksum": exported_checksum,
         "feature_dim": int(dataset_metadata.get("feature_dim", 126)),
         "window_step": int(dataset_metadata.get("window_step", 3)),
-        "checkpoint_path": str(checkpoint_path),
-        "exported_path": str(exported_path),
+        "checkpoint_path": rel_checkpoint,
+        "exported_path": rel_exported,
         "checkpoint_checksum": checkpoint_checksum,
         "created_at": datetime.now(UTC).isoformat(),
     }
