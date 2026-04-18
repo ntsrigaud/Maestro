@@ -5,13 +5,15 @@ from dataclasses import dataclass
 import numpy as np
 
 # ---------------------------------------------------------------------------
-# Feature layout constants for the 134-dim vector produced by
-# LandmarkFeatureTransformer (feature-schema-v2).
+# Feature layout constants for the 147-dim vector produced by
+# LandmarkFeatureTransformer (feature-schema-v5).
 #
-#   [_POS_START : _POS_END]         21 wrist-relative, scale-normalised positions
-#   [_POS_END   : _SPREAD_END]      5  fingertip spread (Euclidean distances)
-#   [_SPREAD_END: _WRIST_TRAJ_END]  3  wrist trajectory (raw 3-D displacement)
-#   [_VEL_START : _VEL_END]         21 time-normalised velocity vectors
+#   [_POS_START  : _POS_END]          21 wrist-relative, scale-normalised positions
+#   [_POS_END    : _SPREAD_END]       5  fingertip spread (Euclidean distances)
+#   [_SPREAD_END : _WRIST_TRAJ_END]   3  wrist trajectory (net displacement)
+#   [_VEL_START  : _VEL_END]          21 time-normalised velocity vectors (wrist-relative)
+#   [_VEL_END    : _ANGLES_END]       10 joint angles
+#   [_ANGLES_END : _WRIST_VEL_END]    3  wrist velocity in camera-normalized coords (v5)
 # ---------------------------------------------------------------------------
 _N_LANDMARKS: int = 21
 _POS_START: int = 0
@@ -20,18 +22,24 @@ _SPREAD_END: int = _POS_END + 5  # 68  (5 fingertip distances)
 _WRIST_TRAJ_END: int = _SPREAD_END + 3  # 71  (3 wrist-trajectory dims)
 _VEL_START: int = _WRIST_TRAJ_END  # 71
 _VEL_END: int = _VEL_START + _N_LANDMARKS * 3  # 134
+_ANGLES_END: int = _VEL_END + 10  # 144
+_WRIST_VEL_START: int = _ANGLES_END  # 144
+_WRIST_VEL_END: int = _WRIST_VEL_START + 3  # 147  (wrist_vel_raw x/y/z)
 
 # Convenience alias kept for backward-compat with tests that imported it.
 _POSITION_DIMS: int = _POS_END  # 63
 
 # X-coordinate indices to negate when performing a horizontal mirror flip.
-# Positions x: every 3rd dim from _POS_START (landmark x-coords).
-# Wrist traj x: the first dim of the wrist-trajectory block (_SPREAD_END).
-# Velocity x:   every 3rd dim from _VEL_START (landmark velocity x-coords).
+# Positions x:      every 3rd dim from _POS_START (landmark x-coords).
+# Wrist traj x:     the first dim of the wrist-trajectory block (_SPREAD_END).
+# Velocity x:       every 3rd dim from _VEL_START (wrist-relative velocity x-coords).
+# Wrist vel raw x:  the first dim of the camera-space wrist velocity block (_WRIST_VEL_START).
+#                   Negating this ensures a mirrored swipe_right is re-signed as swipe_left.
 _X_COORD_DIMS: list[int] = (
     list(range(_POS_START, _POS_END, 3))  # 21 position x-coords
     + [_SPREAD_END]  # 1  wrist-traj x
-    + list(range(_VEL_START, _VEL_END, 3))  # 21 velocity x-coords
+    + list(range(_VEL_START, _VEL_END, 3))  # 21 velocity x-coords (wrist-relative)
+    + [_WRIST_VEL_START]  # 1  wrist velocity raw x (camera space)
 )
 
 
