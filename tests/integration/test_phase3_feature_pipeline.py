@@ -50,7 +50,7 @@ def test_phase3_feature_to_sequence_window_flow() -> None:
     window = buffer.window()
 
     assert len(window.features) == 6
-    assert len(window.features[0]) == 126
+    assert len(window.features[0]) == 147
     assert window.start_timestamp_ms == 0
     assert window.end_timestamp_ms == 165
     assert window.valid_ratio == 1.0

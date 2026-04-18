@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,47 @@ import torch
 
 from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
 from gesture_control.utils.schema_validation import RuntimeConfig
+
+_logger = logging.getLogger(__name__)
+
+
+def _build_model_from_artifact(
+    model_config: dict[str, Any],
+    artifact_type: str,
+    device: torch.device,
+) -> torch.nn.Module:
+    """Instantiate the correct model class based on *artifact_type* / *model_name*.
+
+    Dispatches:
+    * artifact_type starts with ``"tcn"`` → :class:`GestureTCNClassifier`
+    * everything else → :class:`GestureLSTMClassifier`
+    """
+    model_name = str(model_config.get("model_name", ""))
+    if artifact_type.startswith("tcn") or model_name.startswith("tcn"):
+        from gesture_control.infrastructure.model.tcn_model import (
+            GestureTCNClassifier,  # noqa: PLC0415
+        )
+
+        if "num_channels" not in model_config:
+            raise ValueError(
+                "TCN artifact is missing 'num_channels' in model_config. "
+                "Re-export the artifact with the updated export_checkpoint.py."
+            )
+        return GestureTCNClassifier(
+            input_size=int(model_config["input_size"]),
+            num_channels=list(model_config["num_channels"]),
+            kernel_size=int(model_config.get("kernel_size", 3)),
+            dropout=float(model_config["dropout"]),
+            num_classes=int(model_config["num_classes"]),
+        ).to(device)
+
+    return GestureLSTMClassifier(
+        input_size=int(model_config["input_size"]),
+        hidden_size=int(model_config["hidden_size"]),
+        num_layers=int(model_config["num_layers"]),
+        dropout=float(model_config["dropout"]),
+        num_classes=int(model_config["num_classes"]),
+    ).to(device)
 
 
 @dataclass(slots=True)
@@ -29,6 +71,15 @@ def load_latest_inference_artifact(
     registry_path: str | Path,
     device: torch.device,
 ) -> InferenceArtifact:
+    """Load the most recent artifact from a local registry JSON.
+
+    .. deprecated::
+        Use :func:`gesture_control.infrastructure.model.hf_loader.load_artifact_from_hub`
+        with ``backend: huggingface`` configured in ``configs/model_source.yaml``.
+        This function is retained for the local development workflow while the HF
+        migration is validated.  It will be removed once ``backend: huggingface``
+        is the default.
+    """
     registry = _load_registry(registry_path)
     models = registry.get("models")
     if not isinstance(models, list) or not models:
@@ -44,7 +95,14 @@ def load_latest_inference_artifact(
             f"Missing exported_path in latest model entry: {registry_path}"
         )
 
-    return load_inference_artifact(artifact_path=exported_path, device=device)
+    # Resolve relative paths against the registry file's directory so the
+    # loader works regardless of the process working directory and across
+    # machines (registry stores paths relative to its own parent folder).
+    resolved_path = Path(exported_path)
+    if not resolved_path.is_absolute():
+        resolved_path = Path(registry_path).resolve().parent / resolved_path
+
+    return load_inference_artifact(artifact_path=resolved_path, device=device)
 
 
 def load_inference_artifact(
@@ -74,13 +132,8 @@ def load_inference_artifact(
     if state_dict is None:
         raise ValueError(f"Artifact missing model_state_dict: {path}")
 
-    model = GestureLSTMClassifier(
-        input_size=int(model_config["input_size"]),
-        hidden_size=int(model_config["hidden_size"]),
-        num_layers=int(model_config["num_layers"]),
-        dropout=float(model_config["dropout"]),
-        num_classes=int(model_config["num_classes"]),
-    ).to(device)
+    artifact_type = str(payload.get("artifact_type", "lstm_inference"))
+    model = _build_model_from_artifact(model_config, artifact_type, device)
     model.load_state_dict(state_dict)
     model.eval()
 

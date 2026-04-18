@@ -16,11 +16,25 @@ dependencies = [
   "opencv-python-headless>=4.10.0",
   "mediapipe==0.10.14",
   "pyautogui>=0.9.54",
+  "huggingface_hub>=0.22.0",
 ]
 
 [project.optional-dependencies]
 training = [
   "scikit-learn>=1.5.0",
+]
+notebooks = [
+  "scikit-learn>=1.5.0",
+  "matplotlib>=3.8.0",
+  "seaborn>=0.13.0",
+  "pandas>=2.2.0",
+  "jupyter>=1.0.0",
+  "ipykernel>=6.29.0",
+]
+huggingface = [
+  # huggingface_hub is now a core runtime dependency.
+  # This extra is retained for backwards compatibility with existing install
+  # commands that reference it (e.g. pip install -e ".[huggingface]").
 ]
 dev = [
   "pytest>=8.0.0",
@@ -59,4 +73,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["sklearn", "sklearn.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["huggingface_hub", "huggingface_hub.*"]
 ignore_missing_imports = true

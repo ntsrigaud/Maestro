@@ -14,7 +14,7 @@ from gesture_control.training.augmentation import (
 # ---------------------------------------------------------------------------
 
 
-def _make_seq(T: int = 24, F: int = 126, value: float | None = None) -> np.ndarray:
+def _make_seq(T: int = 24, F: int = 147, value: float | None = None) -> np.ndarray:
     """Return a (T, F) float32 array.  Fills with *value* or an arange."""
     if value is not None:
         return np.full((T, F), value, dtype=np.float32)
@@ -89,7 +89,7 @@ def test_spatial_jitter_only_modifies_position_dims() -> None:
         seed=0,
     )
     aug = GestureAugmenter(config)
-    seq = np.zeros((24, 126), dtype=np.float32)
+    seq = np.zeros((24, 147), dtype=np.float32)
     result = aug.augment(seq)
 
     # Position dims should now differ from zero (noise was added).
@@ -112,7 +112,7 @@ def test_spatial_jitter_sigma_scales_noise() -> None:
         apply_prob=1.0,
         seed=1,
     )
-    seq = np.zeros((24, 126), dtype=np.float32)
+    seq = np.zeros((24, 147), dtype=np.float32)
     noise_small = np.abs(
         GestureAugmenter(small).augment(seq)[:, :_POSITION_DIMS]
     ).mean()
@@ -137,7 +137,7 @@ def test_temporal_scale_first_frame_unchanged_for_any_factor() -> None:
             seed=0,
         )
         aug = GestureAugmenter(config)
-        seq = np.arange(24, dtype=np.float32).reshape(24, 1).repeat(126, axis=1)
+        seq = np.arange(24, dtype=np.float32).reshape(24, 1).repeat(147, axis=1)
         result = aug._temporal_scale(seq)
         assert np.isclose(result[0, 0], 0.0), f"Failed at factor_range={factor_range}"
 
@@ -152,7 +152,7 @@ def test_temporal_scale_slow_interpolates_mid_frame() -> None:
     )
     aug = GestureAugmenter(config)
     # Values: seq[t, *] == t (easy to reason about interpolation)
-    seq = np.arange(24, dtype=np.float32).reshape(24, 1).repeat(126, axis=1)
+    seq = np.arange(24, dtype=np.float32).reshape(24, 1).repeat(147, axis=1)
     result = aug._temporal_scale(seq)
     assert np.isclose(result[1, 0], 0.5), f"Got {result[1, 0]}"
 
@@ -166,7 +166,7 @@ def test_temporal_scale_fast_clamps_to_last_frame() -> None:
         seed=0,
     )
     aug = GestureAugmenter(config)
-    seq = np.arange(24, dtype=np.float32).reshape(24, 1).repeat(126, axis=1)
+    seq = np.arange(24, dtype=np.float32).reshape(24, 1).repeat(147, axis=1)
     result = aug._temporal_scale(seq)
     assert np.isclose(result[12, 0], 23.0), f"Got {result[12, 0]}"
 
@@ -192,7 +192,7 @@ def test_temporal_scale_identity_is_noop() -> None:
 
 def test_augmenter_is_deterministic_with_fixed_seed() -> None:
     """Two augmenters with the same seed must produce identical results."""
-    seq = np.random.default_rng(0).random((24, 126)).astype(np.float32)
+    seq = np.random.default_rng(0).random((24, 147)).astype(np.float32)
     config = AugmentationConfig(apply_prob=0.8, seed=123)
     r1 = GestureAugmenter(config).augment(seq)
     r2 = GestureAugmenter(config).augment(seq)
@@ -209,6 +209,6 @@ def test_temporal_scale_various_lengths(T: int) -> None:
     """Temporal scaling must not crash for any realistic window length."""
     config = AugmentationConfig(apply_prob=1.0, seed=0)
     aug = GestureAugmenter(config)
-    seq = np.ones((T, 126), dtype=np.float32)
+    seq = np.ones((T, 147), dtype=np.float32)
     result = aug._temporal_scale(seq)
-    assert result.shape == (T, 126)
+    assert result.shape == (T, 147)

@@ -41,7 +41,7 @@ def test_transform_returns_zero_vector_for_invalid_packet() -> None:
     result = transformer.transform(packet)
 
     assert result.valid is False
-    assert len(result.vector) == 126
+    assert len(result.vector) == 147
     assert all(value == 0.0 for value in result.vector)
 
 
@@ -96,8 +96,11 @@ def test_velocity_features_present_on_subsequent_frames() -> None:
         _landmark_packet(landmarks=second, timestamp_ms=200)
     )
 
-    assert all(value == 0.0 for value in result1.vector[63:])
-    assert any(abs(value) > 0.0 for value in result2.vector[63:])
+    # First frame: velocity dims (71-133) must all be zero;
+    # spread/traj and joint angles may be non-zero.
+    assert all(value == 0.0 for value in result1.vector[71:134])
+    # Second frame: velocity dims must contain non-zero values.
+    assert any(abs(value) > 0.0 for value in result2.vector[71:])
 
 
 def test_non_finite_landmark_marks_feature_invalid() -> None:

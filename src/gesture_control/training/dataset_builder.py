@@ -50,11 +50,14 @@ class SequenceDatasetBuilder:
         min_valid_ratio: float = 0.8,
         label_strategy: str = "last",
         enable_orientation_normalization: bool = False,
+        min_trailing_label_purity: float = 0.9,
     ) -> None:
         if not vocabulary:
             raise ValueError("vocabulary must not be empty")
         if label_strategy not in {"last", "majority"}:
             raise ValueError("label_strategy must be one of: last, majority")
+        if not (0.0 <= min_trailing_label_purity <= 1.0):
+            raise ValueError("min_trailing_label_purity must be in [0.0, 1.0]")
 
         self._vocabulary = vocabulary
         self._label_to_id = {label: index for index, label in enumerate(vocabulary)}
@@ -63,6 +66,7 @@ class SequenceDatasetBuilder:
         self._min_valid_ratio = min_valid_ratio
         self._label_strategy = label_strategy
         self._enable_orientation_normalization = enable_orientation_normalization
+        self._min_trailing_label_purity = min_trailing_label_purity
 
         self._sample_index = 0
         self._samples: list[SequenceSample] = []
@@ -111,6 +115,21 @@ class SequenceDatasetBuilder:
                 raise RuntimeError("Label/window alignment mismatch")
 
             selected_label = self._select_label(labels)
+
+            # Trailing-purity guard: only meaningful for the "last" strategy where
+            # the assigned label equals the final frame's label.  Reject windows
+            # whose trailing frames are predominantly a different class (noisy
+            # boundary samples).  For "majority" strategy the label is chosen by
+            # vote, so trailing purity is not the right quality signal.
+            if self._label_strategy == "last" and self._min_trailing_label_purity > 0.0:
+                trailing_n = max(
+                    1, round(self._window_length * self._min_trailing_label_purity)
+                )
+                trailing_labels = labels[-trailing_n:]
+                trailing_purity = trailing_labels.count(selected_label) / trailing_n
+                if trailing_purity < self._min_trailing_label_purity:
+                    return emitted
+
             sample = SequenceSample(
                 sample_id=f"{frame.recording_id}:{self._sample_index}",
                 recording_id=frame.recording_id,
@@ -134,7 +153,12 @@ class SequenceDatasetBuilder:
             self.add_frame(frame)
         return list(self._samples)
 
-    def save_npz(self, output_path: str | Path) -> Path:
+    def save_npz(
+        self,
+        output_path: str | Path,
+        *,
+        feature_schema_version: str = "feature-schema-v1",
+    ) -> Path:
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -170,7 +194,7 @@ class SequenceDatasetBuilder:
         )
 
         metadata = {
-            "feature_schema_version": "feature-schema-v1",
+            "feature_schema_version": feature_schema_version,
             "feature_dim": int(sequences.shape[2]),
             "window_length": int(sequences.shape[1]),
             "window_step": self._window_step,
@@ -199,14 +223,34 @@ class SequenceDatasetBuilder:
         path = Path(dataset_path)
         with np.load(path, allow_pickle=True) as data:
             metadata = json.loads(str(data["metadata_json"].item()))
+            files = set(data.files)
+            n = len(data["sequences"])
+            # sample_ids / timestamps are absent in derived datasets (e.g. mirror-augmented
+            # NPZs built by the dataset notebook). Provide zero/empty defaults so the loader
+            # remains backward-compatible with any NPZ that only has the core fields.
+            sample_ids = (
+                data["sample_ids"]
+                if "sample_ids" in files
+                else np.empty(n, dtype=object)
+            )
+            start_ts = (
+                data["start_timestamp_ms"]
+                if "start_timestamp_ms" in files
+                else np.zeros(n, dtype=np.int64)
+            )
+            end_ts = (
+                data["end_timestamp_ms"]
+                if "end_timestamp_ms" in files
+                else np.zeros(n, dtype=np.int64)
+            )
             return {
                 "sequences": data["sequences"],
                 "labels": data["labels"],
                 "label_ids": data["label_ids"],
                 "recording_ids": data["recording_ids"],
-                "sample_ids": data["sample_ids"],
-                "start_timestamp_ms": data["start_timestamp_ms"],
-                "end_timestamp_ms": data["end_timestamp_ms"],
+                "sample_ids": sample_ids,
+                "start_timestamp_ms": start_ts,
+                "end_timestamp_ms": end_ts,
                 "valid_ratio": data["valid_ratio"],
                 "metadata": metadata,
             }
