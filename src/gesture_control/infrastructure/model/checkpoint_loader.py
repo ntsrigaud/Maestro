@@ -87,10 +87,11 @@ def load_latest_inference_artifact(
         )
 
     # Resolve relative paths against the registry file's directory so the
-    # loader works regardless of the process working directory.
+    # loader works regardless of the process working directory and across
+    # machines (registry stores paths relative to its own parent folder).
     resolved_path = Path(exported_path)
     if not resolved_path.is_absolute():
-        resolved_path = Path(registry_path).resolve().parent.parent / resolved_path
+        resolved_path = Path(registry_path).resolve().parent / resolved_path
 
     return load_inference_artifact(artifact_path=resolved_path, device=device)
 
