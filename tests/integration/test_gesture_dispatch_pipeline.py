@@ -1,10 +1,10 @@
 """Integration tests: full gesture → command dispatch pipeline.
 
 These tests exercise the real ``GestureActivationController`` +
-``CommandDispatcher`` + ``PowerPointAdapter`` chain without triggering any
+``CommandDispatcher`` + ``DesktopAdapter`` chain without triggering any
 OS-level side-effects.  ``pyautogui`` is patched at the module level of
 ``keyboard_adapter`` so the allowlist logic still runs, but no actual
-keystrokes are sent.
+OS events are sent.
 """
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ import numpy as np
 
 from gesture_control.domain.entities import ExecutableCommand, StabilizedPrediction
 from gesture_control.domain.enums import RuntimeMode
+from gesture_control.infrastructure.dispatch.app_adapters.desktop_adapter import (
+    DesktopAdapter,
+)
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
-)
-from gesture_control.infrastructure.dispatch.app_adapters.powerpoint_adapter import (
-    PowerPointAdapter,
 )
 from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
@@ -31,12 +31,14 @@ from gesture_control.pipeline.activation import GestureActivationController
 # ---------------------------------------------------------------------------
 
 _COMMAND_MAP: dict[str, str] = {
-    "swipe_right": "next_slide",
-    "swipe_left": "previous_slide",
-    "swipe_up": "start_presentation",
-    "swipe_down": "exit_presentation",
-    "zoom_in": "toggle_pointer_mode",
-    "zoom_out": "raise_hand",
+    "swipe_right": "navigate_forward",
+    "swipe_left": "navigate_back",
+    "swipe_up": "scroll_back",
+    "swipe_down": "scroll_forward",
+    "zoom_in": "zoom_in_view",
+    "zoom_out": "zoom_out_view",
+    "open_palm_hold": "mission_control",
+    "unknown": "no_action",
 }
 
 # Kept as a timing base constant so that test timestamps are non-trivially
@@ -71,7 +73,7 @@ def _make_dispatcher(
 ) -> tuple[CommandDispatcher, MagicMock]:
     mock_pya = MagicMock()
     kb = KeyboardAdapter()
-    adapter = PowerPointAdapter(keyboard=kb)
+    adapter = DesktopAdapter(keyboard=kb)
     cmd_set = allowed if allowed is not None else frozenset(_COMMAND_MAP.values())
     dispatcher = CommandDispatcher(
         adapter=adapter,
@@ -106,7 +108,7 @@ class TestActivationStateMachine:
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 1000)):
             cmd = controller.route(_pred("swipe_right"))
         assert cmd is not None
-        assert cmd.command_id == "next_slide"
+        assert cmd.command_id == "navigate_forward"
         assert cmd.source_gesture == "swipe_right"
 
     def test_command_triggers_cooldown(self):
@@ -129,7 +131,7 @@ class TestActivationStateMachine:
         ):
             cmd = controller.route(_pred("swipe_left"))
         assert cmd is not None
-        assert cmd.command_id == "previous_slide"
+        assert cmd.command_id == "navigate_back"
 
     def test_idle_on_missing_hands(self):
         # Patch _now_ms during construction AND rearm() so _last_active_ms starts at 0.
@@ -169,7 +171,7 @@ class TestActivationStateMachine:
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 100)):
             cmd = controller.route(_pred("swipe_right"))
         assert cmd is not None
-        assert cmd.command_id == "next_slide"
+        assert cmd.command_id == "navigate_forward"
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +185,7 @@ class TestGestureDispatchPipeline:
     def setup_method(self):
         self.controller = _make_controller()
         self.kb = KeyboardAdapter()
-        self.adapter = PowerPointAdapter(keyboard=self.kb)
+        self.adapter = DesktopAdapter(keyboard=self.kb)
         self.dispatcher = CommandDispatcher(
             adapter=self.adapter,
             allowed_commands=frozenset(_COMMAND_MAP.values()),
@@ -203,7 +205,7 @@ class TestGestureDispatchPipeline:
         self.controller.rearm()
         assert self.controller.mode is RuntimeMode.ARMED
 
-    def test_swipe_right_dispatches_next_slide(self):
+    def test_swipe_right_dispatches_navigate_forward(self):
         self._arm()
         with patch.object(
             type(self.controller),
@@ -214,9 +216,9 @@ class TestGestureDispatchPipeline:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("right")
+        self.mock_pya.hotkey.assert_called_once_with("ctrl", "right")
 
-    def test_swipe_left_dispatches_previous_slide(self):
+    def test_swipe_left_dispatches_navigate_back(self):
         self._arm()
         with patch.object(
             type(self.controller),
@@ -227,9 +229,9 @@ class TestGestureDispatchPipeline:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("left")
+        self.mock_pya.hotkey.assert_called_once_with("ctrl", "left")
 
-    def test_swipe_up_dispatches_start_presentation(self):
+    def test_swipe_up_dispatches_scroll_back(self):
         self._arm()
         with patch.object(
             type(self.controller),
@@ -240,9 +242,7 @@ class TestGestureDispatchPipeline:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with(
-            "shift", "f5"
-        )  # PowerPoint start_presentation
+        self.mock_pya.scroll.assert_called_once_with(5)  # scroll_back = pyautogui.scroll(+N)
 
     def test_command_dispatched_exactly_once_per_gesture(self):
         self._arm()
@@ -299,7 +299,7 @@ class TestGestureDispatchPipeline:
 class TestIntegrationRateLimiting:
     def test_burst_commands_beyond_limit_are_dropped(self):
         kb = KeyboardAdapter()
-        adapter = PowerPointAdapter(keyboard=kb)
+        adapter = DesktopAdapter(keyboard=kb)
         dispatcher = CommandDispatcher(
             adapter=adapter,
             allowed_commands=frozenset(_COMMAND_MAP.values()),
@@ -315,7 +315,7 @@ class TestIntegrationRateLimiting:
         ):
             for i in range(5):
                 cmd = ExecutableCommand(
-                    command_id="next_slide",
+                    command_id="navigate_forward",
                     source_gesture="swipe_right",
                     issued_at_ms=i * 10,
                 )
@@ -382,7 +382,7 @@ class TestEdgeTriggerSingleDispatch:
             f"Expected exactly 1 command but got {len(commands)}. "
             "Edge-trigger failed to suppress repeated predictions."
         )
-        assert commands[0].command_id == "next_slide"
+        assert commands[0].command_id == "navigate_forward"
 
     def test_gesture_resets_after_unknown_then_redispatches(self):
         """After the gesture transitions through 'unknown', the next accepted
@@ -394,7 +394,7 @@ class TestEdgeTriggerSingleDispatch:
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t)):
             cmd1 = ctrl.route(_pred("swipe_right"))
         assert cmd1 is not None
-        assert cmd1.command_id == "next_slide"
+        assert cmd1.command_id == "navigate_forward"
 
         # Hand returns to unknown — resets the edge-trigger.
         t_unknown = t + _COOLDOWN_MS + 10
@@ -407,7 +407,7 @@ class TestEdgeTriggerSingleDispatch:
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t2)):
             cmd2 = ctrl.route(_pred("swipe_right"))
         assert cmd2 is not None
-        assert cmd2.command_id == "next_slide"
+        assert cmd2.command_id == "navigate_forward"
 
     def test_repeated_swipe_through_expired_cooldown_still_suppressed(self):
         """The most critical regression: after COOLDOWN expires, if the swipe
@@ -449,7 +449,7 @@ class TestEdgeTriggerSingleDispatch:
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_after)):
             cmd2 = ctrl.route(_pred("swipe_left"))
         assert cmd2 is not None
-        assert cmd2.command_id == "previous_slide"
+        assert cmd2.command_id == "navigate_back"
 
     def test_edge_trigger_disabled_falls_back_to_cooldown_only(self):
         """When edge_trigger_enabled=False, the controller falls back to
@@ -481,7 +481,7 @@ class TestEdgeTriggerSingleDispatch:
         once."""
         ctrl = self._make_armed_controller()
         kb = KeyboardAdapter()
-        adapter = PowerPointAdapter(keyboard=kb)
+        adapter = DesktopAdapter(keyboard=kb)
         dispatcher = CommandDispatcher(
             adapter=adapter,
             allowed_commands=frozenset(_COMMAND_MAP.values()),
@@ -516,8 +516,8 @@ class TestEdgeTriggerSingleDispatch:
                 t += 100  # 100 ms per window
 
         assert len(dispatched) == 1, f"Expected 1 dispatch but got {len(dispatched)}"
-        assert dispatched[0].command_id == "next_slide"
-        mock_pya.hotkey.assert_called_once_with("right")
+        assert dispatched[0].command_id == "navigate_forward"
+        mock_pya.hotkey.assert_called_once_with("ctrl", "right")
 
     def test_temporal_voting_buildup_does_not_consume_rising_edge(self):
         """Regression test for the _prev_label / _last_dispatched_label bug.
@@ -541,7 +541,7 @@ class TestEdgeTriggerSingleDispatch:
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
             cmd1 = ctrl.route(_pred("swipe_right"))
         assert cmd1 is not None
-        assert cmd1.command_id == "next_slide"
+        assert cmd1.command_id == "navigate_forward"
 
         # --- COOLDOWN + reset: gesture ends, hand goes neutral ---
         t_rest = t_base + _COOLDOWN_MS + 20
@@ -569,7 +569,7 @@ class TestEdgeTriggerSingleDispatch:
             "Second gesture suppressed. Unaccepted temporal-voting frames "
             "must not advance the edge-trigger counter (_prev_label regression)."
         )
-        assert cmd2.command_id == "previous_slide"
+        assert cmd2.command_id == "navigate_back"
 
     def test_sequential_swipe_right_then_left_then_right(self):
         """Three sequential distinct gestures must each fire exactly once,
@@ -586,7 +586,7 @@ class TestEdgeTriggerSingleDispatch:
 
         # Gesture 1: swipe_right
         cmd1 = _route("swipe_right")
-        assert cmd1 is not None and cmd1.command_id == "next_slide"
+        assert cmd1 is not None and cmd1.command_id == "navigate_forward"
 
         # Cooldown + neutral
         for _ in range(8):
@@ -596,7 +596,7 @@ class TestEdgeTriggerSingleDispatch:
         assert _route("swipe_left", accepted=False) is None
         assert _route("swipe_left", accepted=False) is None
         cmd2 = _route("swipe_left", accepted=True)
-        assert cmd2 is not None and cmd2.command_id == "previous_slide"
+        assert cmd2 is not None and cmd2.command_id == "navigate_back"
 
         # Cooldown + neutral
         for _ in range(8):
@@ -606,7 +606,7 @@ class TestEdgeTriggerSingleDispatch:
         assert _route("swipe_right", accepted=False) is None
         assert _route("swipe_right", accepted=False) is None
         cmd3 = _route("swipe_right", accepted=True)
-        assert cmd3 is not None and cmd3.command_id == "next_slide"
+        assert cmd3 is not None and cmd3.command_id == "navigate_forward"
 
 
 # ---------------------------------------------------------------------------
@@ -635,7 +635,7 @@ class TestGazeGateIntegration:
     def setup_method(self) -> None:
         self.controller = _make_controller()
         self.kb = KeyboardAdapter()
-        self.adapter = PowerPointAdapter(keyboard=self.kb)
+        self.adapter = DesktopAdapter(keyboard=self.kb)
         self.dispatcher = CommandDispatcher(
             adapter=self.adapter,
             allowed_commands=frozenset(_COMMAND_MAP.values()),
@@ -685,7 +685,7 @@ class TestGazeGateIntegration:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("right")
+        self.mock_pya.hotkey.assert_called_once_with("ctrl", "right")
 
     # -- Gaze loss → force_idle -----------------------------------------------
 
@@ -756,14 +756,12 @@ class TestGazeGateIntegration:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with(
-            "shift", "f5"
-        )  # start_presentation
+        self.mock_pya.scroll.assert_called_once_with(5)  # scroll_back = scroll up
 
     # -- New gesture mappings under gaze gate ---------------------------------
 
-    def test_swipe_down_dispatches_exit_presentation_when_gaze_active(self) -> None:
-        """swipe_down → exit_presentation (Escape) must reach pyautogui when gaze
+    def test_swipe_down_dispatches_scroll_forward_when_gaze_active(self) -> None:
+        """swipe_down → scroll_forward must reach pyautogui when gaze
         is active (NullGazeDetector / gaze gate open)."""
         self._arm()
         with patch.object(
@@ -775,7 +773,7 @@ class TestGazeGateIntegration:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("escape")
+        self.mock_pya.scroll.assert_called_once_with(-5)  # scroll_forward = scroll down
 
     def test_swipe_down_does_not_dispatch_when_gaze_absent(self) -> None:
         """swipe_down must be suppressed when the gaze gate is closed (IDLE)."""
