@@ -80,22 +80,6 @@ _KNOWN_PLATFORMS: frozenset[str] = frozenset({"darwin", "win32", "linux"})
 _SCROLL_CLICKS = 5  # pyautogui scroll clicks per gesture event
 _ZOOM_CLICKS = 3  # modifier+scroll steps per zoom gesture event
 
-# Documentation constant — expected values from command_map_desktop.yaml.
-# The runtime-enforced allowlist is built in bootstrap.py from the loaded
-# command map: frozenset(command_map.values()).
-_DESKTOP_ALLOWED: frozenset[str] = frozenset(
-    {
-        "scroll_forward",
-        "scroll_back",
-        "zoom_in_view",
-        "zoom_out_view",
-        "navigate_forward",
-        "navigate_back",
-        "mission_control",
-        "no_action",
-    }
-)
-
 
 class DesktopAdapter:
     """Desktop interaction adapter.
