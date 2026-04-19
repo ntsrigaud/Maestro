@@ -47,7 +47,22 @@ class AppConfig(BaseModel):
     # "tabs"      → Ctrl+Tab / Ctrl+Shift+Tab (browser/editor tabs)
     navigation_mode: str = Field(default="workspace", pattern="^(workspace|tabs)$")
     # Desktop-specific fine-tuning; ignored when active_app != "desktop".
-    desktop: "DesktopConfig" = Field(default_factory=lambda: DesktopConfig())
+    desktop: DesktopConfig = Field(default_factory=lambda: DesktopConfig())
+
+
+class DesktopConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Number of pyautogui scroll clicks per scroll gesture event.
+    # Tune for comfortable document scrolling at your display DPI / resolution.
+    scroll_clicks: int = Field(default=5, ge=1, le=20)
+    # Number of modifier+scroll steps per zoom gesture event.
+    # Smaller values give finer zoom control; larger give faster zoom.
+    zoom_clicks: int = Field(default=3, ge=1, le=10)
+    # Linux desktop environment name, used to select the correct Activities /
+    # Overview shortcut.  Case-insensitive.  Supported: gnome (default), kde.
+    # Any other value falls back to the GNOME shortcut (Super+A).
+    linux_de: str = Field(default="gnome", pattern="^[a-z][a-z0-9_-]{0,31}$")
 
 
 class InferenceConfig(BaseModel):
