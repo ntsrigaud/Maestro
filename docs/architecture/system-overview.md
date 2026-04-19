@@ -2,30 +2,30 @@
 
 ## 1. Introduction
 
-The Gesture Control System is a real-time gesture control application that enables hands-free interaction with presentation and meeting software. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with an LSTM neural network, and dispatches operating-system-level keyboard commands to control applications such as Microsoft PowerPoint and Zoom.
+The Gesture Control System is a real-time gesture control application that enables hands-free desktop interaction. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with an LSTM neural network, and dispatches operating-system-level keyboard commands for navigation, scrolling, zoom, and desktop management.
 
 The architecture follows a modular, protocol-driven design with strict separation between domain logic, infrastructure adapters, and pipeline orchestration. All runtime parameters are externalized to YAML configuration files. The system is CPU-first and operates at interactive frame rates on consumer hardware.
 
 ## 2. System Objective
 
-Provide reliable, low-latency gesture-based control for presentation workflows using a small, highly separable gesture vocabulary. The system prioritizes safety (low false-trigger rate) over recognition speed through multi-stage prediction stabilization and an explicit activation state machine.
+Provide reliable, low-latency gesture-based desktop control using a small, highly separable gesture vocabulary. The system prioritizes safety (low false-trigger rate) over recognition speed through multi-stage prediction stabilization and an explicit activation state machine.
 
 ## 3. Gesture Vocabulary
 
 The system recognizes eight gesture classes derived from the IPN Hand dataset:
 
-| Gesture          | Type            | Mapped Command                      |
-| ---------------- | --------------- | ----------------------------------- |
-| `open_palm_hold` | Static          | No action (model output class only) |
-| `swipe_right`    | Dynamic         | Next slide                          |
-| `swipe_left`     | Dynamic         | Previous slide                      |
-| `swipe_up`       | Dynamic         | Start presentation                  |
-| `swipe_down`     | Dynamic         | Exit presentation                   |
-| `zoom_in`        | Dynamic         | Toggle pointer mode                 |
-| `zoom_out`       | Dynamic         | Raise hand                          |
-| `unknown`        | Rejection class | No action                           |
+| Gesture          | Type            | Mapped Command   |
+| ---------------- | --------------- | ---------------- |
+| `open_palm_hold` | Static          | Mission Control  |
+| `swipe_right`    | Dynamic         | Navigate forward |
+| `swipe_left`     | Dynamic         | Navigate back    |
+| `swipe_up`       | Dynamic         | Scroll back      |
+| `swipe_down`     | Dynamic         | Scroll forward   |
+| `zoom_in`        | Dynamic         | Zoom in view     |
+| `zoom_out`       | Dynamic         | Zoom out view    |
+| `unknown`        | Rejection class | No action        |
 
-The activation gate is controlled entirely by gaze detection: the system starts in ARMED state and accepts command gestures as long as the user's gaze is directed at the camera. Turning away (gaze lost beyond the grace period) transitions the system to IDLE; looking back triggers `rearm()` and resumes ARMED state. `swipe_up` enters slideshow mode, `swipe_down` exits it, and `swipe_left`/`swipe_right` navigate between slides. `open_palm_hold` is retained as a model output class but is not mapped to any command and is silently ignored by the dispatcher.
+The activation gate is controlled entirely by gaze detection: the system starts in ARMED state and accepts command gestures as long as the user's gaze is directed at the camera. Turning away (gaze lost beyond the grace period) transitions the system to IDLE; looking back triggers `rearm()` and resumes ARMED state. `swipe_up`/`swipe_down` scroll through content, `swipe_left`/`swipe_right` navigate between virtual desktops or browser tabs (configurable via `navigation_mode`), `zoom_in`/`zoom_out` adjust view magnification, and `open_palm_hold` triggers Mission Control / Activities overview.
 
 ## 4. High-Level Architecture
 

@@ -28,10 +28,10 @@ direction convention.
 is now the sole command map. Vertical swipe mappings corrected to match natural/touchpad
 scroll direction:
 
-| Gesture | Before | After |
-|---|---|---|
-| `swipe_up` | `scroll_forward` | `scroll_back` |
-| `swipe_down` | `scroll_back` | `scroll_forward` |
+| Gesture      | Before           | After            |
+| ------------ | ---------------- | ---------------- |
+| `swipe_up`   | `scroll_forward` | `scroll_back`    |
+| `swipe_down` | `scroll_back`    | `scroll_forward` |
 
 `swipe_up → scroll_back` scrolls content upward (natural direction: content tracks the
 hand). The corrected semantics are consistent across browsers, PDF viewers, and

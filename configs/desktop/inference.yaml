@@ -15,8 +15,8 @@ min_valid_ratio: 0.6
 # Arm/disarm timing.
 # Longer idle_timeout_ms suits uninterrupted work sessions where the user
 # may leave the camera for extended periods.
-idle_timeout_ms: 60000       # 60 s — disarm after 1 min of inactivity
-command_cooldown_ms: 800     # 0.8 s minimum between dispatched commands
+idle_timeout_ms: 60000 # 60 s — disarm after 1 min of inactivity
+command_cooldown_ms: 800 # 0.8 s minimum between dispatched commands
 
 # Rising-edge trigger: only fire on the first prediction frame, not repeatedly
 # across a slow gesture that lingers in the inference window.

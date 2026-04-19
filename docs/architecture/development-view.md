@@ -67,7 +67,7 @@ Semantic-HGR-System/
 | Module         | Contents                                                                                                                                                       | Responsibility                                                                  |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `entities.py`  | `FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState` | Dataclasses (`slots=True`) representing pipeline state at each processing stage |
-| `enums.py`     | `RuntimeMode`, `CommandID`                                                                                                                                     | Finite state and command vocabularies as `StrEnum` types                        |
+| `enums.py`     | `RuntimeMode`                                                                                                                                                  | Finite state vocabulary as `StrEnum` type                                       |
 | `events.py`    | `DomainEvent`                                                                                                                                                  | Structured event type for telemetry and logging                                 |
 | `contracts.py` | `IRunnable`, `IClosable`                                                                                                                                       | Minimal lifecycle protocols                                                     |
 
@@ -205,16 +205,16 @@ graph TD
 
 Configuration files are organized by concern:
 
-| Category         | Files                            | Schema                                                                           |
-| ---------------- | -------------------------------- | -------------------------------------------------------------------------------- |
-| **Application**  | `app.yaml`                       | `AppConfig` — camera index, resolution, FPS, active application                  |
-| **Inference**    | `inference.yaml`                 | `InferenceConfig` — window length/step, activation timing, cooldown              |
-| **Model source** | `model_source.yaml`              | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename |
-| **Model**        | `model/lstm_default.yaml`        | Training hyperparameters, model architecture, augmentation settings              |
-| **Features**     | `model/feature_pipeline.yaml`    | `FeaturePipelineConfig` — normalization and velocity toggles                     |
-| **Vocabulary**   | `gestures/vocabulary_ipn.yaml`   | Gesture class list (8 classes)                                                   |
-| **Commands**     | `gestures/command_map_ipn.yaml`  | Gesture-to-`CommandID` mapping                                                   |
-| **Thresholds**   | `thresholds/production_ipn.yaml` | Per-class confidence thresholds and temporal vote window sizes                   |
+| Category         | Files                               | Schema                                                                           |
+| ---------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
+| **Application**  | `app.yaml`                          | `AppConfig` — camera index, resolution, FPS                                      |
+| **Inference**    | `inference.yaml`                    | `InferenceConfig` — window length/step, activation timing, cooldown              |
+| **Model source** | `model_source.yaml`                 | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename |
+| **Model**        | `model/lstm_default.yaml`           | Training hyperparameters, model architecture, augmentation settings              |
+| **Features**     | `model/feature_pipeline.yaml`       | `FeaturePipelineConfig` — normalization and velocity toggles                     |
+| **Vocabulary**   | `gestures/vocabulary_ipn.yaml`      | Gesture class list (8 classes)                                                   |
+| **Commands**     | `gestures/command_map_desktop.yaml` | Gesture-to-command mapping (desktop vocabulary)                                  |
+| **Thresholds**   | `thresholds/production_ipn.yaml`    | Per-class confidence thresholds and temporal vote window sizes                   |
 
 All configuration is validated at startup via Pydantic schemas. Invalid configurations cause immediate failure with descriptive error messages.
 
