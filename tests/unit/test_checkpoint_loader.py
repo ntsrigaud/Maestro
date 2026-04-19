@@ -97,7 +97,6 @@ def test_validate_runtime_compatibility_passes(tmp_path: Path) -> None:
                 "frame_width": 1280,
                 "frame_height": 720,
                 "target_fps": 30,
-                "active_app": "powerpoint",
             },
             "inference": {
                 "window_length": 24,
