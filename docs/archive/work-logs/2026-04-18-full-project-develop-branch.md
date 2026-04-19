@@ -26,16 +26,16 @@ The work proceeded in six phases over approximately five weeks (2026-03-16 → 2
 Before new development began, a large volume of deprecated material from the previous
 prototype direction was removed:
 
-| Category | Removed |
-|---|---|
+| Category                                                                                  | Removed                       |
+| ----------------------------------------------------------------------------------------- | ----------------------------- |
 | Ad-hoc guide documents (`DEVELOPMENT_GUIDE.md`, `INSTALL.md`, `QUICK_REFERENCE.md`, etc.) | ~12 root-level markdown files |
-| `docs/Project-Architecture/` subtree (old CLIP/ViT architecture docs) | ~10 files |
-| `docs/Research-Notes/`, `docs/Topics/`, `docs/Imaging/` (research artifacts) | ~15 files + images |
-| `logs/` directory (legacy work logs) | 6 files |
-| `notebooks/` training artifacts and legacy notebooks | ~25 files / images |
-| `scripts/` legacy data collection, HaGRID download, and demo scripts | ~30 scripts |
-| `src/input_manager/`, `src/recognition_engine/`, `src/shared/` | Full legacy packages |
-| `environment.yml`, `setup.py` | Replaced by `pyproject.toml` |
+| `docs/Project-Architecture/` subtree (old CLIP/ViT architecture docs)                     | ~10 files                     |
+| `docs/Research-Notes/`, `docs/Topics/`, `docs/Imaging/` (research artifacts)              | ~15 files + images            |
+| `logs/` directory (legacy work logs)                                                      | 6 files                       |
+| `notebooks/` training artifacts and legacy notebooks                                      | ~25 files / images            |
+| `scripts/` legacy data collection, HaGRID download, and demo scripts                      | ~30 scripts                   |
+| `src/input_manager/`, `src/recognition_engine/`, `src/shared/`                            | Full legacy packages          |
+| `environment.yml`, `setup.py`                                                             | Replaced by `pyproject.toml`  |
 
 ---
 
@@ -46,16 +46,16 @@ prototype direction was removed:
 The repository was reorganized into a production-oriented package centered on
 `src/gesture_control/` with strict layer boundaries:
 
-| Layer | Path |
-|---|---|
-| Domain | `src/gesture_control/domain/` |
-| Interfaces | `src/gesture_control/interfaces/` |
+| Layer          | Path                                  |
+| -------------- | ------------------------------------- |
+| Domain         | `src/gesture_control/domain/`         |
+| Interfaces     | `src/gesture_control/interfaces/`     |
 | Infrastructure | `src/gesture_control/infrastructure/` |
-| Pipeline | `src/gesture_control/pipeline/` |
-| Application | `src/gesture_control/app/` |
-| Training | `src/gesture_control/training/` |
-| Evaluation | `src/gesture_control/evaluation/` |
-| Utilities | `src/gesture_control/utils/` |
+| Pipeline       | `src/gesture_control/pipeline/`       |
+| Application    | `src/gesture_control/app/`            |
+| Training       | `src/gesture_control/training/`       |
+| Evaluation     | `src/gesture_control/evaluation/`     |
+| Utilities      | `src/gesture_control/utils/`          |
 
 **Domain layer** (`domain/entities.py`, `contracts.py`, `enums.py`, `events.py`):
 Dataclass entities for `FrameData`, `LandmarkFrame`, `FeatureFrame`, `GesturePrediction`,
@@ -67,6 +67,7 @@ Dataclass entities for `FrameData`, `LandmarkFrame`, `FeatureFrame`, `GesturePre
 `IFeedbackRenderer`, and later `IGazeIntentDetector`.
 
 **Utilities layer**:
+
 - `config_loader.py` — YAML config loading with environment variable resolution
 - `schema_validation.py` — Pydantic models for all config schemas
 - `reproducibility.py` — deterministic seeding for training runs
@@ -75,16 +76,16 @@ Dataclass entities for `FrameData`, `LandmarkFrame`, `FeatureFrame`, `GesturePre
 
 ### Configuration Baseline
 
-| File | Content |
-|---|---|
-| `configs/app.yaml` | Application runtime settings |
-| `configs/inference.yaml` | Temporal buffer parameters, stabilization, activation, dispatch |
-| `configs/logging.yaml` | Structured logging configuration |
-| `configs/model/lstm_default.yaml` | LSTM architecture and training hyperparameters |
-| `configs/model/feature_pipeline.yaml` | Feature schema version, block dims, normalization |
-| `configs/gestures/vocabulary_ipn.yaml` | IPN-derived gesture class definitions |
-| `configs/gestures/command_map_ipn.yaml` | Gesture → command ID mapping |
-| `configs/thresholds/production_ipn.yaml` | Per-class confidence thresholds |
+| File                                     | Content                                                         |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| `configs/app.yaml`                       | Application runtime settings                                    |
+| `configs/inference.yaml`                 | Temporal buffer parameters, stabilization, activation, dispatch |
+| `configs/logging.yaml`                   | Structured logging configuration                                |
+| `configs/model/lstm_default.yaml`        | LSTM architecture and training hyperparameters                  |
+| `configs/model/feature_pipeline.yaml`    | Feature schema version, block dims, normalization               |
+| `configs/gestures/vocabulary_ipn.yaml`   | IPN-derived gesture class definitions                           |
+| `configs/gestures/command_map_ipn.yaml`  | Gesture → command ID mapping                                    |
+| `configs/thresholds/production_ipn.yaml` | Per-class confidence thresholds                                 |
 
 ### Build System and CI
 
@@ -102,14 +103,14 @@ across `runtime` and `training` job tracks.
 
 Six architecture views added under `docs/architecture/`:
 
-| Document | Content |
-|---|---|
-| `system-overview.md` | Technology stack, deployment topology, key design decisions |
-| `logical-view.md` | Package decomposition and dependency directions |
-| `data-flow.md` | Per-stage data transformation, tensor shapes, feature vector layout |
-| `process-view.md` | Runtime event loop, thread model, state machine |
-| `development-view.md` | Build system, dependency management, CI/CD |
-| `physical-view.md` | Deployment environments, hardware requirements |
+| Document              | Content                                                             |
+| --------------------- | ------------------------------------------------------------------- |
+| `system-overview.md`  | Technology stack, deployment topology, key design decisions         |
+| `logical-view.md`     | Package decomposition and dependency directions                     |
+| `data-flow.md`        | Per-stage data transformation, tensor shapes, feature vector layout |
+| `process-view.md`     | Runtime event loop, thread model, state machine                     |
+| `development-view.md` | Build system, dependency management, CI/CD                          |
+| `physical-view.md`    | Deployment environments, hardware requirements                      |
 
 ---
 
@@ -216,22 +217,22 @@ per-stage latency benchmarking and reporting.
 
 Baseline test coverage (≥ 200 tests passing by end of phase):
 
-| Suite | Coverage |
-|---|---|
-| `tests/unit/test_feature_engineering.py` | 147-dim schema, normalisation |
-| `tests/unit/test_sequence_buffer.py` | Fill ratio, FIFO ordering |
-| `tests/unit/test_mediapipe_extractor.py` | Landmark normalisation |
-| `tests/unit/test_opencv_source.py` | Frame source lifecycle |
-| `tests/unit/test_checkpoint_loader.py` | Artifact loading and schema guard |
-| `tests/unit/test_prediction_stabilization.py` | Voting window |
-| `tests/unit/test_dataset_builder.py` | NPZ construction, vocabulary alignment |
-| `tests/unit/test_training_datamodule.py` | Group split determinism |
-| `tests/unit/test_training_export.py` | Checksum and registry append |
-| `tests/unit/test_overlay_renderer.py` | Rendering state machine |
-| `tests/unit/test_latency_benchmark.py` | Benchmark data model |
-| `tests/integration/test_phase2_pipeline.py` | Frame → prediction integration |
-| `tests/integration/test_phase3_feature_pipeline.py` | Feature schema v5 alignment |
-| `tests/integration/test_training_pipeline_smoke.py` | End-to-end training smoke |
+| Suite                                               | Coverage                               |
+| --------------------------------------------------- | -------------------------------------- |
+| `tests/unit/test_feature_engineering.py`            | 147-dim schema, normalisation          |
+| `tests/unit/test_sequence_buffer.py`                | Fill ratio, FIFO ordering              |
+| `tests/unit/test_mediapipe_extractor.py`            | Landmark normalisation                 |
+| `tests/unit/test_opencv_source.py`                  | Frame source lifecycle                 |
+| `tests/unit/test_checkpoint_loader.py`              | Artifact loading and schema guard      |
+| `tests/unit/test_prediction_stabilization.py`       | Voting window                          |
+| `tests/unit/test_dataset_builder.py`                | NPZ construction, vocabulary alignment |
+| `tests/unit/test_training_datamodule.py`            | Group split determinism                |
+| `tests/unit/test_training_export.py`                | Checksum and registry append           |
+| `tests/unit/test_overlay_renderer.py`               | Rendering state machine                |
+| `tests/unit/test_latency_benchmark.py`              | Benchmark data model                   |
+| `tests/integration/test_phase2_pipeline.py`         | Frame → prediction integration         |
+| `tests/integration/test_phase3_feature_pipeline.py` | Feature schema v5 alignment            |
+| `tests/integration/test_training_pipeline_smoke.py` | End-to-end training smoke              |
 
 ---
 
@@ -335,6 +336,7 @@ rearm, ARMED persistence semantics.
 
 `scikit-learn` moved from core runtime dependencies to the `[training]` optional extra
 in `pyproject.toml`. CI split into two jobs:
+
 - `runtime` — installs `.[dev]`, runs `pytest -m "not training"` and `mypy src/`
 - `training` — installs `.[dev,training]`, runs the full test suite
 
@@ -379,13 +381,13 @@ Summary:
 
 ### Feature Schema Evolution
 
-| Version | Dims | Added block | PR |
-|---|---|---|---|
-| v1 | 126 | Positions + velocities | Phase 2 |
-| v2 | 126 | Wrist trajectory Δ + fingertip spread (replaces old v1 calc) | #138 |
-| v3 | 144 | +10 MCP/PIP joint angles | #138 |
-| v4 | 144 | Baseline training round | #135 |
-| v5 | 147 | +global wrist velocity (`vwx, vwy, vwz`) | #138 |
+| Version | Dims | Added block                                                  | PR      |
+| ------- | ---- | ------------------------------------------------------------ | ------- |
+| v1      | 126  | Positions + velocities                                       | Phase 2 |
+| v2      | 126  | Wrist trajectory Δ + fingertip spread (replaces old v1 calc) | #138    |
+| v3      | 144  | +10 MCP/PIP joint angles                                     | #138    |
+| v4      | 144  | Baseline training round                                      | #135    |
+| v5      | 147  | +global wrist velocity (`vwx, vwy, vwz`)                     | #138    |
 
 Final 147-dim schema:
 
@@ -430,20 +432,20 @@ horizontal flip is applied; `vwx` (index 146) added to the flip axis list.
 
 ## Training Experiments
 
-| Run | Schema | Macro-F1 | Notes |
-|---|---|---|---|
-| `lstm_v1_20260328T100850Z` | v1 | — | Foundation baseline |
-| `lstm_v1_20260330T181558Z` | v1 | — | IPN vocabulary training |
-| `lstm_v1_20260405T082546Z` | v3 | — | v3 feature evaluation |
-| `lstm_v1_20260405T132108Z` | v3 | — | |
-| `lstm_v1_20260413T023049Z` | v3 | — | |
-| `lstm_v1_20260413T064039Z` | v3 | — | |
-| `tcn_v1_20260413T065716Z` | v3 | 0.87 | TCN evaluation |
-| `tcn_v1_20260417T052818Z` | v3 | — | TCN second run |
-| `lstm_v1_20260417T*` (×5) | v4 | — | v4 notebook workflow |
-| `lstm_v1_20260418T002927Z` | v5 | — | v5 training |
-| `lstm_v1_20260418T004149Z` | v5 | — | |
-| `lstm_v1_20260418T023120Z` | v5 | **0.96** | Production model → HF Hub |
+| Run                        | Schema | Macro-F1 | Notes                     |
+| -------------------------- | ------ | -------- | ------------------------- |
+| `lstm_v1_20260328T100850Z` | v1     | —        | Foundation baseline       |
+| `lstm_v1_20260330T181558Z` | v1     | —        | IPN vocabulary training   |
+| `lstm_v1_20260405T082546Z` | v3     | —        | v3 feature evaluation     |
+| `lstm_v1_20260405T132108Z` | v3     | —        |                           |
+| `lstm_v1_20260413T023049Z` | v3     | —        |                           |
+| `lstm_v1_20260413T064039Z` | v3     | —        |                           |
+| `tcn_v1_20260413T065716Z`  | v3     | 0.87     | TCN evaluation            |
+| `tcn_v1_20260417T052818Z`  | v3     | —        | TCN second run            |
+| `lstm_v1_20260417T*` (×5)  | v4     | —        | v4 notebook workflow      |
+| `lstm_v1_20260418T002927Z` | v5     | —        | v5 training               |
+| `lstm_v1_20260418T004149Z` | v5     | —        |                           |
+| `lstm_v1_20260418T023120Z` | v5     | **0.96** | Production model → HF Hub |
 
 16 experiment runs committed to `experiments/runs/` (config snapshots, dataset
 metadata, per-epoch training metrics JSON).
@@ -452,14 +454,14 @@ metadata, per-epoch training metrics JSON).
 
 ## Final System State
 
-| Metric | State |
-|---|---|
-| Test suite | **≥ 250 tests, 0 failures** |
-| CI | Runtime + training job tracks; `mypy src/` enforced |
-| Inference schema | `feature-schema-v5`, 147-dim |
-| Production model | `ntsrigaud/gesture-control-lstm` on Hugging Face Hub (Macro-F1 **0.96**) |
-| Runtime deployment | `pip install -e . && python scripts/run_realtime.py` — no prior training run required |
-| Tracked binary weights | **0 MB** (all `.pt` and `registry.json` excluded from VCS) |
-| Gaze activation | `HeadPoseGazeDetector` as sole arming mechanism |
-| Secure dispatch | `KeyboardAdapter` allowlist; `CommandDispatcher` rate limiting |
-| Application targets | Microsoft PowerPoint, Zoom (extensible via `IApplicationAdapter`) |
+| Metric                 | State                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| Test suite             | **≥ 250 tests, 0 failures**                                                           |
+| CI                     | Runtime + training job tracks; `mypy src/` enforced                                   |
+| Inference schema       | `feature-schema-v5`, 147-dim                                                          |
+| Production model       | `ntsrigaud/gesture-control-lstm` on Hugging Face Hub (Macro-F1 **0.96**)              |
+| Runtime deployment     | `pip install -e . && python scripts/run_realtime.py` — no prior training run required |
+| Tracked binary weights | **0 MB** (all `.pt` and `registry.json` excluded from VCS)                            |
+| Gaze activation        | `HeadPoseGazeDetector` as sole arming mechanism                                       |
+| Secure dispatch        | `KeyboardAdapter` allowlist; `CommandDispatcher` rate limiting                        |
+| Application targets    | Microsoft PowerPoint, Zoom (extensible via `IApplicationAdapter`)                     |

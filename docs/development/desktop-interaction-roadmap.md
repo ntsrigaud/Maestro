@@ -82,8 +82,8 @@ Update `configs/app.yaml` to expose the new fields with their defaults:
 
 ```yaml
 # existing fields unchanged ...
-command_map: command_map_ipn.yaml    # switch to command_map_desktop.yaml for desktop mode
-navigation_mode: workspace           # switch to "tabs" for tab-based navigation
+command_map: command_map_ipn.yaml # switch to command_map_desktop.yaml for desktop mode
+navigation_mode: workspace # switch to "tabs" for tab-based navigation
 ```
 
 ### 1.4 Bootstrap Command Map Fix
@@ -272,9 +272,9 @@ elif active_app == "desktop":
 
 ### Phase 2 Tests
 
-| Test file                                      | Scope                                                                                                                     |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `tests/unit/test_desktop_adapter.py`           | All 8 command IDs; per-platform nav shortcuts; `sys.platform` patching; `navigation_mode` switching; zoom sign convention |
+| Test file                                      | Scope                                                                                                                                                                                                                               |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/unit/test_desktop_adapter.py`           | All 8 command IDs; per-platform nav shortcuts; `sys.platform` patching; `navigation_mode` switching; zoom sign convention                                                                                                           |
 | `tests/unit/test_keyboard_adapter.py` (extend) | `scroll()` clamps to [-20, 20]; `zoom()` clamps to [-5, 5] and sends `keyDown`/`keyUp` with `"command"` on macOS / `"ctrl"` on other platforms; `try/finally` releases modifier on `scroll()` failure; new key names pass allowlist |
 
 ### Phase 2 Gate
@@ -340,13 +340,13 @@ frame_height: 720
 target_fps: 30
 active_app: desktop
 command_map: command_map_desktop.yaml
-navigation_mode: workspace  # switch to "tabs" for browser/editor tab navigation
+navigation_mode: workspace # switch to "tabs" for browser/editor tab navigation
 mirror_display: true
 
 desktop:
   scroll_clicks: 5
   zoom_clicks: 3
-  linux_de: gnome  # linux only: gnome | kde | other
+  linux_de: gnome # linux only: gnome | kde | other
 ```
 
 **`configs/desktop/inference.yaml`** — desktop-tuned timing (same content as Phase 1.2’s `configs/inference_desktop.yaml`; the loader reads `inference.yaml` by name from the config directory):
