@@ -61,6 +61,8 @@ The system performs reliably when the user is seated within ~80–100 cm of the 
 
 `pyautogui.scroll()` injects a native OS scroll event at the current cursor position. It is **application-agnostic**: the same call advances the page in Chrome, Firefox, Preview, Acrobat, VS Code, or any other focused window. There is no need for per-application adapters. `wrist_vel_raw[144:147]` provides a clean vertical velocity signal at desk distance, making vertical swipes the top-1 most reliable gesture pair in production eval.
 
+**Scroll direction convention**: `swipe_up → scroll_forward` scrolls content **downward** (advances the document); `swipe_down → scroll_back` scrolls content upward. This follows natural/touchpad scrolling — the content tracks the hand movement. It is the inverse of the legacy scroll-wheel convention and matches Apple Magic Trackpad and touchscreen behaviour. The command names (`scroll_forward` / `scroll_back`) describe document position, not gesture direction, keeping the semantics stable if the mapping is reconfigured.
+
 ### 2.2 Workspace and Tab Navigation
 
 **Context**: User navigates between virtual desktops or browser tabs without a keyboard chord.
