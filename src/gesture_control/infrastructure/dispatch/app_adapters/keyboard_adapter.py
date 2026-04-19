@@ -67,6 +67,7 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
     }
 )
 
+
 class KeyboardAdapter:
     """Low-level key delivery service backed by *pyautogui*.
 
