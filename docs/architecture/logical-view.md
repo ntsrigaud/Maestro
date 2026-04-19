@@ -76,12 +76,12 @@ graph TB
 
 The domain layer contains pure data structures and abstract contracts. It has no dependencies on external libraries.
 
-| Component               | Responsibility                                                                                                                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Component               | Responsibility                                                                                                                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Entities**            | Dataclasses (using `slots=True`) representing pipeline data at each processing stage: `FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState`. |
-| **Protocol Interfaces** | Ten `typing.Protocol` definitions that specify the behavioral contract for each pipeline stage. Implementations satisfy these contracts through structural subtyping.                                        |
-| **Enums**               | `RuntimeMode` (IDLE, ARMED, COOLDOWN) and `CommandID` (next_slide, previous_slide, raise_hand, start_presentation, toggle_pointer_mode, exit_presentation) define the finite state and command vocabularies. |
-| **Contracts**           | `IRunnable` and `IClosable` protocols for lifecycle management.                                                                                                                                              |
+| **Protocol Interfaces** | Ten `typing.Protocol` definitions that specify the behavioral contract for each pipeline stage. Implementations satisfy these contracts through structural subtyping.                                                                                 |
+| **Enums**               | `RuntimeMode` (IDLE, ARMED, COOLDOWN) and `CommandID` (next_slide, previous_slide, raise_hand, start_presentation, toggle_pointer_mode, exit_presentation) define the finite state and command vocabularies.                                          |
+| **Contracts**           | `IRunnable` and `IClosable` protocols for lifecycle management.                                                                                                                                                                                       |
 
 ### 3.2 Infrastructure Layer
 
@@ -102,12 +102,12 @@ The infrastructure layer provides concrete implementations of domain interfaces 
 
 The pipeline layer contains stateful processing components that sit between raw sensor input and command output.
 
-| Component                       | Interface               | Responsibility                                                                                                                                                                                                          |
-| ------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Component                       | Interface               | Responsibility                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **LandmarkFeatureTransformer**  | `IFeatureTransformer`   | Transforms raw 21×3 landmarks into a **147-dimensional feature vector** (feature-schema-v5) through wrist-relative centering, scale normalization, fingertip spread, wrist trajectory, velocity, joint angles, and wrist velocity in camera-normalized coordinates. Maintains per-frame state for velocity and wrist trajectory computation. |
-| **SlidingWindowSequenceBuffer** | `ISequenceBuffer`       | Accumulates feature vectors in a fixed-length deque (default 24 frames). Emits a `SequenceWindow` when the buffer is full, the step interval has elapsed, and the valid-frame ratio exceeds the minimum threshold.      |
-| **PredictionStabilizer**        | `IPredictionStabilizer` | Applies three-stage filtering: (1) exponential moving average smoothing on class probabilities, (2) per-class confidence thresholding, and (3) temporal majority voting over a configurable window.                     |
-| **GestureActivationController** | `IActivationController` | Implements a three-state machine (IDLE → ARMED → COOLDOWN) that gates command dispatch. Requires activation gesture hold for entry, supports idle timeout for exit, and enforces edge-triggered dispatch with cooldown. |
+| **SlidingWindowSequenceBuffer** | `ISequenceBuffer`       | Accumulates feature vectors in a fixed-length deque (default 24 frames). Emits a `SequenceWindow` when the buffer is full, the step interval has elapsed, and the valid-frame ratio exceeds the minimum threshold.                                                                                                                           |
+| **PredictionStabilizer**        | `IPredictionStabilizer` | Applies three-stage filtering: (1) exponential moving average smoothing on class probabilities, (2) per-class confidence thresholding, and (3) temporal majority voting over a configurable window.                                                                                                                                          |
+| **GestureActivationController** | `IActivationController` | Implements a three-state machine (IDLE → ARMED → COOLDOWN) that gates command dispatch. Requires activation gesture hold for entry, supports idle timeout for exit, and enforces edge-triggered dispatch with cooldown.                                                                                                                      |
 
 ### 3.4 Application Layer
 
