@@ -62,8 +62,8 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "w",
         "y",
         # Desktop adapter additions
-        "win",      # Windows workspace: Ctrl+Win+Arrow; Windows overview: Win+Tab
-        "super",    # Linux overview: Super+A (GNOME), Super+W (KDE)
+        "win",  # Windows workspace: Ctrl+Win+Arrow; Windows overview: Win+Tab
+        "super",  # Linux overview: Super+A (GNOME), Super+W (KDE)
         "command",  # macOS zoom: Cmd+scroll (in-app zoom, not OS accessibility zoom)
     }
 )

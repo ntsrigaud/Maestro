@@ -242,7 +242,9 @@ class TestGestureDispatchPipeline:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.scroll.assert_called_once_with(5)  # scroll_back = pyautogui.scroll(+N)
+        self.mock_pya.scroll.assert_called_once_with(
+            5
+        )  # scroll_back = pyautogui.scroll(+N)
 
     def test_command_dispatched_exactly_once_per_gesture(self):
         self._arm()
