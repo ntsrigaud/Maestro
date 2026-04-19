@@ -1,0 +1,16 @@
+version: v2
+# Gesture-to-command mapping for the PowerPoint / presentation profile.
+#
+# Vertical swipes scroll the active window universally via OS scroll injection
+# (pyautogui.scroll) — no per-application targeting is required.
+# Horizontal swipes advance or rewind the slide deck via keyboard shortcuts.
+# open_palm_hold begins the slideshow from the current slide.
+gesture_commands:
+  swipe_up: scroll_forward # universal: scroll content down in any focused window
+  swipe_down: scroll_back # universal: scroll content up
+  swipe_right: next_slide # advance one slide
+  swipe_left: previous_slide # go back one slide
+  zoom_in: toggle_pointer_mode # activate laser pointer in slideshow mode
+  zoom_out: raise_hand # raise/lower hand reaction (Teams/Zoom meeting panel)
+  open_palm_hold: start_presentation # begin slideshow from current slide
+  unknown: no_action

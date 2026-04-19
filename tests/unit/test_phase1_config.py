@@ -74,7 +74,7 @@ class TestAppConfigNewFields:
     def test_backwards_compat_existing_configs(self, config_dir: Path):
         """Existing configs/app.yaml must load without errors."""
         config = load_runtime_config(config_dir)
-        assert config.app.command_map == "command_map_ipn.yaml"
+        assert config.app.command_map == "command_map_powerpoint.yaml"
         assert config.app.navigation_mode == "workspace"
 
 
