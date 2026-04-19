@@ -325,12 +325,14 @@ _OVERVIEW_SHORTCUTS_LINUX: dict[str, tuple[str, ...]] = {
 }
 ```
 
-### 3.2 `configs/app_desktop.yaml` Example
+### 3.2 `configs/desktop/` Profile Directory
 
-Provide a ready-to-use desktop configuration example alongside the existing `app.yaml`:
+Create a `configs/desktop/` directory — two files are required. `load_runtime_config()` accepts a **directory path** and reads `{dir}/app.yaml` and `{dir}/inference.yaml` by convention. It does not accept a standalone YAML file path, so a flat `configs/app_desktop.yaml` will not be discovered.
+
+**`configs/desktop/app.yaml`:**
 
 ```yaml
-# configs/app_desktop.yaml — desktop interaction profile
+# Desktop interaction profile — invoke with: --config configs/desktop
 app_name: gesture-control-desktop
 camera_index: 0
 frame_width: 1280
@@ -338,13 +340,34 @@ frame_height: 720
 target_fps: 30
 active_app: desktop
 command_map: command_map_desktop.yaml
-navigation_mode: workspace # or: tabs
+navigation_mode: workspace  # switch to "tabs" for browser/editor tab navigation
 mirror_display: true
 
 desktop:
   scroll_clicks: 5
-  linux_de: gnome
+  zoom_clicks: 3
+  linux_de: gnome  # linux only: gnome | kde | other
 ```
+
+**`configs/desktop/inference.yaml`** — desktop-tuned timing (same content as Phase 1.2’s `configs/inference_desktop.yaml`; the loader reads `inference.yaml` by name from the config directory):
+
+```yaml
+window_length: 24
+window_step: 3
+min_valid_ratio: 0.8
+idle_timeout_ms: 60000
+command_cooldown_ms: 800
+edge_trigger_enabled: true
+gaze:
+  enabled: true
+  yaw_threshold_deg: 30
+  pitch_threshold_deg: 25
+  arm_ms: 500
+  grace_ms: 3000
+  sample_interval_frames: 3
+```
+
+> `configs/inference_desktop.yaml` (from Phase 1.2) is kept as a reference artefact but is not loaded at runtime. The active desktop inference config is `configs/desktop/inference.yaml`.
 
 ### Phase 3 Tests
 
