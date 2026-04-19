@@ -33,9 +33,9 @@ gesture_commands:
   swipe_down: scroll_back # universal: go back in any focused app
   swipe_right: navigate_forward # next workspace or next tab (see navigation_mode)
   swipe_left: navigate_back # previous workspace or previous tab
+  zoom_in: zoom_in_view # Ctrl+scroll up — universal view zoom in
+  zoom_out: zoom_out_view # Ctrl+scroll down — universal view zoom out
   open_palm_hold: mission_control # OS overview mode toggle
-  zoom_in: no_action # excluded — unreliable at desk distance
-  zoom_out: no_action # excluded — unreliable at desk distance
   unknown: no_action
 ```
 
@@ -127,7 +127,27 @@ def scroll(self, clicks: int) -> None:
     pyautogui.scroll(max(-20, min(20, clicks)))
 ```
 
-**b) Allowlist extension** — add only keys used in the shortcut tables below:
+**b) New `zoom()` method** — Ctrl+scroll injection for application-agnostic view zoom:
+
+```python
+def zoom(self, clicks: int) -> None:
+    """Inject a Ctrl+scroll zoom event at the current cursor position.
+
+    Positive clicks zoom in; negative zoom out.  Clamped to [-5, 5] to
+    prevent runaway zoom from rapid-fire command delivery.
+    """
+    if pyautogui is None:
+        LOGGER.warning("pyautogui not available — zoom skipped")
+        return
+    clamped = max(-5, min(5, clicks))
+    pyautogui.keyDown("ctrl")
+    pyautogui.scroll(clamped)
+    pyautogui.keyUp("ctrl")
+```
+
+> **Security note:** `zoom()` accepts a plain `int`; `"ctrl"` is a string literal, not user-supplied input. No new key names are required in `_SAFE_KEY_NAMES` since `ctrl` is already present.
+
+**c) Allowlist extension** — add only keys used in the shortcut tables below:
 
 ```python
 _SAFE_KEY_NAMES: frozenset[str] = frozenset({
@@ -138,7 +158,7 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset({
 })
 ```
 
-> **Security note:** `scroll()` accepts a plain `int`; no user-supplied strings reach `pyautogui`. The hotkey path continues to validate every key name against `_SAFE_KEY_NAMES`.
+> **Security note:** `scroll()` and `zoom()` accept plain `int` values; no user-supplied strings reach `pyautogui`. The hotkey path continues to validate every key name against `_SAFE_KEY_NAMES`.
 
 ### 2.2 `DesktopAdapter`
 
@@ -165,11 +185,13 @@ _OVERVIEW_SHORTCUTS: dict[str, tuple[str, ...]] = {
 }
 
 _SCROLL_CLICKS = 5   # configurable; units are pyautogui scroll "clicks"
+_ZOOM_CLICKS  = 3   # configurable; smaller range than scroll to avoid over-zoom
 ```
 
 The adapter's `execute()` method dispatches on `command_id`:
 
 - `scroll_forward` / `scroll_back` → `keyboard.scroll(±_SCROLL_CLICKS)`
+- `zoom_in_view` / `zoom_out_view` → `keyboard.zoom(±_ZOOM_CLICKS)`
 - `navigate_forward` / `navigate_back` → `keyboard.press_hotkey(*_NAV_SHORTCUTS[(platform, navigation_mode)][command_id])`
 - `mission_control` → `keyboard.press_hotkey(*_OVERVIEW_SHORTCUTS[platform])`
 - `no_action` → returns `DispatchResult(success=True, ...)` immediately
@@ -183,6 +205,7 @@ The `CommandDispatcher` for the desktop adapter receives a dedicated allowlist:
 ```python
 _DESKTOP_ALLOWED = frozenset({
     "scroll_forward", "scroll_back",
+    "zoom_in_view", "zoom_out_view",
     "navigate_forward", "navigate_back",
     "mission_control",
     "no_action",
@@ -207,10 +230,10 @@ elif active_app == "desktop":
 
 ### Phase 2 Tests
 
-| Test file                                      | Scope                                                                                               |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `tests/unit/test_desktop_adapter.py`           | All 6 command IDs; per-platform nav shortcuts; `sys.platform` patching; `navigation_mode` switching |
-| `tests/unit/test_keyboard_adapter.py` (extend) | `scroll()` clamps to [-20, 20]; new key names pass allowlist                                        |
+| Test file                                      | Scope                                                                                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `tests/unit/test_desktop_adapter.py`           | All 8 command IDs; per-platform nav shortcuts; `sys.platform` patching; `navigation_mode` switching; zoom sign convention |
+| `tests/unit/test_keyboard_adapter.py` (extend) | `scroll()` clamps to [-20, 20]; `zoom()` clamps to [-5, 5] and sends keyDown/keyUp `ctrl`; new key names pass allowlist   |
 
 ### Phase 2 Gate
 
@@ -346,61 +369,16 @@ The overlay displays `[desktop · workspace]  → mission_control` in a test fra
 
 ---
 
-## Phase 5 — Dataset and Model Robustness (Future)
-
-**Goal:** Improve model robustness at moderate distances (80–100 cm) and for `zoom_in`/`zoom_out` at desk range, without redesigning the pipeline.
-
-### 5.1 Spatial Scale Augmentation
-
-**File:** `src/gesture_control/training/augmentation.py`
-
-Add a `spatial_scale` parameter to `AugmentationConfig` and a corresponding transform in `GestureAugmenter`:
-
-```python
-# Simulate the smaller hand apparent size at moderate distance
-# by uniformly scaling all landmarks toward the wrist origin.
-scale = uniform(spatial_scale_min, spatial_scale_max)   # e.g. (0.6, 1.0)
-landmarks *= scale
-```
-
-This augmentation targets the `positions[0:63]` and `velocity[71:134]` blocks and does not require any architecture change.
-
-### 5.2 Desk-Distance Calibration Dataset
-
-Write a lightweight collection script `scripts/collect_desk_dataset.py` that:
-
-1. Runs the inference pipeline in recording mode (no dispatch)
-2. Writes labeled JSONL landmark files to `data/raw/desk_collected/`
-3. Annotates each sequence with the gesture class via keyboard prompt during capture
-
-Recording protocol: 5 participants × 20 gestures per class × 8 classes = 800 sequences (≈ 30 min per participant at desk distance, 50–80 cm).
-
-These recordings integrate with the existing `build_ipn_dataset.py` pipeline and `GestureDataModule` without code changes.
-
-### 5.3 Fine-Tuning Workflow
-
-The `notebooks/02_model_training.ipynb` notebook is reused as-is. Load the existing `lstm_v1_20260418T023120Z_inference.pt` weights as a starting checkpoint and fine-tune for 10–20 epochs on the combined IPN + desk dataset with a low learning rate (1e-4).
-
-Publish the updated artifact to HF Hub as a new revision via `training/hf_publish.py`. Update `configs/model_source.yaml` to pin the new filename.
-
-### Phase 5 Gate
-
-Spatial scale augmentation: training F1 on the IPN validation split does not decrease by more than 0.02 compared to baseline. Desk-distance test split: all four swipe classes achieve F1 ≥ 0.85.
-
----
-
 ## Dependency Map
 
 ```
 Phase 1 (Config + command map)
     ↓
-Phase 2 (DesktopAdapter + KeyboardAdapter.scroll)
+Phase 2 (DesktopAdapter + KeyboardAdapter.scroll + KeyboardAdapter.zoom)
     ↓
 Phase 3 (DesktopConfig scroll_clicks + linux_de)
     ↓
 Phase 4 (Overlay: active_mode badge + logical command)
-    ↓
-Phase 5 (Dataset augmentation)  ← independent; can run in parallel after Phase 1
 ```
 
 ---
@@ -413,7 +391,6 @@ Phase 5 (Dataset augmentation)  ← independent; can run in parallel after Phase
 | 2     | `app_adapters/desktop_adapter.py`                                             | `keyboard_adapter.py`, `bootstrap.py`                                                   |
 | 3     | `configs/app_desktop.yaml`                                                    | `schema_validation.py` (`DesktopConfig` block), `desktop_adapter.py`                    |
 | 4     | —                                                                             | `domain/entities.py`, `infrastructure/feedback/overlay_renderer.py`, `app/bootstrap.py` |
-| 5     | `scripts/collect_desk_dataset.py`                                             | `training/augmentation.py`, `configs/model_source.yaml`                                 |
 
 **Total core pipeline files modified: 0** (feature engineering, LSTM, stabiliser, activation controller, gaze detector are untouched across all phases).
 
