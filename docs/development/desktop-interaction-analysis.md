@@ -46,7 +46,9 @@ Presentation rooms expose the worst conditions for gesture control:
 
 ## 2. Refined Use Case Scenarios
 
-The system performs reliably when the user is seated within ~80–100 cm of the webcam — standard laptop or desktop monitor distance. This geometry matches the IPN recording setup exactly. At this range the hand occupies ≥ 120×120 pixels at 1280×720, keeping landmark drop-out below the `min_valid_ratio: 0.8` threshold. Only `zoom_in`/`zoom_out` (fine finger spread at `fingertip_spread[63:68]`) remain unreliable and are excluded from the desktop vocabulary.
+The system performs reliably when the user is seated within ~80–100 cm of the webcam — standard laptop or desktop monitor distance. This geometry matches the IPN recording setup exactly. At this range the hand occupies ≥ 120×120 pixels at 1280×720, keeping landmark drop-out below the `min_valid_ratio: 0.8` threshold.
+
+`zoom_in`/`zoom_out` occupy a middle tier: `fingertip_spread[63:68]` and `joint_angles[134:144]` are less reliable than swipe velocity signals at this range, but the production threshold (0.85) and vote window (2) in `production_ipn.yaml` provide adequate filtering for occasional, deliberate pinch gestures. They are included in the desktop vocabulary for view-zoom scenarios where precision is more important than speed.
 
 ### 2.1 Universal Scroll Control
 
@@ -72,7 +74,20 @@ Horizontal swipes are discriminated primarily by `wrist_vel_raw[0]` (x-axis velo
 
 The same logical commands (`navigate_forward`, `navigate_back`) serve both workspace and tab switching; the target is a single config field (`navigation_mode`), not a per-application adapter. The tab shortcuts are identical across Chrome, Firefox, Safari, and Edge.
 
-### 2.3 OS Overview Mode (Mission Control)
+### 2.3 View Zoom
+
+**Context**: User reads a dense PDF, web page, or document and needs to magnify a region without reaching for the keyboard or trackpad.
+
+| Gesture    | Logical command | Implementation                                  |
+| ---------- | --------------- | ----------------------------------------------- |
+| `zoom_in`  | `zoom_in_view`  | `Ctrl` held + `pyautogui.scroll(+N)` — zoom in  |
+| `zoom_out` | `zoom_out_view` | `Ctrl` held + `pyautogui.scroll(-N)` — zoom out |
+
+Holding `Ctrl` while injecting a scroll event is the universal zoom mechanism on all major desktop OSes. It works identically in Chrome, Firefox, Safari, Edge, PDF viewers (Preview, Acrobat, Evince, Okular), image viewers, VS Code, and Office applications — no per-application mapping is required. This mirrors how a physical scroll wheel with `Ctrl` held triggers zoom.
+
+**Reliability note**: `zoom_in`/`zoom_out` have lower recognition stability than swipe gestures at desk distance due to `fingertip_spread[63:68]` compression. They are suitable for occasional, deliberate use — not rapid-fire repeated triggers. The production threshold (0.85) and vote window (2) suppress most false positives.
+
+### 2.4 OS Overview Mode (Mission Control)
 
 **Context**: User wants to switch tasks by invoking the OS-level window/space overview without reaching for the keyboard or trackpad.
 
@@ -87,16 +102,16 @@ The same logical commands (`navigate_forward`, `navigate_back`) serve both works
 ## 3. Core Design Principles for the Extension
 
 1. **No pipeline changes.** Feature engineering, LSTM model, stabiliser, and gaze activation are untouched.
-2. **No retraining required.** The existing production model (Macro-F1 = 0.96) is adequate for all three scenarios at desk distance.
-3. **Single unified adapter.** One `DesktopAdapter` covers all desktop scenarios. Per-application adapters are not needed because scroll is application-agnostic and navigation/overview use a config flag rather than per-app shortcut tables.
-4. **No repeated mappings.** A command that behaves identically across all applications (scroll) is implemented once via OS scroll injection; only OS-specific variants (workspace vs tabs, platform overview shortcuts) are expressed as per-platform tables.
-5. **Vocabulary unchanged.** `zoom_in`/`zoom_out` are excluded by the dispatcher allowlist rather than removed from the model or config.
+2. **No retraining required.** The existing production model (Macro-F1 = 0.96) is adequate for all four scenarios at desk distance.
+3. **Single unified adapter.** One `DesktopAdapter` covers all desktop scenarios. Per-application adapters are not needed because scroll and zoom are application-agnostic OS events; navigation and overview use a config flag rather than per-app shortcut tables.
+4. **No repeated mappings.** Commands that behave identically across all applications (scroll, Ctrl+scroll zoom) are implemented once via OS event injection; only genuine per-OS variants (workspace shortcuts, overview key) appear in platform tables.
+5. **Full gesture vocabulary active.** All 8 model classes are mapped to a logical command. `zoom_in`/`zoom_out` are activated for view-zoom via Ctrl+scroll injection rather than excluded.
 
 ---
 
 ## 4. Gesture–Command Mapping Redesign
 
-Current `command_map_ipn.yaml` uses presentation-domain identifiers. The desktop expansion requires application-agnostic logical commands. `open_palm_hold` is promoted from `no_action` to `mission_control`; `zoom_in`/`zoom_out` are set to `no_action` explicitly (excluded by allowlist, not model).
+Current `command_map_ipn.yaml` uses presentation-domain identifiers. The desktop expansion requires application-agnostic logical commands. `open_palm_hold` is promoted to `mission_control`; `zoom_in`/`zoom_out` are promoted to `zoom_in_view`/`zoom_out_view` via Ctrl+scroll injection.
 
 **Proposed `command_map_desktop.yaml`:**
 
@@ -107,9 +122,9 @@ gesture_commands:
   swipe_down: scroll_back # universal: go back in any focused app
   swipe_right: navigate_forward # next workspace or next tab (navigation_mode)
   swipe_left: navigate_back # previous workspace or previous tab
+  zoom_in: zoom_in_view # Ctrl+scroll up — universal view zoom in
+  zoom_out: zoom_out_view # Ctrl+scroll down — universal view zoom out
   open_palm_hold: mission_control # OS overview mode (Mission Control / Task View / Activities)
-  zoom_in: no_action # excluded — unreliable at desk distance
-  zoom_out: no_action # excluded — unreliable at desk distance
   unknown: no_action
 ```
 
