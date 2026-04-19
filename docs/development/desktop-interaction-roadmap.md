@@ -73,17 +73,17 @@ class AppConfig(BaseModel):
     # Selects the active gesture-to-command map filename (without path prefix).
     # Defaults to the IPN presentation map for backwards compatibility.
     command_map: str = "command_map_ipn.yaml"
-    # "static" = use active_app at startup (current behaviour)
-    # "context_aware" = query OS for frontmost window each dispatch cycle
-    dispatch_mode: str = Field(default="static", pattern="^(static|context_aware)$")
+    # Controls horizontal swipe destination: "workspace" → OS virtual desktop
+    # shortcuts; "tabs" → Ctrl+Tab / Ctrl+Shift+Tab (browser/editor tabs).
+    navigation_mode: str = Field(default="workspace", pattern="^(workspace|tabs)$")
 ```
 
 Update `configs/app.yaml` to expose the new fields with their defaults:
 
 ```yaml
 # existing fields unchanged ...
-command_map: command_map_ipn.yaml # switch to command_map_desktop.yaml for desktop mode
-dispatch_mode: static # switch to context_aware when Phase 3 is complete
+command_map: command_map_ipn.yaml    # switch to command_map_desktop.yaml for desktop mode
+navigation_mode: workspace           # switch to "tabs" for tab-based navigation
 ```
 
 ### 1.4 Config Loader Update
