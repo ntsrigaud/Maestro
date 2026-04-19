@@ -478,7 +478,7 @@ Phase 4 (Overlay: active_mode badge + logical command)
 | ----- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | 1     | `configs/gestures/command_map_desktop.yaml`, `configs/inference_desktop.yaml` | `configs/app.yaml`, `schema_validation.py`, `config_loader.py`                          |
 | 2     | `app_adapters/desktop_adapter.py`                                             | `keyboard_adapter.py`, `bootstrap.py`                                                   |
-| 3     | `configs/app_desktop.yaml`                                                    | `schema_validation.py` (`DesktopConfig` block), `desktop_adapter.py`                    |
+| 3     | `configs/desktop/app.yaml`, `configs/desktop/inference.yaml`                  | `schema_validation.py` (`DesktopConfig` in `AppConfig`), `desktop_adapter.py`           |
 | 4     | —                                                                             | `domain/entities.py`, `infrastructure/feedback/overlay_renderer.py`, `app/bootstrap.py` |
 
 **Total core pipeline files modified: 0** (feature engineering, LSTM, stabiliser, activation controller, gaze detector are untouched across all phases).
