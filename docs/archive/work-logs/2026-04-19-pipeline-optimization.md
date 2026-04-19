@@ -75,11 +75,11 @@ only when active_app is 'desktop'" qualifier).
 IPN default fallback dict removed. The three silent-return branches replaced with
 explicit exceptions:
 
-| Condition | Before | After |
-|---|---|---|
-| File absent | return IPN defaults | `FileNotFoundError` with diagnostic message |
-| Non-dict YAML root | return IPN defaults | `ValueError` |
-| Non-dict `gesture_commands` | return IPN defaults | `ValueError` |
+| Condition                   | Before              | After                                       |
+| --------------------------- | ------------------- | ------------------------------------------- |
+| File absent                 | return IPN defaults | `FileNotFoundError` with diagnostic message |
+| Non-dict YAML root          | return IPN defaults | `ValueError`                                |
+| Non-dict `gesture_commands` | return IPN defaults | `ValueError`                                |
 
 A missing or malformed command map now fails immediately at startup with a clear message
 rather than running silently on a stale vocabulary.
