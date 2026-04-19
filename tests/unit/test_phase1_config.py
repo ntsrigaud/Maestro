@@ -46,7 +46,7 @@ class TestAppConfigNewFields:
 
     def test_defaults_applied_when_fields_absent(self):
         cfg = AppConfig.model_validate(self._minimal())
-        assert cfg.command_map == "command_map_ipn.yaml"
+        assert cfg.command_map == "command_map_desktop.yaml"
         assert cfg.navigation_mode == "workspace"
 
     def test_command_map_override(self):
@@ -74,7 +74,7 @@ class TestAppConfigNewFields:
     def test_backwards_compat_existing_configs(self, config_dir: Path):
         """Existing configs/app.yaml must load without errors."""
         config = load_runtime_config(config_dir)
-        assert config.app.command_map == "command_map_powerpoint.yaml"
+        assert config.app.command_map == "command_map_desktop.yaml"
         assert config.app.navigation_mode == "workspace"
 
 
@@ -113,8 +113,8 @@ class TestCommandMapDesktop:
     def test_scroll_commands_present(self, config_dir: Path):
         data = self._load_desktop_map(config_dir)
         cmds = data["gesture_commands"]
-        assert cmds["swipe_up"] == "scroll_forward"
-        assert cmds["swipe_down"] == "scroll_back"
+        assert cmds["swipe_up"] == "scroll_back"
+        assert cmds["swipe_down"] == "scroll_forward"
 
     def test_zoom_commands_present(self, config_dir: Path):
         data = self._load_desktop_map(config_dir)
