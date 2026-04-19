@@ -220,6 +220,24 @@ The adapter's `execute()` method dispatches on `command_id`:
 
 The `navigation_mode` and `platform` values are injected at construction time (defaulting to `config.app.navigation_mode` and `sys.platform`), so the adapter itself contains no runtime branching.
 
+**Platform normalisation and validation at `__init__` time:**
+
+```python
+_KNOWN_PLATFORMS = frozenset({"darwin", "win32", "linux"})
+
+# Normalise Linux variants (e.g. "linux2" on older CPython builds) to "linux".
+if platform.startswith("linux"):
+    platform = "linux"
+if platform not in _KNOWN_PLATFORMS:
+    raise ValueError(
+        f"DesktopAdapter: unsupported platform {platform!r}. "
+        "Supported: darwin, win32, linux."
+    )
+self._platform = platform
+```
+
+This raises a descriptive `ValueError` at construction rather than a bare `KeyError` at dispatch time when `_NAV_SHORTCUTS[(platform, navigation_mode)]` is accessed on an unrecognised platform.
+
 ### 2.3 Allowed Commands
 
 The `CommandDispatcher` for the desktop adapter receives a dedicated allowlist:
