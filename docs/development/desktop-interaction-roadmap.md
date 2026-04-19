@@ -86,11 +86,21 @@ command_map: command_map_ipn.yaml    # switch to command_map_desktop.yaml for de
 navigation_mode: workspace           # switch to "tabs" for tab-based navigation
 ```
 
-### 1.4 Config Loader Update
+### 1.4 Bootstrap Command Map Fix
 
-**File:** `src/gesture_control/utils/config_loader.py`
+**File:** `src/gesture_control/app/bootstrap.py`
 
-The command map is currently loaded by name from `configs/gestures/`. Verify the loader reads `app.command_map` to resolve the path, or add that resolution if it reads a hardcoded filename.
+The command map path is hardcoded in `build_container()`. Replace the hardcoded filename with the `app.command_map` config field:
+
+```python
+# Current (hardcoded — must be changed):
+command_map = _load_command_map(config_root / "gestures" / "command_map_ipn.yaml")
+
+# Required fix:
+command_map = _load_command_map(config_root / "gestures" / config.app.command_map)
+```
+
+This change depends on `AppConfig.command_map` being defined (§1.3) and must be applied in the same commit. Without it, the desktop command map (`command_map_desktop.yaml`) is never loaded regardless of what `app.yaml` specifies.
 
 ### Phase 1 Tests
 
