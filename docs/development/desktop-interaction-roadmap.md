@@ -425,7 +425,27 @@ Three targeted changes to the existing `render()` method:
 
 ### 4.3 Bootstrap Wiring
 
-Set `active_mode` in `RuntimeState` at bootstrap time from `config.app.active_app` and `config.app.navigation_mode` (e.g. `f"{active_app}·{navigation_mode}"`). The runtime loop reads this field from state without modifications to the dispatch path.
+Two targeted changes to `build_container()` in `bootstrap.py`:
+
+1. **`OverlayRenderer` constructor** — pass `command_map` to enable logical command preview in the overlay:
+
+   ```python
+   overlay_renderer = OverlayRenderer(
+       mirror_display=config.app.mirror_display,
+       command_map=command_map,
+   )
+   ```
+
+2. **`active_mode` initialisation** — set in `RuntimeState` at the runtime loop entry point (after `build_container()` returns):
+
+   ```python
+   state = RuntimeState(
+       mode="idle",
+       active_mode=f"{config.app.active_app}·{config.app.navigation_mode}",
+   )
+   ```
+
+The runtime loop reads `active_mode` from state without modifications to the dispatch path.
 
 ### Phase 4 Tests
 
