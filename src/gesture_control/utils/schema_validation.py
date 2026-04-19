@@ -38,6 +38,16 @@ class AppConfig(BaseModel):
     # like a selfie/mirror camera.  MediaPipe landmark extraction and the entire
     # ML pipeline always operate on the original non-mirrored frame.
     mirror_display: bool = True
+    # Selects the active gesture-to-command map filename (without path prefix).
+    # The file must exist in configs/gestures/.  Defaults to the IPN
+    # presentation map for backwards compatibility.
+    command_map: str = "command_map_ipn.yaml"
+    # Controls horizontal swipe destination for the desktop adapter.
+    # "workspace" → OS virtual desktop shortcuts (Ctrl+→ / Ctrl+Win+→ etc.)
+    # "tabs"      → Ctrl+Tab / Ctrl+Shift+Tab (browser/editor tabs)
+    navigation_mode: str = Field(default="workspace", pattern="^(workspace|tabs)$")
+    # Desktop-specific fine-tuning; ignored when active_app != "desktop".
+    desktop: "DesktopConfig" = Field(default_factory=lambda: DesktopConfig())
 
 
 class InferenceConfig(BaseModel):
