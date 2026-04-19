@@ -47,7 +47,7 @@ Two new fields added with backwards-compatible defaults:
 
 ```yaml
 command_map: command_map_ipn.yaml # switch to command_map_desktop.yaml for desktop
-navigation_mode: workspace        # workspace | tabs
+navigation_mode: workspace # workspace | tabs
 ```
 
 ### `src/gesture_control/utils/schema_validation.py`

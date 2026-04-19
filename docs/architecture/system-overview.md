@@ -14,16 +14,16 @@ Provide reliable, low-latency gesture-based desktop control using a small, highl
 
 The system recognizes eight gesture classes derived from the IPN Hand dataset:
 
-| Gesture          | Type            | Mapped Command       |
-| ---------------- | --------------- | -------------------- |
-| `open_palm_hold` | Static          | Mission Control      |
-| `swipe_right`    | Dynamic         | Navigate forward     |
-| `swipe_left`     | Dynamic         | Navigate back        |
-| `swipe_up`       | Dynamic         | Scroll back          |
-| `swipe_down`     | Dynamic         | Scroll forward       |
-| `zoom_in`        | Dynamic         | Zoom in view         |
-| `zoom_out`       | Dynamic         | Zoom out view        |
-| `unknown`        | Rejection class | No action            |
+| Gesture          | Type            | Mapped Command   |
+| ---------------- | --------------- | ---------------- |
+| `open_palm_hold` | Static          | Mission Control  |
+| `swipe_right`    | Dynamic         | Navigate forward |
+| `swipe_left`     | Dynamic         | Navigate back    |
+| `swipe_up`       | Dynamic         | Scroll back      |
+| `swipe_down`     | Dynamic         | Scroll forward   |
+| `zoom_in`        | Dynamic         | Zoom in view     |
+| `zoom_out`       | Dynamic         | Zoom out view    |
+| `unknown`        | Rejection class | No action        |
 
 The activation gate is controlled entirely by gaze detection: the system starts in ARMED state and accepts command gestures as long as the user's gaze is directed at the camera. Turning away (gaze lost beyond the grace period) transitions the system to IDLE; looking back triggers `rearm()` and resumes ARMED state. `swipe_up`/`swipe_down` scroll through content, `swipe_left`/`swipe_right` navigate between virtual desktops or browser tabs (configurable via `navigation_mode`), `zoom_in`/`zoom_out` adjust view magnification, and `open_palm_hold` triggers Mission Control / Activities overview.
 
