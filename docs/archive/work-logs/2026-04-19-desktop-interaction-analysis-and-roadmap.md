@@ -27,13 +27,13 @@ and tab navigation, view zoom, and OS overview mode.
 
 Five root causes documented with evidence from the codebase:
 
-| Root cause | Key detail |
-|---|---|
-| Dataset distribution mismatch | IPN recorded at 50–80 cm; presenter stands 150–300 cm — completely OOD |
-| MediaPipe quality at distance | Hand < 80×80 px at 1280×720; landmark drop-out > 20% rejects windows via `min_valid_ratio: 0.8` |
-| `fingertip_spread[63:68]` collapse | Inter-fingertip distances compress toward zero; `zoom_in` / `zoom_out` become indistinguishable |
-| `joint_angles[134:144]` degradation | MCP/PIP angle estimation requires MediaPipe depth accuracy; degrades at small hand size |
-| `command_cooldown_ms: 1000` + `edge_trigger` mismatch | Window containing gesture peak is dropped by valid-ratio filter; edge trigger never fires |
+| Root cause                                            | Key detail                                                                                      |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Dataset distribution mismatch                         | IPN recorded at 50–80 cm; presenter stands 150–300 cm — completely OOD                          |
+| MediaPipe quality at distance                         | Hand < 80×80 px at 1280×720; landmark drop-out > 20% rejects windows via `min_valid_ratio: 0.8` |
+| `fingertip_spread[63:68]` collapse                    | Inter-fingertip distances compress toward zero; `zoom_in` / `zoom_out` become indistinguishable |
+| `joint_angles[134:144]` degradation                   | MCP/PIP angle estimation requires MediaPipe depth accuracy; degrades at small hand size         |
+| `command_cooldown_ms: 1000` + `edge_trigger` mismatch | Window containing gesture peak is dropped by valid-ratio filter; edge trigger never fires       |
 
 Environmental factors also documented: projector backwash, autofocus locking to the face, and low hand-background contrast.
 
@@ -41,12 +41,12 @@ Environmental factors also documented: projector backwash, autofocus locking to 
 
 Four scenarios scoped to desk distance (≤ 100 cm), where the hand occupies ≥ 120×120 px and landmark quality is reliable:
 
-| Scenario | Gestures | Implementation |
-|---|---|---|
-| Universal Scroll | `swipe_up` → `scroll_forward`, `swipe_down` → `scroll_back` | `pyautogui.scroll()` at current cursor position — application-agnostic |
-| Workspace / Tab Navigation | `swipe_right` → `navigate_forward`, `swipe_left` → `navigate_back` | Per-platform workspace shortcuts or `Ctrl+Tab` / `Ctrl+Shift+Tab`; controlled by `navigation_mode` config field |
-| View Zoom | `zoom_in` → `zoom_in_view`, `zoom_out` → `zoom_out_view` | Modifier+scroll injection: `Cmd+scroll` on macOS (not `Ctrl+scroll`, which activates the OS Accessibility magnifier), `Ctrl+scroll` on Windows/Linux |
-| OS Overview Mode | `open_palm_hold` → `mission_control` | Per-platform shortcut: `Ctrl+Up` / `Win+Tab` / `Super+A` |
+| Scenario                   | Gestures                                                           | Implementation                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Universal Scroll           | `swipe_up` → `scroll_forward`, `swipe_down` → `scroll_back`        | `pyautogui.scroll()` at current cursor position — application-agnostic                                                                               |
+| Workspace / Tab Navigation | `swipe_right` → `navigate_forward`, `swipe_left` → `navigate_back` | Per-platform workspace shortcuts or `Ctrl+Tab` / `Ctrl+Shift+Tab`; controlled by `navigation_mode` config field                                      |
+| View Zoom                  | `zoom_in` → `zoom_in_view`, `zoom_out` → `zoom_out_view`           | Modifier+scroll injection: `Cmd+scroll` on macOS (not `Ctrl+scroll`, which activates the OS Accessibility magnifier), `Ctrl+scroll` on Windows/Linux |
+| OS Overview Mode           | `open_palm_hold` → `mission_control`                               | Per-platform shortcut: `Ctrl+Up` / `Win+Tab` / `Super+A`                                                                                             |
 
 Scroll direction convention: `swipe_up → scroll_forward` advances the document (natural/touchpad direction); command names describe document position, not gesture direction.
 
@@ -61,17 +61,18 @@ Five guiding constraints established: no pipeline changes, no retraining, single
 
 Four-phase implementation plan:
 
-| Phase | Goal | Key changes |
-|---|---|---|
-| 1 — Configuration | Establish desktop command vocabulary and inference tuning | `command_map_desktop.yaml`; `configs/desktop/` profile directory; `AppConfig.command_map` + `AppConfig.navigation_mode` fields; bootstrap command map fix |
-| 2 — Desktop Adapter | `DesktopAdapter` covering all four scenarios | `KeyboardAdapter.scroll()` and `KeyboardAdapter.zoom()` with clamping; `DesktopAdapter` with per-platform shortcut tables; platform normalisation + `ValueError` at construction for unknown platform; bootstrap `_build_dispatcher()` branch |
-| 3 — Navigation Tuning | User-facing scroll and zoom sensitivity controls | `DesktopConfig` schema block nested under `AppConfig`; `scroll_clicks` and `zoom_clicks` config fields; `linux_de` field for GNOME/KDE/other overview shortcut selection; `configs/desktop/app.yaml` and `configs/desktop/inference.yaml` profile files |
-| 4 — Feedback Improvements | Surface active mode and pending command in the overlay | (planned; not yet specified) |
+| Phase                     | Goal                                                      | Key changes                                                                                                                                                                                                                                             |
+| ------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — Configuration         | Establish desktop command vocabulary and inference tuning | `command_map_desktop.yaml`; `configs/desktop/` profile directory; `AppConfig.command_map` + `AppConfig.navigation_mode` fields; bootstrap command map fix                                                                                               |
+| 2 — Desktop Adapter       | `DesktopAdapter` covering all four scenarios              | `KeyboardAdapter.scroll()` and `KeyboardAdapter.zoom()` with clamping; `DesktopAdapter` with per-platform shortcut tables; platform normalisation + `ValueError` at construction for unknown platform; bootstrap `_build_dispatcher()` branch           |
+| 3 — Navigation Tuning     | User-facing scroll and zoom sensitivity controls          | `DesktopConfig` schema block nested under `AppConfig`; `scroll_clicks` and `zoom_clicks` config fields; `linux_de` field for GNOME/KDE/other overview shortcut selection; `configs/desktop/app.yaml` and `configs/desktop/inference.yaml` profile files |
+| 4 — Feedback Improvements | Surface active mode and pending command in the overlay    | (planned; not yet specified)                                                                                                                                                                                                                            |
 
 Each phase specifies its test gate: all existing tests pass; named new tests for every new
 schema field, adapter method, platform path, and error condition.
 
 Security notes included inline:
+
 - `zoom()` accepts a clamped `int`; `_ZOOM_MODIFIER` resolved from `sys.platform` at
   import time (not user-supplied)
 - `try/finally` guarantees modifier key release if `scroll()` raises
