@@ -33,7 +33,7 @@ graph TB
     subgraph Domain ["Domain Layer"]
         Entities["Domain Entities<br/>(FramePacket, LandmarkPacket,<br/>FeatureFrame, SequenceWindow,<br/>Prediction, StabilizedPrediction,<br/>ExecutableCommand, DispatchResult)"]
         Interfaces["Protocol Interfaces<br/>(IFrameSource, IHandLandmarkExtractor,<br/>IFeatureTransformer, ISequenceBuffer,<br/>IGestureModel, IPredictionStabilizer,<br/>IActivationController, ICommandDispatcher,<br/>IFeedbackRenderer, IGazeIntentDetector)"]
-        Enums["Enums & Contracts<br/>(RuntimeMode, CommandID,<br/>IRunnable, IClosable)"]
+        Enums["Enums & Contracts<br/>(RuntimeMode,<br/>IRunnable, IClosable)"]
     end
 
     Bootstrap --> Camera
@@ -80,7 +80,7 @@ The domain layer contains pure data structures and abstract contracts. It has no
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Entities**            | Dataclasses (using `slots=True`) representing pipeline data at each processing stage: `FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState`. |
 | **Protocol Interfaces** | Ten `typing.Protocol` definitions that specify the behavioral contract for each pipeline stage. Implementations satisfy these contracts through structural subtyping.                                                                                 |
-| **Enums**               | `RuntimeMode` (IDLE, ARMED, COOLDOWN) and `CommandID` (next_slide, previous_slide, raise_hand, start_presentation, toggle_pointer_mode, exit_presentation) define the finite state and command vocabularies.                                          |
+| **Enums**               | `RuntimeMode` (IDLE, ARMED, COOLDOWN) defines the activation state machine vocabulary.                                                                                                                                               |
 | **Contracts**           | `IRunnable` and `IClosable` protocols for lifecycle management.                                                                                                                                                                                       |
 
 ### 3.2 Infrastructure Layer
@@ -93,7 +93,7 @@ The infrastructure layer provides concrete implementations of domain interfaces 
 | **MediaPipeHandsExtractor** | `IHandLandmarkExtractor` | Wraps `mediapipe.solutions.hands.Hands` to extract 21 hand landmarks per frame. Applies configurable detection and tracking confidence thresholds. Returns `LandmarkPacket` with a validity flag.                                    |
 | **GestureLSTMClassifier**   | `IGestureModel`          | Loads a trained LSTM checkpoint and performs forward inference on sequence windows. Returns `Prediction` with per-class softmax probabilities.                                                                                       |
 | **CommandDispatcher**       | `ICommandDispatcher`     | Enforces command allowlist and rate limiting. Delegates to application-specific adapters. Returns `DispatchResult` with diagnostic detail.                                                                                           |
-| **Application Adapters**    | `IApplicationAdapter`    | `PowerPointAdapter` and `ZoomAdapter` translate command IDs to application-specific keyboard shortcuts. Both delegate to `KeyboardAdapter`, which validates key names against a safe allowlist before invoking `pyautogui.hotkey()`. |
+| **Application Adapters**    | `IApplicationAdapter`    | `DesktopAdapter` translates command IDs to OS-level keyboard shortcuts for navigation, scrolling, and zoom. It delegates to `KeyboardAdapter`, which validates key names against a safe allowlist before invoking `pyautogui.hotkey()`. |
 | **OverlayRenderer**         | `IFeedbackRenderer`      | Renders diagnostic information (mode, gesture label, confidence, FPS, latency) onto the video frame for real-time visual feedback.                                                                                                   |
 | **HeadPoseGazeDetector**    | `IGazeIntentDetector`    | Uses MediaPipe Face Mesh and solvePnP to estimate head pose. Implements a 4-state machine (ABSENT → ACQUIRING → ACTIVE → LOSING) gated by yaw/pitch thresholds, arm/grace timers, and a configurable sub-sampling interval.          |
 | **NullGazeDetector**        | `IGazeIntentDetector`    | Null-object implementation that always grants gaze permission. Used when `gaze.enabled = false` to eliminate all gaze-logic overhead from the runtime path.                                                                          |
