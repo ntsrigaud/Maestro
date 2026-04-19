@@ -48,6 +48,15 @@ class Runtime:
     def __init__(self, container: RuntimeDependencies) -> None:
         self._container = container
         self._running = False
+        # Pre-compute the active mode display string from config.  This never
+        # changes at runtime; storing it once avoids repeated attribute lookups
+        # and getattr fallbacks in the hot loop.
+        app_cfg = container.config.app
+        nav_mode = getattr(app_cfg, "navigation_mode", "workspace")
+        active_app = getattr(app_cfg, "active_app", "")
+        self._active_mode = (
+            f"{active_app}\u00b7{nav_mode}" if active_app else "unknown"
+        )
 
     def stop(self) -> None:
         self._running = False
@@ -97,6 +106,7 @@ class Runtime:
                     absent_state = RuntimeState(
                         mode=str(self._container.activation_controller.mode),
                         gaze_permitted=False,
+                        active_mode=self._active_mode,
                     )
                     overlay_frame = self._container.overlay_renderer.render(
                         frame, absent_state
@@ -182,6 +192,7 @@ class Runtime:
                     last_label=latest_label,
                     last_confidence=latest_conf,
                     gaze_permitted=gaze_permitted,
+                    active_mode=self._active_mode,
                     info={
                         "landmarks": landmark_packet.landmarks,
                         "window_ready": self._container.sequence_buffer.ready(),
