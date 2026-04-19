@@ -291,7 +291,7 @@ All unit tests pass. `python scripts/run_realtime.py --config configs --active-a
 
 **File:** `src/gesture_control/utils/schema_validation.py`
 
-Add an optional `desktop` block to `RuntimeConfig`:
+Add `DesktopConfig` as an optional nested block inside **`AppConfig`** — not `RuntimeConfig`. `load_runtime_config()` constructs `AppConfig` directly from `{dir}/app.yaml`; placing `DesktopConfig` here means `configs/desktop/app.yaml` loads it via the existing YAML path without any loader changes. Adding it to `RuntimeConfig` would have no YAML loading path.
 
 ```python
 class DesktopConfig(BaseModel):
