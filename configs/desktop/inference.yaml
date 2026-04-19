@@ -1,0 +1,34 @@
+# Desktop Interaction — Inference Timing Configuration
+# =====================================================
+# Load with: --config configs/desktop
+#
+# Desktop interactions are typically faster than presentation gestures:
+# users expect sub-second feedback when scrolling or zooming.  These
+# settings balance responsiveness against false-positive rate.
+
+# Inference window: 24 frames at 30 FPS ≈ 800 ms look-back.
+# Shorter than the presentation default (32 frames) for snappier response.
+window_length: 24
+window_step: 3
+min_valid_ratio: 0.6
+
+# Arm/disarm timing.
+# Longer idle_timeout_ms suits uninterrupted work sessions where the user
+# may leave the camera for extended periods.
+idle_timeout_ms: 60000       # 60 s — disarm after 1 min of inactivity
+command_cooldown_ms: 800     # 0.8 s minimum between dispatched commands
+
+# Rising-edge trigger: only fire on the first prediction frame, not repeatedly
+# across a slow gesture that lingers in the inference window.
+edge_trigger_enabled: true
+
+# Gaze-aware activation.
+gaze:
+  enabled: true
+  yaw_threshold_deg: 30.0
+  pitch_threshold_deg: 25.0
+  arm_ms: 500
+  # Extended grace period for desktop use: head turns (e.g., reading a
+  # secondary monitor) are common and should not disarm the system.
+  grace_ms: 3000
+  sample_interval_frames: 3
