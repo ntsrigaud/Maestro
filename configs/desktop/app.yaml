@@ -13,9 +13,6 @@ frame_width: 640
 frame_height: 480
 target_fps: 30
 
-# Target application adapter.
-active_app: desktop
-
 # Mirror the preview window left-right (selfie-camera convention).
 mirror_display: true
 

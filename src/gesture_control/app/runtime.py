@@ -53,8 +53,7 @@ class Runtime:
         # and getattr fallbacks in the hot loop.
         app_cfg = container.config.app
         nav_mode = getattr(app_cfg, "navigation_mode", "workspace")
-        active_app = getattr(app_cfg, "active_app", "")
-        self._active_mode = f"{active_app}\u00b7{nav_mode}" if active_app else "unknown"
+        self._active_mode = f"desktop\u00b7{nav_mode}"
 
     def stop(self) -> None:
         self._running = False

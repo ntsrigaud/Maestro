@@ -260,23 +260,25 @@ def _load_thresholds(path: Path) -> dict[str, Any]:
 
 
 def _load_command_map(path: Path) -> dict[str, str]:
-    """Load gesture→command_id mapping from YAML; fall back to IPN defaults."""
-    _defaults: dict[str, str] = {
-        "swipe_right": "next_slide",
-        "swipe_left": "previous_slide",
-        "swipe_up": "start_presentation",
-        "swipe_down": "exit_presentation",
-        "zoom_in": "toggle_pointer_mode",
-        "zoom_out": "raise_hand",
-    }
+    """Load gesture→command_id mapping from YAML.
+
+    Raises:
+        FileNotFoundError: If the command map file does not exist.
+        ValueError: If the file content is not a valid YAML mapping.
+    """
     if not path.exists():
-        return _defaults
+        raise FileNotFoundError(
+            f"Command map file not found: {path}. "
+            "Ensure configs/gestures/command_map_desktop.yaml exists."
+        )
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
-        return _defaults
+        raise ValueError(f"Command map file must contain a YAML mapping: {path}")
     mapping = payload.get("gesture_commands", {})
     if not isinstance(mapping, dict):
-        return _defaults
+        raise ValueError(
+            f"Command map file must contain a 'gesture_commands' mapping: {path}"
+        )
     return {str(k): str(v) for k, v in mapping.items() if k and v}
 
 

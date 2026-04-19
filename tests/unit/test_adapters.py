@@ -114,7 +114,7 @@ class TestKeyboardAdapter:
         with patch(
             "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
-            adapter.zoom(3)
+            adapter.zoom(3, modifier="ctrl")
             assert mock_pya.keyDown.call_count == 1
             assert mock_pya.scroll.call_count == 1
             assert mock_pya.keyUp.call_count == 1
@@ -126,7 +126,7 @@ class TestKeyboardAdapter:
         with patch(
             "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
-            adapter.zoom(-99)
+            adapter.zoom(-99, modifier="ctrl")
             mock_pya.scroll.assert_called_once_with(-5)
 
     def test_zoom_releases_modifier_on_scroll_exception(self):
@@ -137,7 +137,7 @@ class TestKeyboardAdapter:
         ) as mock_pya:
             mock_pya.scroll.side_effect = RuntimeError("display error")
             with pytest.raises(RuntimeError):
-                adapter.zoom(2)
+                adapter.zoom(2, modifier="ctrl")
             assert mock_pya.keyUp.call_count == 1
 
 
