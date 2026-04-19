@@ -8,14 +8,14 @@
 
 ## Feature Blocks
 
-| Block | Slice | Dims | Description |
-|---|---|---|---|
-| `position` | `[0:63]` | 63 | 21 wrist-relative, scale-normalised landmark positions (x, y, z per joint) |
-| `fingertip_spread` | `[63:68]` | 5 | 5 inter-fingertip Euclidean distances |
-| `wrist_trajectory` | `[68:71]` | 3 | Net wrist displacement from the oldest frame in the current window |
-| `velocity` | `[71:134]` | 63 | 21 per-landmark wrist-relative velocity vectors (Δposition per unit time) |
-| `joint_angles` | `[134:144]` | 10 | 10 MCP + PIP joint angles in radians |
-| `wrist_vel_raw` | `[144:147]` | 3 | Camera-normalised wrist velocity (x, y, z) — primary directional signal |
+| Block              | Slice       | Dims | Description                                                                |
+| ------------------ | ----------- | ---- | -------------------------------------------------------------------------- |
+| `position`         | `[0:63]`    | 63   | 21 wrist-relative, scale-normalised landmark positions (x, y, z per joint) |
+| `fingertip_spread` | `[63:68]`   | 5    | 5 inter-fingertip Euclidean distances                                      |
+| `wrist_trajectory` | `[68:71]`   | 3    | Net wrist displacement from the oldest frame in the current window         |
+| `velocity`         | `[71:134]`  | 63   | 21 per-landmark wrist-relative velocity vectors (Δposition per unit time)  |
+| `joint_angles`     | `[134:144]` | 10   | 10 MCP + PIP joint angles in radians                                       |
+| `wrist_vel_raw`    | `[144:147]` | 3    | Camera-normalised wrist velocity (x, y, z) — primary directional signal    |
 
 Total: 63 + 5 + 3 + 63 + 10 + 3 = **147**
 
@@ -80,9 +80,9 @@ When MediaPipe fails to detect a hand (`LandmarkPacket.valid == False`), `Landma
 
 ## Schema Version History
 
-| Version | Dims | Change |
-|---|---|---|
-| `feature-schema-v1` | 126 | Positions (63) + velocities (63) only |
-| `feature-schema-v5` | 147 | Adds fingertip spread (+5), wrist trajectory (+3), joint angles (+10), wrist_vel_raw (+3) |
+| Version             | Dims | Change                                                                                    |
+| ------------------- | ---- | ----------------------------------------------------------------------------------------- |
+| `feature-schema-v1` | 126  | Positions (63) + velocities (63) only                                                     |
+| `feature-schema-v5` | 147  | Adds fingertip spread (+5), wrist trajectory (+3), joint angles (+10), wrist_vel_raw (+3) |
 
 The schema version is embedded in every NPZ dataset artifact and every exported `.pt` inference artifact. Runtime compatibility is enforced by `validate_runtime_compatibility()` in `checkpoint_loader.py`.

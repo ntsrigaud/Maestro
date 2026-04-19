@@ -128,15 +128,15 @@ Semantic-HGR-System/
 
 **Purpose**: Offline dataset construction, model training, evaluation, and export.
 
-| Module                 | Key Classes                                              | Responsibility                                                                  |
-| ---------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `dataset_builder.py`   | `SequenceDatasetBuilder`, `LabeledLandmarkFrame`         | Converts JSONL landmark recordings to NPZ sequence datasets                     |
+| Module                 | Key Classes                                              | Responsibility                                                                       |
+| ---------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `dataset_builder.py`   | `SequenceDatasetBuilder`, `LabeledLandmarkFrame`         | Converts JSONL landmark recordings to NPZ sequence datasets                          |
 | `datamodule.py`        | `GestureDataModule`, `SequenceTensorDataset`             | PyTorch dataset wrappers with recording-level group splits and optional augmentation |
-| `augmentation.py`      | `GestureAugmenter`, `AugmentationConfig`                 | Temporal scaling and spatial jitter for training regularization                 |
-| `train_lstm.py`        | `GestureLSTMClassifier`, `train_lstm()`                  | LSTM model definition and training loop with early stopping                     |
-| `evaluate.py`          | `evaluate_model()`, `EvaluationReport`                   | Per-class precision, recall, F1; confusion matrix                               |
-| `export_checkpoint.py` | `export_inference_artifact()`, `update_model_registry()` | Checkpoint serialization and local registry update                              |
-| `hf_publish.py`        | `publish_to_huggingface()`, `build_model_card()`         | Publish trained artifacts to Hugging Face Hub with auto-generated model card    |
+| `augmentation.py`      | `GestureAugmenter`, `AugmentationConfig`                 | Temporal scaling and spatial jitter for training regularization                      |
+| `train_lstm.py`        | `GestureLSTMClassifier`, `train_lstm()`                  | LSTM model definition and training loop with early stopping                          |
+| `evaluate.py`          | `evaluate_model()`, `EvaluationReport`                   | Per-class precision, recall, F1; confusion matrix                                    |
+| `export_checkpoint.py` | `export_inference_artifact()`, `update_model_registry()` | Checkpoint serialization and local registry update                                   |
+| `hf_publish.py`        | `publish_to_huggingface()`, `build_model_card()`         | Publish trained artifacts to Hugging Face Hub with auto-generated model card         |
 
 **Dependency rule**: Imports pipeline components (`LandmarkFeatureTransformer`, `SlidingWindowSequenceBuffer`) for training–inference parity. Imports PyTorch and scikit-learn. Not imported by the runtime inference path.
 
@@ -205,16 +205,16 @@ graph TD
 
 Configuration files are organized by concern:
 
-| Category        | Files                            | Schema                                                              |
-| --------------- | -------------------------------- | ------------------------------------------------------------------- |
-| **Application** | `app.yaml`                       | `AppConfig` — camera index, resolution, FPS, active application     |
-| **Inference**   | `inference.yaml`                 | `InferenceConfig` — window length/step, activation timing, cooldown |
-| **Model source**| `model_source.yaml`              | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename |
-| **Model**       | `model/lstm_default.yaml`        | Training hyperparameters, model architecture, augmentation settings |
-| **Features**    | `model/feature_pipeline.yaml`    | `FeaturePipelineConfig` — normalization and velocity toggles        |
-| **Vocabulary**  | `gestures/vocabulary_ipn.yaml`   | Gesture class list (8 classes)                                      |
-| **Commands**    | `gestures/command_map_ipn.yaml`  | Gesture-to-`CommandID` mapping                                      |
-| **Thresholds**  | `thresholds/production_ipn.yaml` | Per-class confidence thresholds and temporal vote window sizes      |
+| Category         | Files                            | Schema                                                                           |
+| ---------------- | -------------------------------- | -------------------------------------------------------------------------------- |
+| **Application**  | `app.yaml`                       | `AppConfig` — camera index, resolution, FPS, active application                  |
+| **Inference**    | `inference.yaml`                 | `InferenceConfig` — window length/step, activation timing, cooldown              |
+| **Model source** | `model_source.yaml`              | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename |
+| **Model**        | `model/lstm_default.yaml`        | Training hyperparameters, model architecture, augmentation settings              |
+| **Features**     | `model/feature_pipeline.yaml`    | `FeaturePipelineConfig` — normalization and velocity toggles                     |
+| **Vocabulary**   | `gestures/vocabulary_ipn.yaml`   | Gesture class list (8 classes)                                                   |
+| **Commands**     | `gestures/command_map_ipn.yaml`  | Gesture-to-`CommandID` mapping                                                   |
+| **Thresholds**   | `thresholds/production_ipn.yaml` | Per-class confidence thresholds and temporal vote window sizes                   |
 
 All configuration is validated at startup via Pydantic schemas. Invalid configurations cause immediate failure with descriptive error messages.
 

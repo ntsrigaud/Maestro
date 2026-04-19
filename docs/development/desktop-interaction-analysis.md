@@ -80,10 +80,10 @@ The same logical commands (`navigate_forward`, `navigate_back`) serve both works
 
 **Context**: User reads a dense PDF, web page, or document and needs to magnify a region without reaching for the keyboard or trackpad.
 
-| Gesture    | Logical command | Implementation                                                          |
-| ---------- | --------------- | ----------------------------------------------------------------------- |
-| `zoom_in`  | `zoom_in_view`  | macOS: `Cmd+scroll(+N)` / Win·Linux: `Ctrl+scroll(+N)` — zoom in       |
-| `zoom_out` | `zoom_out_view` | macOS: `Cmd+scroll(-N)` / Win·Linux: `Ctrl+scroll(-N)` — zoom out      |
+| Gesture    | Logical command | Implementation                                                    |
+| ---------- | --------------- | ----------------------------------------------------------------- |
+| `zoom_in`  | `zoom_in_view`  | macOS: `Cmd+scroll(+N)` / Win·Linux: `Ctrl+scroll(+N)` — zoom in  |
+| `zoom_out` | `zoom_out_view` | macOS: `Cmd+scroll(-N)` / Win·Linux: `Ctrl+scroll(-N)` — zoom out |
 
 Holding a modifier while injecting a scroll event is the universal zoom mechanism on all major desktop OSes. The modifier is platform-specific: on macOS, `Ctrl+scroll` activates the OS Accessibility screen magnifier rather than triggering in-application zoom — `Cmd+scroll` is the correct in-app zoom key. On Windows and Linux, `Ctrl+scroll` is the standard. The implementation selects the modifier at adapter construction time via `_ZOOM_MODIFIER`. The mechanism works identically in Chrome, Firefox, Safari, Edge, PDF viewers (Preview, Acrobat, Evince, Okular), image viewers, VS Code, and Office — no per-application mapping is required.
 
