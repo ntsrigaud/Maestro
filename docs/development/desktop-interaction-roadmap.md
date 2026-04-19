@@ -140,9 +140,16 @@ def scroll(self, clicks: int) -> None:
 **b) New `zoom()` method** — Ctrl+scroll injection for application-agnostic view zoom:
 
 ```python
-def zoom(self, clicks: int) -> None:
-    """Inject a Ctrl+scroll zoom event at the current cursor position.
+# Zoom modifier is platform-specific.  On macOS, Ctrl+scroll activates the
+# OS Accessibility screen magnifier — the wrong target.  Cmd+scroll triggers
+# in-app zoom in all major browsers, PDF viewers, and editors on macOS.
+_ZOOM_MODIFIER: str = "command" if sys.platform == "darwin" else "ctrl"
 
+def zoom(self, clicks: int) -> None:
+    """Inject a modifier+scroll zoom event at the current cursor position.
+
+    Uses Cmd+scroll on macOS and Ctrl+scroll on Windows / Linux to trigger
+    in-application view zoom without activating OS-level zoom overlays.
     Positive clicks zoom in; negative zoom out.  Clamped to [-5, 5] to
     prevent runaway zoom from rapid-fire command delivery.
     """
@@ -150,12 +157,16 @@ def zoom(self, clicks: int) -> None:
         LOGGER.warning("pyautogui not available — zoom skipped")
         return
     clamped = max(-5, min(5, clicks))
-    pyautogui.keyDown("ctrl")
-    pyautogui.scroll(clamped)
-    pyautogui.keyUp("ctrl")
+    pyautogui.keyDown(_ZOOM_MODIFIER)
+    try:
+        pyautogui.scroll(clamped)
+    finally:
+        # Always release the modifier — prevents a stuck Ctrl/Cmd key if
+        # pyautogui.scroll() raises (e.g. display server unavailable).
+        pyautogui.keyUp(_ZOOM_MODIFIER)
 ```
 
-> **Security note:** `zoom()` accepts a plain `int`; `"ctrl"` is a string literal, not user-supplied input. No new key names are required in `_SAFE_KEY_NAMES` since `ctrl` is already present.
+> **Security note:** `zoom()` accepts a plain `int`. `_ZOOM_MODIFIER` is a module-level constant resolved from `sys.platform` at import time — not user-supplied. `"ctrl"` is already in `_SAFE_KEY_NAMES`; `"command"` must be added (see §2.1c). The `try/finally` guarantees the modifier is always released, preventing a stuck key if `scroll()` raises.
 
 **c) Allowlist extension** — add only keys used in the shortcut tables below:
 
@@ -165,6 +176,7 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset({
     # New additions for DesktopAdapter:
     "win",      # Windows workspace: Ctrl+Win+Arrow; Windows overview: Win+Tab
     "super",    # Linux overview: Super+A (GNOME), Super+W (KDE)
+    "command",  # macOS zoom: Cmd+scroll (in-app zoom, not OS accessibility zoom)
 })
 ```
 
