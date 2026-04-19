@@ -79,7 +79,7 @@ def build_container(
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
     thresholds = _load_thresholds(config_root / "thresholds" / "production_ipn.yaml")
-    command_map = _load_command_map(config_root / "gestures" / "command_map_ipn.yaml")
+    command_map = _load_command_map(config_root / "gestures" / config.app.command_map)
 
     frame_source = OpenCVFrameSource(
         camera_index=config.app.camera_index,
