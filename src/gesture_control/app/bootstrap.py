@@ -12,6 +12,9 @@ from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSourc
 from gesture_control.infrastructure.dispatch.app_adapters.base import (
     IApplicationAdapter,
 )
+from gesture_control.infrastructure.dispatch.app_adapters.desktop_adapter import (
+    DesktopAdapter,
+)
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
 )
@@ -134,8 +137,15 @@ def build_container(
     dispatcher = _build_dispatcher(
         active_app=config.app.active_app,
         allowed_commands=frozenset(command_map.values()),
+        navigation_mode=config.app.navigation_mode,
+        scroll_clicks=config.app.desktop.scroll_clicks,
+        zoom_clicks=config.app.desktop.zoom_clicks,
+        linux_de=config.app.desktop.linux_de,
     )
-    overlay_renderer = OverlayRenderer(mirror_display=config.app.mirror_display)
+    overlay_renderer = OverlayRenderer(
+        mirror_display=config.app.mirror_display,
+        command_map=command_map,
+    )
     benchmark = LatencyBenchmark()
 
     gaze_cfg = config.inference.gaze
@@ -281,6 +291,7 @@ def _load_command_map(path: Path) -> dict[str, str]:
 def _build_dispatcher(
     active_app: str,
     allowed_commands: frozenset[str],
+    navigation_mode: str = "workspace",
 ) -> CommandDispatcher:
     """Construct the correct adapter for *active_app* and wrap it in a CommandDispatcher."""
     keyboard = KeyboardAdapter()
@@ -290,6 +301,14 @@ def _build_dispatcher(
         adapter = PowerPointAdapter(keyboard=keyboard)
     elif app_lower in ("zoom",):
         adapter = ZoomAdapter(keyboard=keyboard)
+    elif app_lower in ("desktop",):
+        adapter = DesktopAdapter(
+            keyboard=keyboard,
+            navigation_mode=navigation_mode,
+            scroll_clicks=scroll_clicks,
+            zoom_clicks=zoom_clicks,
+            linux_de=linux_de,
+        )
     else:
         import logging as _logging
 
