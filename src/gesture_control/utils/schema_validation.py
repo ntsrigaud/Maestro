@@ -33,7 +33,6 @@ class AppConfig(BaseModel):
     frame_width: int = Field(ge=320)
     frame_height: int = Field(ge=240)
     target_fps: int = Field(ge=1, le=120)
-    active_app: str
     # When True the display window is flipped horizontally so the preview acts
     # like a selfie/mirror camera.  MediaPipe landmark extraction and the entire
     # ML pipeline always operate on the original non-mirrored frame.
@@ -45,7 +44,7 @@ class AppConfig(BaseModel):
     # "workspace" → OS virtual desktop shortcuts (Ctrl+→ / Ctrl+Win+→ etc.)
     # "tabs"      → Ctrl+Tab / Ctrl+Shift+Tab (browser/editor tabs)
     navigation_mode: str = Field(default="workspace", pattern="^(workspace|tabs)$")
-    # Desktop-specific fine-tuning; ignored when active_app != "desktop".
+    # Desktop-specific fine-tuning for scroll/zoom sensitivity and Linux DE.
     desktop: DesktopConfig = Field(default_factory=lambda: DesktopConfig())
 
 
