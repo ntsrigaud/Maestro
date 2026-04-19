@@ -18,6 +18,7 @@ from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifie
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _write_artifact(path: Path) -> None:
     model = GestureLSTMClassifier(
         input_size=147,
@@ -39,8 +40,14 @@ def _write_artifact(path: Path) -> None:
             "num_classes": 8,
         },
         "class_labels": [
-            "open_palm_hold", "swipe_right", "swipe_left", "swipe_up",
-            "swipe_down", "zoom_in", "zoom_out", "unknown",
+            "open_palm_hold",
+            "swipe_right",
+            "swipe_left",
+            "swipe_up",
+            "swipe_down",
+            "zoom_in",
+            "zoom_out",
+            "unknown",
         ],
         "feature_schema": {
             "feature_schema_version": "feature-schema-v5",
@@ -57,16 +64,21 @@ def _write_artifact(path: Path) -> None:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 def test_load_artifact_from_hub_calls_hf_hub_download(tmp_path: Path) -> None:
     """load_artifact_from_hub should delegate to hf_hub_download and return
     a correctly populated InferenceArtifact."""
     artifact_path = tmp_path / "lstm_v1_test_inference.pt"
     _write_artifact(artifact_path)
 
-    with patch("gesture_control.infrastructure.model.hf_loader.hf_hub_download") as mock_dl:
+    with patch(
+        "gesture_control.infrastructure.model.hf_loader.hf_hub_download"
+    ) as mock_dl:
         mock_dl.return_value = str(artifact_path)
 
-        from gesture_control.infrastructure.model.hf_loader import load_artifact_from_hub
+        from gesture_control.infrastructure.model.hf_loader import (
+            load_artifact_from_hub,
+        )
 
         artifact = load_artifact_from_hub(
             repo_id="ntsrigaud/gesture-control-lstm",
@@ -92,10 +104,14 @@ def test_load_artifact_from_hub_passes_cache_dir(tmp_path: Path) -> None:
     artifact_path = tmp_path / "model.pt"
     _write_artifact(artifact_path)
 
-    with patch("gesture_control.infrastructure.model.hf_loader.hf_hub_download") as mock_dl:
+    with patch(
+        "gesture_control.infrastructure.model.hf_loader.hf_hub_download"
+    ) as mock_dl:
         mock_dl.return_value = str(artifact_path)
 
-        from gesture_control.infrastructure.model.hf_loader import load_artifact_from_hub
+        from gesture_control.infrastructure.model.hf_loader import (
+            load_artifact_from_hub,
+        )
 
         load_artifact_from_hub(
             repo_id="ntsrigaud/gesture-control-lstm",

@@ -337,7 +337,9 @@ class TestGazeBorder:
 # ---------------------------------------------------------------------------
 
 
-def _has_any_non_black_pixel_in_row(frame: np.ndarray, y: int, *, tolerance: int = 5) -> bool:
+def _has_any_non_black_pixel_in_row(
+    frame: np.ndarray, y: int, *, tolerance: int = 5
+) -> bool:
     """Return True if any pixel in the frame row at y-offset is brighter than black."""
     row_start = max(0, y - tolerance)
     row_end = min(frame.shape[0], y + tolerance)
@@ -350,7 +352,9 @@ class TestModeBadge:
 
     WIDTH, HEIGHT = 640, 480
 
-    def _make_desktop_state(self, active_mode: str, label: str = "unknown") -> RuntimeState:
+    def _make_desktop_state(
+        self, active_mode: str, label: str = "unknown"
+    ) -> RuntimeState:
         return RuntimeState(
             mode="armed",
             last_label=label,
@@ -365,9 +369,9 @@ class TestModeBadge:
         state = self._make_desktop_state("desktop\u00b7workspace")
         result = renderer.render(frame, state)
         # Row 18 (badge y) should contain non-black pixels (the badge text).
-        assert _has_any_non_black_pixel_in_row(result.frame, 18), (
-            "Mode badge text must produce visible pixels near row 18"
-        )
+        assert _has_any_non_black_pixel_in_row(
+            result.frame, 18
+        ), "Mode badge text must produce visible pixels near row 18"
 
     def test_no_mode_badge_when_active_mode_is_unknown(self) -> None:
         """Default 'unknown' active_mode must NOT render a white badge row.
@@ -397,11 +401,11 @@ class TestModeBadge:
     def test_command_map_accepted_in_constructor(self) -> None:
         """OverlayRenderer must accept command_map param without error."""
         cmap = {"open_palm_hold": "mission_control", "unknown": "no_action"}
-        renderer = OverlayRenderer(
-            mirror_display=False, command_map=cmap
-        )
+        renderer = OverlayRenderer(mirror_display=False, command_map=cmap)
         frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
-        state = self._make_desktop_state("desktop\u00b7workspace", label="open_palm_hold")
+        state = self._make_desktop_state(
+            "desktop\u00b7workspace", label="open_palm_hold"
+        )
         result = renderer.render(frame, state)
         assert result.frame.shape == (self.HEIGHT, self.WIDTH, 3)
 
@@ -437,14 +441,14 @@ class TestModeBadge:
         result = renderer.render(frame, state)
         assert result.frame.shape == (self.HEIGHT, self.WIDTH, 3)
         # Badge row must be lit (mode badge present).
-        assert _has_any_non_black_pixel_in_row(result.frame, 18), (
-            "Phase 4 gate: badge row must contain visible pixels"
-        )
+        assert _has_any_non_black_pixel_in_row(
+            result.frame, 18
+        ), "Phase 4 gate: badge row must contain visible pixels"
         # Pred ring must exist (non-black background in the pred line area).
         pred_y = 48 + 24  # y_offset=24 because active_mode != 'unknown'
-        assert _has_any_non_black_pixel_in_row(result.frame, pred_y), (
-            "Phase 4 gate: pred ring must contain visible pixels"
-        )
+        assert _has_any_non_black_pixel_in_row(
+            result.frame, pred_y
+        ), "Phase 4 gate: pred ring must contain visible pixels"
 
 
 class TestPredRingColours:
@@ -452,7 +456,9 @@ class TestPredRingColours:
 
     WIDTH, HEIGHT = 640, 480
 
-    def _render_ring(self, mode: str, active_mode: str = "desktop\u00b7workspace") -> np.ndarray:
+    def _render_ring(
+        self, mode: str, active_mode: str = "desktop\u00b7workspace"
+    ) -> np.ndarray:
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
         state = RuntimeState(
