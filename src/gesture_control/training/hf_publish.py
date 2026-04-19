@@ -294,7 +294,9 @@ def build_model_card(
     repo_id: str = "ntsrigaud/gesture-control-lstm",
 ) -> str:
     """Return the rendered Markdown model card string without uploading."""
-    return _build_model_card(result=result, config=config, test_report=test_report, repo_id=repo_id)
+    return _build_model_card(
+        result=result, config=config, test_report=test_report, repo_id=repo_id
+    )
 
 
 def publish_to_huggingface(

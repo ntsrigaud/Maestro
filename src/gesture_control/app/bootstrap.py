@@ -209,7 +209,9 @@ def _load_model_from_source(
     """
     src = config.model_source
     if src.backend == "huggingface":
-        from gesture_control.infrastructure.model.hf_loader import load_artifact_from_hub
+        from gesture_control.infrastructure.model.hf_loader import (
+            load_artifact_from_hub,
+        )
 
         return load_artifact_from_hub(
             repo_id=src.repo_id,
