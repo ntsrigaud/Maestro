@@ -240,9 +240,11 @@ This raises a descriptive `ValueError` at construction rather than a bare `KeyEr
 
 ### 2.3 Allowed Commands
 
-The `CommandDispatcher` for the desktop adapter receives a dedicated allowlist:
+The `CommandDispatcher` for the desktop adapter receives a dedicated allowlist built from `frozenset(command_map.values())` in `bootstrap.py` — the same mechanism used for all adapters. The constant in `desktop_adapter.py` is a **documentation artefact** that declares the expected command vocabulary for readability, but it is not the runtime-enforced set:
 
 ```python
+# Documentation constant — expected values from command_map_desktop.yaml.
+# Runtime allowlist is built in bootstrap.py: frozenset(command_map.values()).
 _DESKTOP_ALLOWED = frozenset({
     "scroll_forward", "scroll_back",
     "zoom_in_view", "zoom_out_view",
