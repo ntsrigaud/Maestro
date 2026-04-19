@@ -92,11 +92,11 @@ metrics).
 
 **TCN investigation documents** (→ `docs/archive/research/`):
 
-| File | Content |
-|---|---|
-| `tcn-runtime-bug-investigation.md` | Off-by-one error in wrist trajectory window; orientation normalisation interaction |
-| `tcn-quality-gap-investigation.md` | Root-cause analysis: receptive field underfit on 30-frame sequences |
-| `tcn-performance-analysis-report.md` | Benchmark comparison LSTM vs TCN; LSTM Macro-F1 0.94 vs TCN 0.87 |
+| File                                 | Content                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| `tcn-runtime-bug-investigation.md`   | Off-by-one error in wrist trajectory window; orientation normalisation interaction |
+| `tcn-quality-gap-investigation.md`   | Root-cause analysis: receptive field underfit on 30-frame sequences                |
+| `tcn-performance-analysis-report.md` | Benchmark comparison LSTM vs TCN; LSTM Macro-F1 0.94 vs TCN 0.87                   |
 
 **Decision:** TCN architecture retired; LSTM retained as the sole production model.
 `configs/model/tcn_default.yaml` deleted in the final cleanup PR.
@@ -109,6 +109,7 @@ metrics).
 
 **`src/gesture_control/training/hf_publish.py`** (448 lines) — new Hugging Face Hub
 publishing module:
+
 - `publish_to_huggingface()`: two-stage commit upload — model card + `config.json`
   metadata snapshot first, binary inference artifact second.
 - `build_model_card()`: renders a model card with YAML front-matter, gesture class
@@ -195,24 +196,24 @@ Full detail in the dedicated meta work log
 `docs/archive/work-logs/2026-04-18-repository-cleanup-hf-migration-and-documentation-archival.md`.
 Summary:
 
-| Sub-PR | Key change |
-|---|---|
-| #139 | 47 historical docs → `docs/archive/`; `feature-schema-v5` spec published; `docs/work-logs/` removed |
-| #140 | `ModelSourceConfig`, `hf_loader.py`, bootstrap dispatch; 21 `.pt` + `registry.json` deleted from VCS |
-| #141 | Model card usage snippet updated to HF Hub download |
-| #142 | `--hf-revision` CLI flag; `--registry` deprecated; 3 unit tests for HF loader |
-| #143 | `configs/model/tcn_default.yaml` deleted; `gesture-lstm-v5` → `gesture-control-lstm` |
+| Sub-PR | Key change                                                                                           |
+| ------ | ---------------------------------------------------------------------------------------------------- |
+| #139   | 47 historical docs → `docs/archive/`; `feature-schema-v5` spec published; `docs/work-logs/` removed  |
+| #140   | `ModelSourceConfig`, `hf_loader.py`, bootstrap dispatch; 21 `.pt` + `registry.json` deleted from VCS |
+| #141   | Model card usage snippet updated to HF Hub download                                                  |
+| #142   | `--hf-revision` CLI flag; `--registry` deprecated; 3 unit tests for HF loader                        |
+| #143   | `configs/model/tcn_default.yaml` deleted; `gesture-lstm-v5` → `gesture-control-lstm`                 |
 
 ---
 
 ## Outcome
 
-| Metric | Before | After |
-|---|---|---|
-| Feature schema | v1 baseline | `feature-schema-v5`, 147-dim |
-| Model Macro-F1 (IPN test) | ~0.87 LSTM v1 (from analysis) | **0.96** LSTM v5 |
-| Architecture | LSTM only | LSTM + TCN explored; TCN retired |
-| Training workflow | `scripts/train_model.py` only | Notebook Layer 1 + Layer 2 + HF publishing |
-| Model deployment | Local `models/` directory | Hugging Face Hub (`ntsrigaud/gesture-control-lstm`) |
-| Tracked binary weight size | ~22 MB `.pt` files | 0 MB — all weights excluded from VCS |
-| Architecture documentation | v1 feature schema | 147-dim, `feature-schema-v5` throughout |
+| Metric                     | Before                        | After                                               |
+| -------------------------- | ----------------------------- | --------------------------------------------------- |
+| Feature schema             | v1 baseline                   | `feature-schema-v5`, 147-dim                        |
+| Model Macro-F1 (IPN test)  | ~0.87 LSTM v1 (from analysis) | **0.96** LSTM v5                                    |
+| Architecture               | LSTM only                     | LSTM + TCN explored; TCN retired                    |
+| Training workflow          | `scripts/train_model.py` only | Notebook Layer 1 + Layer 2 + HF publishing          |
+| Model deployment           | Local `models/` directory     | Hugging Face Hub (`ntsrigaud/gesture-control-lstm`) |
+| Tracked binary weight size | ~22 MB `.pt` files            | 0 MB — all weights excluded from VCS                |
+| Architecture documentation | v1 feature schema             | 147-dim, `feature-schema-v5` throughout             |

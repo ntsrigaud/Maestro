@@ -27,13 +27,13 @@ post-`feature-schema-v5` housekeeping pass on the repository. The goals were:
 
 ## Scope of Work (88 files, +1196 / −449)
 
-| Sub-PR | Title | Key deliverables |
-|---|---|---|
-| #139 | Documentation archival and feature-schema-v5 rollout | 47 files moved to `docs/archive/`; `data-flow.md` + `system-overview.md` updated to 147-dim; `docs/ml-system/feature-schema-v5.md` created; `docs/work-logs/` directory removed |
-| #140 | HF Hub model loader and local artifact cleanup | `ModelSourceConfig`, `configs/model_source.yaml`, `hf_loader.py`, bootstrap dispatch; 21 `.pt` files + `registry.json` deleted; `huggingface_hub` promoted to core dep |
-| #141 | Model card usage snippet update | `hf_publish.py` usage snippet updated to HF Hub download |
-| #142 | Runtime CLI deprecations and HF loader tests | `--hf-revision` flag; `--registry` deprecated; `load_latest_inference_artifact()` deprecation notice; `train_model.py` conditional registry update; 3 offline unit tests for `hf_loader.py` |
-| #143 | TCN config cleanup and HF repo ID correction | `configs/model/tcn_default.yaml` deleted; `gesture-lstm-v5` → `gesture-control-lstm` across 4 files |
+| Sub-PR | Title                                                | Key deliverables                                                                                                                                                                            |
+| ------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #139   | Documentation archival and feature-schema-v5 rollout | 47 files moved to `docs/archive/`; `data-flow.md` + `system-overview.md` updated to 147-dim; `docs/ml-system/feature-schema-v5.md` created; `docs/work-logs/` directory removed             |
+| #140   | HF Hub model loader and local artifact cleanup       | `ModelSourceConfig`, `configs/model_source.yaml`, `hf_loader.py`, bootstrap dispatch; 21 `.pt` files + `registry.json` deleted; `huggingface_hub` promoted to core dep                      |
+| #141   | Model card usage snippet update                      | `hf_publish.py` usage snippet updated to HF Hub download                                                                                                                                    |
+| #142   | Runtime CLI deprecations and HF loader tests         | `--hf-revision` flag; `--registry` deprecated; `load_latest_inference_artifact()` deprecation notice; `train_model.py` conditional registry update; 3 offline unit tests for `hf_loader.py` |
+| #143   | TCN config cleanup and HF repo ID correction         | `configs/model/tcn_default.yaml` deleted; `gesture-lstm-v5` → `gesture-control-lstm` across 4 files                                                                                         |
 
 ---
 
@@ -42,23 +42,27 @@ post-`feature-schema-v5` housekeeping pass on the repository. The goals were:
 ### Documentation Archival and Feature-Schema-v5 Update (PR #139)
 
 **`docs/archive/` hierarchy established:**
+
 - 41 historical work logs → `docs/archive/work-logs/`
 - 4 research investigation reports → `docs/archive/research/`
 - 3 completed development plans → `docs/archive/plans/`
 - `docs/work-logs/` directory removed; all work logs henceforth written directly to `docs/archive/work-logs/`
 
 **Architecture docs updated to 147-dim / `feature-schema-v5`:**
+
 - `docs/architecture/data-flow.md`: feature node, `FeatureFrame` table, Temporal Buffer table, LSTM input tensor shape all updated; feature vector prose replaced with the canonical six-block layout diagram.
 - `docs/architecture/system-overview.md`: Feature Engineering step and LSTM Inference step updated; Model Export step references the Hugging Face Hub.
 - `README.md`: architecture pointer updated from `ARCHITECTURE_SPECIFICATION.md` → `docs/architecture/`; models directory description updated to reference HF Hub.
 
 **New files:**
+
 - `docs/ml-system/feature-schema-v5.md`: canonical 147-dim feature specification with block table, preprocessing pipeline with mathematical notation, orientation normalisation rationale, invalid frame policy, and schema version history.
 - `docs/development/repository-refactoring-plan.md`: plan document covering HF Hub publication strategy, archive directory structure, and model registry naming conventions.
 
 ### HF Hub Model Loader (PR #140)
 
 **`src/gesture_control/utils/schema_validation.py`** — new `ModelSourceConfig` Pydantic model (`extra="forbid"`):
+
 - `backend: "local" | "huggingface"` (regex-validated)
 - HF Hub fields: `repo_id`, `revision`, `filename`, `cache_dir`
 - Local fields: `registry_path`
@@ -69,10 +73,12 @@ post-`feature-schema-v5` housekeeping pass on the repository. The goals were:
 **`src/gesture_control/utils/config_loader.py`** — `load_runtime_config()` loads `model_source.yaml`; falls back to `ModelSourceConfig()` defaults when absent (backwards-compatible).
 
 **`src/gesture_control/infrastructure/model/hf_loader.py`** — new module:
+
 - `load_artifact_from_hub()`: calls `hf_hub_download()` then delegates to `load_inference_artifact()` for unpacking and device placement.
 - Guards against absent `huggingface_hub` with an informative `ImportError`.
 
 **`src/gesture_control/app/bootstrap.py`** — `build_container()` updated:
+
 - `registry_path: str | None = None`; `hf_revision_override: str | None = None` added.
 - Direct `load_latest_inference_artifact()` call replaced with `_load_model_from_source()` routing on `config.model_source.backend`.
 
@@ -89,6 +95,7 @@ post-`feature-schema-v5` housekeeping pass on the repository. The goals were:
 ### CLI Deprecations and HF Loader Tests (PR #142)
 
 **`src/gesture_control/app/main.py`:**
+
 - `--hf-revision REVISION` flag added (forwarded to `build_container(hf_revision_override=...)`).
 - `--registry` default changed to `None`; help text marks it as deprecated.
 - `--model-artifact` help text updated to reference `model_source.yaml`.
@@ -98,6 +105,7 @@ post-`feature-schema-v5` housekeeping pass on the repository. The goals were:
 **`scripts/train_model.py`** — `update_model_registry()` called conditionally: `... if args.registry else None`.
 
 **`tests/unit/test_hf_loader.py`** — three offline unit tests using `unittest.mock.patch`:
+
 - `test_load_artifact_from_hub_calls_hf_hub_download` — call args and returned artifact fields
 - `test_load_artifact_from_hub_passes_cache_dir` — `cache_dir` and `revision` forwarded correctly
 - `test_load_artifact_from_hub_raises_on_missing_huggingface_hub` — `ImportError` on absent library

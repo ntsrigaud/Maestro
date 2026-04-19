@@ -63,10 +63,10 @@ pytest
 
 The recommended training workflow uses the Jupyter notebooks under `notebooks/`:
 
-| Notebook | Purpose |
-| -------- | ------- |
-| `01_dataset_preparation.ipynb` | Build the NPZ dataset from IPN Hand video landmarks |
-| `02_model_training.ipynb` | Train, evaluate, export, and publish to Hugging Face Hub |
+| Notebook                       | Purpose                                                  |
+| ------------------------------ | -------------------------------------------------------- |
+| `01_dataset_preparation.ipynb` | Build the NPZ dataset from IPN Hand video landmarks      |
+| `02_model_training.ipynb`      | Train, evaluate, export, and publish to Hugging Face Hub |
 
 Install the notebook extra and launch Jupyter:
 
@@ -88,14 +88,14 @@ See `docs/architecture/` for the full system specification, module contracts, an
 
 Key directories:
 
-| Directory              | Purpose                                                                |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `src/gesture_control/` | Core package (domain, interfaces, infrastructure, pipeline, training)  |
-| `configs/`             | YAML configuration (app, inference, model, gestures, thresholds)       |
-| `scripts/`             | CLI entry points (data collection, dataset build, training, inference) |
+| Directory              | Purpose                                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/gesture_control/` | Core package (domain, interfaces, infrastructure, pipeline, training)                                                                      |
+| `configs/`             | YAML configuration (app, inference, model, gestures, thresholds)                                                                           |
+| `scripts/`             | CLI entry points (data collection, dataset build, training, inference)                                                                     |
 | `models/`              | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/gesture-control-lstm) |
-| `tests/`               | Unit, integration, and system tests                                    |
-| `docs/`                | Architecture docs, guides, and decision records                        |
+| `tests/`               | Unit, integration, and system tests                                                                                                        |
+| `docs/`                | Architecture docs, guides, and decision records                                                                                            |
 
 ## Dataset Generation
 
@@ -123,13 +123,13 @@ The training pipeline includes group-aware data splitting (no recording leakage)
 
 ## Current System State
 
-| Metric | Value |
-| ------ | ----- |
-| Inference feature schema | `feature-schema-v5` (147-dim) |
-| Production model | [`ntsrigaud/gesture-control-lstm`](https://huggingface.co/ntsrigaud/gesture-control-lstm) — Macro-F1 **0.96** |
-| Model loading | Hugging Face Hub (cached, no training required) |
-| Gaze activation | `HeadPoseGazeDetector` — sole arming mechanism |
-| Test suite | ≥ 250 tests, 0 failures |
-| Tracked binary weights | **0 MB** — all `.pt` artifacts excluded from VCS |
+| Metric                   | Value                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Inference feature schema | `feature-schema-v5` (147-dim)                                                                                 |
+| Production model         | [`ntsrigaud/gesture-control-lstm`](https://huggingface.co/ntsrigaud/gesture-control-lstm) — Macro-F1 **0.96** |
+| Model loading            | Hugging Face Hub (cached, no training required)                                                               |
+| Gaze activation          | `HeadPoseGazeDetector` — sole arming mechanism                                                                |
+| Test suite               | ≥ 250 tests, 0 failures                                                                                       |
+| Tracked binary weights   | **0 MB** — all `.pt` artifacts excluded from VCS                                                              |
 
 The complete development history is recorded in [docs/architecture/](docs/architecture/) and [docs/archive/work-logs/](docs/archive/work-logs/).
