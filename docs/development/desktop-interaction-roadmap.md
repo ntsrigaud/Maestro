@@ -371,8 +371,9 @@ gaze:
 
 ### Phase 3 Tests
 
-- Unit test: `DesktopConfig` validates `scroll_clicks` bounds and `linux_de` pattern.
-- Unit test: `DesktopAdapter` passes `scroll_clicks` to `KeyboardAdapter.scroll()`; verified via mock.
+- Unit test: `DesktopConfig` validates `scroll_clicks` bounds (`ge=1, le=20`), `zoom_clicks` bounds (`ge=1, le=5`), and `linux_de` pattern.
+- Unit test: `DesktopAdapter` passes `scroll_clicks` to `KeyboardAdapter.scroll()` and `zoom_clicks` to `KeyboardAdapter.zoom()`; verified via mock.
+- Unit test: `DesktopAdapter` raises `ValueError` at construction for an unsupported platform string.
 - Unit test: Linux `mission_control` shortcut resolves correctly for `gnome`, `kde`, and `other`.
 
 ### Phase 3 Gate
