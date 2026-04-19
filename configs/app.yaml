@@ -8,3 +8,9 @@ active_app: powerpoint
 # This does NOT affect MediaPipe landmark extraction or the ML pipeline;
 # frames are always processed in the original (non-mirrored) coordinate space.
 mirror_display: true
+# Active gesture-to-command map (filename in configs/gestures/).
+# Switch to command_map_desktop.yaml for the desktop interaction profile.
+command_map: command_map_ipn.yaml
+# Horizontal swipe destination (workspace | tabs).  Relevant only when
+# active_app is "desktop"; ignored by presentation adapters.
+navigation_mode: workspace
