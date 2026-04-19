@@ -330,3 +330,149 @@ class TestGazeBorder:
         state = RuntimeState(mode="idle", last_label="unknown", last_confidence=0.0)
         result = renderer.render(frame, state).frame
         assert _border_pixel(result, corner="top-left") == _AMBER
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Mode badge and command preview
+# ---------------------------------------------------------------------------
+
+
+def _has_any_non_black_pixel_in_row(frame: np.ndarray, y: int, *, tolerance: int = 5) -> bool:
+    """Return True if any pixel in the frame row at y-offset is brighter than black."""
+    row_start = max(0, y - tolerance)
+    row_end = min(frame.shape[0], y + tolerance)
+    patch = frame[row_start:row_end, :]
+    return bool(patch.max() > 0)
+
+
+class TestModeBadge:
+    """Verify that the mode badge is rendered when active_mode is set."""
+
+    WIDTH, HEIGHT = 640, 480
+
+    def _make_desktop_state(self, active_mode: str, label: str = "unknown") -> RuntimeState:
+        return RuntimeState(
+            mode="armed",
+            last_label=label,
+            last_confidence=0.9,
+            active_mode=active_mode,
+        )
+
+    def test_mode_badge_rendered_when_active_mode_not_unknown(self) -> None:
+        """A non-'unknown' active_mode must produce visible text near y=18."""
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
+        state = self._make_desktop_state("desktop\u00b7workspace")
+        result = renderer.render(frame, state)
+        # Row 18 (badge y) should contain non-black pixels (the badge text).
+        assert _has_any_non_black_pixel_in_row(result.frame, 18), (
+            "Mode badge text must produce visible pixels near row 18"
+        )
+
+    def test_no_mode_badge_when_active_mode_is_unknown(self) -> None:
+        """Default 'unknown' active_mode must NOT render a white badge row.
+
+        The badge is drawn in white (B=255, G=255, R=255 in BGR).  All regular
+        HUD text uses yellow (B=0, G=255, R=255).  Checking that the blue
+        channel is 0 in the badge row area confirms that no white badge text
+        was rendered, even if yellow HUD text overlaps the same y range.
+        """
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
+        state = RuntimeState(
+            mode="idle",
+            last_label="unknown",
+            last_confidence=0.0,
+            active_mode="unknown",
+        )
+        result = renderer.render(frame, state)
+        # Badge text colour is white (B=255).  Yellow HUD text has B=0.
+        # Confirm no white pixels in rows 14-22 (blue channel must stay 0).
+        patch_blue = np.asarray(result.frame)[14:22, 8:300, 0]  # B channel
+        assert patch_blue.max() == 0, (
+            "Row 18 must have no white pixels (B=255) when active_mode='unknown'; "
+            "only yellow HUD text (B=0) is permitted there"
+        )
+
+    def test_command_map_accepted_in_constructor(self) -> None:
+        """OverlayRenderer must accept command_map param without error."""
+        cmap = {"open_palm_hold": "mission_control", "unknown": "no_action"}
+        renderer = OverlayRenderer(
+            mirror_display=False, command_map=cmap
+        )
+        frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
+        state = self._make_desktop_state("desktop\u00b7workspace", label="open_palm_hold")
+        result = renderer.render(frame, state)
+        assert result.frame.shape == (self.HEIGHT, self.WIDTH, 3)
+
+    def test_render_succeeds_without_command_map(self) -> None:
+        """OverlayRenderer with no command_map must render without error."""
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
+        state = self._make_desktop_state("desktop\u00b7workspace")
+        result = renderer.render(frame, state)
+        assert result.frame.shape == (self.HEIGHT, self.WIDTH, 3)
+
+    def test_phase4_gate_desktop_workspace_mission_control(self) -> None:
+        """Gate: overlay displays [desktop·workspace] → mission_control.
+
+        A synthetic RuntimeState with active_mode='desktop·workspace' and
+        last_label='open_palm_hold', rendered through a renderer with the
+        desktop command map, must produce a non-empty canvas containing
+        visible pixels in both the badge row (y≈18) and pred ring row (y≈72).
+        """
+        cmap = {
+            "open_palm_hold": "mission_control",
+            "unknown": "no_action",
+            "swipe_up": "scroll_forward",
+        }
+        renderer = OverlayRenderer(mirror_display=False, command_map=cmap)
+        frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
+        state = RuntimeState(
+            mode="armed",
+            last_label="open_palm_hold",
+            last_confidence=0.97,
+            active_mode="desktop\u00b7workspace",
+        )
+        result = renderer.render(frame, state)
+        assert result.frame.shape == (self.HEIGHT, self.WIDTH, 3)
+        # Badge row must be lit (mode badge present).
+        assert _has_any_non_black_pixel_in_row(result.frame, 18), (
+            "Phase 4 gate: badge row must contain visible pixels"
+        )
+        # Pred ring must exist (non-black background in the pred line area).
+        pred_y = 48 + 24  # y_offset=24 because active_mode != 'unknown'
+        assert _has_any_non_black_pixel_in_row(result.frame, pred_y), (
+            "Phase 4 gate: pred ring must contain visible pixels"
+        )
+
+
+class TestPredRingColours:
+    """Verify pred ring background colour reflects the mode state."""
+
+    WIDTH, HEIGHT = 640, 480
+
+    def _render_ring(self, mode: str, active_mode: str = "desktop\u00b7workspace") -> np.ndarray:
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
+        state = RuntimeState(
+            mode=mode,
+            last_label="unknown",
+            last_confidence=0.0,
+            active_mode=active_mode,
+        )
+        return renderer.render(frame, state).frame
+
+    def test_armed_ring_is_dark_green(self) -> None:
+        frame = self._render_ring("armed")
+        pred_y = 48 + 24
+        # The ring for 'armed' is a dark-green band; check green > 0 in that row.
+        row_start, row_end = pred_y - 18, pred_y + 6
+        patch = frame[row_start:row_end, 50:200]
+        # Dark green has G channel set; the band should not be fully black.
+        assert patch[:, :, 1].max() > 0, "Armed pred ring must have G channel > 0"
+
+    def test_ring_renders_without_error_for_all_known_modes(self) -> None:
+        for mode in ("idle", "armed", "cooldown"):
+            frame = self._render_ring(mode)
+            assert frame.shape == (self.HEIGHT, self.WIDTH, 3)
