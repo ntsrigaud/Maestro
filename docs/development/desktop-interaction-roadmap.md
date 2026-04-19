@@ -308,12 +308,12 @@ class DesktopConfig(BaseModel):
     # "gnome" → Super+A;  "kde" → Super+W;  "other" → bare Super key.
     linux_de: str = Field(default="gnome", pattern="^(gnome|kde|other)$")
 
-class RuntimeConfig(BaseModel):
+class AppConfig(BaseModel):
     ...
     desktop: DesktopConfig = Field(default_factory=DesktopConfig)
 ```
 
-Update `DesktopAdapter` to read `scroll_clicks` from config at construction (replaces the module-level `_SCROLL_CLICKS` constant).
+Update `DesktopAdapter` to read `scroll_clicks` and `zoom_clicks` from config at construction (replaces the module-level `_SCROLL_CLICKS` and `_ZOOM_CLICKS` constants).
 
 For Linux, refine `_OVERVIEW_SHORTCUTS` to branch on `linux_de`:
 
