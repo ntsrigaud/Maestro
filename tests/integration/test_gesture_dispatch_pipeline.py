@@ -17,8 +17,8 @@ import numpy as np
 from gesture_control.domain.entities import ExecutableCommand, StabilizedPrediction
 from gesture_control.domain.enums import RuntimeMode
 from gesture_control.infrastructure.dispatch.app_adapters.desktop_adapter import (
-    DesktopAdapter,
     _NAV_SHORTCUTS,
+    DesktopAdapter,
 )
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
