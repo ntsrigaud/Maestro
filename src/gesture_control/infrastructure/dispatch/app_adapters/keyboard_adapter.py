@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 
 LOGGER = logging.getLogger(__name__)
 
@@ -68,12 +67,6 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
     }
 )
 
-# Zoom modifier is platform-specific.  On macOS, Ctrl+scroll activates the OS
-# Accessibility screen magnifier — the wrong target.  Cmd+scroll triggers in-app
-# zoom in all major browsers, PDF viewers, and editors on macOS.
-_ZOOM_MODIFIER: str = "command" if sys.platform == "darwin" else "ctrl"
-
-
 class KeyboardAdapter:
     """Low-level key delivery service backed by *pyautogui*.
 
@@ -131,28 +124,23 @@ class KeyboardAdapter:
         pyautogui.scroll(max(-20, min(20, clicks)))
         LOGGER.debug("Scrolled: clicks=%d", clicks)
 
-    def zoom(self, clicks: int, *, modifier: str | None = None) -> None:
+    def zoom(self, clicks: int, *, modifier: str) -> None:
         """Inject a modifier+scroll zoom event at the current cursor position.
 
         Uses Cmd+scroll on macOS and Ctrl+scroll on Windows / Linux to trigger
         in-application view zoom without activating OS-level zoom overlays.
         Positive clicks zoom in; negative zoom out.  Clamped to [-5, 5] to
         prevent runaway zoom from rapid-fire command delivery.
-
-        An explicit *modifier* overrides the module-level ``_ZOOM_MODIFIER``
-        constant (useful when the caller knows the target platform differs from
-        the host, e.g. in ``DesktopAdapter`` tests).
         """
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — zoom skipped.")
             return
-        _modifier = modifier if modifier is not None else _ZOOM_MODIFIER
         clamped = max(-5, min(5, clicks))
-        pyautogui.keyDown(_modifier)
+        pyautogui.keyDown(modifier)
         try:
             pyautogui.scroll(clamped)
         finally:
             # Always release the modifier — prevents a stuck Ctrl/Cmd key if
             # pyautogui.scroll() raises (e.g. display server unavailable).
-            pyautogui.keyUp(_modifier)
-        LOGGER.debug("Zoomed: modifier=%s clicks=%d", _modifier, clamped)
+            pyautogui.keyUp(modifier)
+        LOGGER.debug("Zoomed: modifier=%s clicks=%d", modifier, clamped)
