@@ -292,6 +292,9 @@ def _build_dispatcher(
     active_app: str,
     allowed_commands: frozenset[str],
     navigation_mode: str = "workspace",
+    scroll_clicks: int = 5,
+    zoom_clicks: int = 3,
+    linux_de: str = "gnome",
 ) -> CommandDispatcher:
     """Construct the correct adapter for *active_app* and wrap it in a CommandDispatcher."""
     keyboard = KeyboardAdapter()
