@@ -378,7 +378,7 @@ gaze:
 
 ### Phase 3 Gate
 
-`python scripts/run_realtime.py --config configs/app_desktop.yaml` starts without error. `DesktopAdapter.execute("mission_control")` calls the correct OS shortcut for the configured `linux_de`.
+`python scripts/run_realtime.py --config configs/desktop` starts without error (the directory path is passed to `load_runtime_config()`). `DesktopAdapter.execute("mission_control")` calls the correct OS shortcut for the configured `linux_de`.
 
 ---
 
