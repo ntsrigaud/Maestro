@@ -8,6 +8,11 @@ Phase 1 covers:
 - inference_desktop.yaml validates against InferenceConfig.
 - bootstrap command map resolution uses config.app.command_map.
 
+Phase 3 covers:
+- DesktopConfig validates scroll_clicks, zoom_clicks, and linux_de.
+- AppConfig.desktop defaults are correct.
+- configs/desktop/ directory loads via load_runtime_config.
+- configs/desktop/app.yaml sets active_app=desktop and command_map_desktop.yaml.
 """
 
 from __future__ import annotations
@@ -16,10 +21,10 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from gesture_control.utils.config_loader import load_runtime_config
 from gesture_control.utils.schema_validation import AppConfig, DesktopConfig, InferenceConfig
-
 
 # ---------------------------------------------------------------------------
 # AppConfig schema extension
@@ -59,11 +64,11 @@ class TestAppConfigNewFields:
         assert cfg.navigation_mode == "tabs"
 
     def test_navigation_mode_invalid_rejected(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AppConfig.model_validate(self._minimal(navigation_mode="context_aware"))
 
     def test_unknown_field_still_rejected(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             AppConfig.model_validate(self._minimal(dispatch_mode="static"))
 
     def test_backwards_compat_existing_configs(self, config_dir: Path):
@@ -180,3 +185,106 @@ class TestBootstrapCommandMapResolution:
         assert "no_action" in result.values()
         assert "scroll_forward" in result.values()
 
+
+# ---------------------------------------------------------------------------
+# Phase 3: DesktopConfig schema
+# ---------------------------------------------------------------------------
+
+
+class TestDesktopConfig:
+    def test_defaults(self):
+        cfg = DesktopConfig()
+        assert cfg.scroll_clicks == 5
+        assert cfg.zoom_clicks == 3
+        assert cfg.linux_de == "gnome"
+
+    def test_scroll_clicks_bounds(self):
+        assert DesktopConfig(scroll_clicks=1).scroll_clicks == 1
+        assert DesktopConfig(scroll_clicks=20).scroll_clicks == 20
+        with pytest.raises(ValidationError):
+            DesktopConfig(scroll_clicks=0)
+        with pytest.raises(ValidationError):
+            DesktopConfig(scroll_clicks=21)
+
+    def test_zoom_clicks_bounds(self):
+        assert DesktopConfig(zoom_clicks=1).zoom_clicks == 1
+        assert DesktopConfig(zoom_clicks=10).zoom_clicks == 10
+        with pytest.raises(ValidationError):
+            DesktopConfig(zoom_clicks=0)
+        with pytest.raises(ValidationError):
+            DesktopConfig(zoom_clicks=11)
+
+    def test_linux_de_pattern_accepted(self):
+        for de in ("gnome", "kde", "xfce", "cinnamon", "lxde"):
+            assert DesktopConfig(linux_de=de).linux_de == de
+
+    def test_linux_de_invalid_pattern_rejected(self):
+        with pytest.raises(ValidationError):
+            DesktopConfig(linux_de="GNOME!")
+
+    def test_unknown_field_rejected(self):
+        with pytest.raises(ValidationError):
+            DesktopConfig.model_validate({"scroll_clicks": 5, "unknown_field": True})
+
+
+class TestAppConfigDesktopField:
+    def _minimal(self, **overrides) -> dict:
+        base = {
+            "app_name": "test",
+            "camera_index": 0,
+            "frame_width": 640,
+            "frame_height": 480,
+            "target_fps": 30,
+            "active_app": "desktop",
+        }
+        base.update(overrides)
+        return base
+
+    def test_desktop_defaults_nested(self):
+        cfg = AppConfig.model_validate(self._minimal())
+        assert cfg.desktop.scroll_clicks == 5
+        assert cfg.desktop.zoom_clicks == 3
+        assert cfg.desktop.linux_de == "gnome"
+
+    def test_desktop_overrides_respected(self):
+        cfg = AppConfig.model_validate(
+            self._minimal(desktop={"scroll_clicks": 10, "zoom_clicks": 5, "linux_de": "kde"})
+        )
+        assert cfg.desktop.scroll_clicks == 10
+        assert cfg.desktop.zoom_clicks == 5
+        assert cfg.desktop.linux_de == "kde"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: configs/desktop/ directory
+# ---------------------------------------------------------------------------
+
+
+class TestDesktopConfigDirectory:
+    def _desktop_config_dir(self, config_dir: Path) -> Path:
+        return config_dir.parent / "configs" / "desktop"
+
+    def test_desktop_dir_exists(self, config_dir: Path):
+        desktop_dir = self._desktop_config_dir(config_dir)
+        assert desktop_dir.is_dir(), f"configs/desktop/ not found at {desktop_dir}"
+
+    def test_desktop_app_yaml_loads_successfully(self, config_dir: Path):
+        desktop_dir = self._desktop_config_dir(config_dir)
+        config = load_runtime_config(desktop_dir)
+        assert config.app.active_app == "desktop"
+        assert config.app.command_map == "command_map_desktop.yaml"
+        assert config.app.navigation_mode == "workspace"
+
+    def test_desktop_inference_yaml_loads_successfully(self, config_dir: Path):
+        desktop_dir = self._desktop_config_dir(config_dir)
+        config = load_runtime_config(desktop_dir)
+        assert config.inference.window_length == 24
+        assert config.inference.command_cooldown_ms == 800
+        assert config.inference.gaze.grace_ms == 3000
+
+    def test_desktop_config_desktop_field_loaded(self, config_dir: Path):
+        desktop_dir = self._desktop_config_dir(config_dir)
+        config = load_runtime_config(desktop_dir)
+        assert config.app.desktop.scroll_clicks == 5
+        assert config.app.desktop.zoom_clicks == 3
+        assert config.app.desktop.linux_de == "gnome"
