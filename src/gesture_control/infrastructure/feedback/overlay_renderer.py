@@ -18,13 +18,13 @@ _BORDER_THICKNESS = 4
 
 # Prediction ring — a coloured background rectangle drawn behind the
 # gesture prediction line to give immediate mode-state feedback.
-_RING_ARMED:    tuple[int, int, int] = (0, 60, 0)    # dark green background
-_RING_COOLDOWN: tuple[int, int, int] = (0, 55, 90)   # dark amber background
-_RING_DEFAULT:  tuple[int, int, int] = (30, 30, 30)  # dark grey background
+_RING_ARMED: tuple[int, int, int] = (0, 60, 0)  # dark green background
+_RING_COOLDOWN: tuple[int, int, int] = (0, 55, 90)  # dark amber background
+_RING_DEFAULT: tuple[int, int, int] = (30, 30, 30)  # dark grey background
 
 # Text colours (BGR).
-_TEXT_BADGE:   tuple[int, int, int] = (255, 255, 255)  # white — mode badge
-_TEXT_OVERLAY: tuple[int, int, int] = (0, 255, 255)    # yellow — HUD lines
+_TEXT_BADGE: tuple[int, int, int] = (255, 255, 255)  # white — mode badge
+_TEXT_OVERLAY: tuple[int, int, int] = (0, 255, 255)  # yellow — HUD lines
 
 
 class OverlayRenderer:
