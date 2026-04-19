@@ -198,6 +198,14 @@ class TestBootstrapCommandMapResolution:
         assert "no_action" in result.values()
         assert "scroll_forward" in result.values()
 
+    def test_missing_command_map_raises_file_not_found(self, tmp_path: Path):
+        """_load_command_map must raise FileNotFoundError for absent files."""
+        from gesture_control.app.bootstrap import _load_command_map  # type: ignore[attr-defined]
+
+        missing = tmp_path / "nonexistent_map.yaml"
+        with pytest.raises(FileNotFoundError, match="Command map file not found"):
+            _load_command_map(missing)
+
 
 # ---------------------------------------------------------------------------
 # Phase 3: DesktopConfig schema
