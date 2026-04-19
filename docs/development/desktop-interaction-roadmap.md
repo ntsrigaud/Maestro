@@ -297,12 +297,15 @@ Add `DesktopConfig` as an optional nested block inside **`AppConfig`** — not `
 class DesktopConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # Number of pyautogui scroll clicks per gesture event.
-    # Increase for fast scrolling (e.g. long terminal output); decrease for
-    # precision reading (e.g. dense code or research papers).
+    # Number of pyautogui scroll clicks per scroll gesture event.
+    # Increase for fast scrolling (long terminal output); decrease for
+    # precision reading (dense code or research papers).
     scroll_clicks: int = Field(default=5, ge=1, le=20)
-    # Linux-specific: desktop environment hint for mission_control shortcut
-    # selection. "gnome" uses Super+A; "kde" uses Super+W.
+    # Number of modifier+scroll steps per zoom gesture event.
+    # Upper bound matches KeyboardAdapter.zoom() internal clamp of [-5, 5].
+    zoom_clicks: int = Field(default=3, ge=1, le=5)
+    # Linux-specific: desktop environment hint for mission_control shortcut.
+    # "gnome" → Super+A;  "kde" → Super+W;  "other" → bare Super key.
     linux_de: str = Field(default="gnome", pattern="^(gnome|kde|other)$")
 
 class RuntimeConfig(BaseModel):
