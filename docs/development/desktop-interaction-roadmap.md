@@ -275,7 +275,7 @@ elif active_app == "desktop":
 | Test file                                      | Scope                                                                                                                     |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `tests/unit/test_desktop_adapter.py`           | All 8 command IDs; per-platform nav shortcuts; `sys.platform` patching; `navigation_mode` switching; zoom sign convention |
-| `tests/unit/test_keyboard_adapter.py` (extend) | `scroll()` clamps to [-20, 20]; `zoom()` clamps to [-5, 5] and sends keyDown/keyUp `ctrl`; new key names pass allowlist   |
+| `tests/unit/test_keyboard_adapter.py` (extend) | `scroll()` clamps to [-20, 20]; `zoom()` clamps to [-5, 5] and sends `keyDown`/`keyUp` with `"command"` on macOS / `"ctrl"` on other platforms; `try/finally` releases modifier on `scroll()` failure; new key names pass allowlist |
 
 ### Phase 2 Gate
 
