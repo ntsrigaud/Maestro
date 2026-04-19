@@ -12,7 +12,7 @@ Phase 3 covers:
 - DesktopConfig validates scroll_clicks, zoom_clicks, and linux_de.
 - AppConfig.desktop defaults are correct.
 - configs/desktop/ directory loads via load_runtime_config.
-- configs/desktop/app.yaml sets active_app=desktop and command_map_desktop.yaml.
+- configs/desktop/app.yaml sets command_map_desktop.yaml.
 """
 
 from __future__ import annotations
@@ -43,7 +43,6 @@ class TestAppConfigNewFields:
             "frame_width": 640,
             "frame_height": 480,
             "target_fps": 30,
-            "active_app": "desktop",
         }
         base.update(overrides)
         return base
@@ -184,7 +183,6 @@ class TestBootstrapCommandMapResolution:
         app_yaml = cfg_dir / "app.yaml"
         app_data = yaml.safe_load(app_yaml.read_text(encoding="utf-8"))
         app_data["command_map"] = "command_map_desktop.yaml"
-        app_data["active_app"] = "desktop"
         app_yaml.write_text(yaml.dump(app_data), encoding="utf-8")
 
         config = load_runtime_config(cfg_dir)
@@ -256,7 +254,6 @@ class TestAppConfigDesktopField:
             "frame_width": 640,
             "frame_height": 480,
             "target_fps": 30,
-            "active_app": "desktop",
         }
         base.update(overrides)
         return base
@@ -294,7 +291,6 @@ class TestDesktopConfigDirectory:
     def test_desktop_app_yaml_loads_successfully(self, config_dir: Path):
         desktop_dir = self._desktop_config_dir(config_dir)
         config = load_runtime_config(desktop_dir)
-        assert config.app.active_app == "desktop"
         assert config.app.command_map == "command_map_desktop.yaml"
         assert config.app.navigation_mode == "workspace"
 
@@ -311,3 +307,38 @@ class TestDesktopConfigDirectory:
         assert config.app.desktop.scroll_clicks == 5
         assert config.app.desktop.zoom_clicks == 3
         assert config.app.desktop.linux_de == "gnome"
+
+
+# ---------------------------------------------------------------------------
+# Cross-check: command_map_desktop.yaml values vs. DesktopAdapter handlers
+# ---------------------------------------------------------------------------
+
+_DESKTOP_ADAPTER_HANDLED: frozenset[str] = frozenset(
+    {
+        "scroll_forward",
+        "scroll_back",
+        "zoom_in_view",
+        "zoom_out_view",
+        "navigate_forward",
+        "navigate_back",
+        "mission_control",
+        "no_action",
+    }
+)
+
+
+class TestCommandMapVsAdapterCoverage:
+    """Ensure every command in command_map_desktop.yaml is handled by DesktopAdapter."""
+
+    def test_all_commands_covered_by_adapter(self, config_dir: Path):
+        data = yaml.safe_load(
+            (config_dir / "gestures" / "command_map_desktop.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        mapped_commands = set(data["gesture_commands"].values())
+        uncovered = mapped_commands - _DESKTOP_ADAPTER_HANDLED
+        assert not uncovered, (
+            f"Commands in command_map_desktop.yaml not handled by DesktopAdapter: "
+            f"{uncovered}"
+        )
