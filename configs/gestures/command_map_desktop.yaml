@@ -1,0 +1,16 @@
+version: v2
+# Application-agnostic logical commands for the desktop interaction profile.
+#
+# Scroll and zoom use OS event injection (pyautogui) and are therefore
+# application-agnostic: the same command works in any focused window.
+# Navigation and overview use per-platform keyboard shortcuts resolved at
+# adapter construction time from the navigation_mode config field.
+gesture_commands:
+  swipe_up: scroll_forward    # universal: advance document in any focused app
+  swipe_down: scroll_back     # universal: go back in any focused app
+  swipe_right: navigate_forward  # next workspace or next tab (see navigation_mode)
+  swipe_left: navigate_back      # previous workspace or previous tab
+  zoom_in: zoom_in_view     # modifier+scroll up — universal view zoom in
+  zoom_out: zoom_out_view   # modifier+scroll down — universal view zoom out
+  open_palm_hold: mission_control  # OS overview mode (Mission Control / Task View / Activities)
+  unknown: no_action
