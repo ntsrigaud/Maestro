@@ -9,20 +9,11 @@ import yaml
 
 from gesture_control.evaluation.benchmark_latency import LatencyBenchmark
 from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSource
-from gesture_control.infrastructure.dispatch.app_adapters.base import (
-    IApplicationAdapter,
-)
 from gesture_control.infrastructure.dispatch.app_adapters.desktop_adapter import (
     DesktopAdapter,
 )
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
-)
-from gesture_control.infrastructure.dispatch.app_adapters.powerpoint_adapter import (
-    PowerPointAdapter,
-)
-from gesture_control.infrastructure.dispatch.app_adapters.zoom_adapter import (
-    ZoomAdapter,
 )
 from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
@@ -135,7 +126,6 @@ def build_container(
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
     )
     dispatcher = _build_dispatcher(
-        active_app=config.app.active_app,
         allowed_commands=frozenset(command_map.values()),
         navigation_mode=config.app.navigation_mode,
         scroll_clicks=config.app.desktop.scroll_clicks,
@@ -219,7 +209,9 @@ def _load_model_from_source(
     """
     src = config.model_source
     if src.backend == "huggingface":
-        from gesture_control.infrastructure.model.hf_loader import load_artifact_from_hub
+        from gesture_control.infrastructure.model.hf_loader import (
+            load_artifact_from_hub,
+        )
 
         return load_artifact_from_hub(
             repo_id=src.repo_id,
@@ -289,36 +281,26 @@ def _load_command_map(path: Path) -> dict[str, str]:
 
 
 def _build_dispatcher(
-    active_app: str,
     allowed_commands: frozenset[str],
     navigation_mode: str = "workspace",
     scroll_clicks: int = 5,
     zoom_clicks: int = 3,
     linux_de: str = "gnome",
 ) -> CommandDispatcher:
-    """Construct the correct adapter for *active_app* and wrap it in a CommandDispatcher."""
-    keyboard = KeyboardAdapter()
-    app_lower = (active_app or "").strip().lower()
-    adapter: IApplicationAdapter
-    if app_lower in ("powerpoint", "ppt"):
-        adapter = PowerPointAdapter(keyboard=keyboard)
-    elif app_lower in ("zoom",):
-        adapter = ZoomAdapter(keyboard=keyboard)
-    elif app_lower in ("desktop",):
-        adapter = DesktopAdapter(
-            keyboard=keyboard,
-            navigation_mode=navigation_mode,
-            scroll_clicks=scroll_clicks,
-            zoom_clicks=zoom_clicks,
-            linux_de=linux_de,
-        )
-    else:
-        import logging as _logging
+    """Wrap a DesktopAdapter in a CommandDispatcher.
 
-        _logging.getLogger(__name__).warning(
-            "Unknown active_app=%r — defaulting to PowerPointAdapter", active_app
-        )
-        adapter = PowerPointAdapter(keyboard=keyboard)
+    OS-level event injection (pyautogui.scroll) routes every command to
+    whichever window currently holds focus, so no application detection is
+    needed.  The same scroll / navigate / zoom commands work universally
+    across browsers, PDF viewers, presentation software, and anything else.
+    """
+    adapter = DesktopAdapter(
+        keyboard=KeyboardAdapter(),
+        navigation_mode=navigation_mode,
+        scroll_clicks=scroll_clicks,
+        zoom_clicks=zoom_clicks,
+        linux_de=linux_de,
+    )
     return CommandDispatcher(
         adapter=adapter,
         allowed_commands=allowed_commands,

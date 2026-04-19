@@ -24,7 +24,11 @@ import yaml
 from pydantic import ValidationError
 
 from gesture_control.utils.config_loader import load_runtime_config
-from gesture_control.utils.schema_validation import AppConfig, DesktopConfig, InferenceConfig
+from gesture_control.utils.schema_validation import (
+    AppConfig,
+    DesktopConfig,
+    InferenceConfig,
+)
 
 # ---------------------------------------------------------------------------
 # AppConfig schema extension
@@ -46,7 +50,7 @@ class TestAppConfigNewFields:
 
     def test_defaults_applied_when_fields_absent(self):
         cfg = AppConfig.model_validate(self._minimal())
-        assert cfg.command_map == "command_map_ipn.yaml"
+        assert cfg.command_map == "command_map_desktop.yaml"
         assert cfg.navigation_mode == "workspace"
 
     def test_command_map_override(self):
@@ -74,7 +78,7 @@ class TestAppConfigNewFields:
     def test_backwards_compat_existing_configs(self, config_dir: Path):
         """Existing configs/app.yaml must load without errors."""
         config = load_runtime_config(config_dir)
-        assert config.app.command_map == "command_map_powerpoint.yaml"
+        assert config.app.command_map == "command_map_desktop.yaml"
         assert config.app.navigation_mode == "workspace"
 
 
@@ -101,8 +105,14 @@ class TestCommandMapDesktop:
         data = self._load_desktop_map(config_dir)
         gestures = data["gesture_commands"]
         expected_gestures = {
-            "swipe_up", "swipe_down", "swipe_right", "swipe_left",
-            "zoom_in", "zoom_out", "open_palm_hold", "unknown",
+            "swipe_up",
+            "swipe_down",
+            "swipe_right",
+            "swipe_left",
+            "zoom_in",
+            "zoom_out",
+            "open_palm_hold",
+            "unknown",
         }
         assert set(gestures.keys()) == expected_gestures
 
@@ -113,8 +123,8 @@ class TestCommandMapDesktop:
     def test_scroll_commands_present(self, config_dir: Path):
         data = self._load_desktop_map(config_dir)
         cmds = data["gesture_commands"]
-        assert cmds["swipe_up"] == "scroll_forward"
-        assert cmds["swipe_down"] == "scroll_back"
+        assert cmds["swipe_up"] == "scroll_back"
+        assert cmds["swipe_down"] == "scroll_forward"
 
     def test_zoom_commands_present(self, config_dir: Path):
         data = self._load_desktop_map(config_dir)
@@ -161,7 +171,9 @@ class TestInferenceDesktopYaml:
 
 
 class TestBootstrapCommandMapResolution:
-    def test_desktop_map_loaded_when_config_specifies_it(self, config_dir: Path, tmp_path: Path):
+    def test_desktop_map_loaded_when_config_specifies_it(
+        self, config_dir: Path, tmp_path: Path
+    ):
         """When app.yaml names command_map_desktop.yaml the bootstrap must load
         the desktop vocabulary (not the hardcoded IPN map)."""
         import shutil
@@ -180,6 +192,7 @@ class TestBootstrapCommandMapResolution:
 
         # Verify _load_command_map would resolve to the desktop map
         from gesture_control.app.bootstrap import _load_command_map  # type: ignore[attr-defined]
+
         result = _load_command_map(cfg_dir / "gestures" / config.app.command_map)
         assert "mission_control" in result.values()
         assert "no_action" in result.values()
@@ -248,7 +261,9 @@ class TestAppConfigDesktopField:
 
     def test_desktop_overrides_respected(self):
         cfg = AppConfig.model_validate(
-            self._minimal(desktop={"scroll_clicks": 10, "zoom_clicks": 5, "linux_de": "kde"})
+            self._minimal(
+                desktop={"scroll_clicks": 10, "zoom_clicks": 5, "linux_de": "kde"}
+            )
         )
         assert cfg.desktop.scroll_clicks == 10
         assert cfg.desktop.zoom_clicks == 5

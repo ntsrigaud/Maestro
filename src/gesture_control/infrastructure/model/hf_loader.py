@@ -32,6 +32,7 @@ from gesture_control.infrastructure.model.checkpoint_loader import (
 
 try:
     from huggingface_hub import hf_hub_download
+
     _HF_AVAILABLE = True
 except ImportError:  # pragma: no cover
     hf_hub_download = None  # type: ignore[assignment]

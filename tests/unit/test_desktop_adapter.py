@@ -23,7 +23,9 @@ from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter impor
 # Helpers
 # ---------------------------------------------------------------------------
 
-_PYA_PATH = "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+_PYA_PATH = (
+    "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+)
 
 SCROLL_CLICKS = 5
 ZOOM_CLICKS = 3

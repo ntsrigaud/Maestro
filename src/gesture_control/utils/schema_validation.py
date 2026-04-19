@@ -39,9 +39,8 @@ class AppConfig(BaseModel):
     # ML pipeline always operate on the original non-mirrored frame.
     mirror_display: bool = True
     # Selects the active gesture-to-command map filename (without path prefix).
-    # The file must exist in configs/gestures/.  Defaults to the IPN
-    # presentation map for backwards compatibility.
-    command_map: str = "command_map_ipn.yaml"
+    # The file must exist in configs/gestures/.
+    command_map: str = "command_map_desktop.yaml"
     # Controls horizontal swipe destination for the desktop adapter.
     # "workspace" → OS virtual desktop shortcuts (Ctrl+→ / Ctrl+Win+→ etc.)
     # "tabs"      → Ctrl+Tab / Ctrl+Shift+Tab (browser/editor tabs)
@@ -113,5 +112,7 @@ class RuntimeConfig(BaseModel):
 
     app: AppConfig
     inference: InferenceConfig
-    feature_pipeline: FeaturePipelineConfig = Field(default_factory=FeaturePipelineConfig)
+    feature_pipeline: FeaturePipelineConfig = Field(
+        default_factory=FeaturePipelineConfig
+    )
     model_source: ModelSourceConfig = Field(default_factory=ModelSourceConfig)
