@@ -9,6 +9,7 @@ OS events are sent.
 
 from __future__ import annotations
 
+import sys
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -16,6 +17,7 @@ import numpy as np
 from gesture_control.domain.entities import ExecutableCommand, StabilizedPrediction
 from gesture_control.domain.enums import RuntimeMode
 from gesture_control.infrastructure.dispatch.app_adapters.desktop_adapter import (
+    _NAV_SHORTCUTS,
     DesktopAdapter,
 )
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
@@ -25,6 +27,14 @@ from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 from gesture_control.pipeline.activation import GestureActivationController
+
+# Resolve platform-correct workspace navigation shortcuts using the same lookup
+# table that DesktopAdapter uses at construction time.  This keeps assertions
+# correct on macOS (ctrl+right), Windows (ctrl+win+right), and Linux CI
+# (ctrl+alt+right) without patching sys.platform.
+_PLATFORM = sys.platform if sys.platform in ("darwin", "win32") else "linux"
+_NAV_FORWARD = _NAV_SHORTCUTS[(_PLATFORM, "workspace")]["navigate_forward"]
+_NAV_BACK = _NAV_SHORTCUTS[(_PLATFORM, "workspace")]["navigate_back"]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -216,7 +226,7 @@ class TestGestureDispatchPipeline:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("ctrl", "right")
+        self.mock_pya.hotkey.assert_called_once_with(*_NAV_FORWARD)
 
     def test_swipe_left_dispatches_navigate_back(self):
         self._arm()
@@ -229,7 +239,7 @@ class TestGestureDispatchPipeline:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("ctrl", "left")
+        self.mock_pya.hotkey.assert_called_once_with(*_NAV_BACK)
 
     def test_swipe_up_dispatches_scroll_back(self):
         self._arm()
@@ -519,7 +529,7 @@ class TestEdgeTriggerSingleDispatch:
 
         assert len(dispatched) == 1, f"Expected 1 dispatch but got {len(dispatched)}"
         assert dispatched[0].command_id == "navigate_forward"
-        mock_pya.hotkey.assert_called_once_with("ctrl", "right")
+        mock_pya.hotkey.assert_called_once_with(*_NAV_FORWARD)
 
     def test_temporal_voting_buildup_does_not_consume_rising_edge(self):
         """Regression test for the _prev_label / _last_dispatched_label bug.
@@ -687,7 +697,7 @@ class TestGazeGateIntegration:
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("ctrl", "right")
+        self.mock_pya.hotkey.assert_called_once_with(*_NAV_FORWARD)
 
     # -- Gaze loss → force_idle -----------------------------------------------
 
