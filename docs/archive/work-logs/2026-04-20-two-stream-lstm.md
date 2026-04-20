@@ -29,22 +29,22 @@ The table below tracks test performance from the first IPN-vocabulary single-str
 8-class IPN vocabulary (`swipe_{right,left,up,down}`, `zoom_{in,out}`,
 `open_palm_hold`, `unknown`).
 
-| Run | Architecture | Schema | Dims | Hidden | Test Acc | Macro-F1 |
-|---|---|---|---|---|---|---|
-| `lstm_v1_20260330T181558Z` | Single-stream LSTM, no attn | v1 | 126 | 128 | 0.7880 | 0.7800 |
-| `lstm_v1_20260413T023049Z` | Single-stream LSTM, no attn | v1 | 126 | 128 | 0.7967 | 0.7907 |
-| `lstm_v1_20260417T152606Z` | Single-stream LSTM + temporal attn | v4 | 144 | 128 | 0.7928 | 0.7841 |
-| `lstm_v1_20260418T023120Z` | Single-stream LSTM + temporal attn | v5 | 147 | 128 | 0.7907 | 0.7807 |
-| `two_stream_lstm_v1_20260420T073729Z` | **Two-stream LSTM + per-stream attn** | v5 | 147 | 64×2 | **0.7917** | **0.7836** |
-| `two_stream_lstm_v1_20260420T091839Z` | Two-stream LSTM + per-stream attn (prod) | v5 | 147 | 64×2 | 0.7899 | 0.7795 |
+| Run                                   | Architecture                             | Schema | Dims | Hidden | Test Acc   | Macro-F1   |
+| ------------------------------------- | ---------------------------------------- | ------ | ---- | ------ | ---------- | ---------- |
+| `lstm_v1_20260330T181558Z`            | Single-stream LSTM, no attn              | v1     | 126  | 128    | 0.7880     | 0.7800     |
+| `lstm_v1_20260413T023049Z`            | Single-stream LSTM, no attn              | v1     | 126  | 128    | 0.7967     | 0.7907     |
+| `lstm_v1_20260417T152606Z`            | Single-stream LSTM + temporal attn       | v4     | 144  | 128    | 0.7928     | 0.7841     |
+| `lstm_v1_20260418T023120Z`            | Single-stream LSTM + temporal attn       | v5     | 147  | 128    | 0.7907     | 0.7807     |
+| `two_stream_lstm_v1_20260420T073729Z` | **Two-stream LSTM + per-stream attn**    | v5     | 147  | 64×2   | **0.7917** | **0.7836** |
+| `two_stream_lstm_v1_20260420T091839Z` | Two-stream LSTM + per-stream attn (prod) | v5     | 147  | 64×2   | 0.7899     | 0.7795     |
 
 **Key observation:** the two-stream architecture matches the best single-stream result
 (0.7907 / 0.7807 → 0.7917 / 0.7836 on best run) while using 64 hidden units per stream
 vs. 128 in the single-stream model. Approximate parameter counts:
 
-| Model | Params |
-|---|---|
-| `lstm_v1` (hidden=128) | ~284 K |
+| Model                                        | Params |
+| -------------------------------------------- | ------ |
+| `lstm_v1` (hidden=128)                       | ~284 K |
 | `two_stream_lstm_v1` (hidden=64 × 2 streams) | ~143 K |
 
 The two-stream model achieves equivalent or better test performance at approximately
@@ -54,16 +54,16 @@ The two-stream model achieves equivalent or better test performance at approxima
 
 ## Per-Class Comparison (best run per architecture, feature-schema-v5)
 
-| Class | lstm_v1 F1 | two_stream F1 | Δ |
-|---|---|---|---|
-| `open_palm_hold` | 0.7992 | 0.7641 | -0.035 |
-| `swipe_right` | 0.7775 | 0.7844 | +0.007 |
-| `swipe_left` | 0.8599 | 0.8279 | -0.032 |
-| `swipe_up` | 0.7972 | 0.7231 | -0.074 |
-| `swipe_down` | 0.7696 | 0.8270 | +0.057 |
-| `zoom_in` | 0.7056 | 0.7303 | +0.025 |
-| `zoom_out` | 0.7107 | 0.7595 | +0.049 |
-| `unknown` | 0.8263 | 0.8528 | +0.027 |
+| Class            | lstm_v1 F1 | two_stream F1 | Δ      |
+| ---------------- | ---------- | ------------- | ------ |
+| `open_palm_hold` | 0.7992     | 0.7641        | -0.035 |
+| `swipe_right`    | 0.7775     | 0.7844        | +0.007 |
+| `swipe_left`     | 0.8599     | 0.8279        | -0.032 |
+| `swipe_up`       | 0.7972     | 0.7231        | -0.074 |
+| `swipe_down`     | 0.7696     | 0.8270        | +0.057 |
+| `zoom_in`        | 0.7056     | 0.7303        | +0.025 |
+| `zoom_out`       | 0.7107     | 0.7595        | +0.049 |
+| `unknown`        | 0.8263     | 0.8528        | +0.027 |
 
 The two-stream model improves `swipe_down` (+5.7 pp), `zoom_out` (+4.9 pp), `zoom_in`
 (+2.5 pp), and `unknown` (+2.7 pp). The motion-dedicated stream gives zoom and downward
@@ -150,11 +150,11 @@ performance is confirmed stable.
 
 Three training runs executed on this branch:
 
-| Run | Test Acc | Macro-F1 | Best Epoch | Notes |
-|---|---|---|---|---|
-| `two_stream_lstm_v1_20260420T073729Z` | 0.7917 | 0.7836 | 12 | Initial exploratory run |
-| `two_stream_lstm_v1_20260420T091431Z` | 0.7846 | 0.7750 | 8 | Config sweep variant |
-| `two_stream_lstm_v1_20260420T091839Z` | 0.7899 | 0.7795 | 11 | **Promoted to production** |
+| Run                                   | Test Acc | Macro-F1 | Best Epoch | Notes                      |
+| ------------------------------------- | -------- | -------- | ---------- | -------------------------- |
+| `two_stream_lstm_v1_20260420T073729Z` | 0.7917   | 0.7836   | 12         | Initial exploratory run    |
+| `two_stream_lstm_v1_20260420T091431Z` | 0.7846   | 0.7750   | 8          | Config sweep variant       |
+| `two_stream_lstm_v1_20260420T091839Z` | 0.7899   | 0.7795   | 11         | **Promoted to production** |
 
 All three runs use feature-schema-v5 (147-dim, `ipn_dataset_v5_mirrored.npz`).
 

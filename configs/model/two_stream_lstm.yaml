@@ -1,7 +1,7 @@
 model:
   model_name: two_stream_lstm_v1
-  input_size: 147        # total feature dims (feature-schema-v5); split internally
-  hidden_size: 64        # per-stream hidden size; fused layer receives 2×64 = 128
+  input_size: 147 # total feature dims (feature-schema-v5); split internally
+  hidden_size: 64 # per-stream hidden size; fused layer receives 2×64 = 128
   num_layers: 2
   dropout: 0.3
   num_classes: 8
