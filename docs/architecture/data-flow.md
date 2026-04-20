@@ -146,7 +146,7 @@ At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The
 
 ### Stage 6: LSTM Inference
 
-**Component**: `GestureLSTMClassifier`  
+**Component**: `GestureLSTMClassifier` (single-stream) or `TwoStreamGestureLSTM` (two-stream)  
 **Input**: `SequenceWindow`  
 **Output**: `Prediction`
 
@@ -156,21 +156,52 @@ At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The
 | `top_class`   | `str`              | Class label with highest probability |
 | `confidence`  | `float`            | Probability of the top class         |
 
-The LSTM model architecture:
+Two model architectures are supported, selected by `model_name` in the training config:
+
+**Single-stream LSTM** (`lstm_v1`) — baseline:
 
 ```
 Input tensor: (1, 24, 147)  — batch=1, sequence=24 frames, features=147
     ↓
 LSTM: input_size=147, hidden_size=128, num_layers=2, dropout=0.3
+    ↓ Bahdanau attention pool over T
+Context: (1, 128)
     ↓
-Final hidden state: (1, 128)
-    ↓
-Fully connected: Linear(128, 8)
-    ↓
-Softmax: 8-class probability distribution
+Linear(128, 8) → Softmax: 8-class probability distribution
+~264 K parameters
 ```
 
-The model runs in `torch.no_grad()` evaluation mode. The output dictionary maps each of the 8 gesture labels to its softmax probability.
+**Two-stream LSTM** (`two_stream_lstm_v1`) — Tier 4-A architecture:
+
+```
+Input tensor: (1, 24, 147)
+    ↓ feature partition (no learned parameters)
+┌─────────────────────────────────┐  ┌──────────────────────────────────────────┐
+│ Stream A — Pose / Shape         │  │ Stream B — Motion / Dynamics             │
+│  positions[0:63]       63 dims  │  │  fingertip_spread[63:68]     5 dims      │
+│  joint_angles[134:144] 10 dims  │  │  wrist_trajectory[68:71]     3 dims      │
+│  ───────────────────── ───────  │  │  velocity[71:134]            63 dims     │
+│  Total                 73 dims  │  │  wrist_vel_raw[144:147]       3 dims     │
+│                                 │  │  ────────────────────────────────────    │
+│  LSTM(73→64, 2 layers)          │  │  Total                       74 dims     │
+│  Bahdanau attention pool        │  │                                          │
+│  Context: (1, 64)               │  │  LSTM(74→64, 2 layers)                   │
+│                                 │  │  Bahdanau attention pool                 │
+│                                 │  │  Context: (1, 64)                        │
+└─────────────────────────────────┘  └──────────────────────────────────────────┘
+    ↓                                     ↓
+    └──────── concat ─────────────────────┘
+             Fused: (1, 128)
+                ↓
+          Dropout(0.3)
+                ↓
+         Linear(128, 8) → Softmax: 8-class probability distribution
+~182 K parameters
+```
+
+The two-stream architecture addresses the directional signal dilution identified in the model improvement plan (Tier 4-A): the 6 critical directional dims (`wrist_traj` + `wrist_vel_raw`) previously competed for gradient weight with 141 pose and velocity dims in a single LSTM. Stream B gives motion features a fully independent representational pathway, eliminating within-timestep feature competition that Bahdanau attention alone cannot resolve (attention operates over time, not over feature dimensions).
+
+Both models run in `torch.no_grad()` evaluation mode. The `artifact_type` field in the `.pt` file (`lstm_inference` vs `two_stream_lstm_inference`) controls which class is reconstructed by `checkpoint_loader.py` at load time.
 
 ### Stage 7: Prediction Stabilization
 
@@ -274,8 +305,8 @@ The keyboard adapter invokes `pyautogui.hotkey(*keys)` with the validated key na
 | --------------- | ------------------------------ | --------------------- |
 | Raw frame       | ~2.7 MB (1280×720×3)           | 30 Hz                 |
 | Landmark packet | 252 bytes (21×3×4)             | 30 Hz                 |
-| Feature vector  | 504 bytes (126×4)              | 30 Hz                 |
-| Sequence window | 12,096 bytes (24×126×4)        | ~10 Hz                |
+| Feature vector  | 588 bytes (147×4)              | 30 Hz                 |
+| Sequence window | 14,112 bytes (24×147×4)        | ~10 Hz                |
 | Prediction      | ~200 bytes (8 floats + labels) | ~10 Hz                |
 | Command         | ~100 bytes                     | ~0.1 Hz (per gesture) |
 
