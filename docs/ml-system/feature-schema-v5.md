@@ -93,9 +93,9 @@ The schema version is embedded in every NPZ dataset artifact and every exported 
 
 The `TwoStreamGestureLSTM` (`configs/model/two_stream_lstm.yaml`) partitions the 147-dim vector into two semantically coherent streams before any recurrent processing. The partition is a deterministic index gather — no additional preprocessing is required.
 
-| Stream                 | Slice(s)                    | Dims | Semantic role                                                                       |
-| ---------------------- | --------------------------- | ---- | ----------------------------------------------------------------------------------- |
-| **A — Pose / Shape**   | `[0:63]` + `[134:144]`      | 73   | Static hand configuration: wrist-relative landmark positions + MCP/PIP joint angles |
+| Stream                    | Slice(s)                 | Dims | Semantic role                                                                                      |
+| ------------------------- | ------------------------ | ---- | -------------------------------------------------------------------------------------------------- |
+| **A — Pose / Shape**      | `[0:63]` + `[134:144]`   | 73   | Static hand configuration: wrist-relative landmark positions + MCP/PIP joint angles                |
 | **B — Motion / Dynamics** | `[63:134]` + `[144:147]` | 74   | Dynamic hand motion: fingertip spread, wrist trajectory, per-landmark velocity, raw wrist velocity |
 
 **Rationale.** In the single-stream baseline, the 6 directional dims (`wrist_traj[68:71]` and `wrist_vel_raw[144:147]`) compete for gradient weight with the 141 remaining dims inside every LSTM timestep. Bahdanau attention resolves temporal competition (which timesteps matter) but cannot resolve within-timestep feature competition (which feature dims matter). Stream B gives the critical motion signals a fully independent pathway, eliminating this competition and raising the effective capacity dedicated to swipe direction discrimination from ~4% to ~50% of total model capacity.
