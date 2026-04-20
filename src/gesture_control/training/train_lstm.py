@@ -190,6 +190,19 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
             num_classes=config.num_classes,
         ).to(device)
 
+    if config.model_name.startswith("two_stream"):
+        from gesture_control.infrastructure.model.two_stream_lstm import (
+            TwoStreamGestureLSTM,
+        )
+
+        return TwoStreamGestureLSTM(
+            input_size=config.input_size,
+            hidden_size=config.hidden_size,
+            num_layers=config.num_layers,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+        ).to(device)
+
     return GestureLSTMClassifier(
         input_size=config.input_size,
         hidden_size=config.hidden_size,
