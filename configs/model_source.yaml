@@ -11,7 +11,7 @@ backend: huggingface
 # Hugging Face Hub settings (active when backend == "huggingface").
 repo_id: ntsrigaud/gesture-control-lstm
 revision: main
-filename: lstm_v1_20260418T023120Z_inference.pt
+filename: two_stream_lstm_v1_20260420T091839Z_inference.pt
 cache_dir: null # null = HF default (~/.cache/huggingface/hub)
 
 # Local registry settings (active when backend == "local").
