@@ -35,6 +35,14 @@ class PredictionStabilizer:
         )
         self._ema_alpha = ema_alpha
         self._unknown_label = unknown_label
+        # Classes with vote_window == 1 are instant-dispatch gestures whose
+        # peak probability lasts only 1-2 inference windows (~100-200 ms).
+        # EMA ramp-up would attenuate the peak below the threshold before it
+        # is ever compared, so these classes bypass EMA entirely.  The internal
+        # EMA state is still updated so that all other classes remain smooth.
+        self._ema_bypass_labels: frozenset[str] = frozenset(
+            cls for cls, w in self._class_vote_windows.items() if w == 1
+        )
 
         self._ema_probs: dict[str, float] = {}
         max_window = max([vote_window] + list(self._class_vote_windows.values()))
@@ -87,14 +95,19 @@ class PredictionStabilizer:
             return dict(self._ema_probs)
 
         all_labels = set(self._ema_probs) | set(probs)
-        next_probs: dict[str, float] = {}
+        next_ema: dict[str, float] = {}
+        output_probs: dict[str, float] = {}
         for label in all_labels:
             prev = self._ema_probs.get(label, 0.0)
             curr = probs.get(label, 0.0)
-            next_probs[label] = self._ema_alpha * curr + (1.0 - self._ema_alpha) * prev
+            ema_val = self._ema_alpha * curr + (1.0 - self._ema_alpha) * prev
+            next_ema[label] = ema_val
+            # Bypass EMA for instant-dispatch classes: compare raw confidence
+            # against the threshold so a single high-confidence frame suffices.
+            output_probs[label] = curr if label in self._ema_bypass_labels else ema_val
 
-        self._ema_probs = next_probs
-        return dict(next_probs)
+        self._ema_probs = next_ema
+        return output_probs
 
     @staticmethod
     def _argmax(probs: dict[str, float]) -> tuple[str, float]:
