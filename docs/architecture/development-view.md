@@ -11,11 +11,13 @@ Semantic-HGR-System/
 ├── configs/                          # Runtime and model configuration (YAML)
 │   ├── app.yaml                      # Camera, FPS, active application
 │   ├── inference.yaml                # Window geometry, activation timing, thresholds
-│   ├── logging.yaml                  # Logging configuration
 │   ├── model_source.yaml             # Model backend: huggingface or local
+│   ├── desktop/                      # Config overrides for close-range desktop use
+│   │   ├── app.yaml                  # Desktop camera/FPS overrides
+│   │   └── inference.yaml            # Desktop timing (shorter timeouts, faster cooldown)
 │   ├── gestures/
 │   │   ├── vocabulary_ipn.yaml       # Gesture class vocabulary (8 classes)
-│   │   └── command_map_ipn.yaml      # Gesture-to-command mapping
+│   │   └── command_map_desktop.yaml  # Gesture-to-command mapping (desktop vocabulary)
 │   ├── model/
 │   │   ├── lstm_default.yaml         # LSTM architecture and training hyperparameters
 │   │   └── feature_pipeline.yaml     # Feature normalization toggles
