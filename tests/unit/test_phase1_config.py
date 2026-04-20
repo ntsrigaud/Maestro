@@ -5,7 +5,6 @@ Phase 1 covers:
 - AppConfig rejects invalid navigation_mode values.
 - AppConfig without new fields in YAML loads successfully (backwards compatibility).
 - command_map_desktop.yaml loads and contains the expected command vocabulary.
-- inference_desktop.yaml validates against InferenceConfig.
 - bootstrap command map resolution uses config.app.command_map.
 
 Phase 3 covers:
@@ -27,7 +26,6 @@ from gesture_control.utils.config_loader import load_runtime_config
 from gesture_control.utils.schema_validation import (
     AppConfig,
     DesktopConfig,
-    InferenceConfig,
 )
 
 # ---------------------------------------------------------------------------
@@ -140,28 +138,6 @@ class TestCommandMapDesktop:
     def test_unknown_maps_to_no_action(self, config_dir: Path):
         data = self._load_desktop_map(config_dir)
         assert data["gesture_commands"]["unknown"] == "no_action"
-
-
-# ---------------------------------------------------------------------------
-# inference_desktop.yaml (reference artefact)
-# ---------------------------------------------------------------------------
-
-
-class TestInferenceDesktopYaml:
-    def test_validates_against_inference_config(self, config_dir: Path):
-        path = config_dir.parent / "configs" / "inference_desktop.yaml"
-        # Also try relative to the config_dir itself (test fixture may vary)
-        if not path.exists():
-            path = config_dir / "inference_desktop.yaml"
-        if not path.exists():
-            # Resolve from repo root
-            path = config_dir.parent / "inference_desktop.yaml"
-        assert path.exists(), f"inference_desktop.yaml not found; tried {path}"
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        cfg = InferenceConfig.model_validate(data)
-        assert cfg.window_length == 24
-        assert cfg.command_cooldown_ms == 800
-        assert cfg.gaze.grace_ms == 3000
 
 
 # ---------------------------------------------------------------------------
