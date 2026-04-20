@@ -29,16 +29,16 @@ issues.
 
 ## Scope of Work
 
-| Area | Change type |
-|---|---|
-| 40 historical work logs | Move → `docs/archive/work-logs/` |
-| 4 research investigation reports | Move → `docs/archive/research/` |
-| 3 completed development plans | Move → `docs/archive/plans/` |
-| `docs/architecture/data-flow.md` | Update — 126 → 147 dims; six-block v5 layout |
-| `docs/architecture/system-overview.md` | Update — feature engineering description; HF Hub model export |
-| `README.md` | Update — architecture reference; models directory description |
-| `docs/ml-system/feature-schema-v5.md` | New — canonical ML feature specification |
-| `docs/development/repository-refactoring-plan.md` | New — repository refactoring and model migration plan |
+| Area                                              | Change type                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------- |
+| 40 historical work logs                           | Move → `docs/archive/work-logs/`                              |
+| 4 research investigation reports                  | Move → `docs/archive/research/`                               |
+| 3 completed development plans                     | Move → `docs/archive/plans/`                                  |
+| `docs/architecture/data-flow.md`                  | Update — 126 → 147 dims; six-block v5 layout                  |
+| `docs/architecture/system-overview.md`            | Update — feature engineering description; HF Hub model export |
+| `README.md`                                       | Update — architecture reference; models directory description |
+| `docs/ml-system/feature-schema-v5.md`             | New — canonical ML feature specification                      |
+| `docs/development/repository-refactoring-plan.md` | New — repository refactoring and model migration plan         |
 
 ---
 

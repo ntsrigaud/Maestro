@@ -26,18 +26,18 @@ promotes `huggingface_hub` to a core runtime dependency.
 
 ## Scope of Work
 
-| Area | Change type |
-|---|---|
-| `ModelSourceConfig` schema | New — Pydantic model for artifact source configuration |
-| `configs/model_source.yaml` | New — runtime configuration file for model source |
-| `RuntimeConfig` | Update — add `model_source` field |
-| `load_runtime_config()` | Update — load and validate `model_source.yaml` |
-| `hf_loader.py` | New — Hugging Face Hub inference artifact loader |
-| `bootstrap.py` | Refactor — dispatch on `model_source.backend` |
-| `pyproject.toml` | Update — promote `huggingface_hub` to core dependency |
-| `.gitignore` | Update — exclude local model artifacts |
-| `models/exported/*.pt` (21 files) | Delete — removed from version control |
-| `models/registry.json` | Delete — removed from version control |
+| Area                              | Change type                                            |
+| --------------------------------- | ------------------------------------------------------ |
+| `ModelSourceConfig` schema        | New — Pydantic model for artifact source configuration |
+| `configs/model_source.yaml`       | New — runtime configuration file for model source      |
+| `RuntimeConfig`                   | Update — add `model_source` field                      |
+| `load_runtime_config()`           | Update — load and validate `model_source.yaml`         |
+| `hf_loader.py`                    | New — Hugging Face Hub inference artifact loader       |
+| `bootstrap.py`                    | Refactor — dispatch on `model_source.backend`          |
+| `pyproject.toml`                  | Update — promote `huggingface_hub` to core dependency  |
+| `.gitignore`                      | Update — exclude local model artifacts                 |
+| `models/exported/*.pt` (21 files) | Delete — removed from version control                  |
+| `models/registry.json`            | Delete — removed from version control                  |
 
 ---
 
@@ -102,6 +102,7 @@ a Hugging Face Hub repository:
 **File:** `src/gesture_control/app/bootstrap.py`
 
 `build_container()` signature updated:
+
 - `registry_path: str | None = None` (was `str = "models/registry.json"`)
 - `hf_revision_override: str | None = None` (new — for CLI `--hf-revision` flag)
 

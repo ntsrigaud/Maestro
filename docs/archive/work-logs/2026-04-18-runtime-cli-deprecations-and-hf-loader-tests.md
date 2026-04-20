@@ -28,12 +28,12 @@ This branch addresses all four.
 
 ## Scope of Work
 
-| Area | Change type |
-|---|---|
-| `src/gesture_control/app/main.py` | Feat — `--hf-revision` flag; deprecate `--registry` |
-| `src/gesture_control/infrastructure/model/checkpoint_loader.py` | Deprecation notice on `load_latest_inference_artifact()` |
-| `scripts/train_model.py` | Fix — gate `update_model_registry()` behind `args.registry` |
-| `tests/unit/test_hf_loader.py` | New — 3 unit tests for `load_artifact_from_hub()` |
+| Area                                                            | Change type                                                 |
+| --------------------------------------------------------------- | ----------------------------------------------------------- |
+| `src/gesture_control/app/main.py`                               | Feat — `--hf-revision` flag; deprecate `--registry`         |
+| `src/gesture_control/infrastructure/model/checkpoint_loader.py` | Deprecation notice on `load_latest_inference_artifact()`    |
+| `scripts/train_model.py`                                        | Fix — gate `update_model_registry()` behind `args.registry` |
+| `tests/unit/test_hf_loader.py`                                  | New — 3 unit tests for `load_artifact_from_hub()`           |
 
 ---
 
@@ -89,11 +89,11 @@ the planned removal path.
 
 Three offline unit tests using `unittest.mock.patch` to stub `hf_hub_download`:
 
-| Test | What it verifies |
-|---|---|
-| `test_load_artifact_from_hub_calls_hf_hub_download` | `hf_hub_download` called with correct args; returned `InferenceArtifact` has correct `feature_schema_version`, `feature_dim`, `model_version`, and `class_labels` |
-| `test_load_artifact_from_hub_passes_cache_dir` | `cache_dir` forwarded as a string; `revision` forwarded correctly |
-| `test_load_artifact_from_hub_raises_on_missing_huggingface_hub` | `ImportError` raised with message matching `"huggingface_hub is required"` when `_HF_AVAILABLE` is patched to `False` |
+| Test                                                            | What it verifies                                                                                                                                                  |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test_load_artifact_from_hub_calls_hf_hub_download`             | `hf_hub_download` called with correct args; returned `InferenceArtifact` has correct `feature_schema_version`, `feature_dim`, `model_version`, and `class_labels` |
+| `test_load_artifact_from_hub_passes_cache_dir`                  | `cache_dir` forwarded as a string; `revision` forwarded correctly                                                                                                 |
+| `test_load_artifact_from_hub_raises_on_missing_huggingface_hub` | `ImportError` raised with message matching `"huggingface_hub is required"` when `_HF_AVAILABLE` is patched to `False`                                             |
 
 All tests use a minimal `GestureLSTMClassifier` fixture written to a `tmp_path` `.pt`
 file so no network access or real Hub credentials are required.

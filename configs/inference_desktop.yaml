@@ -1,0 +1,18 @@
+# Desktop interaction inference profile.
+#
+# Reference artefact — documents the tuned timing values for desk-distance use.
+# NOT loaded at runtime; the active desktop config is configs/desktop/inference.yaml.
+# See configs/desktop/ for the profile loaded by load_runtime_config().
+window_length: 24
+window_step: 3
+min_valid_ratio: 0.8
+idle_timeout_ms: 60000 # 1 min; 5-min timeout is excessive for desk use
+command_cooldown_ms: 800 # slightly tighter than presentation config (1000 ms)
+edge_trigger_enabled: true
+gaze:
+  enabled: true
+  yaw_threshold_deg: 30
+  pitch_threshold_deg: 25
+  arm_ms: 500
+  grace_ms: 3000 # shorter grace than presentation (5000 ms)
+  sample_interval_frames: 3
