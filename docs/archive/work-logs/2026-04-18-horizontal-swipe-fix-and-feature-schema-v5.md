@@ -30,17 +30,17 @@ a `KeyError` when loading NPZ files that lack optional timestamp / sample-ID fie
 
 ## Scope of Work
 
-| Area | Change type |
-|---|---|
-| Feature engineering | Enhancement — 147-dim `feature-schema-v5` (global wrist velocity) |
-| Augmentation | Fix — disable on-the-fly mirror flip; extend `_X_COORD_DIMS` for v5 |
-| Dataset notebook | Enhancement — offline label-aware mirror augmentation section |
-| NPZ loader | Fix — tolerate missing optional fields (`sample_ids`, timestamps) |
-| Registry export | Fix — store paths relative to registry file |
-| Registry loader | Fix — resolve relative paths against registry directory |
-| Config | Update — `input_size` 144 → 147; `mirror_flip_prob` → 0.0; schema v4 → v5 |
-| Tests | Alignment — all tests updated to 147-dim / `feature-schema-v5` |
-| Experiment artefacts | Added — 3 LSTM v5 runs registered |
+| Area                 | Change type                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| Feature engineering  | Enhancement — 147-dim `feature-schema-v5` (global wrist velocity)         |
+| Augmentation         | Fix — disable on-the-fly mirror flip; extend `_X_COORD_DIMS` for v5       |
+| Dataset notebook     | Enhancement — offline label-aware mirror augmentation section             |
+| NPZ loader           | Fix — tolerate missing optional fields (`sample_ids`, timestamps)         |
+| Registry export      | Fix — store paths relative to registry file                               |
+| Registry loader      | Fix — resolve relative paths against registry directory                   |
+| Config               | Update — `input_size` 144 → 147; `mirror_flip_prob` → 0.0; schema v4 → v5 |
+| Tests                | Alignment — all tests updated to 147-dim / `feature-schema-v5`            |
+| Experiment artefacts | Added — 3 LSTM v5 runs registered                                         |
 
 ---
 
@@ -133,27 +133,27 @@ level too high).
 
 All tests were updated to the 147-dim feature vector:
 
-| Test file | Change |
-|---|---|
-| `tests/unit/test_feature_engineering.py` | Zero-vector assertions updated to 147 dims |
-| `tests/unit/test_augmentation.py` | Fixtures rebuilt for 147-dim tensors; `_X_COORD_DIMS` count updated |
-| `tests/unit/test_dataset_builder.py` | Schema version updated to `feature-schema-v5` |
-| `tests/unit/test_training_datamodule.py` | Feature dim assertion updated to 147 |
-| `tests/integration/test_phase2_pipeline.py` | Forward-pass input dim updated to 147 |
-| `tests/integration/test_phase3_feature_pipeline.py` | Feature dim assertion updated |
+| Test file                                           | Change                                                              |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| `tests/unit/test_feature_engineering.py`            | Zero-vector assertions updated to 147 dims                          |
+| `tests/unit/test_augmentation.py`                   | Fixtures rebuilt for 147-dim tensors; `_X_COORD_DIMS` count updated |
+| `tests/unit/test_dataset_builder.py`                | Schema version updated to `feature-schema-v5`                       |
+| `tests/unit/test_training_datamodule.py`            | Feature dim assertion updated to 147                                |
+| `tests/integration/test_phase2_pipeline.py`         | Forward-pass input dim updated to 147                               |
+| `tests/integration/test_phase3_feature_pipeline.py` | Feature dim assertion updated                                       |
 
-| Metric | Result |
-|---|---|
-| `pytest tests/` | **203 passed, 0 failed** |
-| `ruff check src/ tests/` | **All checks passed** |
-| `ruff check notebooks/` | **All checks passed** |
+| Metric                   | Result                   |
+| ------------------------ | ------------------------ |
+| `pytest tests/`          | **203 passed, 0 failed** |
+| `ruff check src/ tests/` | **All checks passed**    |
+| `ruff check notebooks/`  | **All checks passed**    |
 
 ### Experiment Artefacts Registered
 
 Three LSTM runs on `feature-schema-v5` registered in `models/registry.json`:
 
-| Artefact ID | Schema |
-|---|---|
+| Artefact ID                | Schema            |
+| -------------------------- | ----------------- |
 | `lstm_v1_20260418T002927Z` | feature-schema-v5 |
 | `lstm_v1_20260418T004149Z` | feature-schema-v5 |
 | `lstm_v1_20260418T023120Z` | feature-schema-v5 |

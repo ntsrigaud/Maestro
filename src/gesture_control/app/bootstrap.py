@@ -9,17 +9,11 @@ import yaml
 
 from gesture_control.evaluation.benchmark_latency import LatencyBenchmark
 from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSource
-from gesture_control.infrastructure.dispatch.app_adapters.base import (
-    IApplicationAdapter,
+from gesture_control.infrastructure.dispatch.app_adapters.desktop_adapter import (
+    DesktopAdapter,
 )
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
-)
-from gesture_control.infrastructure.dispatch.app_adapters.powerpoint_adapter import (
-    PowerPointAdapter,
-)
-from gesture_control.infrastructure.dispatch.app_adapters.zoom_adapter import (
-    ZoomAdapter,
 )
 from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
@@ -79,7 +73,7 @@ def build_container(
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
     thresholds = _load_thresholds(config_root / "thresholds" / "production_ipn.yaml")
-    command_map = _load_command_map(config_root / "gestures" / "command_map_ipn.yaml")
+    command_map = _load_command_map(config_root / "gestures" / config.app.command_map)
 
     frame_source = OpenCVFrameSource(
         camera_index=config.app.camera_index,
@@ -132,10 +126,16 @@ def build_container(
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
     )
     dispatcher = _build_dispatcher(
-        active_app=config.app.active_app,
         allowed_commands=frozenset(command_map.values()),
+        navigation_mode=config.app.navigation_mode,
+        scroll_clicks=config.app.desktop.scroll_clicks,
+        zoom_clicks=config.app.desktop.zoom_clicks,
+        linux_de=config.app.desktop.linux_de,
     )
-    overlay_renderer = OverlayRenderer(mirror_display=config.app.mirror_display)
+    overlay_renderer = OverlayRenderer(
+        mirror_display=config.app.mirror_display,
+        command_map=command_map,
+    )
     benchmark = LatencyBenchmark()
 
     gaze_cfg = config.inference.gaze
@@ -209,7 +209,9 @@ def _load_model_from_source(
     """
     src = config.model_source
     if src.backend == "huggingface":
-        from gesture_control.infrastructure.model.hf_loader import load_artifact_from_hub
+        from gesture_control.infrastructure.model.hf_loader import (
+            load_artifact_from_hub,
+        )
 
         return load_artifact_from_hub(
             repo_id=src.repo_id,
@@ -258,45 +260,49 @@ def _load_thresholds(path: Path) -> dict[str, Any]:
 
 
 def _load_command_map(path: Path) -> dict[str, str]:
-    """Load gesture→command_id mapping from YAML; fall back to IPN defaults."""
-    _defaults: dict[str, str] = {
-        "swipe_right": "next_slide",
-        "swipe_left": "previous_slide",
-        "swipe_up": "start_presentation",
-        "swipe_down": "exit_presentation",
-        "zoom_in": "toggle_pointer_mode",
-        "zoom_out": "raise_hand",
-    }
+    """Load gesture→command_id mapping from YAML.
+
+    Raises:
+        FileNotFoundError: If the command map file does not exist.
+        ValueError: If the file content is not a valid YAML mapping.
+    """
     if not path.exists():
-        return _defaults
+        raise FileNotFoundError(
+            f"Command map file not found: {path}. "
+            "Ensure configs/gestures/command_map_desktop.yaml exists."
+        )
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
-        return _defaults
+        raise ValueError(f"Command map file must contain a YAML mapping: {path}")
     mapping = payload.get("gesture_commands", {})
     if not isinstance(mapping, dict):
-        return _defaults
+        raise ValueError(
+            f"Command map file must contain a 'gesture_commands' mapping: {path}"
+        )
     return {str(k): str(v) for k, v in mapping.items() if k and v}
 
 
 def _build_dispatcher(
-    active_app: str,
     allowed_commands: frozenset[str],
+    navigation_mode: str = "workspace",
+    scroll_clicks: int = 5,
+    zoom_clicks: int = 3,
+    linux_de: str = "gnome",
 ) -> CommandDispatcher:
-    """Construct the correct adapter for *active_app* and wrap it in a CommandDispatcher."""
-    keyboard = KeyboardAdapter()
-    app_lower = (active_app or "").strip().lower()
-    adapter: IApplicationAdapter
-    if app_lower in ("powerpoint", "ppt"):
-        adapter = PowerPointAdapter(keyboard=keyboard)
-    elif app_lower in ("zoom",):
-        adapter = ZoomAdapter(keyboard=keyboard)
-    else:
-        import logging as _logging
+    """Wrap a DesktopAdapter in a CommandDispatcher.
 
-        _logging.getLogger(__name__).warning(
-            "Unknown active_app=%r — defaulting to PowerPointAdapter", active_app
-        )
-        adapter = PowerPointAdapter(keyboard=keyboard)
+    OS-level event injection (pyautogui.scroll) routes every command to
+    whichever window currently holds focus, so no application detection is
+    needed.  The same scroll / navigate / zoom commands work universally
+    across browsers, PDF viewers, presentation software, and anything else.
+    """
+    adapter = DesktopAdapter(
+        keyboard=KeyboardAdapter(),
+        navigation_mode=navigation_mode,
+        scroll_clicks=scroll_clicks,
+        zoom_clicks=zoom_clicks,
+        linux_de=linux_de,
+    )
     return CommandDispatcher(
         adapter=adapter,
         allowed_commands=allowed_commands,

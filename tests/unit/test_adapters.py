@@ -14,12 +14,6 @@ from gesture_control.domain.entities import DispatchResult, ExecutableCommand
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
 )
-from gesture_control.infrastructure.dispatch.app_adapters.powerpoint_adapter import (
-    PowerPointAdapter,
-)
-from gesture_control.infrastructure.dispatch.app_adapters.zoom_adapter import (
-    ZoomAdapter,
-)
 from gesture_control.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
@@ -80,92 +74,71 @@ class TestKeyboardAdapter:
                 adapter.press_hotkey("ctrl", "malicious")
             mock_pya.hotkey.assert_not_called()
 
-
-# ---------------------------------------------------------------------------
-# PowerPointAdapter tests
-# ---------------------------------------------------------------------------
-
-
-class TestPowerPointAdapter:
-    def setup_method(self):
-        self.kb = KeyboardAdapter()
-        self.adapter = PowerPointAdapter(keyboard=self.kb)
-        self._patcher = patch(
+    def test_new_platform_keys_in_allowlist(self):
+        """win, super, command must pass the safe key allowlist."""
+        adapter = KeyboardAdapter()
+        with patch(
             "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
-        )
-        self.mock_pya = self._patcher.start()
+        ) as mock_pya:
+            for key in ("win", "super", "command"):
+                mock_pya.reset_mock()
+                adapter.press_hotkey(key)
+                mock_pya.hotkey.assert_called_once_with(key)
 
-    def teardown_method(self):
-        self._patcher.stop()
-
-    def test_target_app(self):
-        assert self.adapter.target_app == "powerpoint"
-
-    def test_next_slide_delegates_correct_keys(self):
-        result = self.adapter.execute("next_slide")
-        assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("right")
-
-    def test_previous_slide_delegates_correct_keys(self):
-        result = self.adapter.execute("previous_slide")
-        assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("left")
-
-    def test_start_presentation_uses_shift_f5(self):
-        result = self.adapter.execute("start_presentation")
-        assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("shift", "f5")
-
-    def test_toggle_pointer_mode_uses_ctrl_l(self):
-        result = self.adapter.execute("toggle_pointer_mode")
-        assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("ctrl", "l")
-
-    def test_unknown_command_returns_failure(self):
-        result = self.adapter.execute("unknown_command_xyz")
-        assert result.success is False
-        assert "no_shortcut_for" in (result.detail or "")
-
-    def test_keyboard_exception_returns_failure(self):
-        self.mock_pya.hotkey.side_effect = OSError("kbd error")
-        result = self.adapter.execute("next_slide")
-        assert result.success is False
-        assert "kbd error" in (result.detail or "")
-
-
-# ---------------------------------------------------------------------------
-# ZoomAdapter tests
-# ---------------------------------------------------------------------------
-
-
-class TestZoomAdapter:
-    def setup_method(self):
-        self.kb = KeyboardAdapter()
-        self.adapter = ZoomAdapter(keyboard=self.kb)
-        self._patcher = patch(
+    def test_scroll_calls_pyautogui_scroll_with_clamped_value(self):
+        adapter = KeyboardAdapter()
+        with patch(
             "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
-        )
-        self.mock_pya = self._patcher.start()
+        ) as mock_pya:
+            adapter.scroll(5)
+            mock_pya.scroll.assert_called_once_with(5)
 
-    def teardown_method(self):
-        self._patcher.stop()
+    def test_scroll_clamps_to_minus_20(self):
+        adapter = KeyboardAdapter()
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            adapter.scroll(-99)
+            mock_pya.scroll.assert_called_once_with(-20)
 
-    def test_target_app(self):
-        assert self.adapter.target_app == "zoom"
+    def test_scroll_clamps_to_plus_20(self):
+        adapter = KeyboardAdapter()
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            adapter.scroll(99)
+            mock_pya.scroll.assert_called_once_with(20)
 
-    def test_toggle_pointer_mode_uses_alt_f2(self):
-        result = self.adapter.execute("toggle_pointer_mode")
-        assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("alt", "f2")
+    def test_zoom_calls_keydown_scroll_keyup(self):
+        adapter = KeyboardAdapter()
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            adapter.zoom(3, modifier="ctrl")
+            assert mock_pya.keyDown.call_count == 1
+            assert mock_pya.scroll.call_count == 1
+            assert mock_pya.keyUp.call_count == 1
+            # Modifier must be released with the same key it was pressed with.
+            assert mock_pya.keyDown.call_args[0][0] == mock_pya.keyUp.call_args[0][0]
 
-    def test_raise_hand_uses_alt_y(self):
-        result = self.adapter.execute("raise_hand")
-        assert result.success is True
-        self.mock_pya.hotkey.assert_called_once_with("alt", "y")
+    def test_zoom_clamps_to_minus_5(self):
+        adapter = KeyboardAdapter()
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            adapter.zoom(-99, modifier="ctrl")
+            mock_pya.scroll.assert_called_once_with(-5)
 
-    def test_unknown_command_returns_failure(self):
-        result = self.adapter.execute("does_not_exist")
-        assert result.success is False
+    def test_zoom_releases_modifier_on_scroll_exception(self):
+        """keyUp must be called even when pyautogui.scroll raises."""
+        adapter = KeyboardAdapter()
+        with patch(
+            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            mock_pya.scroll.side_effect = RuntimeError("display error")
+            with pytest.raises(RuntimeError):
+                adapter.zoom(2, modifier="ctrl")
+            assert mock_pya.keyUp.call_count == 1
 
 
 # ---------------------------------------------------------------------------
