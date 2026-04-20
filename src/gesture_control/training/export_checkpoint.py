@@ -33,7 +33,11 @@ def export_inference_artifact(
     artifact_type = (
         "tcn_inference"
         if config.model.model_name.startswith("tcn")
-        else "lstm_inference"
+        else (
+            "two_stream_lstm_inference"
+            if config.model.model_name.startswith("two_stream")
+            else "lstm_inference"
+        )
     )
     payload: dict[str, Any] = {
         "artifact_type": artifact_type,
