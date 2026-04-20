@@ -23,6 +23,7 @@ def _build_model_from_artifact(
 
     Dispatches:
     * artifact_type starts with ``"tcn"`` → :class:`GestureTCNClassifier`
+    * artifact_type starts with ``"two_stream"`` → :class:`TwoStreamGestureLSTM`
     * everything else → :class:`GestureLSTMClassifier`
     """
     model_name = str(model_config.get("model_name", ""))
@@ -40,6 +41,19 @@ def _build_model_from_artifact(
             input_size=int(model_config["input_size"]),
             num_channels=list(model_config["num_channels"]),
             kernel_size=int(model_config.get("kernel_size", 3)),
+            dropout=float(model_config["dropout"]),
+            num_classes=int(model_config["num_classes"]),
+        ).to(device)
+
+    if artifact_type.startswith("two_stream") or model_name.startswith("two_stream"):
+        from gesture_control.infrastructure.model.two_stream_lstm import (
+            TwoStreamGestureLSTM,  # noqa: PLC0415
+        )
+
+        return TwoStreamGestureLSTM(
+            input_size=int(model_config["input_size"]),
+            hidden_size=int(model_config["hidden_size"]),
+            num_layers=int(model_config["num_layers"]),
             dropout=float(model_config["dropout"]),
             num_classes=int(model_config["num_classes"]),
         ).to(device)

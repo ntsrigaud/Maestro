@@ -98,7 +98,7 @@ class TestKeyboardAdapter:
         with patch(
             "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
-            adapter.scroll(-99)
+            adapter.scroll(-999)
             mock_pya.scroll.assert_called_once_with(-20)
 
     def test_scroll_clamps_to_plus_20(self):
@@ -106,7 +106,7 @@ class TestKeyboardAdapter:
         with patch(
             "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
-            adapter.scroll(99)
+            adapter.scroll(999)
             mock_pya.scroll.assert_called_once_with(20)
 
     def test_zoom_calls_keydown_scroll_keyup(self):
