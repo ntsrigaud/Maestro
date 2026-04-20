@@ -4,14 +4,18 @@ acceptance:
 
 # Dynamic swipe gestures tolerate a slightly lower threshold because
 # their short temporal span makes high-confidence peaks harder to sustain.
+# DIAGNOSTIC (T1-B): swipe thresholds temporarily lowered from 0.80 to 0.60
+# to isolate whether the EMA ramp-up (T1-A) or the model confidence is the
+# binding constraint.  Raise back to 0.75-0.80 once real-webcam performance
+# is confirmed stable.
 class_thresholds:
-  open_palm_hold: 0.90
-  swipe_right: 0.80
-  swipe_left: 0.80
-  swipe_up: 0.80
-  swipe_down: 0.80
-  zoom_in: 0.85
-  zoom_out: 0.85
+  open_palm_hold: 0.75
+  swipe_right: 0.70
+  swipe_left: 0.70
+  swipe_up: 0.70
+  swipe_down: 0.70
+  zoom_in: 0.70
+  zoom_out: 0.70
   unknown: 1.00
 
 # Stability vote windows (consecutive stabilised decisions required).
