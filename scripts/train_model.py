@@ -150,16 +150,20 @@ def main() -> None:
     # Deprecated: update_model_registry() is retained for the local development
     # workflow only.  Once backend: huggingface is validated end-to-end, remove
     # this call together with the --registry CLI argument.
-    registry_entry = update_model_registry(
-        registry_path=args.registry,
-        model_version=result.model_version,
-        checkpoint_path=result.checkpoint_path,
-        exported_path=exported_path,
-        class_labels=result.class_labels,
-        dataset_metadata=result.dataset_metadata,
-        feature_schema_version=train_cfg.export.feature_schema_version,
-        training_data_version=training_data_version,
-    ) if args.registry else None
+    registry_entry = (
+        update_model_registry(
+            registry_path=args.registry,
+            model_version=result.model_version,
+            checkpoint_path=result.checkpoint_path,
+            exported_path=exported_path,
+            class_labels=result.class_labels,
+            dataset_metadata=result.dataset_metadata,
+            feature_schema_version=train_cfg.export.feature_schema_version,
+            training_data_version=training_data_version,
+        )
+        if args.registry
+        else None
+    )
 
     report = {
         "status": "success",

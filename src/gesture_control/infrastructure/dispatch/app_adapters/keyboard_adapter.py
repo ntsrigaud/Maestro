@@ -60,6 +60,10 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "s",
         "w",
         "y",
+        # Desktop adapter additions
+        "win",  # Windows workspace: Ctrl+Win+Arrow; Windows overview: Win+Tab
+        "super",  # Linux overview: Super+A (GNOME), Super+W (KDE)
+        "command",  # macOS zoom: Cmd+scroll (in-app zoom, not OS accessibility zoom)
     }
 )
 
@@ -107,3 +111,37 @@ class KeyboardAdapter:
 
         pyautogui.hotkey(*[k.lower() for k in keys])
         LOGGER.debug("Pressed hotkey: %s", "+".join(k.lower() for k in keys))
+
+    def scroll(self, clicks: int) -> None:
+        """Inject a native OS scroll event at the current cursor position.
+
+        Positive clicks scroll up (view content higher in the document);
+        negative clicks scroll down (advance through the document).  Clamped
+        to [-20, 20] to prevent runaway scrolls from rapid-fire delivery.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — scroll skipped.")
+            return
+        pyautogui.scroll(max(-20, min(20, clicks)))
+        LOGGER.debug("Scrolled: clicks=%d", clicks)
+
+    def zoom(self, clicks: int, *, modifier: str) -> None:
+        """Inject a modifier+scroll zoom event at the current cursor position.
+
+        Uses Cmd+scroll on macOS and Ctrl+scroll on Windows / Linux to trigger
+        in-application view zoom without activating OS-level zoom overlays.
+        Positive clicks zoom in; negative zoom out.  Clamped to [-5, 5] to
+        prevent runaway zoom from rapid-fire command delivery.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — zoom skipped.")
+            return
+        clamped = max(-5, min(5, clicks))
+        pyautogui.keyDown(modifier)
+        try:
+            pyautogui.scroll(clamped)
+        finally:
+            # Always release the modifier — prevents a stuck Ctrl/Cmd key if
+            # pyautogui.scroll() raises (e.g. display server unavailable).
+            pyautogui.keyUp(modifier)
+        LOGGER.debug("Zoomed: modifier=%s clicks=%d", modifier, clamped)

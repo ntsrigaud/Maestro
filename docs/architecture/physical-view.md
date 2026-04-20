@@ -72,17 +72,17 @@ GPU acceleration is **optional and not required**. If a CUDA-capable GPU or Appl
 
 ### 4.2 Runtime Dependencies
 
-| Library                | Version   | Role                                                               |
-| ---------------------- | --------- | ------------------------------------------------------------------ |
-| mediapipe              | ==0.10.14 | Hand landmark extraction (pinned for reproducibility)              |
-| torch                  | ≥2.7.0    | LSTM inference and training                                        |
-| opencv-python-headless | ≥4.10.0   | Webcam capture and image rendering                                 |
-| pyautogui              | ≥0.9.54   | OS keyboard event injection                                        |
-| pydantic               | ≥2.6.0    | Configuration schema validation                                    |
-| numpy                  | ≥1.26.0   | Array operations                                                   |
-| PyYAML                 | ≥6.0.1    | Configuration file parsing                                         |
+| Library                | Version   | Role                                                                                                                                |
+| ---------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| mediapipe              | ==0.10.14 | Hand landmark extraction (pinned for reproducibility)                                                                               |
+| torch                  | ≥2.7.0    | LSTM inference and training                                                                                                         |
+| opencv-python-headless | ≥4.10.0   | Webcam capture and image rendering                                                                                                  |
+| pyautogui              | ≥0.9.54   | OS keyboard event injection                                                                                                         |
+| pydantic               | ≥2.6.0    | Configuration schema validation                                                                                                     |
+| numpy                  | ≥1.26.0   | Array operations                                                                                                                    |
+| PyYAML                 | ≥6.0.1    | Configuration file parsing                                                                                                          |
 | huggingface_hub        | ≥0.22.0   | Model download from HF Hub (`[huggingface]` optional extra; required for the default `backend: huggingface` in `model_source.yaml`) |
-| scikit-learn           | ≥1.5.0    | Dataset splitting and training metrics (`[training]` optional extra; not required at inference runtime) |
+| scikit-learn           | ≥1.5.0    | Dataset splitting and training metrics (`[training]` optional extra; not required at inference runtime)                             |
 
 ### 4.3 OS Permissions
 
@@ -120,14 +120,14 @@ The system requires the following OS-level permissions:
 
 The system reads from and writes to the local file system:
 
-| Path                         | Access     | Purpose                                                                   |
-| ---------------------------- | ---------- | ------------------------------------------------------------------------- |
-| `configs/`                   | Read       | YAML configuration files loaded at startup                                |
-| `models/checkpoints/`        | Write      | Training checkpoints saved during model training (.gitignored)            |
-| `data/raw/`                  | Read/Write | JSONL landmark recordings from data collection                            |
-| `data/processed/`            | Read/Write | NPZ sequence datasets built from raw data                                 |
-| `experiments/runs/`          | Write      | Training run logs and metrics                                             |
-| `~/.cache/huggingface/hub/`  | Read/Write | Hugging Face Hub download cache (first-use download of production model)  |
+| Path                        | Access     | Purpose                                                                  |
+| --------------------------- | ---------- | ------------------------------------------------------------------------ |
+| `configs/`                  | Read       | YAML configuration files loaded at startup                               |
+| `models/checkpoints/`       | Write      | Training checkpoints saved during model training (.gitignored)           |
+| `data/raw/`                 | Read/Write | JSONL landmark recordings from data collection                           |
+| `data/processed/`           | Read/Write | NPZ sequence datasets built from raw data                                |
+| `experiments/runs/`         | Write      | Training run logs and metrics                                            |
+| `~/.cache/huggingface/hub/` | Read/Write | Hugging Face Hub download cache (first-use download of production model) |
 
 Trained inference artifacts are **not tracked in VCS**. The production model (`lstm_v1_20260418T023120Z_inference.pt`) is hosted on the Hugging Face Hub (`ntsrigaud/gesture-control-lstm`) and downloaded on first use by `hf_hub_download()`. The backend is controlled by `configs/model_source.yaml`.
 

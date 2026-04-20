@@ -1,0 +1,22 @@
+version: v2
+# Universal gesture-to-command map.
+#
+# All commands use OS event injection (pyautogui) and are routed by the OS to
+# whichever window currently has focus — no application detection is required.
+# This means the same gesture behaves intuitively across every context:
+#   swipe_up   → scroll_back   → pyautogui.scroll(+N) → scrolls up in a browser,
+#                                goes to the previous slide in a presentation
+#   swipe_down → scroll_forward → pyautogui.scroll(-N) → scrolls down in a browser,
+#                                advances to the next slide in a presentation
+#
+# Navigation and overview use per-platform keyboard shortcuts resolved at
+# adapter construction time from the navigation_mode config field.
+gesture_commands:
+  swipe_up: scroll_back # universal: scroll up / previous slide in any focused app
+  swipe_down: scroll_forward # universal: scroll down / next slide in any focused app
+  swipe_right: navigate_forward # next workspace or next tab (see navigation_mode)
+  swipe_left: navigate_back # previous workspace or previous tab
+  zoom_in: zoom_in_view # modifier+scroll up — universal view zoom in
+  zoom_out: zoom_out_view # modifier+scroll down — universal view zoom out
+  open_palm_hold: mission_control # OS overview mode (Mission Control / Task View / Activities)
+  unknown: no_action

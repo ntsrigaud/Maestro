@@ -7,11 +7,11 @@
 
 ## Model Comparison
 
-| Model | Schema | Dims | Orient. Norm | Test Acc | Test F1 |
-|-------|--------|------|--------------|----------|---------|
-| `lstm_v1_20260330T181558Z` (baseline) | v1 | 126 | off | **78.8%** | 78.0% |
-| `lstm_v1_20260413T064039Z`            | v2 | 134 | **on** | 73.6% | 71.9% |
-| `tcn_v1_20260413T065716Z`             | v3 | 144 | **on** | 75.0% | 73.7% |
+| Model                                 | Schema | Dims | Orient. Norm | Test Acc  | Test F1 |
+| ------------------------------------- | ------ | ---- | ------------ | --------- | ------- |
+| `lstm_v1_20260330T181558Z` (baseline) | v1     | 126  | off          | **78.8%** | 78.0%   |
+| `lstm_v1_20260413T064039Z`            | v2     | 134  | **on**       | 73.6%     | 71.9%   |
+| `tcn_v1_20260413T065716Z`             | v3     | 144  | **on**       | 75.0%     | 73.7%   |
 
 All three models were trained on the same 22,973 IPN windows with identical label distributions. The only differences are the feature schema version and orientation normalization setting.
 
@@ -19,16 +19,16 @@ All three models were trained on the same 22,973 IPN windows with identical labe
 
 ## Per-Class Recall Analysis
 
-| Gesture | Baseline (v1) | LSTM v2 (v2) | TCN v1 (v3) | Δ (baseline→v2) |
-|---------|--------------|-------------|------------|-----------------|
-| open_palm_hold | 72.1% | 72.7% | 69.0% | +0.6% |
-| **swipe_right** | **74.9%** | **53.1%** | **60.8%** | **–21.8%** |
-| swipe_left | 84.7% | 85.0% | 82.9% | +0.3% |
-| **swipe_up** | **74.7%** | **57.3%** | **57.3%** | **–17.4%** |
-| **swipe_down** | **84.0%** | **71.1%** | **74.3%** | **–13.0%** |
-| zoom_in | 70.0% | 71.1% | 78.9% | +1.1% |
-| zoom_out | 69.5% | 75.3% | 73.4% | +5.8% |
-| unknown | 93.2% | 89.3% | 91.4% | –4.0% |
+| Gesture         | Baseline (v1) | LSTM v2 (v2) | TCN v1 (v3) | Δ (baseline→v2) |
+| --------------- | ------------- | ------------ | ----------- | --------------- |
+| open_palm_hold  | 72.1%         | 72.7%        | 69.0%       | +0.6%           |
+| **swipe_right** | **74.9%**     | **53.1%**    | **60.8%**   | **–21.8%**      |
+| swipe_left      | 84.7%         | 85.0%        | 82.9%       | +0.3%           |
+| **swipe_up**    | **74.7%**     | **57.3%**    | **57.3%**   | **–17.4%**      |
+| **swipe_down**  | **84.0%**     | **71.1%**    | **74.3%**   | **–13.0%**      |
+| zoom_in         | 70.0%         | 71.1%        | 78.9%       | +1.1%           |
+| zoom_out        | 69.5%         | 75.3%        | 73.4%       | +5.8%           |
+| unknown         | 93.2%         | 89.3%        | 91.4%       | –4.0%           |
 
 **Finding**: Only three-quarters of the directional gestures regress significantly. `swipe_left` is a striking exception — broadly unchanged. Non-directional gestures (zoom, static holds) are unaffected or slightly improved.
 
@@ -42,7 +42,7 @@ Each frame's landmarks are re-expressed in a hand-local coordinate frame:
 
 ```
 x_hat = unit(landmark[5] – landmark[17])   # index_MCP → pinky_MCP axis
-y_hat = orth(unit(landmark[9]), z_hat)      # toward middle-MCP, orthogonalised  
+y_hat = orth(unit(landmark[9]), z_hat)      # toward middle-MCP, orthogonalised
 z_hat = x_hat × y_hat
 ```
 
@@ -61,6 +61,7 @@ Even though velocity is near-zero for pure translation, real swipes include slig
 
 **Step 4 — coordinate-frame mixing forces the model to learn cross-space features.**  
 After normalization, the feature vector mixes two incompatible spaces:
+
 - `position[0:63]` / `velocity[71:134]` — palm-local frame
 - `wrist_traj[68:71]` — camera frame
 
@@ -75,12 +76,12 @@ x_hat ≈ camera-left   (index_MCP is camera-right of pinky_MCP)
 y_hat ≈ camera-up
 ```
 
-| Camera gesture | In palm-local frame | In-frame alias |
-|---------------|---------------------|----------------|
-| swipe_right (+cam_x) | −x_hat direction | near −y_hat if palm tilts → **confused with swipe_down** |
-| swipe_left (−cam_x)  | +x_hat direction | clean, far from other swipe axes |
-| swipe_up (+cam_y)    | +y_hat direction | near +x_hat if palm tilts → confused with swipe_left |
-| swipe_down (−cam_y)  | −y_hat direction | near −x_hat → confused with swipe_right |
+| Camera gesture       | In palm-local frame | In-frame alias                                           |
+| -------------------- | ------------------- | -------------------------------------------------------- |
+| swipe_right (+cam_x) | −x_hat direction    | near −y_hat if palm tilts → **confused with swipe_down** |
+| swipe_left (−cam_x)  | +x_hat direction    | clean, far from other swipe axes                         |
+| swipe_up (+cam_y)    | +y_hat direction    | near +x_hat if palm tilts → confused with swipe_left     |
+| swipe_down (−cam_y)  | −y_hat direction    | near −x_hat → confused with swipe_right                  |
 
 A modest palm tilt simultaneously maps swipe_right → swipe_down and vice-versa; swipe_left maps into a region with no close neighbour. This explains the asymmetry exactly:
 
@@ -107,12 +108,12 @@ For the first window of each recording the two semantics are identical. For late
 
 Rebuild the dataset with **orientation_normalization disabled** while retaining all new features. This recovers camera-space position information as an implicit directional cue while keeping spread, wrist_traj, and joint_angle benefits.
 
-| Schema | Dims | Orient. Norm | Spread | Wrist Traj | Joint Angles |
-|--------|------|--------------|--------|-----------|-------------|
-| v1 (baseline) | 126 | off | — | — | — |
-| v2 | 134 | **on** | ✓ | ✓ | — |
-| v3 | 144 | **on** | ✓ | ✓ | ✓ |
-| **v4 (proposed)** | **144** | **off** | ✓ | ✓ | ✓ |
+| Schema            | Dims    | Orient. Norm | Spread | Wrist Traj | Joint Angles |
+| ----------------- | ------- | ------------ | ------ | ---------- | ------------ |
+| v1 (baseline)     | 126     | off          | —      | —          | —            |
+| v2                | 134     | **on**       | ✓      | ✓          | —            |
+| v3                | 144     | **on**       | ✓      | ✓          | ✓            |
+| **v4 (proposed)** | **144** | **off**      | ✓      | ✓          | ✓            |
 
 Expected outcome: retain spread/wrist_traj/joint_angle gains while recovering the directional recall lost to orientation normalization. Projected accuracy ≥ 78% (matching or exceeding baseline).
 
