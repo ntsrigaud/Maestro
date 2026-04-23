@@ -239,18 +239,11 @@ def _build_model_card(
     test_report: EvaluationReport,
     repo_id: str = "ntsrigaud/gesture-control-lstm",
 ) -> str:
-    arch_name = config.model.model_name
-    is_tcn = arch_name.startswith("tcn")
-    arch_tag = "tcn" if is_tcn else "lstm"
-
-    if is_tcn:
-        channels = config.model.num_channels or [64, 64, 64, 64]
-        architecture = f"Dilated TCN ({len(channels)} blocks, channels={channels})"
-    else:
-        architecture = (
-            f"2-layer LSTM with temporal attention "
-            f"(hidden_size={config.model.hidden_size})"
-        )
+    arch_tag = "lstm"
+    architecture = (
+        f"Two-stream LSTM with temporal attention "
+        f"(hidden_size={config.model.hidden_size}/stream, layers={config.model.num_layers})"
+    )
 
     num_params = _count_parameters(result.model)
     num_classes_active = len(result.class_labels) - 1  # subtract unknown
@@ -382,14 +375,6 @@ def publish_to_huggingface(
             "num_layers": config.model.num_layers,
             "dropout": config.model.dropout,
             "num_classes": config.model.num_classes,
-            **(
-                {
-                    "num_channels": config.model.num_channels,
-                    "kernel_size": config.model.kernel_size,
-                }
-                if config.model.model_name.startswith("tcn")
-                else {}
-            ),
         },
         "feature_schema": {
             "feature_schema_version": config.export.feature_schema_version,
