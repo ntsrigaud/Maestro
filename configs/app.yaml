@@ -9,3 +9,9 @@ target_fps: 30
 mirror_display: true
 # Active gesture-to-command map (filename in configs/gestures/).
 command_map: command_map_presentation.yaml
+# Which physical hand to use for gesture recognition (from the user's viewpoint).
+# Accepted values: left, right, both.
+#   right — only recognise gestures made with the user's right hand.
+#   left  — only recognise gestures made with the user's left hand.
+#   both  — accept whichever hand is detected (original behaviour).
+hand_preference: right

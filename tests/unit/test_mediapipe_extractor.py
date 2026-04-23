@@ -131,3 +131,96 @@ def test_close_calls_mediapipe_close(mock_hands_cls: MagicMock) -> None:
     extractor.close()
 
     hands_obj.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Hand-preference filtering tests
+# ---------------------------------------------------------------------------
+
+
+def _make_hands_obj_with_label(label: str) -> MagicMock:
+    """Return a mock MediaPipe Hands object that reports *label* ("Left"/"Right")."""
+    classification = SimpleNamespace(label=label, score=0.98)
+    handedness = SimpleNamespace(classification=[classification])
+    hand_landmarks = SimpleNamespace(landmark=_landmarks())
+    hands_obj = MagicMock()
+    hands_obj.process.return_value = SimpleNamespace(
+        multi_handedness=[handedness],
+        multi_hand_landmarks=[hand_landmarks],
+    )
+    return hands_obj
+
+
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
+def test_hand_preference_right_accepts_users_right_hand(mock_hands_cls: MagicMock) -> None:
+    """preference='right' (user's right hand) must accept MediaPipe 'Left' label.
+
+    In a non-mirrored webcam frame MediaPipe labels the user's right hand as
+    'Left' (it assumes a mirrored/selfie view).  The extractor must invert the
+    mapping so that the user-facing preference aligns with physical hands.
+    """
+    mock_hands_cls.return_value = _make_hands_obj_with_label("Left")
+
+    extractor = MediaPipeHandsExtractor(hand_preference="right")
+    result = extractor.extract(_frame_packet())
+
+    assert result.valid is True
+    assert result.handedness == "Left"
+
+
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
+def test_hand_preference_right_rejects_users_left_hand(mock_hands_cls: MagicMock) -> None:
+    """preference='right' must reject MediaPipe 'Right' label (user's left hand)."""
+    mock_hands_cls.return_value = _make_hands_obj_with_label("Right")
+
+    extractor = MediaPipeHandsExtractor(hand_preference="right")
+    result = extractor.extract(_frame_packet())
+
+    assert result.valid is False
+    assert result.handedness == "Right"
+
+
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
+def test_hand_preference_left_accepts_users_left_hand(mock_hands_cls: MagicMock) -> None:
+    """preference='left' (user's left hand) must accept MediaPipe 'Right' label."""
+    mock_hands_cls.return_value = _make_hands_obj_with_label("Right")
+
+    extractor = MediaPipeHandsExtractor(hand_preference="left")
+    result = extractor.extract(_frame_packet())
+
+    assert result.valid is True
+    assert result.handedness == "Right"
+
+
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
+def test_hand_preference_left_rejects_users_right_hand(mock_hands_cls: MagicMock) -> None:
+    """preference='left' must reject MediaPipe 'Left' label (user's right hand)."""
+    mock_hands_cls.return_value = _make_hands_obj_with_label("Left")
+
+    extractor = MediaPipeHandsExtractor(hand_preference="left")
+    result = extractor.extract(_frame_packet())
+
+    assert result.valid is False
+    assert result.handedness == "Left"
+
+
+@patch(
+    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+)
+def test_hand_preference_both_accepts_any_hand(mock_hands_cls: MagicMock) -> None:
+    """When hand_preference='both', either hand is accepted (no filtering applied)."""
+    mock_hands_cls.return_value = _make_hands_obj_with_label("Left")
+
+    extractor = MediaPipeHandsExtractor(hand_preference="both")
+    result = extractor.extract(_frame_packet())
+
+    assert result.valid is True
+    assert result.handedness == "Left"
