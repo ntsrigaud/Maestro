@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -30,15 +29,7 @@ def export_inference_artifact(
     path.mkdir(parents=True, exist_ok=True)
 
     artifact_path = path / f"{result.model_version}_inference.pt"
-    artifact_type = (
-        "tcn_inference"
-        if config.model.model_name.startswith("tcn")
-        else (
-            "two_stream_lstm_inference"
-            if config.model.model_name.startswith("two_stream")
-            else "lstm_inference"
-        )
-    )
+    artifact_type = "two_stream_lstm_inference"
     payload: dict[str, Any] = {
         "artifact_type": artifact_type,
         "artifact_version": result.model_version,
@@ -51,16 +42,6 @@ def export_inference_artifact(
             "num_layers": config.model.num_layers,
             "dropout": config.model.dropout,
             "num_classes": config.model.num_classes,
-            # TCN-specific fields — saved so the loader can reconstruct the exact
-            # architecture without relying on defaults.  Absent for LSTM artifacts.
-            **(
-                {
-                    "num_channels": config.model.num_channels,
-                    "kernel_size": config.model.kernel_size,
-                }
-                if config.model.model_name.startswith("tcn")
-                else {}
-            ),
         },
         "class_labels": result.class_labels,
         "feature_schema": {
@@ -76,70 +57,3 @@ def export_inference_artifact(
 
     torch.save(payload, artifact_path)
     return artifact_path
-
-
-def update_model_registry(
-    *,
-    registry_path: str | Path,
-    model_version: str,
-    checkpoint_path: str | Path,
-    exported_path: str | Path,
-    class_labels: list[str],
-    dataset_metadata: dict[str, Any],
-    feature_schema_version: str,
-    training_data_version: str,
-) -> dict[str, Any]:
-    path = Path(registry_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    if path.exists():
-        existing = json.loads(path.read_text(encoding="utf-8"))
-    else:
-        existing = {"models": []}
-
-    if not isinstance(existing, dict) or "models" not in existing:
-        existing = {"models": []}
-
-    checkpoint_checksum = compute_sha256(checkpoint_path)
-    exported_checksum = compute_sha256(exported_path)
-
-    # Store paths relative to the registry file so the registry is portable
-    # across machines.  The loader resolves them back to absolute paths at
-    # runtime using the registry file's own location as the anchor.
-    registry_dir = path.parent
-    try:
-        rel_checkpoint = str(
-            Path(checkpoint_path).resolve().relative_to(registry_dir.resolve())
-        )
-    except ValueError:
-        rel_checkpoint = str(checkpoint_path)
-    try:
-        rel_exported = str(
-            Path(exported_path).resolve().relative_to(registry_dir.resolve())
-        )
-    except ValueError:
-        rel_exported = str(exported_path)
-
-    entry = {
-        "model_version": model_version,
-        "training_data_version": training_data_version,
-        "feature_schema_version": feature_schema_version,
-        "class_labels": class_labels,
-        "window_length": int(dataset_metadata.get("window_length", 24)),
-        "checksum": exported_checksum,
-        "feature_dim": int(dataset_metadata.get("feature_dim", 126)),
-        "window_step": int(dataset_metadata.get("window_step", 3)),
-        "checkpoint_path": rel_checkpoint,
-        "exported_path": rel_exported,
-        "checkpoint_checksum": checkpoint_checksum,
-        "created_at": datetime.now(UTC).isoformat(),
-    }
-
-    models = existing.get("models")
-    if not isinstance(models, list):
-        models = []
-    models.append(entry)
-    existing["models"] = models
-
-    path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
-    return entry

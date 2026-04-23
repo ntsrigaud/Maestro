@@ -12,7 +12,6 @@ from torch import nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
 from gesture_control.training.augmentation import AugmentationConfig
 from gesture_control.training.datamodule import DataSplitConfig, GestureDataModule
 from gesture_control.training.evaluate import EvaluationReport, evaluate_model
@@ -27,9 +26,6 @@ class ModelConfig:
     num_layers: int
     dropout: float
     num_classes: int
-    # TCN-specific (ignored when model_name does not start with "tcn")
-    num_channels: list[int] | None = None
-    kernel_size: int = 3
 
 
 @dataclass(slots=True)
@@ -58,7 +54,6 @@ class SchedulerConfig:
 class ExportConfig:
     checkpoint_dir: str
     exported_dir: str
-    registry_path: str
     feature_schema_version: str
 
 
@@ -115,12 +110,6 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             num_layers=int(model_data.get("num_layers", 2)),
             dropout=float(model_data.get("dropout", 0.3)),
             num_classes=int(model_data.get("num_classes", 8)),
-            num_channels=(
-                [int(c) for c in model_data["num_channels"]]
-                if "num_channels" in model_data
-                else None
-            ),
-            kernel_size=int(model_data.get("kernel_size", 3)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
@@ -151,7 +140,6 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
         export=ExportConfig(
             checkpoint_dir=str(export_data.get("checkpoint_dir", "models/checkpoints")),
             exported_dir=str(export_data.get("exported_dir", "models/exported")),
-            registry_path=str(export_data.get("registry_path", "models/registry.json")),
             feature_schema_version=str(
                 export_data.get("feature_schema_version", "feature-schema-v1")
             ),
@@ -177,33 +165,23 @@ def _parse_augmentation_config(
 
 
 def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
-    """Instantiate the correct model architecture based on ``config.model_name``."""
-    if config.model_name.startswith("tcn"):
-        from gesture_control.infrastructure.model.tcn_model import GestureTCNClassifier
+    """Instantiate :class:`TwoStreamGestureLSTM` from *config*.
 
-        num_channels = config.num_channels or [64, 64, 64, 64]
-        return GestureTCNClassifier(
-            input_size=config.input_size,
-            num_channels=num_channels,
-            kernel_size=config.kernel_size,
-            dropout=config.dropout,
-            num_classes=config.num_classes,
-        ).to(device)
-
-    if config.model_name.startswith("two_stream"):
-        from gesture_control.infrastructure.model.two_stream_lstm import (
-            TwoStreamGestureLSTM,
+    Raises:
+        ValueError: If *config.model_name* does not identify a two-stream model.
+    """
+    if not config.model_name.startswith("two_stream"):
+        raise ValueError(
+            f"Unsupported model_name {config.model_name!r}. "
+            "Only two_stream_* models are supported. "
+            "Use configs/model/two_stream_lstm.yaml."
         )
 
-        return TwoStreamGestureLSTM(
-            input_size=config.input_size,
-            hidden_size=config.hidden_size,
-            num_layers=config.num_layers,
-            dropout=config.dropout,
-            num_classes=config.num_classes,
-        ).to(device)
+    from gesture_control.infrastructure.model.two_stream_lstm import (
+        TwoStreamGestureLSTM,
+    )
 
-    return GestureLSTMClassifier(
+    return TwoStreamGestureLSTM(
         input_size=config.input_size,
         hidden_size=config.hidden_size,
         num_layers=config.num_layers,

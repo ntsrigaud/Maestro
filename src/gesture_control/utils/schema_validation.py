@@ -39,28 +39,7 @@ class AppConfig(BaseModel):
     mirror_display: bool = True
     # Selects the active gesture-to-command map filename (without path prefix).
     # The file must exist in configs/gestures/.
-    command_map: str = "command_map_desktop.yaml"
-    # Controls horizontal swipe destination for the desktop adapter.
-    # "workspace" → OS virtual desktop shortcuts (Ctrl+→ / Ctrl+Win+→ etc.)
-    # "tabs"      → Ctrl+Tab / Ctrl+Shift+Tab (browser/editor tabs)
-    navigation_mode: str = Field(default="workspace", pattern="^(workspace|tabs)$")
-    # Desktop-specific fine-tuning for scroll/zoom sensitivity and Linux DE.
-    desktop: DesktopConfig = Field(default_factory=lambda: DesktopConfig())
-
-
-class DesktopConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    # Number of pyautogui scroll clicks per scroll gesture event.
-    # Tune for comfortable document scrolling at your display DPI / resolution.
-    scroll_clicks: int = Field(default=5, ge=1, le=20)
-    # Number of modifier+scroll steps per zoom gesture event.
-    # Smaller values give finer zoom control; larger give faster zoom.
-    zoom_clicks: int = Field(default=3, ge=1, le=10)
-    # Linux desktop environment name, used to select the correct Activities /
-    # Overview shortcut.  Case-insensitive.  Supported: gnome (default), kde.
-    # Any other value falls back to the GNOME shortcut (Super+A).
-    linux_de: str = Field(default="gnome", pattern="^[a-z][a-z0-9_-]{0,31}$")
+    command_map: str = "command_map_presentation.yaml"
 
 
 class InferenceConfig(BaseModel):
@@ -95,15 +74,12 @@ class FeaturePipelineConfig(BaseModel):
 class ModelSourceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # "local" loads from the local registry JSON; "huggingface" downloads from HF Hub.
-    backend: str = Field(default="local", pattern="^(local|huggingface)$")
-    # Hugging Face Hub settings (required when backend == "huggingface").
+    backend: str = Field(default="huggingface", pattern="^huggingface$")
+    # Hugging Face Hub settings.
     repo_id: str = "ntsrigaud/gesture-control-lstm"
     revision: str = "main"
-    filename: str = "lstm_v1_inference.pt"
+    filename: str = "two_stream_lstm_v1_20260420T091839Z_inference.pt"
     cache_dir: str | None = None
-    # Local registry settings (used when backend == "local").
-    registry_path: str = "models/registry.json"
 
 
 class RuntimeConfig(BaseModel):

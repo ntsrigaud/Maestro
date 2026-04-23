@@ -4,10 +4,7 @@ acceptance:
 
 # Dynamic swipe gestures tolerate a slightly lower threshold because
 # their short temporal span makes high-confidence peaks harder to sustain.
-# DIAGNOSTIC (T1-B): swipe thresholds temporarily lowered from 0.80 to 0.60
-# to isolate whether the EMA ramp-up (T1-A) or the model confidence is the
-# binding constraint.  Raise back to 0.75-0.80 once real-webcam performance
-# is confirmed stable.
+# Post-diagnostic production values. 0.70 confirmed stable.
 class_thresholds:
   open_palm_hold: 0.75
   swipe_right: 0.70
