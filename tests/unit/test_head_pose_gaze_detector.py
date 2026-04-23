@@ -34,9 +34,9 @@ from gesture_control.utils.schema_validation import GazeConfig
 # Patch targets
 # ---------------------------------------------------------------------------
 
-_MP_FACE_MESH = (
+_MP_FACE_DETECTION = (
     "gesture_control.infrastructure.gaze.head_pose_detector"
-    ".mp.solutions.face_mesh.FaceMesh"
+    ".mp.solutions.face_detection.FaceDetection"
 )
 _MONOTONIC = "gesture_control.infrastructure.gaze.head_pose_detector.time.monotonic"
 
@@ -69,8 +69,8 @@ def _make_detector(
     cfg: GazeConfig = _CFG,
     on_gaze_lost: object = None,
 ) -> HeadPoseGazeDetector:
-    """Return a HeadPoseGazeDetector with MediaPipe Face Mesh mocked out."""
-    with patch(_MP_FACE_MESH):
+    """Return a HeadPoseGazeDetector with MediaPipe Face Detection mocked out."""
+    with patch(_MP_FACE_DETECTION):
         return HeadPoseGazeDetector(config=cfg, on_gaze_lost=on_gaze_lost)  # type: ignore[arg-type]
 
 
@@ -418,11 +418,39 @@ class TestAmortizationCache:
 
 
 class TestClose:
-    def test_close_delegates_to_face_mesh_close(self) -> None:
-        """close() must release the MediaPipe Face Mesh context."""
-        with patch(_MP_FACE_MESH) as mock_fm_cls:
-            mock_fm = MagicMock()
-            mock_fm_cls.return_value = mock_fm
+    def test_close_delegates_to_face_detection_close(self) -> None:
+        """close() must release the MediaPipe Face Detection context."""
+        with patch(_MP_FACE_DETECTION) as mock_fd_cls:
+            mock_fd = MagicMock()
+            mock_fd_cls.return_value = mock_fd
             det = HeadPoseGazeDetector(config=_CFG)
             det.close()
-        mock_fm.close.assert_called_once()
+        mock_fd.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# HeadPoseGazeDetector — _is_within_cone() with Face Detection result schema
+# ---------------------------------------------------------------------------
+
+
+class TestIsWithinCone:
+    """Validate the Face Detection result schema path in _is_within_cone."""
+
+    def test_returns_false_when_no_detections(self) -> None:
+        """_is_within_cone must return False when results.detections is empty."""
+        from types import SimpleNamespace
+
+        det = _make_detector()
+        results = SimpleNamespace(detections=[])
+        assert det._is_within_cone(results, h=480, w=640) is False
+
+    def test_returns_false_when_fewer_than_six_keypoints(self) -> None:
+        """_is_within_cone must return False when a detection has < 6 keypoints."""
+        from types import SimpleNamespace
+
+        det = _make_detector()
+        kp = [SimpleNamespace(x=0.5, y=0.5)] * 3  # only 3 — malformed detection
+        location_data = SimpleNamespace(relative_keypoints=kp)
+        detection = SimpleNamespace(location_data=location_data)
+        results = SimpleNamespace(detections=[detection])
+        assert det._is_within_cone(results, h=480, w=640) is False

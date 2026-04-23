@@ -1,4 +1,4 @@
-"""Head-pose-based gaze intent detector using MediaPipe Face Mesh and solvePnP."""
+"""Head-pose-based gaze intent detector using MediaPipe Face Detection and solvePnP."""
 
 from __future__ import annotations
 
@@ -18,33 +18,33 @@ from gesture_control.utils.schema_validation import GazeConfig
 LOGGER = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Six-point PnP face model
+# Six-point PnP face model (MediaPipe Face Detection keypoints)
 # ---------------------------------------------------------------------------
-# Canonical 3-D coordinates (millimetres) for six anatomical landmarks that
-# are reliably detected by MediaPipe Face Mesh.  These serve as the object
-# points in the Perspective-n-Point solve.
+# Canonical 3-D coordinates (millimetres) for the 6 keypoints produced by
+# mp.solutions.face_detection.FaceDetection.  Face Detection corresponds to
+# the BlazeFace short-range model — the detection stage that previously ran
+# inside the Face Mesh pipeline.  Using Face Detection directly eliminates
+# the heavyweight 256×256 Face Mesh network.
 #
-# Landmark index → anatomy:
-#   1   → nose tip     (between brows, closest to camera in neutral pose)
-#   152 → chin         (bottom of mandible)
-#   226 → left  eye outer corner  (temporal canthus, left side of face)
-#   446 → right eye outer corner  (temporal canthus, right side of face)
-#   57  → left  mouth corner
-#   287 → right mouth corner
+# Keypoint order (fixed by MediaPipe Face Detection):
+#   0 → right eye centre
+#   1 → left eye centre
+#   2 → nose tip
+#   3 → mouth centre
+#   4 → right ear tragion
+#   5 → left ear tragion
 #
 # The coordinate system is face-centred: origin at the nose tip, X rightward,
-# Y upward, Z toward the camera.  Values are adapted from the Fisher (2016)
-# generic face model.
-_LANDMARK_INDICES: tuple[int, ...] = (1, 152, 226, 446, 57, 287)
-
+# Y upward, Z toward the camera.  Values adapted from the Bosphorus generic
+# face model (Savran et al., 2008).
 _MODEL_POINTS_3D = np.array(
     [
-        [0.0, 0.0, 0.0],  # 1   nose tip
-        [0.0, -63.6, -12.5],  # 152 chin
-        [-43.3, 32.7, -26.0],  # 226 left eye outer corner
-        [43.3, 32.7, -26.0],  # 446 right eye outer corner
-        [-28.9, -28.9, -24.1],  # 57  left mouth corner
-        [28.9, -28.9, -24.1],  # 287 right mouth corner
+        [30.0,   32.7, -26.0],   # 0  right eye centre
+        [-30.0,  32.7, -26.0],   # 1  left eye centre
+        [0.0,    0.0,   0.0],    # 2  nose tip (origin)
+        [0.0,  -20.0, -14.0],    # 3  mouth centre
+        [77.5,   0.0, -44.5],    # 4  right ear tragion
+        [-77.5,  0.0, -44.5],    # 5  left ear tragion
     ],
     dtype=np.float64,
 )
@@ -159,11 +159,9 @@ class HeadPoseGazeDetector:
         self._cfg = config
         self._on_gaze_lost = on_gaze_lost
 
-        self._face_mesh = mp.solutions.face_mesh.FaceMesh(
-            max_num_faces=1,
-            refine_landmarks=False,
+        self._face_detection = mp.solutions.face_detection.FaceDetection(
+            model_selection=0,           # short-range model (≤ 2 m), optimal for webcam
             min_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
         )
 
         self._state: _GazeState = _GazeState.ABSENT
@@ -194,7 +192,7 @@ class HeadPoseGazeDetector:
             # failures in some solvePnP and MediaPipe C extensions that
             # require contiguous memory.
             rgb = cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
-            results = self._face_mesh.process(rgb)
+            results = self._face_detection.process(rgb)
             within_cone = self._is_within_cone(results, h, w)
             now_ms = time.monotonic() * 1000.0
             self._transition(within_cone, now_ms)
@@ -217,8 +215,8 @@ class HeadPoseGazeDetector:
         return self._last_permitted
 
     def close(self) -> None:
-        """Release the MediaPipe Face Mesh context."""
-        self._face_mesh.close()
+        """Release the MediaPipe Face Detection context."""
+        self._face_detection.close()
 
     def set_on_gaze_lost(self, callback: Callable[[], None]) -> None:
         """Register (or replace) the gaze-lost callback after construction.
@@ -234,13 +232,15 @@ class HeadPoseGazeDetector:
 
     def _is_within_cone(self, results, h: int, w: int) -> bool:  # type: ignore[no-untyped-def]
         """Return True if the detected head pose is within the acceptance cone."""
-        if not results.multi_face_landmarks:
+        if not results.detections:
             return False
 
-        landmarks = results.multi_face_landmarks[0].landmark
+        keypoints = results.detections[0].location_data.relative_keypoints
+        if len(keypoints) < 6:
+            return False
 
         image_points = np.array(
-            [[landmarks[idx].x * w, landmarks[idx].y * h] for idx in _LANDMARK_INDICES],
+            [[kp.x * w, kp.y * h] for kp in keypoints],
             dtype=np.float64,
         )
 
@@ -300,7 +300,7 @@ class HeadPoseGazeDetector:
             if not within_cone:
                 # Hysteresis: require two consecutive out-of-cone samples
                 # before resetting the stability timer.  A single noisy
-                # Face Mesh result must not abort a valid acquisition.
+                # Face Detection result must not abort a valid acquisition.
                 self._acquiring_false_count += 1
                 if self._acquiring_false_count >= 2:
                     self._state = _GazeState.ABSENT
