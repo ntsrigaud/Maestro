@@ -31,8 +31,17 @@ notebooks = [
   "jupyter>=1.0.0",
   "ipykernel>=6.29.0",
 ]
+ui = [
+  "PySide6>=6.7.0",
+  # opencv-python (not headless) is required for the preview-window feature.
+  # It conflicts with opencv-python-headless; uninstall headless first if needed:
+  #   pip uninstall opencv-python-headless && pip install 'presentation-meeting-control[ui]'
+  "opencv-python>=4.10.0",
+]
 dev = [
   "pytest>=8.0.0",
+  "pytest-qt>=4.4.0",
+  "PySide6>=6.7.0",
   "ruff>=0.3.0",
   "mypy>=1.8.0",
   "types-PyYAML>=6.0.12",
