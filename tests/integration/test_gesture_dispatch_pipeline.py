@@ -1,7 +1,7 @@
 """Integration tests: full gesture → command dispatch pipeline.
 
 These tests exercise the real ``GestureActivationController`` +
-``CommandDispatcher`` + ``DesktopAdapter`` chain without triggering any
+``CommandDispatcher`` + ``PresentationAdapter`` chain without triggering any
 OS-level side-effects.  ``pyautogui`` is patched at the module level of
 ``keyboard_adapter`` so the allowlist logic still runs, but no actual
 OS events are sent.
