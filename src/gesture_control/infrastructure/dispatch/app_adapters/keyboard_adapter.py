@@ -60,10 +60,13 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "s",
         "w",
         "y",
-        # Desktop adapter additions
-        "win",  # Windows workspace: Ctrl+Win+Arrow; Windows overview: Win+Tab
-        "super",  # Linux overview: Super+A (GNOME), Super+W (KDE)
-        "command",  # macOS zoom: Cmd+scroll (in-app zoom, not OS accessibility zoom)
+        # Presentation zoom and modifier keys
+        "equal",   # Cmd/Ctrl+= to zoom in (pyautogui key name for the = key)
+        "minus",   # Cmd/Ctrl+- to zoom out
+        "command", # macOS modifier for zoom and slideshow start/stop
+        # Retained for completeness (workspace navigation removed but keys kept safe)
+        "win",
+        "super",
     }
 )
 
