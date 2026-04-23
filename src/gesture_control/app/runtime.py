@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from typing import Protocol
 
 import cv2
@@ -45,9 +46,14 @@ class RuntimeDependencies(Protocol):
 
 
 class Runtime:
-    def __init__(self, container: RuntimeDependencies) -> None:
+    def __init__(
+        self,
+        container: RuntimeDependencies,
+        on_state: Callable[[RuntimeState], None] | None = None,
+    ) -> None:
         self._container = container
         self._running = False
+        self._on_state = on_state
         # Pre-compute the active mode display string from config.  This never
         # changes at runtime; storing it once avoids repeated attribute lookups
         # and getattr fallbacks in the hot loop.
@@ -114,6 +120,8 @@ class Runtime:
                         if key == ord("q"):
                             self.stop()
                     processed_frames += 1
+                    if self._on_state is not None:
+                        self._on_state(absent_state)
                     continue
 
                 t1 = time.perf_counter()
@@ -204,6 +212,9 @@ class Runtime:
                         ),
                     },
                 )
+
+                if self._on_state is not None:
+                    self._on_state(state)
 
                 overlay_frame = self._container.overlay_renderer.render(frame, state)
                 if self._container.show_window:
