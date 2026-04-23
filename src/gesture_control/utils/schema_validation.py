@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -40,6 +42,15 @@ class AppConfig(BaseModel):
     # Selects the active gesture-to-command map filename (without path prefix).
     # The file must exist in configs/gestures/.
     command_map: str = "command_map_presentation.yaml"
+    # Restricts gesture recognition to a specific physical hand from the user's
+    # perspective.  Accepted values:
+    #   "right" — only recognise the user's right hand.
+    #   "left"  — only recognise the user's left hand.
+    #   "both"  — accept whichever hand is detected (default behaviour).
+    # Internally the extractor inverts the label before comparing with MediaPipe,
+    # because MediaPipe assumes a mirrored/selfie frame: in a standard non-mirrored
+    # webcam feed the user's right hand is reported as "Left" and vice versa.
+    hand_preference: Literal["left", "right", "both"] = "both"
 
 
 class InferenceConfig(BaseModel):
