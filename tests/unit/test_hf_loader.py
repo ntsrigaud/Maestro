@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 import torch
 
-from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
+from gesture_control.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -20,21 +20,21 @@ from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifie
 
 
 def _write_artifact(path: Path) -> None:
-    model = GestureLSTMClassifier(
+    model = TwoStreamGestureLSTM(
         input_size=147,
-        hidden_size=32,
+        hidden_size=64,
         num_layers=2,
         dropout=0.1,
         num_classes=8,
     )
     payload = {
-        "artifact_type": "lstm_inference",
-        "artifact_version": "lstm_v1_test",
+        "artifact_type": "two_stream_lstm_inference",
+        "artifact_version": "two_stream_test_v1",
         "model_state_dict": model.state_dict(),
         "model_config": {
-            "model_name": "lstm_v1",
+            "model_name": "two_stream_lstm_v1",
             "input_size": 147,
-            "hidden_size": 32,
+            "hidden_size": 64,
             "num_layers": 2,
             "dropout": 0.1,
             "num_classes": 8,
@@ -95,7 +95,7 @@ def test_load_artifact_from_hub_calls_hf_hub_download(tmp_path: Path) -> None:
     )
     assert artifact.feature_schema_version == "feature-schema-v5"
     assert artifact.feature_dim == 147
-    assert artifact.model_version == "lstm_v1_test"
+    assert artifact.model_version == "two_stream_test_v1"
     assert len(artifact.class_labels) == 8
 
 
