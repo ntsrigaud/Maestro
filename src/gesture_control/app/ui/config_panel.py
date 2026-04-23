@@ -13,10 +13,10 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
+    QLineEdit,
     QPushButton,
     QScrollArea,
     QSpinBox,
-    QLineEdit,
     QVBoxLayout,
     QWidget,
 )
