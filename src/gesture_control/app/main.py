@@ -33,14 +33,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--registry",
-        default=None,
-        help=(
-            "[Deprecated] Local model registry path for backend=local. "
-            "Configure model_source in configs/model_source.yaml instead."
-        ),
-    )
-    parser.add_argument(
         "--no-display",
         action="store_true",
         help="Disable cv2 window display while keeping overlay rendering in pipeline.",
@@ -64,7 +56,6 @@ def main() -> None:
     container = build_container(
         args.config,
         model_artifact_path=args.model_artifact,
-        registry_path=args.registry,
         hf_revision_override=args.hf_revision,
         show_window=not args.no_display,
     )
