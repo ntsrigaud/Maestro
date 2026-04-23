@@ -1,0 +1,12 @@
+version: v3
+# Presentation controller gesture-to-command mapping.
+# Commands route to PresentationAdapter → KeyboardAdapter → pyautogui.
+gesture_commands:
+  swipe_down: next_slide
+  swipe_up: previous_slide
+  swipe_right: scroll_forward
+  swipe_left: scroll_back
+  zoom_in: zoom_in_view
+  zoom_out: zoom_out_view
+  open_palm_hold: start_stop_presentation
+  unknown: no_action
