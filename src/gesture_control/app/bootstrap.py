@@ -9,8 +9,8 @@ import yaml
 
 from gesture_control.evaluation.benchmark_latency import LatencyBenchmark
 from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSource
-from gesture_control.infrastructure.dispatch.app_adapters.desktop_adapter import (
-    DesktopAdapter,
+from gesture_control.infrastructure.dispatch.app_adapters.presentation_adapter import (
+    PresentationAdapter,
 )
 from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
@@ -26,7 +26,6 @@ from gesture_control.infrastructure.mediapipe.hands_extractor import (
 from gesture_control.infrastructure.model.checkpoint_loader import (
     InferenceArtifact,
     load_inference_artifact,
-    load_latest_inference_artifact,
     validate_runtime_compatibility,
 )
 from gesture_control.interfaces.command_dispatcher import ICommandDispatcher
@@ -66,7 +65,6 @@ def build_container(
     config_path: str,
     *,
     model_artifact_path: str | None = None,
-    registry_path: str | None = None,
     hf_revision_override: str | None = None,
     show_window: bool = True,
 ) -> AppContainer:
@@ -104,7 +102,6 @@ def build_container(
     else:
         artifact = _load_model_from_source(
             config=config,
-            registry_path_override=registry_path,
             hf_revision_override=hf_revision_override,
             device=device,
         )
@@ -127,10 +124,6 @@ def build_container(
     )
     dispatcher = _build_dispatcher(
         allowed_commands=frozenset(command_map.values()),
-        navigation_mode=config.app.navigation_mode,
-        scroll_clicks=config.app.desktop.scroll_clicks,
-        zoom_clicks=config.app.desktop.zoom_clicks,
-        linux_de=config.app.desktop.linux_de,
     )
     overlay_renderer = OverlayRenderer(
         mirror_display=config.app.mirror_display,
@@ -196,34 +189,25 @@ def validate_container_dataset(
 def _load_model_from_source(
     *,
     config: Any,
-    registry_path_override: str | None,
     hf_revision_override: str | None,
     device: torch.device,
 ) -> InferenceArtifact:
-    """Load a model artifact according to ``config.model_source.backend``.
+    """Load the two-stream LSTM artifact from Hugging Face Hub.
 
-    When *registry_path_override* is provided it takes precedence over the
-    ``registry_path`` field in ``model_source`` (supports legacy CLI usage).
     When *hf_revision_override* is provided it overrides ``model_source.revision``
     (supports the ``--hf-revision`` CLI flag).
     """
     src = config.model_source
-    if src.backend == "huggingface":
-        from gesture_control.infrastructure.model.hf_loader import (
-            load_artifact_from_hub,
-        )
+    from gesture_control.infrastructure.model.hf_loader import (
+        load_artifact_from_hub,
+    )
 
-        return load_artifact_from_hub(
-            repo_id=src.repo_id,
-            filename=src.filename,
-            revision=hf_revision_override or src.revision,
-            cache_dir=src.cache_dir,
-            device=device,
-        )
-    # backend == "local"
-    effective_registry = registry_path_override or src.registry_path
-    return load_latest_inference_artifact(
-        registry_path=effective_registry, device=device
+    return load_artifact_from_hub(
+        repo_id=src.repo_id,
+        filename=src.filename,
+        revision=hf_revision_override or src.revision,
+        cache_dir=src.cache_dir,
+        device=device,
     )
 
 
@@ -269,7 +253,7 @@ def _load_command_map(path: Path) -> dict[str, str]:
     if not path.exists():
         raise FileNotFoundError(
             f"Command map file not found: {path}. "
-            "Ensure configs/gestures/command_map_desktop.yaml exists."
+            "Ensure configs/gestures/command_map_presentation.yaml exists."
         )
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
@@ -284,24 +268,10 @@ def _load_command_map(path: Path) -> dict[str, str]:
 
 def _build_dispatcher(
     allowed_commands: frozenset[str],
-    navigation_mode: str = "workspace",
-    scroll_clicks: int = 5,
-    zoom_clicks: int = 3,
-    linux_de: str = "gnome",
 ) -> CommandDispatcher:
-    """Wrap a DesktopAdapter in a CommandDispatcher.
-
-    OS-level event injection (pyautogui.scroll) routes every command to
-    whichever window currently holds focus, so no application detection is
-    needed.  The same scroll / navigate / zoom commands work universally
-    across browsers, PDF viewers, presentation software, and anything else.
-    """
-    adapter = DesktopAdapter(
+    """Wrap a PresentationAdapter in a CommandDispatcher."""
+    adapter = PresentationAdapter(
         keyboard=KeyboardAdapter(),
-        navigation_mode=navigation_mode,
-        scroll_clicks=scroll_clicks,
-        zoom_clicks=zoom_clicks,
-        linux_de=linux_de,
     )
     return CommandDispatcher(
         adapter=adapter,
