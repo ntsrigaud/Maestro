@@ -29,7 +29,7 @@ graph TD
     Transform --> Buffer["5. Buffer Push<br/>SlidingWindowSequenceBuffer.push()"]
     Buffer --> Ready{Buffer Ready?}
     Ready -->|No| Render
-    Ready -->|Yes| Infer["6. LSTM Inference<br/>GestureLSTMClassifier.predict()"]
+    Ready -->|Yes| Infer["6. Two-Stream LSTM Inference<br/>TwoStreamGestureLSTM.predict()"]
     Infer --> Stabilize["7. Stabilize<br/>PredictionStabilizer.update()"]
     Stabilize --> Activate["8. Activation Routing<br/>GestureActivationController.route()"]
     Activate --> HasCmd{Command?}
@@ -157,7 +157,7 @@ graph TD
     Allow -->|Rejected| Fail1["DispatchResult<br/>(rejected_by_allowlist)"]
     Allow -->|Passed| Rate{Rate Limit Check}
     Rate -->|Exceeded| Fail2["DispatchResult<br/>(rate_limited)"]
-    Rate -->|Passed| Adapter["App Adapter<br/>(PowerPoint / Zoom)"]
+    Rate -->|Passed| Adapter["PresentationAdapter"]
     Adapter --> KeyValidate{Key Name Validation}
     KeyValidate -->|Invalid| Fail3["DispatchResult<br/>(invalid_key)"]
     KeyValidate -->|Valid| Execute["pyautogui.hotkey()"]
