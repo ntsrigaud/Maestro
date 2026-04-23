@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-from PySide6.QtWidgets import QApplication
+from unittest.mock import patch
 
 from gesture_control.app.ui.main_window import MainWindow
 
