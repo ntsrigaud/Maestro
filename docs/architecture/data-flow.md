@@ -13,7 +13,7 @@ graph TD
     B -->|gaze_permitted=true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
     C -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
     D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 24x147)"]
-    E -->|SequenceWindow| F["LSTM Classifier<br/>(2-Layer, Hidden=128, 8-Class)"]
+    E -->|SequenceWindow| F["Two-Stream LSTM<br/>(Hidden=64/stream, Fused=128, 8-Class)"]
     F -->|Prediction| G["Prediction Stabilizer<br/>(EMA + Threshold + Voting)"]
     G -->|StabilizedPrediction| H["Activation Controller<br/>(IDLE / ARMED / COOLDOWN)"]
     H -->|ExecutableCommand| I["Command Dispatcher<br/>(Allowlist + Rate Limit)"]
@@ -144,9 +144,9 @@ The buffer is a fixed-length deque (default length 24). Feature frames are pushe
 
 At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 24-frame window spans approximately 800 ms of hand motion, capturing sufficient temporal context for dynamic gesture recognition.
 
-### Stage 6: LSTM Inference
+### Stage 6: Two-Stream LSTM Inference
 
-**Component**: `GestureLSTMClassifier` (single-stream) or `TwoStreamGestureLSTM` (two-stream)  
+**Component**: `TwoStreamGestureLSTM`  
 **Input**: `SequenceWindow`  
 **Output**: `Prediction`
 
@@ -156,22 +156,9 @@ At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The
 | `top_class`   | `str`              | Class label with highest probability |
 | `confidence`  | `float`            | Probability of the top class         |
 
-Two model architectures are supported, selected by `model_name` in the training config:
+The `TwoStreamGestureLSTM` (`two_stream_lstm_v1`) is the sole supported model architecture — a Tier 4-A two-stream design:
 
-**Single-stream LSTM** (`lstm_v1`) — baseline:
-
-```
-Input tensor: (1, 24, 147)  — batch=1, sequence=24 frames, features=147
-    ↓
-LSTM: input_size=147, hidden_size=128, num_layers=2, dropout=0.3
-    ↓ Bahdanau attention pool over T
-Context: (1, 128)
-    ↓
-Linear(128, 8) → Softmax: 8-class probability distribution
-~264 K parameters
-```
-
-**Two-stream LSTM** (`two_stream_lstm_v1`) — Tier 4-A architecture:
+**Two-stream LSTM** (`two_stream_lstm_v1`):
 
 ```
 Input tensor: (1, 24, 147)
@@ -201,7 +188,7 @@ Input tensor: (1, 24, 147)
 
 The two-stream architecture addresses the directional signal dilution identified in the model improvement plan (Tier 4-A): the 6 critical directional dims (`wrist_traj` + `wrist_vel_raw`) previously competed for gradient weight with 141 pose and velocity dims in a single LSTM. Stream B gives motion features a fully independent representational pathway, eliminating within-timestep feature competition that Bahdanau attention alone cannot resolve (attention operates over time, not over feature dimensions).
 
-Both models run in `torch.no_grad()` evaluation mode. The `artifact_type` field in the `.pt` file (`lstm_inference` vs `two_stream_lstm_inference`) controls which class is reconstructed by `checkpoint_loader.py` at load time.
+The model runs in `torch.no_grad()` evaluation mode. `checkpoint_loader.py` validates that `artifact_type` equals `two_stream_lstm_inference` before reconstructing the model; any other artifact type raises `ValueError` to prevent silent failure.
 
 ### Stage 7: Prediction Stabilization
 
@@ -288,16 +275,18 @@ The dispatch chain applies three validation stages before OS interaction:
 **Input**: Validated key tuple from application adapter  
 **Output**: OS keyboard event
 
-The keyboard adapter invokes `pyautogui.hotkey(*keys)` with the validated key names. Example command-to-key mappings:
+The keyboard adapter invokes `pyautogui.hotkey(*keys)` with the validated key names. `PresentationAdapter` command-to-key mappings:
 
-| Command               | PowerPoint Keys | Zoom Keys      |
-| --------------------- | --------------- | -------------- |
-| `next_slide`          | `("right",)`    | `("right",)`   |
-| `previous_slide`      | `("left",)`     | `("left",)`    |
-| `raise_hand`          | —               | `("alt", "y")` |
-| `start_presentation`  | `("f5",)`       | —              |
-| `toggle_pointer_mode` | `("ctrl", "l")` | —              |
-| `exit_presentation`   | `("escape",)`   | —              |
+| Command                   | Key(s)                                                       |
+| ------------------------- | ------------------------------------------------------------ |
+| `next_slide`              | `("right",)`                                                 |
+| `previous_slide`          | `("left",)`                                                  |
+| `scroll_forward`          | `("down",)`                                                  |
+| `scroll_back`             | `("up",)`                                                    |
+| `zoom_in_view`            | `("command", "equal")` macOS / `("ctrl", "equal")` Win/Linux |
+| `zoom_out_view`           | `("command", "minus")` macOS / `("ctrl", "minus")` Win/Linux |
+| `start_stop_presentation` | `("command", "enter")` macOS / `("f5",)` Win/Linux           |
+| `no_action`               | _(no keystroke; returns `success=False`)_                    |
 
 ## 4. Data Volume Summary
 

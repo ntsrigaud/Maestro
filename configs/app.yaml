@@ -1,4 +1,4 @@
-app_name: presentation-meeting-control
+app_name: presentation-controller
 camera_index: 0
 frame_width: 1280
 frame_height: 720
@@ -8,6 +8,4 @@ target_fps: 30
 # frames are always processed in the original (non-mirrored) coordinate space.
 mirror_display: true
 # Active gesture-to-command map (filename in configs/gestures/).
-command_map: command_map_desktop.yaml
-# Horizontal swipe destination (workspace | tabs).
-navigation_mode: workspace
+command_map: command_map_presentation.yaml
