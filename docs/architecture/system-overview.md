@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-The Gesture Control System is a real-time gesture control application that enables hands-free desktop interaction. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with an LSTM neural network, and dispatches operating-system-level keyboard commands for navigation, scrolling, zoom, and desktop management.
+The Gesture Control System is a real-time gesture control application that enables hands-free presentation control. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with a two-stream LSTM neural network, and dispatches operating-system-level keyboard commands for slide navigation, scrolling, zoom, and presentation start/stop.
 
 The architecture follows a modular, protocol-driven design with strict separation between domain logic, infrastructure adapters, and pipeline orchestration. All runtime parameters are externalized to YAML configuration files. The system is CPU-first and operates at interactive frame rates on consumer hardware.
 
@@ -14,18 +14,18 @@ Provide reliable, low-latency gesture-based desktop control using a small, highl
 
 The system recognizes eight gesture classes derived from the IPN Hand dataset:
 
-| Gesture          | Type            | Mapped Command   |
-| ---------------- | --------------- | ---------------- |
-| `open_palm_hold` | Static          | Mission Control  |
-| `swipe_right`    | Dynamic         | Navigate forward |
-| `swipe_left`     | Dynamic         | Navigate back    |
-| `swipe_up`       | Dynamic         | Scroll back      |
-| `swipe_down`     | Dynamic         | Scroll forward   |
-| `zoom_in`        | Dynamic         | Zoom in view     |
-| `zoom_out`       | Dynamic         | Zoom out view    |
-| `unknown`        | Rejection class | No action        |
+| Gesture          | Type            | Mapped Command          |
+| ---------------- | --------------- | ----------------------- |
+| `open_palm_hold` | Static          | Start/stop presentation |
+| `swipe_right`    | Dynamic         | Scroll forward          |
+| `swipe_left`     | Dynamic         | Scroll back             |
+| `swipe_up`       | Dynamic         | Previous slide          |
+| `swipe_down`     | Dynamic         | Next slide              |
+| `zoom_in`        | Dynamic         | Zoom in view            |
+| `zoom_out`       | Dynamic         | Zoom out view           |
+| `unknown`        | Rejection class | No action               |
 
-The activation gate is controlled entirely by gaze detection: the system starts in ARMED state and accepts command gestures as long as the user's gaze is directed at the camera. Turning away (gaze lost beyond the grace period) transitions the system to IDLE; looking back triggers `rearm()` and resumes ARMED state. `swipe_up`/`swipe_down` scroll through content, `swipe_left`/`swipe_right` navigate between virtual desktops or browser tabs (configurable via `navigation_mode`), `zoom_in`/`zoom_out` adjust view magnification, and `open_palm_hold` triggers Mission Control / Activities overview.
+The activation gate is controlled entirely by gaze detection: the system starts in ARMED state and accepts command gestures as long as the user's gaze is directed at the camera. Turning away (gaze lost beyond the grace period) transitions the system to IDLE; looking back triggers `rearm()` and resumes ARMED state. `swipe_down`/`swipe_up` navigate slides (next/previous), `swipe_right`/`swipe_left` scroll content forward/back, `zoom_in`/`zoom_out` adjust view magnification, and `open_palm_hold` starts or stops the presentation.
 
 ## 4. High-Level Architecture
 
@@ -79,7 +79,7 @@ graph LR
 3. **Landmark Extraction**: MediaPipe Hands detects 21 hand landmarks with confidence filtering.
 4. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity, joint angles, fingertip spread, and wrist trajectory features to produce a 147-dimensional feature vector (feature-schema-v5).
 5. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
-6. **LSTM Inference**: The buffered sequence (24×147) is classified by a 2-layer LSTM into one of 8 gesture classes.
+6. **Two-Stream LSTM Inference**: The buffered sequence (24×147) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory), each processed by an independent 2-layer LSTM with Bahdanau attention. The fused context (128 dims) is projected to an 8-class probability distribution by `TwoStreamGestureLSTM`.
 7. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
 8. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in ARMED state; gaze loss transitions to IDLE; gaze restoration calls `rearm()` to return to ARMED. Edge-triggered dispatch is enforced throughout.
 9. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
@@ -131,7 +131,7 @@ Nine `Protocol` interfaces define service contracts. Implementations can be swap
 The offline training pipeline converts labeled video data into a trained LSTM checkpoint:
 
 1. **Data Collection**: The IPN Hand dataset (200 videos, 8 classes) is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks from IPN video files and produces NPZ sequence datasets.
-2. **Model Training**: `scripts/train_model.py` trains a 2-layer LSTM with class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
+2. **Model Training**: `scripts/train_model.py` trains a `TwoStreamGestureLSTM` — a two-stream, 2-layer LSTM with independent Bahdanau attention per stream, class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
 3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/gesture-control-lstm`). At runtime the artifact is downloaded on first use and served from the local Hugging Face cache.
 
 ---
