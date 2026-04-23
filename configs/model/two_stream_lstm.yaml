@@ -50,7 +50,6 @@ scheduler:
 export:
   checkpoint_dir: models/checkpoints
   exported_dir: models/exported
-  registry_path: models/registry.json
   feature_schema_version: feature-schema-v5
 
 augmentation:
