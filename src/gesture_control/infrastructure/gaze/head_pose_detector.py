@@ -39,12 +39,12 @@ LOGGER = logging.getLogger(__name__)
 # face model (Savran et al., 2008).
 _MODEL_POINTS_3D = np.array(
     [
-        [30.0,   32.7, -26.0],   # 0  right eye centre
-        [-30.0,  32.7, -26.0],   # 1  left eye centre
-        [0.0,    0.0,   0.0],    # 2  nose tip (origin)
-        [0.0,  -20.0, -14.0],    # 3  mouth centre
-        [77.5,   0.0, -44.5],    # 4  right ear tragion
-        [-77.5,  0.0, -44.5],    # 5  left ear tragion
+        [30.0, 32.7, -26.0],  # 0  right eye centre
+        [-30.0, 32.7, -26.0],  # 1  left eye centre
+        [0.0, 0.0, 0.0],  # 2  nose tip (origin)
+        [0.0, -20.0, -14.0],  # 3  mouth centre
+        [77.5, 0.0, -44.5],  # 4  right ear tragion
+        [-77.5, 0.0, -44.5],  # 5  left ear tragion
     ],
     dtype=np.float64,
 )
@@ -160,7 +160,7 @@ class HeadPoseGazeDetector:
         self._on_gaze_lost = on_gaze_lost
 
         self._face_detection = mp.solutions.face_detection.FaceDetection(
-            model_selection=0,           # short-range model (≤ 2 m), optimal for webcam
+            model_selection=0,  # short-range model (≤ 2 m), optimal for webcam
             min_detection_confidence=0.5,
         )
 
