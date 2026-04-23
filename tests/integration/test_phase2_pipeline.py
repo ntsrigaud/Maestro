@@ -8,16 +8,16 @@ import numpy as np
 from gesture_control.app.bootstrap import build_container
 from gesture_control.domain.entities import FramePacket, LandmarkPacket
 from gesture_control.infrastructure.model.checkpoint_loader import InferenceArtifact
-from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
+from gesture_control.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 
 
 def _mock_artifact() -> InferenceArtifact:
     """Create a dummy InferenceArtifact matching the current feature-schema-v5 config."""
-    model = GestureLSTMClassifier(
+    model = TwoStreamGestureLSTM(
         input_size=147,
-        hidden_size=32,
-        num_layers=1,
-        dropout=0.0,
+        hidden_size=64,
+        num_layers=2,
+        dropout=0.1,
         num_classes=8,
     )
     return InferenceArtifact(
@@ -42,9 +42,7 @@ def _mock_artifact() -> InferenceArtifact:
     )
 
 
-@patch(
-    "gesture_control.app.bootstrap.load_latest_inference_artifact", return_value=None
-)
+@patch("gesture_control.app.bootstrap._load_model_from_source")
 @patch("gesture_control.app.bootstrap.validate_runtime_compatibility")
 @patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
 @patch("gesture_control.app.bootstrap.MediaPipeHandsExtractor")
@@ -82,9 +80,7 @@ def test_frame_to_landmark_pipeline(
     assert landmark.valid is True
 
 
-@patch(
-    "gesture_control.app.bootstrap.load_latest_inference_artifact", return_value=None
-)
+@patch("gesture_control.app.bootstrap._load_model_from_source")
 @patch("gesture_control.app.bootstrap.validate_runtime_compatibility")
 @patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
 @patch("gesture_control.app.bootstrap.MediaPipeHandsExtractor")

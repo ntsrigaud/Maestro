@@ -14,19 +14,19 @@ pytestmark = pytest.mark.training
 
 def _create_dataset(path: Path) -> None:
     rng = np.random.default_rng(123)
-    n, t, f = 128, 24, 126
+    n, t, f = 128, 24, 147
 
     sequences = rng.normal(size=(n, t, f)).astype(np.float32)
     labels = np.array(["open_palm_hold"] * 64 + ["swipe_right"] * 64, dtype=object)
     label_ids = np.array([0] * 64 + [1] * 64, dtype=np.int64)
 
     metadata = {
-        "feature_schema_version": "feature-schema-v1",
+        "feature_schema_version": "feature-schema-v5",
         "feature_dim": f,
         "window_length": t,
         "window_step": 3,
         "vocabulary": ["open_palm_hold", "swipe_right"],
-        "enable_orientation_normalization": True,
+        "enable_orientation_normalization": False,
     }
 
     # Assign at least 3 unique recording IDs per class so GestureDataModule
@@ -61,8 +61,8 @@ def test_training_pipeline_smoke(tmp_path: Path) -> None:
     cfg_path.write_text(
         """
 model:
-  model_name: lstm_smoke
-  input_size: 126
+  model_name: two_stream_smoke
+  input_size: 147
   hidden_size: 32
   num_layers: 2
   dropout: 0.1
@@ -91,8 +91,7 @@ scheduler:
 export:
   checkpoint_dir: models/checkpoints
   exported_dir: models/exported
-  registry_path: models/registry.json
-  feature_schema_version: feature-schema-v1
+  feature_schema_version: feature-schema-v5
 """.strip(),
         encoding="utf-8",
     )
