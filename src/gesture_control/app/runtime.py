@@ -29,6 +29,27 @@ from gesture_control.utils.schema_validation import RuntimeConfig
 LOGGER = logging.getLogger(__name__)
 
 
+def _imshow(window_name: str, frame: np.ndarray) -> bool:
+    """
+    Try to display a frame using cv2.imshow.
+
+    Returns True on success, False if the display backend is unavailable
+    (e.g. headless OpenCV build or called from a non-main thread while a
+    Qt event loop is already running).  On failure a warning is logged once
+    so the caller can disable show_window for subsequent frames.
+    """
+    try:
+        cv2.imshow(window_name, frame)
+        return True
+    except cv2.error as exc:
+        LOGGER.warning(
+            "cv2.imshow unavailable (headless build or Qt thread conflict); "
+            "disabling preview window. Reason: %s",
+            exc,
+        )
+        return False
+
+
 class RuntimeDependencies(Protocol):
     config: RuntimeConfig
     frame_source: IFrameSource
@@ -115,13 +136,15 @@ class Runtime:
                         frame, absent_state
                     )
                     if self._container.show_window:
-                        cv2.imshow(app_name, overlay_frame.frame)
-                        key = cv2.waitKey(1) & 0xFF
-                        if key == ord("q"):
+                        if not _imshow(app_name, overlay_frame.frame):
+                            self._container.show_window = False
+                        elif cv2.waitKey(1) & 0xFF == ord("q"):
                             self.stop()
                     processed_frames += 1
                     if self._on_state is not None:
                         self._on_state(absent_state)
+                    if max_frames > 0 and processed_frames >= max_frames:
+                        self.stop()
                     continue
 
                 t1 = time.perf_counter()
@@ -218,9 +241,9 @@ class Runtime:
 
                 overlay_frame = self._container.overlay_renderer.render(frame, state)
                 if self._container.show_window:
-                    cv2.imshow(app_name, overlay_frame.frame)
-                    key = cv2.waitKey(1) & 0xFF
-                    if key == ord("q"):
+                    if not _imshow(app_name, overlay_frame.frame):
+                        self._container.show_window = False
+                    elif cv2.waitKey(1) & 0xFF == ord("q"):
                         self.stop()
 
                 if processed_frames % 30 == 0:
