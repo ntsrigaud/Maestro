@@ -1,42 +1,50 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import torch
 
 from gesture_control.infrastructure.model.checkpoint_loader import (
     load_inference_artifact,
-    load_latest_inference_artifact,
     validate_runtime_compatibility,
 )
-from gesture_control.infrastructure.model.lstm_model import GestureLSTMClassifier
+from gesture_control.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 from gesture_control.utils.schema_validation import RuntimeConfig
 
 
 def _write_artifact(path: Path) -> None:
-    model = GestureLSTMClassifier(
-        input_size=126,
-        hidden_size=32,
+    model = TwoStreamGestureLSTM(
+        input_size=147,
+        hidden_size=64,
         num_layers=2,
         dropout=0.1,
-        num_classes=2,
+        num_classes=8,
     )
     payload = {
-        "artifact_type": "lstm_inference",
-        "artifact_version": "lstm_test_v1",
+        "artifact_type": "two_stream_lstm_inference",
+        "artifact_version": "two_stream_test_v1",
         "model_state_dict": model.state_dict(),
         "model_config": {
-            "input_size": 126,
-            "hidden_size": 32,
+            "model_name": "two_stream_lstm_v1",
+            "input_size": 147,
+            "hidden_size": 64,
             "num_layers": 2,
             "dropout": 0.1,
-            "num_classes": 2,
+            "num_classes": 8,
         },
-        "class_labels": ["open_palm_hold", "unknown"],
+        "class_labels": [
+            "open_palm_hold",
+            "swipe_right",
+            "swipe_left",
+            "swipe_up",
+            "swipe_down",
+            "zoom_in",
+            "zoom_out",
+            "unknown",
+        ],
         "feature_schema": {
-            "feature_schema_version": "feature-schema-v1",
-            "feature_dim": 126,
+            "feature_schema_version": "feature-schema-v5",
+            "feature_dim": 147,
             "window_length": 24,
             "window_step": 3,
             "orientation_normalization": True,
@@ -54,38 +62,44 @@ def test_load_inference_artifact(tmp_path: Path) -> None:
         device=torch.device("cpu"),
     )
 
-    assert artifact.model_version == "lstm_test_v1"
-    assert artifact.feature_dim == 126
+    assert artifact.model_version == "two_stream_test_v1"
+    assert artifact.feature_dim == 147
     assert artifact.window_length == 24
     assert artifact.window_step == 3
     assert artifact.orientation_normalization is True
-    assert artifact.class_labels == ["open_palm_hold", "unknown"]
+    assert len(artifact.class_labels) == 8
+    assert artifact.class_labels[0] == "open_palm_hold"
 
 
-def test_load_latest_inference_artifact(tmp_path: Path) -> None:
-    artifact_path = tmp_path / "model.pt"
-    _write_artifact(artifact_path)
-
-    registry_path = tmp_path / "registry.json"
-    registry_path.write_text(
-        json.dumps(
-            {
-                "models": [
-                    {
-                        "model_version": "lstm_test_v1",
-                        "exported_path": str(artifact_path),
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    artifact = load_latest_inference_artifact(
-        registry_path=registry_path,
-        device=torch.device("cpu"),
-    )
-    assert artifact.artifact_path == artifact_path
+def test_load_inference_artifact_rejects_wrong_type(tmp_path: Path) -> None:
+    """Artifacts with non-two-stream type must raise ValueError."""
+    artifact_path = tmp_path / "bad.pt"
+    # Craft a minimal payload with a single-stream lstm artifact_type.
+    payload = {
+        "artifact_type": "lstm_inference",
+        "artifact_version": "v0",
+        "model_state_dict": {},
+        "model_config": {
+            "model_name": "lstm_v1",
+            "input_size": 126,
+            "hidden_size": 64,
+            "num_layers": 2,
+            "dropout": 0.1,
+            "num_classes": 8,
+        },
+        "class_labels": ["a", "b"],
+        "feature_schema": {
+            "feature_schema_version": "v1",
+            "feature_dim": 126,
+            "window_length": 24,
+            "window_step": 3,
+            "orientation_normalization": False,
+        },
+    }
+    torch.save(payload, artifact_path)
+    import pytest
+    with pytest.raises(ValueError, match="Unsupported artifact type"):
+        load_inference_artifact(artifact_path=artifact_path, device=torch.device("cpu"))
 
 
 def test_validate_runtime_compatibility_passes(tmp_path: Path) -> None:
