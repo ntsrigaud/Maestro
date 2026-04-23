@@ -92,7 +92,9 @@ class PresentationAdapter:
                     detail="no_action",
                 )
             case _:
-                LOGGER.warning("PresentationAdapter: unrecognised command %r", command_id)
+                LOGGER.warning(
+                    "PresentationAdapter: unrecognised command %r", command_id
+                )
                 return DispatchResult(
                     success=False,
                     command_id=command_id,

@@ -42,7 +42,6 @@ def export_inference_artifact(
             "num_layers": config.model.num_layers,
             "dropout": config.model.dropout,
             "num_classes": config.model.num_classes,
-
         },
         "class_labels": result.class_labels,
         "feature_schema": {
