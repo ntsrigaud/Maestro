@@ -84,6 +84,7 @@ def build_container(
         max_num_hands=1,
         min_detection_confidence=0.7,
         min_tracking_confidence=0.5,
+        hand_preference=config.app.hand_preference,
     )
     feature_transformer = LandmarkFeatureTransformer(
         enable_orientation_normalization=config.feature_pipeline.orientation_normalization,
