@@ -110,12 +110,6 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             num_layers=int(model_data.get("num_layers", 2)),
             dropout=float(model_data.get("dropout", 0.3)),
             num_classes=int(model_data.get("num_classes", 8)),
-            num_channels=(
-                [int(c) for c in model_data["num_channels"]]
-                if "num_channels" in model_data
-                else None
-            ),
-            kernel_size=int(model_data.get("kernel_size", 3)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
