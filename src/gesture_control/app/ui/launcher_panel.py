@@ -80,9 +80,7 @@ class LauncherPanel(QWidget):
         self._btn.setText(self._LABELS[self._state])
         self._btn.setEnabled(self._state != "building")
         colour = self._COLOURS[self._state]
-        self._pill.setStyleSheet(
-            f"background-color: {colour}; border-radius: 6px;"
-        )
+        self._pill.setStyleSheet(f"background-color: {colour}; border-radius: 6px;")
 
     @property
     def state(self) -> str:

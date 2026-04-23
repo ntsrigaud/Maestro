@@ -141,7 +141,9 @@ class MainWindow(QMainWindow):
                 QSystemTrayIcon.MessageIcon.Information,
                 800,
             )
-            QTimer.singleShot(300, lambda: self._tray.setIcon(_make_tray_icon("#44AA44")))
+            QTimer.singleShot(
+                300, lambda: self._tray.setIcon(_make_tray_icon("#44AA44"))
+            )
         else:
             self._tray.setIcon(_make_tray_icon("#44AA44"))
 
@@ -175,4 +177,3 @@ class MainWindow(QMainWindow):
         self._controller.wait(timeout_ms=3_000)
         self._tray.hide()
         super().closeEvent(event)
-

@@ -21,7 +21,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from gesture_control.utils.schema_validation import AppConfig, InferenceConfig, RuntimeConfig
+from gesture_control.utils.schema_validation import (
+    AppConfig,
+    InferenceConfig,
+    RuntimeConfig,
+)
 
 _EXCLUDE_FIELDS = frozenset({"command_map", "app_name"})
 

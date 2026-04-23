@@ -21,7 +21,9 @@ class TestModelPanel:
         qtbot.addWidget(panel)
         assert panel.hf_revision_override() == "v1.2"
 
-    def test_artifact_path_returns_none_when_no_local_file_selected(self, qtbot) -> None:
+    def test_artifact_path_returns_none_when_no_local_file_selected(
+        self, qtbot
+    ) -> None:
         panel = ModelPanel()
         qtbot.addWidget(panel)
         panel._tabs.setCurrentIndex(1)

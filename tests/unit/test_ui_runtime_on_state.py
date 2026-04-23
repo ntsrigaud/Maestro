@@ -8,10 +8,10 @@ import numpy as np
 from gesture_control.app.runtime import Runtime
 from gesture_control.domain.entities import RuntimeState
 
-
 # ---------------------------------------------------------------------------
 # Minimal container factories
 # ---------------------------------------------------------------------------
+
 
 def _make_gaze_permitted_container() -> SimpleNamespace:
     """Container whose gaze detector always permits and whose sequence buffer
@@ -112,6 +112,7 @@ def _make_gaze_absent_container() -> SimpleNamespace:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestOnStateCallback:
     def test_on_state_called_per_frame_when_gaze_permitted(self) -> None:
