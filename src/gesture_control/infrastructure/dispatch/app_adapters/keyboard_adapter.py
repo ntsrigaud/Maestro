@@ -61,9 +61,9 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "w",
         "y",
         # Presentation zoom and modifier keys
-        "equal",   # Cmd/Ctrl+= to zoom in (pyautogui key name for the = key)
-        "minus",   # Cmd/Ctrl+- to zoom out
-        "command", # macOS modifier for zoom and slideshow start/stop
+        "equal",  # Cmd/Ctrl+= to zoom in (pyautogui key name for the = key)
+        "minus",  # Cmd/Ctrl+- to zoom out
+        "command",  # macOS modifier for zoom and slideshow start/stop
         # Retained for completeness (workspace navigation removed but keys kept safe)
         "win",
         "super",

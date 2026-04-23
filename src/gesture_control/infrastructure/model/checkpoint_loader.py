@@ -136,6 +136,3 @@ def validate_runtime_compatibility(
             "Inference window_step mismatch: runtime "
             f"{runtime_config.inference.window_step} vs artifact {artifact.window_step}"
         )
-
-
-

@@ -98,6 +98,7 @@ def test_load_inference_artifact_rejects_wrong_type(tmp_path: Path) -> None:
     }
     torch.save(payload, artifact_path)
     import pytest
+
     with pytest.raises(ValueError, match="Unsupported artifact type"):
         load_inference_artifact(artifact_path=artifact_path, device=torch.device("cpu"))
 
