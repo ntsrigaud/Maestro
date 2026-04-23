@@ -135,7 +135,9 @@ class RuntimeController(QObject):
     ) -> None:
         """Spawn the worker thread. No-op if already running."""
         if self._thread is not None and self._thread.isRunning():
-            LOGGER.warning("RuntimeController.start() called while already running; ignoring")
+            LOGGER.warning(
+                "RuntimeController.start() called while already running; ignoring"
+            )
             return
 
         self._thread = _RuntimeThread(
