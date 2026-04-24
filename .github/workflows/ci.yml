@@ -9,6 +9,8 @@ jobs:
   runtime:
     name: Runtime environment
     runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,6 +21,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Install Qt system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libegl1 libopengl0
 
       - name: Install runtime + dev dependencies
         run: |
@@ -37,6 +44,8 @@ jobs:
   training:
     name: Training environment
     runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,6 +56,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Install Qt system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libegl1 libopengl0
 
       - name: Install runtime + dev + training dependencies
         run: |
