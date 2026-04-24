@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 import numpy as np
 
-from gesture_control.domain.entities import FramePacket
-from gesture_control.infrastructure.mediapipe.hands_extractor import (
+from maestro.domain.entities import FramePacket
+from maestro.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
 )
 
@@ -65,7 +65,7 @@ def run_phase2_benchmark(frames: int) -> BenchmarkResult:
     hands_obj.close = lambda: None
 
     with patch(
-        "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands",
+        "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands",
         return_value=hands_obj,
     ):
         extractor = MediaPipeHandsExtractor(

@@ -5,10 +5,10 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from gesture_control.app.bootstrap import build_container
-from gesture_control.domain.entities import FramePacket, LandmarkPacket
-from gesture_control.infrastructure.model.checkpoint_loader import InferenceArtifact
-from gesture_control.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+from maestro.app.bootstrap import build_container
+from maestro.domain.entities import FramePacket, LandmarkPacket
+from maestro.infrastructure.model.checkpoint_loader import InferenceArtifact
+from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 
 
 def _mock_artifact() -> InferenceArtifact:
@@ -42,10 +42,10 @@ def _mock_artifact() -> InferenceArtifact:
     )
 
 
-@patch("gesture_control.app.bootstrap._load_model_from_source")
-@patch("gesture_control.app.bootstrap.validate_runtime_compatibility")
-@patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
-@patch("gesture_control.app.bootstrap.MediaPipeHandsExtractor")
+@patch("maestro.app.bootstrap._load_model_from_source")
+@patch("maestro.app.bootstrap.validate_runtime_compatibility")
+@patch("maestro.infrastructure.camera.opencv_source.cv2.VideoCapture")
+@patch("maestro.app.bootstrap.MediaPipeHandsExtractor")
 def test_frame_to_landmark_pipeline(
     mock_extractor_cls: MagicMock,
     mock_capture_cls: MagicMock,
@@ -80,10 +80,10 @@ def test_frame_to_landmark_pipeline(
     assert landmark.valid is True
 
 
-@patch("gesture_control.app.bootstrap._load_model_from_source")
-@patch("gesture_control.app.bootstrap.validate_runtime_compatibility")
-@patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
-@patch("gesture_control.app.bootstrap.MediaPipeHandsExtractor")
+@patch("maestro.app.bootstrap._load_model_from_source")
+@patch("maestro.app.bootstrap.validate_runtime_compatibility")
+@patch("maestro.infrastructure.camera.opencv_source.cv2.VideoCapture")
+@patch("maestro.app.bootstrap.MediaPipeHandsExtractor")
 def test_pipeline_handles_no_hand(
     mock_extractor_cls: MagicMock,
     mock_capture_cls: MagicMock,

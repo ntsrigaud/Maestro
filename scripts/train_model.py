@@ -8,13 +8,13 @@ from pathlib import Path
 
 import torch
 
-from gesture_control.training.export_checkpoint import (
+from maestro.training.export_checkpoint import (
     export_inference_artifact,
     update_model_registry,
 )
-from gesture_control.training.train_lstm import load_training_config, train_lstm
-from gesture_control.utils.config_loader import load_runtime_config
-from gesture_control.utils.feature_validation import validate_dataset_compatibility
+from maestro.training.train_lstm import load_training_config, train_lstm
+from maestro.utils.config_loader import load_runtime_config
+from maestro.utils.feature_validation import validate_dataset_compatibility
 
 
 def _resolve_device(device_name: str) -> torch.device:

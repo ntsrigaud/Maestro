@@ -23,7 +23,7 @@ Semantic-HGR-System/
 │   │   └── feature_pipeline.yaml     # Feature normalization toggles
 │   └── thresholds/
 │       └── production_ipn.yaml       # Per-class confidence thresholds and vote windows
-├── src/gesture_control/              # Main application package
+├── src/maestro/              # Main application package
 │   ├── app/                          # Application layer
 │   ├── domain/                       # Domain entities and interfaces
 │   ├── interfaces/                   # Protocol definitions
@@ -62,7 +62,7 @@ Semantic-HGR-System/
 
 ## 3. Package Decomposition
 
-### 3.1 `src/gesture_control/domain/`
+### 3.1 `src/maestro/domain/`
 
 **Purpose**: Pure business concepts with no external dependencies.
 
@@ -75,7 +75,7 @@ Semantic-HGR-System/
 
 **Dependency rule**: This package imports only from the Python standard library. No other package in the system may be imported here.
 
-### 3.2 `src/gesture_control/interfaces/`
+### 3.2 `src/maestro/interfaces/`
 
 **Purpose**: Protocol definitions for all pipeline services.
 
@@ -94,7 +94,7 @@ Semantic-HGR-System/
 
 **Dependency rule**: Imports only domain entities. Uses `typing.Protocol` for structural subtyping.
 
-### 3.3 `src/gesture_control/infrastructure/`
+### 3.3 `src/maestro/infrastructure/`
 
 **Purpose**: Concrete implementations wrapping external libraries.
 
@@ -112,7 +112,7 @@ Semantic-HGR-System/
 
 **Dependency rule**: May import domain entities, interfaces, and external libraries. Must not import from pipeline, training, or app packages.
 
-### 3.4 `src/gesture_control/pipeline/`
+### 3.4 `src/maestro/pipeline/`
 
 **Purpose**: Stateful inference pipeline components.
 
@@ -125,7 +125,7 @@ Semantic-HGR-System/
 
 **Dependency rule**: May import domain entities and interfaces. Must not import from infrastructure or app packages. The `LandmarkFeatureTransformer` and `SlidingWindowSequenceBuffer` are shared with the training package to enforce feature parity.
 
-### 3.5 `src/gesture_control/training/`
+### 3.5 `src/maestro/training/`
 
 **Purpose**: Offline dataset construction, model training, evaluation, and export.
 
@@ -141,7 +141,7 @@ Semantic-HGR-System/
 
 **Dependency rule**: Imports pipeline components (`LandmarkFeatureTransformer`, `SlidingWindowSequenceBuffer`) for training–inference parity. Imports PyTorch and scikit-learn. Not imported by the runtime inference path.
 
-### 3.6 `src/gesture_control/app/`
+### 3.6 `src/maestro/app/`
 
 **Purpose**: Application entry points and dependency wiring.
 
@@ -153,7 +153,7 @@ Semantic-HGR-System/
 
 **Dependency rule**: May import from all other packages. This is the only package that performs concrete instantiation.
 
-#### 3.6.1 `src/gesture_control/app/ui/`
+#### 3.6.1 `src/maestro/app/ui/`
 
 **Purpose**: PySide6 graphical control surface for runtime lifecycle, configuration editing, and state observation.
 
@@ -171,7 +171,7 @@ Semantic-HGR-System/
 
 See [ui-view.md](ui-view.md) for the complete UI architecture documentation.
 
-### 3.7 `src/gesture_control/utils/`
+### 3.7 `src/maestro/utils/`
 
 **Purpose**: Shared utilities used across training and inference.
 
@@ -183,7 +183,7 @@ See [ui-view.md](ui-view.md) for the complete UI architecture documentation.
 | `time_utils.py`         | Timestamp utilities                                                                        |
 | `reproducibility.py`    | Random seed management for NumPy, PyTorch, and Python `random`                             |
 
-### 3.8 `src/gesture_control/evaluation/`
+### 3.8 `src/maestro/evaluation/`
 
 **Purpose**: Runtime performance measurement.
 

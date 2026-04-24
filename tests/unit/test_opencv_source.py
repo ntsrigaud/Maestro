@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from gesture_control.domain.entities import FramePacket
-from gesture_control.infrastructure.camera.opencv_source import OpenCVFrameSource
+from maestro.domain.entities import FramePacket
+from maestro.infrastructure.camera.opencv_source import OpenCVFrameSource
 
 
 def _mock_capture_with_frame(width: int = 1280, height: int = 720) -> MagicMock:
@@ -16,7 +16,7 @@ def _mock_capture_with_frame(width: int = 1280, height: int = 720) -> MagicMock:
     return capture
 
 
-@patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
+@patch("maestro.infrastructure.camera.opencv_source.cv2.VideoCapture")
 def test_init_raises_when_camera_unavailable(mock_capture_cls: MagicMock) -> None:
     capture = MagicMock()
     capture.isOpened.return_value = False
@@ -26,7 +26,7 @@ def test_init_raises_when_camera_unavailable(mock_capture_cls: MagicMock) -> Non
         OpenCVFrameSource(camera_index=9)
 
 
-@patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
+@patch("maestro.infrastructure.camera.opencv_source.cv2.VideoCapture")
 def test_read_returns_frame_packet(mock_capture_cls: MagicMock) -> None:
     mock_capture_cls.return_value = _mock_capture_with_frame()
     source = OpenCVFrameSource(target_fps=30)
@@ -39,7 +39,7 @@ def test_read_returns_frame_packet(mock_capture_cls: MagicMock) -> None:
     assert packet.timestamp_ms > 0
 
 
-@patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
+@patch("maestro.infrastructure.camera.opencv_source.cv2.VideoCapture")
 def test_frame_id_increments(mock_capture_cls: MagicMock) -> None:
     mock_capture_cls.return_value = _mock_capture_with_frame()
     source = OpenCVFrameSource(target_fps=30)
@@ -51,7 +51,7 @@ def test_frame_id_increments(mock_capture_cls: MagicMock) -> None:
     assert second.frame_id == 1
 
 
-@patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
+@patch("maestro.infrastructure.camera.opencv_source.cv2.VideoCapture")
 def test_read_raises_when_capture_fails(mock_capture_cls: MagicMock) -> None:
     capture = MagicMock()
     capture.isOpened.return_value = True
@@ -63,7 +63,7 @@ def test_read_raises_when_capture_fails(mock_capture_cls: MagicMock) -> None:
         source.read()
 
 
-@patch("gesture_control.infrastructure.camera.opencv_source.cv2.VideoCapture")
+@patch("maestro.infrastructure.camera.opencv_source.cv2.VideoCapture")
 def test_close_releases_camera(mock_capture_cls: MagicMock) -> None:
     capture = _mock_capture_with_frame()
     mock_capture_cls.return_value = capture

@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-The Gesture Control System is a real-time gesture control application that enables hands-free presentation control. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with a two-stream LSTM neural network, and dispatches operating-system-level keyboard commands for slide navigation, scrolling, zoom, and presentation start/stop.
+Maestro is a real-time gesture recognition system that enables hands-free presentation control. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with a two-stream LSTM neural network, and dispatches operating-system-level keyboard commands for slide navigation, scrolling, zoom, and presentation start/stop.
 
 The architecture follows a modular, protocol-driven design with strict separation between domain logic, infrastructure adapters, and pipeline orchestration. All runtime parameters are externalized to YAML configuration files. The system is CPU-first and operates at interactive frame rates on consumer hardware.
 
@@ -133,7 +133,7 @@ The offline training pipeline converts labeled video data into a trained LSTM ch
 
 1. **Data Collection**: The IPN Hand dataset (200 videos, 8 classes) is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks from IPN video files and produces NPZ sequence datasets.
 2. **Model Training**: `scripts/train_model.py` trains a `TwoStreamGestureLSTM` — a two-stream, 2-layer LSTM with independent Bahdanau attention per stream, class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
-3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/gesture-control-lstm`). At runtime the artifact is downloaded on first use and served from the local Hugging Face cache.
+3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/maestro-lstm`). At runtime the artifact is downloaded on first use and served from the local Hugging Face cache.
 
 ---
 

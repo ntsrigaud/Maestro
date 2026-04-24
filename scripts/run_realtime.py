@@ -1,4 +1,4 @@
-from gesture_control.app.main import main
+from maestro.app.main import main
 
 if __name__ == "__main__":
     main()
