@@ -34,7 +34,7 @@ The system is organized into four layers:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Application Layer                    │
-│         (Bootstrap, Runtime Loop, CLI Scripts)          │
+│  (Bootstrap, Runtime Loop, CLI Scripts, PySide6 UI)     │
 ├─────────────────────────────────────────────────────────┤
 │                    Pipeline Layer                       │
 │  (Feature Engineering, Buffering, Stabilization,        │
@@ -55,7 +55,7 @@ The system is organized into four layers:
 
 **Pipeline Layer**: Stateful processing components that transform data between pipeline stages. Includes feature normalization, temporal windowing, prediction smoothing, and the activation state machine.
 
-**Application Layer**: Composition root (`bootstrap.py`) wires all dependencies from configuration. The runtime loop (`runtime.py`) orchestrates the sequential frame processing pipeline.
+**Application Layer**: Composition root (`bootstrap.py`) wires all dependencies from configuration. The runtime loop (`runtime.py`) orchestrates the sequential frame processing pipeline. The **PySide6 graphical interface** (`app/ui/`) provides start/stop control, live telemetry monitoring, configuration editing, and model selection without modifying the inference pipeline. Two launch modes are supported: `scripts/run_ui.py` (graphical) and `scripts/run_realtime.py` (CLI-only).
 
 ## 5. End-to-End Pipeline Summary
 
@@ -123,6 +123,7 @@ Nine `Protocol` interfaces define service contracts. Implementations can be swap
 | OS Keyboard Control     | pyautogui         | ≥0.9.54                                                                |
 | Config Validation       | Pydantic          | ≥2.6.0                                                                 |
 | Array Operations        | NumPy             | ≥1.26.0                                                                |
+| Graphical Interface     | PySide6 (Qt6)     | ≥6.5.0 (`[dev]` optional extra; not required for CLI inference)        |
 | Model Hosting           | Hugging Face Hub  | ≥0.22.0 (optional `[huggingface]` extra; required for default backend) |
 | ML Metrics (training)   | scikit-learn      | ≥1.5.0 (optional `[training]` extra)                                   |
 
