@@ -288,7 +288,46 @@ The keyboard adapter invokes `pyautogui.hotkey(*keys)` with the validated key na
 | `start_stop_presentation` | `("command", "enter")` macOS / `("f5",)` Win/Linux           |
 | `no_action`               | _(no keystroke; returns `success=False`)_                    |
 
-## 4. Data Volume Summary
+## 4. UI State Delivery
+
+`RuntimeState` is produced at the end of every frame iteration and is the exclusive data
+contract between the inference loop and the UI layer. It is not a pipeline stage — it is
+assembled from existing pipeline state variables and passed to an optional callback.
+
+### Production
+
+After every frame (whether or not a command was dispatched), `Runtime.run()` assembles a
+`RuntimeState` and calls `self._on_state(state)` if the callback is not `None`. The callback is
+provided by `_RuntimeThread._handle_state()` in the UI path.
+
+### Throttling
+
+`_RuntimeThread._handle_state()` increments a private frame counter and emits the
+`state_ready` Qt signal only every `emit_every` frames (default 3). At 30 FPS, this caps UI
+signal traffic at approximately 10 Hz. The counter is private to the worker thread; no
+synchronization is required.
+
+### Cross-Thread Delivery
+
+Qt's queued signal connection delivers each emitted `RuntimeState` from the worker thread to
+the main (Qt event loop) thread via Qt's event queue. The `RuntimeState` frozen dataclass is
+safe to pass across thread boundaries without copying or locking.
+
+### Consumers
+
+| Consumer            | Connected Signal                  | Fields Read                                                 |
+| ------------------- | --------------------------------- | ----------------------------------------------------------- |
+| `StatusMonitor`     | `RuntimeController.state_updated` | All fields                                                  |
+| `MainWindow` (tray) | `RuntimeController.state_updated` | `gaze_permitted`, `info["accepted"]`, `last_label`          |
+| `MainWindow` (log)  | `RuntimeController.state_updated` | `mode`, `info["accepted"]`, `last_label`, `last_confidence` |
+
+### CLI Path
+
+When the system is launched via `scripts/run_realtime.py`, `on_state` is `None`. No
+`RuntimeState` objects are emitted to any callback; the inference loop is completely unmodified
+from its pre-UI implementation.
+
+## 5. Data Volume Summary
 
 | Pipeline Point  | Data Size                      | Frequency             |
 | --------------- | ------------------------------ | --------------------- |
