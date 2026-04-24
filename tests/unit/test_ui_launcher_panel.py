@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 
-from gesture_control.app.ui.launcher_panel import LauncherPanel
+from maestro.app.ui.launcher_panel import LauncherPanel
 
 
 class TestLauncherPanelStateMachine:

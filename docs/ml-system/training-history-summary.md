@@ -83,4 +83,4 @@ Best epoch: **11** (val loss 0.9955)
 ---
 
 _Exported by system audit cleanup — 2026-04-20. Artifact uploaded to HF Hub as
-`two_stream_lstm_v1_20260420T091839Z_inference.pt` (repo: `ntsrigaud/gesture-control-lstm`)._
+`two_stream_lstm_v1_20260420T091839Z_inference.pt` (repo: `ntsrigaud/maestro-lstm`)._

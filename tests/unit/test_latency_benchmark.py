@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from gesture_control.evaluation.benchmark_latency import (
+from maestro.evaluation.benchmark_latency import (
     LatencyBenchmark,
     write_latency_report,
 )

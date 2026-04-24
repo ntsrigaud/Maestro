@@ -2,7 +2,7 @@
 #
 # Artifacts are loaded exclusively from Hugging Face Hub (cached after first use).
 backend: huggingface
-repo_id: ntsrigaud/gesture-control-lstm
+repo_id: ntsrigaud/maestro-lstm
 revision: main
 filename: two_stream_lstm_v1_20260420T091839Z_inference.pt
 cache_dir: null # null = HF default (~/.cache/huggingface/hub)

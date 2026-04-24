@@ -18,7 +18,7 @@ graph TB
 
         subgraph SW ["Software Environment"]
             Python["Python 3.11 Runtime"]
-            subgraph App ["Gesture Control Application"]
+            subgraph App ["Maestro Application"]
                 GUI["PySide6 Control Panel<br/>(GUI mode only)"]
                 Capture["Frame Capture<br/>(OpenCV)"]
                 MP["Landmark Extraction<br/>(MediaPipe)"]
@@ -141,7 +141,7 @@ The system reads from and writes to the local file system:
 | `experiments/runs/`         | Write      | Training run logs and metrics                                            |
 | `~/.cache/huggingface/hub/` | Read/Write | Hugging Face Hub download cache (first-use download of production model) |
 
-Trained inference artifacts are **not tracked in VCS**. The production model (`lstm_v1_20260418T023120Z_inference.pt`) is hosted on the Hugging Face Hub (`ntsrigaud/gesture-control-lstm`) and downloaded on first use by `hf_hub_download()`. The backend is controlled by `configs/model_source.yaml`.
+Trained inference artifacts are **not tracked in VCS**. The production model (`lstm_v1_20260418T023120Z_inference.pt`) is hosted on the Hugging Face Hub (`ntsrigaud/maestro-lstm`) and downloaded on first use by `hf_hub_download()`. The backend is controlled by `configs/model_source.yaml`.
 
 ## 7. Deployment Procedure
 

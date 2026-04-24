@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from gesture_control.domain.entities import FramePacket, RuntimeState
-from gesture_control.infrastructure.feedback.overlay_renderer import OverlayRenderer
+from maestro.domain.entities import FramePacket, RuntimeState
+from maestro.infrastructure.feedback.overlay_renderer import OverlayRenderer
 
 
 def _make_frame(width: int = 100, height: int = 100) -> FramePacket:

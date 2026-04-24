@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gesture_control.training.augmentation import AugmentationConfig
-from gesture_control.training.datamodule import DataSplitConfig, GestureDataModule
+from maestro.training.augmentation import AugmentationConfig
+from maestro.training.datamodule import DataSplitConfig, GestureDataModule
 
 pytestmark = pytest.mark.training
 

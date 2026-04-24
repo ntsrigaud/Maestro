@@ -25,20 +25,20 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from gesture_control.domain.entities import FramePacket
-from gesture_control.infrastructure.gaze.head_pose_detector import HeadPoseGazeDetector
-from gesture_control.infrastructure.gaze.null_detector import NullGazeDetector
-from gesture_control.utils.schema_validation import GazeConfig
+from maestro.domain.entities import FramePacket
+from maestro.infrastructure.gaze.head_pose_detector import HeadPoseGazeDetector
+from maestro.infrastructure.gaze.null_detector import NullGazeDetector
+from maestro.utils.schema_validation import GazeConfig
 
 # ---------------------------------------------------------------------------
 # Patch targets
 # ---------------------------------------------------------------------------
 
 _MP_FACE_DETECTION = (
-    "gesture_control.infrastructure.gaze.head_pose_detector"
+    "maestro.infrastructure.gaze.head_pose_detector"
     ".mp.solutions.face_detection.FaceDetection"
 )
-_MONOTONIC = "gesture_control.infrastructure.gaze.head_pose_detector.time.monotonic"
+_MONOTONIC = "maestro.infrastructure.gaze.head_pose_detector.time.monotonic"
 
 # ---------------------------------------------------------------------------
 # Shared test data

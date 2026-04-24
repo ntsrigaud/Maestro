@@ -9,14 +9,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gesture_control.training.dataset_builder import SequenceDatasetBuilder
-from gesture_control.utils.feature_validation import (
+from maestro.training.dataset_builder import SequenceDatasetBuilder
+from maestro.utils.feature_validation import (
     FeatureSchemaError,
     load_dataset_metadata,
     validate_dataset_compatibility,
     validate_feature_schema_parity,
 )
-from gesture_control.utils.schema_validation import FeaturePipelineConfig
+from maestro.utils.schema_validation import FeaturePipelineConfig
 
 
 class TestFeatureSchemaValidation:
@@ -235,7 +235,7 @@ class TestTrainingInferenceParity:
 
     def test_dataset_builder_stores_correct_metadata(self):
         """SequenceDatasetBuilder should store feature config in metadata."""
-        from gesture_control.training.dataset_builder import LabeledLandmarkFrame
+        from maestro.training.dataset_builder import LabeledLandmarkFrame
 
         builder = SequenceDatasetBuilder(
             vocabulary=["gesture_a"],

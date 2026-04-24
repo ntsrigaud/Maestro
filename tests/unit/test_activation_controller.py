@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from gesture_control.domain.entities import StabilizedPrediction
-from gesture_control.domain.enums import RuntimeMode
-from gesture_control.pipeline.activation import GestureActivationController
+from maestro.domain.entities import StabilizedPrediction
+from maestro.domain.enums import RuntimeMode
+from maestro.pipeline.activation import GestureActivationController
 
 
 def _pred(

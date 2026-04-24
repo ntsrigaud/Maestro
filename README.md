@@ -1,6 +1,6 @@
-# Presentation Control System
+# Maestro
 
-Production-grade webcam-based gesture control system using MediaPipe Hands and an LSTM classifier for presentation control workflows.
+Production-grade webcam-based gesture recognition system for hands-free presentation control, powered by MediaPipe Hands and a two-stream LSTM classifier.
 
 ## System Overview
 
@@ -52,7 +52,7 @@ pip install -e ".[huggingface]"
 python scripts/run_realtime.py --config configs
 ```
 
-The default configuration (`configs/model_source.yaml`) loads the production model from [Hugging Face Hub](https://huggingface.co/ntsrigaud/gesture-control-lstm) on first run. The artifact is cached locally by `huggingface_hub` and requires no re-download on subsequent runs.
+The default configuration (`configs/model_source.yaml`) loads the production model from [Hugging Face Hub](https://huggingface.co/ntsrigaud/maestro-lstm) on first run. The artifact is cached locally by `huggingface_hub` and requires no re-download on subsequent runs.
 
 **Developers** (linting, type-checking, and tests):
 
@@ -104,18 +104,18 @@ See `docs/architecture/` for the full system specification, module contracts, an
 
 Key directories:
 
-| Directory              | Purpose                                                                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/gesture_control/` | Core package (domain, interfaces, infrastructure, pipeline, training, app/ui)                                                              |
-| `configs/`             | YAML configuration (app, inference, model, gestures, thresholds)                                                                           |
-| `scripts/`             | CLI entry points (`run_ui.py`, `run_realtime.py`, data, training)                                                                          |
-| `models/`              | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/gesture-control-lstm) |
-| `tests/`               | Unit, integration, and system tests (269 total)                                                                                            |
-| `docs/`                | Architecture docs, guides, and decision records                                                                                            |
+| Directory      | Purpose                                                                                                                            |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `src/maestro/` | Core package (domain, interfaces, infrastructure, pipeline, training, app/ui)                                                      |
+| `configs/`     | YAML configuration (app, inference, model, gestures, thresholds)                                                                   |
+| `scripts/`     | CLI entry points (`run_ui.py`, `run_realtime.py`, data, training)                                                                  |
+| `models/`      | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/maestro-lstm) |
+| `tests/`       | Unit, integration, and system tests (269 total)                                                                                    |
+| `docs/`        | Architecture docs, guides, and decision records                                                                                    |
 
 ### GUI Architecture
 
-The PySide6 UI (`src/gesture_control/app/ui/`) is a non-blocking control surface:
+The PySide6 UI (`src/maestro/app/ui/`) is a non-blocking control surface:
 
 - `RuntimeController` owns a `QThread` worker that runs `build_container()` and `Runtime.run()`.
 - `Runtime` receives an optional `on_state` callback; the worker thread throttles callback emissions to ~10 Hz and forwards them as Qt signals to the main thread.
@@ -151,13 +151,13 @@ The training pipeline includes group-aware data splitting (no recording leakage)
 
 ## Current System State
 
-| Metric                   | Value                                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| Inference feature schema | `feature-schema-v5` (147-dim)                                                                                 |
-| Production model         | [`ntsrigaud/gesture-control-lstm`](https://huggingface.co/ntsrigaud/gesture-control-lstm) — Macro-F1 **0.96** |
-| Model loading            | Hugging Face Hub (cached, no training required)                                                               |
-| Gaze activation          | `HeadPoseGazeDetector` — sole arming mechanism                                                                |
-| Test suite               | 269 tests, 0 failures                                                                                         |
-| Tracked binary weights   | **0 MB** — all `.pt` artifacts excluded from VCS                                                              |
+| Metric                   | Value                                                                                         |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| Inference feature schema | `feature-schema-v5` (147-dim)                                                                 |
+| Production model         | [`ntsrigaud/maestro-lstm`](https://huggingface.co/ntsrigaud/maestro-lstm) — Macro-F1 **0.96** |
+| Model loading            | Hugging Face Hub (cached, no training required)                                               |
+| Gaze activation          | `HeadPoseGazeDetector` — sole arming mechanism                                                |
+| Test suite               | 269 tests, 0 failures                                                                         |
+| Tracked binary weights   | **0 MB** — all `.pt` artifacts excluded from VCS                                              |
 
 The complete development history is recorded in [docs/architecture/](docs/architecture/) and [docs/archive/work-logs/](docs/archive/work-logs/).

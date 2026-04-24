@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from gesture_control.app.ui.controller import RuntimeController
-from gesture_control.domain.entities import RuntimeState
+from maestro.app.ui.controller import RuntimeController
+from maestro.domain.entities import RuntimeState
 
 # Patch targets — prevent real build_container / Runtime.run from executing
-_PATCH_BUILD = "gesture_control.app.ui.controller.build_container"
-_PATCH_RUNTIME = "gesture_control.app.ui.controller.Runtime"
+_PATCH_BUILD = "maestro.app.ui.controller.build_container"
+_PATCH_RUNTIME = "maestro.app.ui.controller.Runtime"
 
 
 def _stub_container() -> MagicMock:

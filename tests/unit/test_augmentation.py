@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from gesture_control.training.augmentation import (
+from maestro.training.augmentation import (
     _POSITION_DIMS,
     AugmentationConfig,
     GestureAugmenter,
