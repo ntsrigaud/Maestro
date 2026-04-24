@@ -12,6 +12,7 @@ graph TB
         Bootstrap["Bootstrap<br/>(AppContainer)"]
         RuntimeLoop["Runtime Loop"]
         CLI["CLI Scripts"]
+        UI["PySide6 UI<br/>(app/ui/)"]
     end
 
     subgraph Pipeline ["Pipeline Layer"]
@@ -164,6 +165,11 @@ The separation of stabilization from activation ensures that the state machine r
 
 ```mermaid
 graph LR
+    subgraph Control ["Control Subsystem (GUI mode)"]
+        RC[RuntimeController]
+        MW[MainWindow]
+    end
+
     subgraph Perception ["Perception Subsystem"]
         FS[Frame Source]
         LE[Landmark Extractor]
@@ -186,6 +192,8 @@ graph LR
         KB[Keyboard Adapter]
     end
 
+    Control -->|manages lifecycle| Perception
+    Control -.->|observes RuntimeState| Decision
     Perception --> Recognition
     Recognition --> Decision
     Decision --> Execution
@@ -193,8 +201,10 @@ graph LR
 
 Each subsystem can be tested in isolation by providing synthetic inputs at its boundary. The perception subsystem requires hardware mocking; the recognition subsystem operates on numerical arrays; the decision subsystem processes `Prediction` objects; and the execution subsystem validates command routing.
 
+The **Control subsystem** is present only when the system is launched via `scripts/run_ui.py`. It manages the inference lifecycle (start/stop/restart) and observes `RuntimeState` updates via Qt queued signals. In CLI mode (`scripts/run_realtime.py`) the Control subsystem is absent and the process exits on keyboard interrupt.
+
 ---
 
 **Document**: Logical View  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: March 2026
+**Last Updated**: April 2026
