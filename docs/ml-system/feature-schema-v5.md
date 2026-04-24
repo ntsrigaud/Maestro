@@ -100,7 +100,7 @@ The `TwoStreamGestureLSTM` (`configs/model/two_stream_lstm.yaml`) partitions the
 
 **Rationale.** In the single-stream baseline, the 6 directional dims (`wrist_traj[68:71]` and `wrist_vel_raw[144:147]`) compete for gradient weight with the 141 remaining dims inside every LSTM timestep. Bahdanau attention resolves temporal competition (which timesteps matter) but cannot resolve within-timestep feature competition (which feature dims matter). Stream B gives the critical motion signals a fully independent pathway, eliminating this competition and raising the effective capacity dedicated to swipe direction discrimination from ~4% to ~50% of total model capacity.
 
-**Implementation** (`src/gesture_control/infrastructure/model/two_stream_lstm.py`):
+**Implementation** (`src/maestro/infrastructure/model/two_stream_lstm.py`):
 
 ```python
 pose   = torch.cat([x[..., :63],  x[..., 134:144]], dim=-1)  # (B, T, 73)

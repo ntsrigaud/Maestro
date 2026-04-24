@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from gesture_control.domain.entities import FeatureFrame
-from gesture_control.pipeline.buffering import SlidingWindowSequenceBuffer
+from maestro.domain.entities import FeatureFrame
+from maestro.pipeline.buffering import SlidingWindowSequenceBuffer
 
 
 def _feature(index: int, *, valid: bool = True) -> FeatureFrame:

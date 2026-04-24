@@ -4,12 +4,12 @@ from pathlib import Path
 
 import torch
 
-from gesture_control.infrastructure.model.checkpoint_loader import (
+from maestro.infrastructure.model.checkpoint_loader import (
     load_inference_artifact,
     validate_runtime_compatibility,
 )
-from gesture_control.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
-from gesture_control.utils.schema_validation import RuntimeConfig
+from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+from maestro.utils.schema_validation import RuntimeConfig
 
 
 def _write_artifact(path: Path) -> None:

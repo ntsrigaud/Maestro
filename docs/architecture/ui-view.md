@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-The UI layer provides a graphical control surface for the Gesture Control System. Its
+The UI layer provides a graphical control surface for Maestro. Its
 responsibilities are confined to three concerns:
 
 - **Lifecycle management**: starting and stopping the inference runtime.
@@ -107,7 +107,7 @@ graph TD
 ### 2.3 Package Structure
 
 ```
-src/gesture_control/app/
+src/maestro/app/
 ├── bootstrap.py          # Unchanged — composition root
 ├── runtime.py            # Minimal change: on_state optional callback
 ├── main.py               # Unchanged — CLI entry point
