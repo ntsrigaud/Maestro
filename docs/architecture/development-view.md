@@ -148,10 +148,28 @@ Semantic-HGR-System/
 | Module         | Key Components                      | Responsibility                                                            |
 | -------------- | ----------------------------------- | ------------------------------------------------------------------------- |
 | `bootstrap.py` | `AppContainer`, `build_container()` | Composition root; reads configs, loads model, instantiates all components |
-| `runtime.py`   | `Runtime`                           | Main event loop; sequential frame processing and display                  |
-| `main.py`      | `main()`, `parse_args()`            | CLI argument parsing and runtime launch                                   |
+| `runtime.py`   | `Runtime`                           | Main event loop; sequential frame processing and optional UI callback     |
+| `main.py`      | `main()`, `parse_args()`            | CLI argument parsing and runtime launch (no PySide6 dependency)           |
 
 **Dependency rule**: May import from all other packages. This is the only package that performs concrete instantiation.
+
+#### 3.6.1 `src/gesture_control/app/ui/`
+
+**Purpose**: PySide6 graphical control surface for runtime lifecycle, configuration editing, and state observation.
+
+| Module              | Key Components                        | Responsibility                                                           |
+| ------------------- | ------------------------------------- | ------------------------------------------------------------------------ |
+| `app_ui.py`         | `run_ui()`                            | `QApplication` bootstrap; UI entry point called from `scripts/run_ui.py` |
+| `controller.py`     | `RuntimeController`, `_RuntimeThread` | Worker `QThread` wrapper; bridges `Runtime` lifecycle to Qt signals      |
+| `main_window.py`    | `MainWindow`                          | Root window; owns controller; wires signals between all panels           |
+| `launcher_panel.py` | `LauncherPanel`                       | Start/Stop button, status pill, preview-window checkbox                  |
+| `status_monitor.py` | `StatusMonitor`                       | Per-frame telemetry display driven entirely by `state_updated` signal    |
+| `config_panel.py`   | `ConfigPanel`                         | Pydantic-driven form editor; atomic YAML write on Apply & Restart        |
+| `model_panel.py`    | `ModelPanel`                          | Hugging Face / Local model source selector                               |
+
+**Dependency rule**: `app/ui/` may import from `app/` (bootstrap, runtime), `domain/`, and `utils/`. No file outside `app/ui/` imports from `app/ui/`. `app/runtime.py` and `app/main.py` contain no PySide6 imports — the inference CLI path is fully isolated from the UI layer.
+
+See [ui-view.md](ui-view.md) for the complete UI architecture documentation.
 
 ### 3.7 `src/gesture_control/utils/`
 
@@ -182,7 +200,9 @@ graph TD
     App --> Utils["utils/"]
     App --> Domain["domain/"]
     App --> Interfaces["interfaces/"]
-
+    UI["app/ui/"] --> App
+    UI --> Domain
+    UI --> Utils
     Pipeline --> Domain
     Pipeline --> Interfaces
 
@@ -221,19 +241,20 @@ All configuration is validated at startup via Pydantic schemas. Invalid configur
 
 ## 6. Script Entry Points
 
-| Script                         | Purpose                              | Primary Dependencies                   |
-| ------------------------------ | ------------------------------------ | -------------------------------------- |
-| `scripts/run_realtime.py`      | Launch real-time gesture recognition | `app/`, `pipeline/`, `infrastructure/` |
-| `scripts/train_model.py`       | Train LSTM from NPZ dataset          | `training/`, `utils/`                  |
-| `scripts/build_ipn_dataset.py` | Convert IPN Hand dataset to NPZ      | `training/`, `pipeline/`               |
-| `scripts/benchmark_system.py`  | Latency profiling                    | `evaluation/`                          |
+| Script                         | Purpose                                         | Primary Dependencies                   |
+| ------------------------------ | ----------------------------------------------- | -------------------------------------- |
+| `scripts/run_ui.py`            | Launch PySide6 GUI (control panel + monitoring) | `app/ui/`, `app/`, `domain/`           |
+| `scripts/run_realtime.py`      | Launch CLI-only real-time gesture recognition   | `app/`, `pipeline/`, `infrastructure/` |
+| `scripts/train_model.py`       | Train LSTM from NPZ dataset                     | `training/`, `utils/`                  |
+| `scripts/build_ipn_dataset.py` | Convert IPN Hand dataset to NPZ                 | `training/`, `pipeline/`               |
+| `scripts/benchmark_system.py`  | Latency profiling                               | `evaluation/`                          |
 
 ## 7. Testing Organization
 
 ```
 tests/
-├── conftest.py                              # Shared fixtures
-├── unit/                                    # 17 test modules
+├── conftest.py                              # Shared fixtures; skips test_ui_* when PySide6 absent
+├── unit/                                    # 24 test modules
 │   ├── test_opencv_source.py
 │   ├── test_mediapipe_extractor.py
 │   ├── test_feature_engineering.py
@@ -252,7 +273,14 @@ tests/
 │   ├── test_overlay_renderer.py
 │   ├── test_runtime.py
 │   ├── test_hf_loader.py
-│   └── test_head_pose_gaze_detector.py
+│   ├── test_head_pose_gaze_detector.py
+│   ├── test_ui_runtime_on_state.py          # UI: on_state callback integration
+│   ├── test_ui_runtime_controller.py        # UI: RuntimeController signals + lifecycle
+│   ├── test_ui_launcher_panel.py            # UI: LauncherPanel state machine
+│   ├── test_ui_status_monitor.py            # UI: StatusMonitor field rendering
+│   ├── test_ui_config_panel.py              # UI: form validation, atomic write
+│   ├── test_ui_model_panel.py               # UI: HF / Local tab switching
+│   └── test_ui_tray.py                      # UI: system tray + show_window checkbox
 ├── integration/                             # 5 test modules
 │   ├── test_phase2_pipeline.py
 │   ├── test_phase3_feature_pipeline.py
@@ -263,7 +291,7 @@ tests/
 └── fixtures/                                # Test data and configs
 ```
 
-**Testing strategy**: Unit tests mock external dependencies (OpenCV, MediaPipe, pyautogui). Integration tests exercise multi-component pipelines with synthetic data. All tests run without GPU, camera hardware, or display server.
+**Testing strategy**: Unit tests mock external dependencies (OpenCV, MediaPipe, pyautogui). Integration tests exercise multi-component pipelines with synthetic data. UI tests (`test_ui_*`) require PySide6 and `pytest-qt`; `conftest.py` skips them automatically when PySide6 is absent. All tests run without GPU or camera hardware.
 
 ---
 
