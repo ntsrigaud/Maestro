@@ -13,18 +13,18 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from gesture_control.domain.entities import ExecutableCommand, StabilizedPrediction
-from gesture_control.domain.enums import RuntimeMode
-from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
+from maestro.domain.entities import ExecutableCommand, StabilizedPrediction
+from maestro.domain.enums import RuntimeMode
+from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
 )
-from gesture_control.infrastructure.dispatch.app_adapters.presentation_adapter import (
+from maestro.infrastructure.dispatch.app_adapters.presentation_adapter import (
     PresentationAdapter,
 )
-from gesture_control.infrastructure.dispatch.command_dispatcher import (
+from maestro.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
-from gesture_control.pipeline.activation import GestureActivationController
+from maestro.pipeline.activation import GestureActivationController
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -193,7 +193,7 @@ class TestGestureDispatchPipeline:
             rate_limit_window_ms=1000,
         )
         self._patcher = patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         )
         self.mock_pya = self._patcher.start()
 
@@ -265,7 +265,7 @@ class TestGestureDispatchPipeline:
     def test_allowlist_blocks_unknown_command_id(self):
         """Even if a command somehow bypasses the activation controller,
         the dispatcher allowlist is the last line of defense."""
-        from gesture_control.domain.entities import ExecutableCommand
+        from maestro.domain.entities import ExecutableCommand
 
         bad_cmd = ExecutableCommand(
             command_id="delete_everything",
@@ -307,11 +307,11 @@ class TestIntegrationRateLimiting:
             rate_limit_window_ms=5_000,
         )
 
-        from gesture_control.domain.entities import ExecutableCommand
+        from maestro.domain.entities import ExecutableCommand
 
         results = []
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ):
             for i in range(5):
                 cmd = ExecutableCommand(
@@ -503,7 +503,7 @@ class TestEdgeTriggerSingleDispatch:
 
         dispatched = []
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             t = _ACTIVATION_HOLD_MS + 50
             for pred in prediction_stream:
@@ -643,7 +643,7 @@ class TestGazeGateIntegration:
             rate_limit_window_ms=1000,
         )
         self._patcher = patch(
-            "gesture_control.infrastructure.dispatch.app_adapters"
+            "maestro.infrastructure.dispatch.app_adapters"
             ".keyboard_adapter.pyautogui"
         )
         self.mock_pya = self._patcher.start()
@@ -661,8 +661,8 @@ class TestGazeGateIntegration:
     def test_null_detector_update_always_permits_gaze(self) -> None:
         """NullGazeDetector.update() must return True on every call, preserving
         the pre-gaze pipeline baseline with zero behavioural change."""
-        from gesture_control.domain.entities import FramePacket
-        from gesture_control.infrastructure.gaze.null_detector import NullGazeDetector
+        from maestro.domain.entities import FramePacket
+        from maestro.infrastructure.gaze.null_detector import NullGazeDetector
 
         null_det = NullGazeDetector()
         frame = FramePacket(

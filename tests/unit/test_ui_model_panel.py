@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from gesture_control.app.ui.model_panel import ModelPanel
-from gesture_control.utils.schema_validation import ModelSourceConfig
+from maestro.app.ui.model_panel import ModelPanel
+from maestro.utils.schema_validation import ModelSourceConfig
 
 
 class TestModelPanel:

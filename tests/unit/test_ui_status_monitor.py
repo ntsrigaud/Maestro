@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from gesture_control.app.ui.status_monitor import StatusMonitor
-from gesture_control.domain.entities import RuntimeState
+from maestro.app.ui.status_monitor import StatusMonitor
+from maestro.domain.entities import RuntimeState
 
 
 class TestStatusMonitorUpdates:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import yaml
 
-from gesture_control.app.ui.config_panel import ConfigPanel
+from maestro.app.ui.config_panel import ConfigPanel
 
 
 class TestConfigPanelValidation:
@@ -41,7 +41,7 @@ class TestConfigPanelValidation:
         assert panel.current_config() is None
 
     def test_safe_write_is_atomic(self, tmp_path) -> None:
-        from gesture_control.app.ui.config_panel import _safe_write
+        from maestro.app.ui.config_panel import _safe_write
 
         target = tmp_path / "test.yaml"
         _safe_write(target, {"key": "value"})
