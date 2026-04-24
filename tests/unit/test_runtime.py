@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from gesture_control.app.runtime import Runtime
+from maestro.app.runtime import Runtime
 
 
 def _container_with_runtime_error() -> SimpleNamespace:

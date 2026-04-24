@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 
-from gesture_control.domain.entities import LandmarkPacket
-from gesture_control.pipeline.feature_engineering import LandmarkFeatureTransformer
+from maestro.domain.entities import LandmarkPacket
+from maestro.pipeline.feature_engineering import LandmarkFeatureTransformer
 
 
 def _landmark_packet(

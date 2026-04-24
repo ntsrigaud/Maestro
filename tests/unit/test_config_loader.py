@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gesture_control.utils.config_loader import load_runtime_config
+from maestro.utils.config_loader import load_runtime_config
 
 
 def test_load_runtime_config(config_dir: Path) -> None:

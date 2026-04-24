@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from gesture_control.domain.entities import Prediction
-from gesture_control.pipeline.stabilization import PredictionStabilizer
+from maestro.domain.entities import Prediction
+from maestro.pipeline.stabilization import PredictionStabilizer
 
 
 def test_prediction_stabilizer_rejects_low_confidence() -> None:
