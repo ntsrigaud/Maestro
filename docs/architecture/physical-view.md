@@ -26,7 +26,7 @@ graph TB
                 Dispatch["Command Dispatch<br/>(pyautogui)"]
                 Overlay["Visual Feedback<br/>(OpenCV)"]
             end
-            TargetApp["Target Application<br/>(PowerPoint / Zoom)"]
+            TargetApp["Target Application<br/>(Presentation Software)"]
         end
     end
 

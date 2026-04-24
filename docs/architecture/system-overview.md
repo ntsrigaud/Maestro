@@ -75,7 +75,7 @@ graph LR
 ```
 
 1. **Frame Capture**: OpenCV reads a BGR frame from the webcam at 30 FPS (1280×720).
-2. **Gaze Estimation**: MediaPipe Face Mesh estimates head pose from facial landmarks. If the user's gaze is not directed toward the camera, all downstream gesture processing is bypassed for that frame.
+2. **Gaze Estimation**: MediaPipe BlazeFace face detection estimates head pose from 6 face keypoints. If the user's gaze is not directed toward the camera, all downstream gesture processing is bypassed for that frame.
 3. **Landmark Extraction**: MediaPipe Hands detects 21 hand landmarks with confidence filtering.
 4. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity, joint angles, fingertip spread, and wrist trajectory features to produce a 147-dimensional feature vector (feature-schema-v5).
 5. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
