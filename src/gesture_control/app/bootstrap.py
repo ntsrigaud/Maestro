@@ -66,7 +66,7 @@ def build_container(
     *,
     model_artifact_path: str | None = None,
     hf_revision_override: str | None = None,
-    show_window: bool = True,
+    show_window: bool = False,
 ) -> AppContainer:
     config_root = Path(config_path)
     config = load_runtime_config(config_root)

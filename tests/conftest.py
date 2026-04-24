@@ -22,10 +22,18 @@ try:
 except (ModuleNotFoundError, ValueError):
     _sklearn_present = False
 
+try:
+    _pyside6_present = importlib.util.find_spec("PySide6") is not None
+except (ModuleNotFoundError, ValueError):
+    _pyside6_present = False
+
 
 def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
-    """Prevent collection of training tests when scikit-learn is absent."""
+    """Prevent collection of training tests when scikit-learn is absent,
+    and UI tests when PySide6 is absent."""
     if not _sklearn_present and "training" in collection_path.name:
+        return True
+    if not _pyside6_present and collection_path.name.startswith("test_ui_"):
         return True
     return None
 

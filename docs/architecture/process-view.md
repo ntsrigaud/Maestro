@@ -2,17 +2,32 @@
 
 ## 1. Overview
 
-The process view describes the runtime behavior of the system, including the real-time frame processing pipeline, concurrency model, state management, and timing characteristics. The system operates as a single-threaded sequential pipeline optimized for deterministic latency on CPU hardware.
+The process view describes the runtime behavior of the system, including the real-time frame processing pipeline, concurrency model, state management, and timing characteristics. The system supports two execution modes: a **single-threaded CLI mode** (`scripts/run_realtime.py`) and a **dual-thread GUI mode** (`scripts/run_ui.py`). In both modes the core inference pipeline is identical; the only difference is lifecycle management and state observation.
 
 ## 2. Threading Model
 
-The system uses a **single-threaded execution model**. All pipeline stages execute sequentially within the main thread of the `Runtime.run()` event loop. This design choice is deliberate:
+### 2.1 CLI Mode — Single-Threaded Execution
+
+When launched via `scripts/run_realtime.py`, the system uses a **single-threaded execution model**. All pipeline stages execute sequentially within the main thread of the `Runtime.run()` event loop. This design choice is deliberate:
 
 - **Determinism**: Sequential execution eliminates race conditions in stateful components (feature transformer velocity history, sliding window buffer, prediction stabilizer EMA state, activation controller state machine).
 - **Simplicity**: No synchronization primitives, thread pools, or message queues are required.
 - **Sufficient throughput**: The combined pipeline latency (~60–80 ms) sustains interactive frame rates (12–16 inferences per second) on consumer CPUs, which exceeds the temporal resolution required for gesture recognition.
 
 OpenCV's `VideoCapture.read()` blocks until a frame is available. The frame source enforces target FPS timing through sleep-based throttling, preventing CPU spinning.
+
+### 2.2 GUI Mode — Dual-Thread Execution
+
+When launched via `scripts/run_ui.py`, the system uses a **dual-thread execution model**:
+
+| Thread            | Runs                                         | Responsibility                            |
+| ----------------- | -------------------------------------------- | ----------------------------------------- |
+| **Main thread**   | `QApplication.exec()` (Qt event loop)        | UI rendering, signal dispatch, user input |
+| **Worker thread** | `_RuntimeThread` (QThread) → `Runtime.run()` | Full inference pipeline, unmodified       |
+
+Cross-thread communication uses Qt **queued signal connections** — the only safe mechanism for passing data across thread boundaries in Qt. `_RuntimeThread._handle_state()` is called by `Runtime` every frame via the `on_state` callback. The worker increments a frame counter and emits the `state_ready` Qt signal every `emit_every` frames (default 3), capping UI traffic at approximately 10 Hz at 30 FPS. The queued connection delivers each `RuntimeState` frozen dataclass safely to the main thread via Qt's event queue. No mutex, explicit lock, or shared mutable state is used.
+
+The inference pipeline is **unmodified between modes**: `on_state` is the only addition to `runtime.py`. When `on_state is None` (CLI mode), there is zero overhead.
 
 ## 3. Main Event Loop
 
@@ -36,10 +51,11 @@ graph TD
     HasCmd -->|Yes| Dispatch["9. Dispatch<br/>CommandDispatcher.dispatch()"]
     HasCmd -->|No| Render
     Dispatch --> Render["10. Render Overlay<br/>OverlayRenderer.render()"]
-    Render --> Display["Display Frame<br/>cv2.imshow()"]
+    Render --> Display["Display Frame<br/>cv2.imshow()<br/>(opt-in; GUI default: off)"]
     Display --> KeyCheck{Key Press?}
     KeyCheck -->|Q / ESC| Shutdown([Graceful Shutdown])
-    KeyCheck -->|None| Start
+    KeyCheck -->|None| Callback["on_state callback<br/>(if registered; throttled ~10 Hz)"]
+    Callback --> Start
 ```
 
 ### Iteration Timing
@@ -192,10 +208,11 @@ The training pipeline reuses `LandmarkFeatureTransformer` and `SlidingWindowSequ
 
 ## 8. Graceful Shutdown
 
-The runtime loop supports two shutdown triggers:
+The runtime loop supports three shutdown triggers:
 
-1. **Keyboard interrupt**: Pressing Q or ESC in the display window.
+1. **Keyboard interrupt**: Pressing Q or ESC in the optional preview window (CLI mode; the window is opt-in and disabled by default in GUI mode).
 2. **Frame limit**: Reaching `--max-frames` count (used in testing and benchmarking).
+3. **UI Stop button**: Clicking Stop in the PySide6 control panel calls `RuntimeController.stop()`, which signals `_RuntimeThread` to exit via Qt's interruption mechanism. The inference loop checks for interruption each frame and exits cleanly; `MainWindow` waits up to 3 seconds for the worker thread to join before hiding the system tray icon.
 
 On shutdown, the runtime:
 
