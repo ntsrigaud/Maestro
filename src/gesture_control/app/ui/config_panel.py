@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -98,7 +98,7 @@ class ConfigPanel(QWidget):
     # Private — form construction
     # ------------------------------------------------------------------
 
-    def _build_group(self, title: str, model_cls: type) -> QGroupBox:
+    def _build_group(self, title: str, model_cls: type[BaseModel]) -> QGroupBox:
         box = QGroupBox(title)
         form = QFormLayout(box)
         for name, info in model_cls.model_fields.items():
@@ -114,36 +114,36 @@ class ConfigPanel(QWidget):
         annotation = info.annotation
         # bool must come before int (bool is subclass of int in Python)
         if annotation is bool:
-            w = QCheckBox()
-            w.stateChanged.connect(self._on_any_change)
-            return w
+            check = QCheckBox()
+            check.stateChanged.connect(self._on_any_change)
+            return check
         if annotation is int:
-            w = QSpinBox()
+            spin = QSpinBox()
             ge_val, le_val = _ge(info), _le(info)
-            w.setMinimum(ge_val if ge_val is not None else -999_999)
-            w.setMaximum(le_val if le_val is not None else 999_999)
-            w.valueChanged.connect(self._on_any_change)
-            return w
+            spin.setMinimum(int(ge_val) if ge_val is not None else -999_999)
+            spin.setMaximum(int(le_val) if le_val is not None else 999_999)
+            spin.valueChanged.connect(self._on_any_change)
+            return spin
         if annotation is float:
-            w = QDoubleSpinBox()
+            dspin = QDoubleSpinBox()
             ge_val, le_val = _ge(info), _le(info)
-            w.setMinimum(ge_val if ge_val is not None else -1e9)
-            w.setMaximum(le_val if le_val is not None else 1e9)
-            w.setSingleStep(0.05)
-            w.valueChanged.connect(self._on_any_change)
-            return w
+            dspin.setMinimum(ge_val if ge_val is not None else -1e9)
+            dspin.setMaximum(le_val if le_val is not None else 1e9)
+            dspin.setSingleStep(0.05)
+            dspin.valueChanged.connect(self._on_any_change)
+            return dspin
         if annotation is str:
-            w = QLineEdit()
-            w.textChanged.connect(self._on_any_change)
-            return w
+            edit = QLineEdit()
+            edit.textChanged.connect(self._on_any_change)
+            return edit
         # Literal — use QComboBox with literal choices
         if typing.get_origin(annotation) is typing.Literal:
             choices = annotation.__args__
-            w = QComboBox()
+            combo = QComboBox()
             for c in choices:
-                w.addItem(str(c))
-            w.currentIndexChanged.connect(self._on_any_change)
-            return w
+                combo.addItem(str(c))
+            combo.currentIndexChanged.connect(self._on_any_change)
+            return combo
         return None  # unsupported / nested type; skip field
 
     # ------------------------------------------------------------------
