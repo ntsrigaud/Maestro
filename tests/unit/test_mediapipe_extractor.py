@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from gesture_control.domain.entities import FramePacket, LandmarkPacket
-from gesture_control.infrastructure.mediapipe.hands_extractor import (
+from maestro.domain.entities import FramePacket, LandmarkPacket
+from maestro.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
 )
 
@@ -25,7 +25,7 @@ def _landmarks(count: int = 21) -> list[SimpleNamespace]:
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_extract_returns_invalid_when_no_hand(mock_hands_cls: MagicMock) -> None:
     hands_obj = MagicMock()
@@ -45,7 +45,7 @@ def test_extract_returns_invalid_when_no_hand(mock_hands_cls: MagicMock) -> None
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_extract_returns_valid_packet_for_detected_hand(
     mock_hands_cls: MagicMock,
@@ -74,7 +74,7 @@ def test_extract_returns_valid_packet_for_detected_hand(
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_extract_rejects_low_detection_confidence(mock_hands_cls: MagicMock) -> None:
     classification = SimpleNamespace(label="Left", score=0.2)
@@ -95,7 +95,7 @@ def test_extract_rejects_low_detection_confidence(mock_hands_cls: MagicMock) -> 
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_extract_rejects_low_tracking_confidence(mock_hands_cls: MagicMock) -> None:
     classification = SimpleNamespace(label="Right", score=0.98)
@@ -121,7 +121,7 @@ def test_extract_rejects_low_tracking_confidence(mock_hands_cls: MagicMock) -> N
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_close_calls_mediapipe_close(mock_hands_cls: MagicMock) -> None:
     hands_obj = MagicMock()
@@ -152,7 +152,7 @@ def _make_hands_obj_with_label(label: str) -> MagicMock:
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_hand_preference_right_accepts_users_right_hand(
     mock_hands_cls: MagicMock,
@@ -173,7 +173,7 @@ def test_hand_preference_right_accepts_users_right_hand(
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_hand_preference_right_rejects_users_left_hand(
     mock_hands_cls: MagicMock,
@@ -189,7 +189,7 @@ def test_hand_preference_right_rejects_users_left_hand(
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_hand_preference_left_accepts_users_left_hand(
     mock_hands_cls: MagicMock,
@@ -205,7 +205,7 @@ def test_hand_preference_left_accepts_users_left_hand(
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_hand_preference_left_rejects_users_right_hand(
     mock_hands_cls: MagicMock,
@@ -221,7 +221,7 @@ def test_hand_preference_left_rejects_users_right_hand(
 
 
 @patch(
-    "gesture_control.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
+    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
 )
 def test_hand_preference_both_accepts_any_hand(mock_hands_cls: MagicMock) -> None:
     """When hand_preference='both', either hand is accepted (no filtering applied)."""

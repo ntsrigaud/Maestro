@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gesture_control.training.dataset_builder import (
+from maestro.training.dataset_builder import (
     LabeledLandmarkFrame,
     SequenceDatasetBuilder,
 )

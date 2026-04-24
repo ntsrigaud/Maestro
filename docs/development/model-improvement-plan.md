@@ -32,7 +32,7 @@ The system achieves 79 % accuracy on held-out IPN Hand test recordings, but swip
 
 **Files changed.**
 
-- [`src/gesture_control/pipeline/stabilization.py`](../src/gesture_control/pipeline/stabilization.py)
+- [`src/maestro/pipeline/stabilization.py`](../src/maestro/pipeline/stabilization.py)
 - [`tests/unit/test_prediction_stabilization.py`](../tests/unit/test_prediction_stabilization.py) — two new tests
 
 ### T1-B — Diagnostic Threshold Reduction ✅

@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from gesture_control.app.runtime import Runtime
-from gesture_control.domain.entities import RuntimeState
+from maestro.app.runtime import Runtime
+from maestro.domain.entities import RuntimeState
 
 # ---------------------------------------------------------------------------
 # Minimal container factories

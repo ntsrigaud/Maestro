@@ -357,7 +357,7 @@ The output NPZ from `build_ipn_dataset.py` is fully compatible with
 `GestureDataModule` and the existing training pipeline. No changes to
 `datamodule.py`, `train_lstm.py`, or the feature transformer are required.
 
-The bootstrap module (`src/gesture_control/app/bootstrap.py`) already loads
+The bootstrap module (`src/maestro/app/bootstrap.py`) already loads
 the IPN-specific configuration files directly:
 
 - `configs/gestures/vocabulary_ipn.yaml`

@@ -10,11 +10,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from gesture_control.domain.entities import DispatchResult, ExecutableCommand
-from gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter import (
+from maestro.domain.entities import DispatchResult, ExecutableCommand
+from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
 )
-from gesture_control.infrastructure.dispatch.command_dispatcher import (
+from maestro.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 
@@ -42,7 +42,7 @@ class TestKeyboardAdapter:
     def test_valid_keys_call_pyautogui(self):
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             adapter.press_hotkey("ctrl", "right")
             mock_pya.hotkey.assert_called_once_with("ctrl", "right")
@@ -50,7 +50,7 @@ class TestKeyboardAdapter:
     def test_single_valid_key(self):
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             adapter.press_hotkey("f5")
             mock_pya.hotkey.assert_called_once_with("f5")
@@ -68,7 +68,7 @@ class TestKeyboardAdapter:
     def test_invalid_key_never_calls_pyautogui(self):
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             with pytest.raises(ValueError):
                 adapter.press_hotkey("ctrl", "malicious")
@@ -78,7 +78,7 @@ class TestKeyboardAdapter:
         """win, super, command must pass the safe key allowlist."""
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             for key in ("win", "super", "command"):
                 mock_pya.reset_mock()
@@ -88,7 +88,7 @@ class TestKeyboardAdapter:
     def test_scroll_calls_pyautogui_scroll_with_clamped_value(self):
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             adapter.scroll(5)
             mock_pya.scroll.assert_called_once_with(5)
@@ -96,7 +96,7 @@ class TestKeyboardAdapter:
     def test_scroll_clamps_to_minus_20(self):
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             adapter.scroll(-999)
             mock_pya.scroll.assert_called_once_with(-20)
@@ -104,7 +104,7 @@ class TestKeyboardAdapter:
     def test_scroll_clamps_to_plus_20(self):
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             adapter.scroll(999)
             mock_pya.scroll.assert_called_once_with(20)
@@ -112,7 +112,7 @@ class TestKeyboardAdapter:
     def test_zoom_calls_keydown_scroll_keyup(self):
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             adapter.zoom(3, modifier="ctrl")
             assert mock_pya.keyDown.call_count == 1
@@ -124,7 +124,7 @@ class TestKeyboardAdapter:
     def test_zoom_clamps_to_minus_5(self):
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             adapter.zoom(-99, modifier="ctrl")
             mock_pya.scroll.assert_called_once_with(-5)
@@ -133,7 +133,7 @@ class TestKeyboardAdapter:
         """keyUp must be called even when pyautogui.scroll raises."""
         adapter = KeyboardAdapter()
         with patch(
-            "gesture_control.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
             mock_pya.scroll.side_effect = RuntimeError("display error")
             with pytest.raises(RuntimeError):

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from gesture_control.domain.entities import LandmarkPacket
-from gesture_control.pipeline.buffering import SlidingWindowSequenceBuffer
-from gesture_control.pipeline.feature_engineering import LandmarkFeatureTransformer
+from maestro.domain.entities import LandmarkPacket
+from maestro.pipeline.buffering import SlidingWindowSequenceBuffer
+from maestro.pipeline.feature_engineering import LandmarkFeatureTransformer
 
 
 def _landmark_packet(index: int, *, valid: bool = True) -> LandmarkPacket:

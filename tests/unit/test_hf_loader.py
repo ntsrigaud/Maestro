@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 import torch
 
-from gesture_control.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -72,11 +72,11 @@ def test_load_artifact_from_hub_calls_hf_hub_download(tmp_path: Path) -> None:
     _write_artifact(artifact_path)
 
     with patch(
-        "gesture_control.infrastructure.model.hf_loader.hf_hub_download"
+        "maestro.infrastructure.model.hf_loader.hf_hub_download"
     ) as mock_dl:
         mock_dl.return_value = str(artifact_path)
 
-        from gesture_control.infrastructure.model.hf_loader import (
+        from maestro.infrastructure.model.hf_loader import (
             load_artifact_from_hub,
         )
 
@@ -105,11 +105,11 @@ def test_load_artifact_from_hub_passes_cache_dir(tmp_path: Path) -> None:
     _write_artifact(artifact_path)
 
     with patch(
-        "gesture_control.infrastructure.model.hf_loader.hf_hub_download"
+        "maestro.infrastructure.model.hf_loader.hf_hub_download"
     ) as mock_dl:
         mock_dl.return_value = str(artifact_path)
 
-        from gesture_control.infrastructure.model.hf_loader import (
+        from maestro.infrastructure.model.hf_loader import (
             load_artifact_from_hub,
         )
 
@@ -130,7 +130,7 @@ def test_load_artifact_from_hub_raises_on_missing_huggingface_hub(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """An informative ImportError should be raised when huggingface_hub is absent."""
-    import gesture_control.infrastructure.model.hf_loader as hf_loader_module
+    import maestro.infrastructure.model.hf_loader as hf_loader_module
 
     # Simulate huggingface_hub being absent by patching the module-level flag
     monkeypatch.setattr(hf_loader_module, "_HF_AVAILABLE", False)

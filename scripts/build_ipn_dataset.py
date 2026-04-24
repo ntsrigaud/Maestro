@@ -69,11 +69,11 @@ import yaml
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from gesture_control.domain.entities import FramePacket  # noqa: E402
-from gesture_control.infrastructure.mediapipe.hands_extractor import (  # noqa: E402
+from maestro.domain.entities import FramePacket  # noqa: E402
+from maestro.infrastructure.mediapipe.hands_extractor import (  # noqa: E402
     MediaPipeHandsExtractor,
 )
-from gesture_control.training.dataset_builder import (  # noqa: E402
+from maestro.training.dataset_builder import (  # noqa: E402
     LabeledLandmarkFrame,
     SequenceDatasetBuilder,
 )

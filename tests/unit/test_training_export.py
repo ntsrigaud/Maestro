@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from gesture_control.training.export_checkpoint import compute_sha256
+from maestro.training.export_checkpoint import compute_sha256
 
 pytestmark = pytest.mark.training
 

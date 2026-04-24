@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from gesture_control.training.train_lstm import load_training_config, train_lstm
+from maestro.training.train_lstm import load_training_config, train_lstm
 
 pytestmark = pytest.mark.training
 
