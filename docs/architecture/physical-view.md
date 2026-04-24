@@ -19,6 +19,7 @@ graph TB
         subgraph SW ["Software Environment"]
             Python["Python 3.11 Runtime"]
             subgraph App ["Gesture Control Application"]
+                GUI["PySide6 Control Panel<br/>(GUI mode only)"]
                 Capture["Frame Capture<br/>(OpenCV)"]
                 MP["Landmark Extraction<br/>(MediaPipe)"]
                 LSTM["Gesture Classification<br/>(PyTorch LSTM)"]
@@ -35,7 +36,9 @@ graph TB
     LSTM --> Dispatch
     Dispatch -->|OS Keyboard Events| Keyboard
     Keyboard -->|Key Press| TargetApp
-    Overlay -->|Window Frame| Display
+    GUI -->|Qt application window| Display
+    Overlay -->|Preview frame, opt-in| Display
+    GUI -->|manages lifecycle| Capture
 ```
 
 ## 3. Hardware Requirements
@@ -81,6 +84,7 @@ GPU acceleration is **optional and not required**. If a CUDA-capable GPU or Appl
 | pydantic               | ≥2.6.0    | Configuration schema validation                                                                                                     |
 | numpy                  | ≥1.26.0   | Array operations                                                                                                                    |
 | PyYAML                 | ≥6.0.1    | Configuration file parsing                                                                                                          |
+| PySide6                | ≥6.5.0    | Qt6 Python bindings for the graphical interface (`[dev]` optional extra; not required for CLI inference)                            |
 | huggingface_hub        | ≥0.22.0   | Model download from HF Hub (`[huggingface]` optional extra; required for the default `backend: huggingface` in `model_source.yaml`) |
 | scikit-learn           | ≥1.5.0    | Dataset splitting and training metrics (`[training]` optional extra; not required at inference runtime)                             |
 
@@ -112,9 +116,17 @@ The system requires the following OS-level permissions:
 
 ### 5.3 Application → Display
 
+**GUI mode** (`scripts/run_ui.py`):
+
+- **Protocol**: PySide6 Qt window rendered by the OS compositor
+- **Data**: Form controls, telemetry labels, log entries, system tray icon
+- **Tray colours**: Grey (stopped), green (running + gaze active), amber (command dispatched, 300 ms flash)
+
+**CLI mode** / opt-in preview window:
+
 - **Protocol**: OpenCV `imshow()` window
 - **Data**: Annotated BGR frame with diagnostic overlay
-- **Optional**: Can be disabled with `--no-display` for headless operation
+- **Optional**: Enabled by the "Show preview window" checkbox in GUI mode, or always-on in CLI mode (`run_realtime.py`)
 
 ## 6. File System Layout
 
@@ -152,7 +164,10 @@ pip install -e ".[huggingface]"
 ### 7.2 Inference Execution
 
 ```bash
-# Run real-time gesture recognition (default: model downloaded from Hugging Face Hub)
+# Launch graphical control panel (recommended)
+python scripts/run_ui.py
+
+# Run CLI-only inference (headless; no PySide6 required)
 python scripts/run_realtime.py --config configs
 
 # Override HF revision
