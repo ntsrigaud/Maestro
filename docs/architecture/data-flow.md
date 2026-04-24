@@ -8,7 +8,7 @@ This document describes the complete data flow through the real-time inference p
 
 ```mermaid
 graph TD
-    A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| B["Gaze Estimation<br/>(Face Mesh + Head Pose)"]
+    A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| B["Gaze Estimation<br/>(BlazeFace + Head Pose)"]
     B -->|gaze_permitted=false| Z["Skip to next frame"]
     B -->|gaze_permitted=true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
     C -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
@@ -54,9 +54,9 @@ The frame source reads from `cv2.VideoCapture` with a buffer size of 1 to minimi
 | `True`       | User head pose within ±30° yaw and ±25° pitch; gaze state is ACTIVE or LOSING (within grace period) | Downstream stages proceed normally           |
 | `False`      | No face detected, head pose outside thresholds, or gaze state is ABSENT or ACQUIRING                | All downstream stages skipped for this frame |
 
-The detector maintains a four-state machine (ABSENT → ACQUIRING → ACTIVE → LOSING). Face Mesh is sampled every `gaze_sample_interval_frames` frames (default 3) at approximately 10 Hz; the cached result is returned on intervening frames at negligible cost. When the LOSING→ABSENT transition fires, `GestureActivationController.force_idle()` is invoked to reset any in-progress gesture hold, preventing an armed system from persisting unattended.
+The detector maintains a four-state machine (ABSENT → ACQUIRING → ACTIVE → LOSING). BlazeFace is sampled every `gaze_sample_interval_frames` frames (default 3) at approximately 10 Hz; the cached result is returned on intervening frames at negligible cost. When the LOSING→ABSENT transition fires, `GestureActivationController.force_idle()` is invoked to reset any in-progress gesture hold, preventing an armed system from persisting unattended.
 
-The BGR frame is converted to RGB and processed by `mediapipe.solutions.face_mesh.FaceMesh`. Head orientation is computed by fitting a Perspective-n-Point (PnP) pose using six anatomical reference landmarks (nose tip, chin, eye corners, mouth corners) and resolving Euler angles from the resulting rotation matrix.
+The BGR frame is converted to RGB and processed by MediaPipe BlazeFace face detection (`mediapipe.solutions.face_detection.FaceDetection`). BlazeFace provides 6 face keypoints directly — right eye, left eye, nose tip, mouth center, and ear tragions — eliminating the 468 unused landmarks computed by the previous Face Mesh model. Head orientation is computed by fitting a Perspective-n-Point (PnP) pose from these 6 keypoints and resolving Euler angles from the resulting rotation matrix.
 
 This stage does not produce a domain entity. `gaze_permitted` flows directly into the runtime loop control path and is stored in `RuntimeState` for overlay rendering.
 
