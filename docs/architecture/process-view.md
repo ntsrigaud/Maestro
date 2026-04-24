@@ -65,7 +65,7 @@ At 30 FPS target, each loop iteration has a ~33 ms budget. The pipeline stages c
 | Stage               | Typical Latency | Notes                                               |
 | ------------------- | --------------- | --------------------------------------------------- |
 | Frame Capture       | 1–2 ms          | Blocks until frame available; buffer size = 1       |
-| Gaze Estimation     | 1–2 ms          | MediaPipe Face Mesh amortized; runs at ⅓ frame rate |
+| Gaze Estimation     | 1–2 ms          | MediaPipe BlazeFace amortized; runs at ⅓ frame rate |
 | Landmark Extraction | 15–25 ms        | MediaPipe CPU inference; skipped if gaze absent     |
 | Feature Transform   | < 1 ms          | NumPy array operations                              |
 | Buffer Push         | < 0.1 ms        | Deque append                                        |
@@ -75,7 +75,7 @@ At 30 FPS target, each loop iteration has a ~33 ms budget. The pipeline stages c
 | Command Dispatch    | < 1 ms          | pyautogui call (when command emitted)               |
 | Overlay Render      | 1–2 ms          | OpenCV text/rectangle drawing                       |
 
-**Total end-to-end (gaze active)**: ~40–60 ms per frame (without LSTM inference), ~60–80 ms when inference triggers. Gaze estimation adds ~1–2 ms amortized per frame because Face Mesh is sampled at 10 Hz (every 3rd frame) and the result is cached. When gaze is absent, the per-frame cost drops to ~3–5 ms (capture + gaze check + render).
+**Total end-to-end (gaze active)**: ~40–60 ms per frame (without LSTM inference), ~60–80 ms when inference triggers. Gaze estimation adds ~1–2 ms amortized per frame because BlazeFace is sampled at 10 Hz (every 3rd frame) and the result is cached. When gaze is absent, the per-frame cost drops to ~3–5 ms (capture + gaze check + render).
 
 ## 4. Gaze-Aware Activation Design
 
