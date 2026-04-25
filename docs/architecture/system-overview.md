@@ -37,8 +37,8 @@ The system is organized into four layers:
 │  (Bootstrap, Runtime Loop, CLI Scripts, PySide6 UI)     │
 ├─────────────────────────────────────────────────────────┤
 │                    Pipeline Layer                       │
-│  (Feature Engineering, Buffering, Stabilization,        │
-│   Activation Control)                                   │
+│  (Hand Selection, Feature Engineering, Buffering,       │
+│   Stabilization, Activation Control)                    │
 ├─────────────────────────────────────────────────────────┤
 │                 Infrastructure Layer                    │
 │  (OpenCV Camera, MediaPipe Extractor, LSTM Model,       │
@@ -49,7 +49,7 @@ The system is organized into four layers:
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Domain Layer**: Pure data structures and interface contracts with no framework dependencies. All pipeline data types (`FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`) are frozen dataclasses.
+**Domain Layer**: Pure data structures and interface contracts with no framework dependencies. All pipeline data types (`FramePacket`, `HandLandmarks`, `MultiHandPacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`) are frozen dataclasses.
 
 **Infrastructure Layer**: Concrete implementations of domain interfaces using external libraries (OpenCV, MediaPipe, PyTorch, pyautogui). Each implementation is isolated behind a Protocol interface.
 
@@ -59,13 +59,14 @@ The system is organized into four layers:
 
 ## 5. End-to-End Pipeline Summary
 
-The real-time inference pipeline processes each camera frame through ten sequential stages:
+The real-time inference pipeline processes each camera frame through eleven sequential stages:
 
 ```mermaid
 graph LR
     A[Camera Frame] --> B[Gaze Estimation]
     B --> C[Landmark Extraction]
-    C --> D[Feature Engineering]
+    C --> Cs[Hand Selection]
+    Cs --> D[Feature Engineering]
     D --> E[Temporal Buffering]
     E --> F[LSTM Inference]
     F --> G[Prediction Stabilization]
@@ -76,14 +77,15 @@ graph LR
 
 1. **Frame Capture**: OpenCV reads a BGR frame from the webcam at 30 FPS (1280×720).
 2. **Gaze Estimation**: MediaPipe BlazeFace face detection estimates head pose from 6 face keypoints. If the user's gaze is not directed toward the camera, all downstream gesture processing is bypassed for that frame.
-3. **Landmark Extraction**: MediaPipe Hands detects 21 hand landmarks with confidence filtering.
-4. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity, joint angles, fingertip spread, and wrist trajectory features to produce a 147-dimensional feature vector (feature-schema-v5).
-5. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
-6. **Two-Stream LSTM Inference**: The buffered sequence (24×147) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory), each processed by an independent 2-layer LSTM with Bahdanau attention. The fused context (128 dims) is projected to an 8-class probability distribution by `TwoStreamGestureLSTM`.
-7. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
-8. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in ARMED state; gaze loss transitions to IDLE; gaze restoration calls `rearm()` to return to ARMED. Edge-triggered dispatch is enforced throughout.
-9. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
-10. **Keyboard Execution**: The adapter translates commands to keyboard shortcuts and invokes them via pyautogui with key-name allowlist validation.
+3. **Landmark Extraction**: MediaPipe Hands detects all visible hands (up to 2) and returns a `MultiHandPacket` containing each hand's 21 landmarks, handedness label, detection confidence, and tracking confidence.
+4. **Hand Selection**: `HandSelector` applies the user's `hand_preference` configuration to pick one hand from the `MultiHandPacket`, producing a `LandmarkPacket`. Encodes the selfie-view inversion (`"right"` → MP `"Left"`, `"left"` → MP `"Right"`); marks the packet `valid=False` if the preferred hand is absent or below confidence thresholds.
+5. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity, joint angles, fingertip spread, and wrist trajectory features to produce a 147-dimensional feature vector (feature-schema-v5).
+6. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
+7. **Two-Stream LSTM Inference**: The buffered sequence (24×147) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory), each processed by an independent 2-layer LSTM with Bahdanau attention. The fused context (128 dims) is projected to an 8-class probability distribution by `TwoStreamGestureLSTM`.
+8. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
+9. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in ARMED state; gaze loss transitions to IDLE; gaze restoration calls `rearm()` to return to ARMED. Edge-triggered dispatch is enforced throughout.
+10. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
+11. **Keyboard Execution**: The adapter translates commands to keyboard shortcuts and invokes them via pyautogui with key-name allowlist validation.
 
 ## 6. Key Architectural Characteristics
 
