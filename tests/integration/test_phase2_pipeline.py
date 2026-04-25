@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 
 from maestro.app.bootstrap import build_container
-from maestro.domain.entities import FramePacket, LandmarkPacket
+from maestro.domain.entities import FramePacket, HandLandmarks, MultiHandPacket
 from maestro.infrastructure.model.checkpoint_loader import InferenceArtifact
 from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 
@@ -61,22 +61,26 @@ def test_frame_to_landmark_pipeline(
     mock_capture_cls.return_value = capture
 
     extractor = MagicMock()
-    extractor.extract.return_value = LandmarkPacket(
-        landmarks=[[0.5, 0.5, 0.0] for _ in range(21)],
-        handedness="Right",
-        detect_conf=0.95,
-        track_conf=1.0,
+    extractor.extract.return_value = MultiHandPacket(
+        hands=[
+            HandLandmarks(
+                label="Left",  # config hand_preference='right' → MP 'Left'
+                landmarks=[[0.5, 0.5, 0.0] for _ in range(21)],
+                detect_conf=0.95,
+                track_conf=1.0,
+            )
+        ],
         timestamp_ms=0,
-        valid=True,
     )
     mock_extractor_cls.return_value = extractor
 
     container = build_container(str(config_dir))
     frame = container.frame_source.read()
-    landmark = container.landmark_extractor.extract(frame)
+    multi = container.landmark_extractor.extract(frame)
+    landmark = container.hand_selector.select(multi)
 
     assert isinstance(frame, FramePacket)
-    assert isinstance(landmark, LandmarkPacket)
+    assert isinstance(multi, MultiHandPacket)
     assert landmark.valid is True
 
 
@@ -99,20 +103,14 @@ def test_pipeline_handles_no_hand(
     mock_capture_cls.return_value = capture
 
     extractor = MagicMock()
-    extractor.extract.return_value = LandmarkPacket(
-        landmarks=[],
-        handedness=None,
-        detect_conf=0.0,
-        track_conf=0.0,
-        timestamp_ms=0,
-        valid=False,
-    )
+    extractor.extract.return_value = MultiHandPacket(hands=[], timestamp_ms=0)
     mock_extractor_cls.return_value = extractor
 
     container = build_container(str(config_dir))
     frame = container.frame_source.read()
-    landmark = container.landmark_extractor.extract(frame)
+    multi = container.landmark_extractor.extract(frame)
+    landmark = container.hand_selector.select(multi)
 
     assert isinstance(frame, FramePacket)
-    assert isinstance(landmark, LandmarkPacket)
+    assert isinstance(multi, MultiHandPacket)
     assert landmark.valid is False
