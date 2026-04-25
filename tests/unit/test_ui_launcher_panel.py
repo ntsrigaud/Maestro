@@ -10,7 +10,7 @@ class TestLauncherPanelStateMachine:
         panel = LauncherPanel()
         qtbot.addWidget(panel)
         assert panel.state == "idle"
-        assert panel._btn.text() == "Start"
+        assert panel._btn.text() == "Start Session"
         assert panel._btn.isEnabled()
 
     def test_on_start_clicked_transitions_to_building(self, qtbot) -> None:
@@ -27,7 +27,7 @@ class TestLauncherPanelStateMachine:
         panel.on_start_clicked()
         panel.on_runtime_started()
         assert panel.state == "running"
-        assert panel._btn.text() == "Stop"
+        assert panel._btn.text() == "Stop Session"
         assert panel._btn.isEnabled()
 
     def test_on_runtime_stopped_transitions_to_idle(self, qtbot) -> None:

@@ -458,9 +458,7 @@ def assemble_dataset(
             # spans generating far more windows than short gesture segments.
             t_end_effective = seg.t_end
             if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
-                t_end_effective = min(
-                    seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1
-                )
+                t_end_effective = min(seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1)
 
             seg_windows_before = len(builder.samples)
             for frame_id in range(seg.t_start, t_end_effective + 1):
@@ -490,9 +488,7 @@ def assemble_dataset(
     if missing_cache > 0:
         logger.warning("%d video(s) had no cache and were skipped.", missing_cache)
 
-    logger.info(
-        "Assembly complete: %d sliding-window samples generated.", total_windows
-    )
+    logger.info("Assembly complete: %d sliding-window samples generated.", total_windows)
     return builder
 
 
@@ -518,8 +514,7 @@ def _load_vocabulary(vocab_config_path: Path) -> list[str]:
     gestures = payload.get("gestures", [])
     if not isinstance(gestures, list) or not gestures:
         raise ValueError(
-            f"Vocabulary config '{vocab_config_path}' must contain a non-empty"
-            " 'gestures' list."
+            f"Vocabulary config '{vocab_config_path}' must contain a non-empty 'gestures' list."
         )
     return [str(g) for g in gestures]
 

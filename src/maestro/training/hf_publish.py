@@ -287,9 +287,7 @@ def build_model_card(
     repo_id: str = "ntsrigaud/maestro-lstm",
 ) -> str:
     """Return the rendered Markdown model card string without uploading."""
-    return _build_model_card(
-        result=result, config=config, test_report=test_report, repo_id=repo_id
-    )
+    return _build_model_card(result=result, config=config, test_report=test_report, repo_id=repo_id)
 
 
 def publish_to_huggingface(
@@ -346,14 +344,11 @@ def publish_to_huggingface(
     """
     if not _HF_AVAILABLE:
         raise ImportError(
-            "huggingface_hub is not installed.\n"
-            "Install it with: pip install huggingface_hub"
+            "huggingface_hub is not installed.\nInstall it with: pip install huggingface_hub"
         )
 
     if "/" not in repo_id:
-        raise ValueError(
-            f"repo_id must be in the form 'username/repo-name', got: {repo_id!r}"
-        )
+        raise ValueError(f"repo_id must be in the form 'username/repo-name', got: {repo_id!r}")
 
     resolved_token = token or os.environ.get("HF_TOKEN")
     if resolved_token:

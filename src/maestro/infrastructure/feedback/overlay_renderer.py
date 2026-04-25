@@ -97,10 +97,7 @@ class OverlayRenderer:
         # --- Prediction line with logical command preview ---------------
         logical_cmd = self._command_map.get(state.last_label, "")
         if logical_cmd and logical_cmd != "no_action":
-            line2 = (
-                f"pred={state.last_label}  → {logical_cmd}  "
-                f"conf={state.last_confidence:.2f}"
-            )
+            line2 = f"pred={state.last_label}  → {logical_cmd}  conf={state.last_confidence:.2f}"
         else:
             line2 = f"pred={state.last_label} conf={state.last_confidence:.2f}"
 
@@ -131,9 +128,7 @@ class OverlayRenderer:
         if self._output_rgb:
             canvas = canvas[..., ::-1]
 
-        return FramePacket(
-            frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id
-        )
+        return FramePacket(frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id)
 
     def _draw_gaze_border(self, image: Any, state: RuntimeState) -> None:
         """Draw a coloured border reflecting the current gaze + activation state."""
@@ -167,9 +162,7 @@ class OverlayRenderer:
         y1 = min(h, y + 6)
         image[y0:y1, 0:w] = bg
 
-    def _draw_landmarks(
-        self, image: Any, landmarks: Any, *, mirror: bool = False
-    ) -> None:
+    def _draw_landmarks(self, image: Any, landmarks: Any, *, mirror: bool = False) -> None:
         if not isinstance(landmarks, list):
             return
 

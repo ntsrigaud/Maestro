@@ -113,12 +113,8 @@ def test_spatial_jitter_sigma_scales_noise() -> None:
         seed=1,
     )
     seq = np.zeros((24, 147), dtype=np.float32)
-    noise_small = np.abs(
-        GestureAugmenter(small).augment(seq)[:, :_POSITION_DIMS]
-    ).mean()
-    noise_large = np.abs(
-        GestureAugmenter(large).augment(seq)[:, :_POSITION_DIMS]
-    ).mean()
+    noise_small = np.abs(GestureAugmenter(small).augment(seq)[:, :_POSITION_DIMS]).mean()
+    noise_large = np.abs(GestureAugmenter(large).augment(seq)[:, :_POSITION_DIMS]).mean()
     assert noise_large > noise_small
 
 

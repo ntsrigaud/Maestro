@@ -1,52 +1,95 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+# ---------------------------------------------------------------------------
+# Design tokens (colours only — spacing handled by layouts)
+# ---------------------------------------------------------------------------
+_COLOUR = {
+    "idle": "#6B7280",  # neutral grey
+    "building": "#D97706",  # amber
+    "running": "#059669",  # emerald green
+    "error": "#DC2626",  # red
+}
 
 
 class LauncherPanel(QWidget):
     """
+    Primary runtime control surface.
+
     Emits start_requested / stop_requested. Never calls RuntimeController
     directly — that wiring is done in MainWindow.
+
+    Visual structure
+    ----------------
+    ┌─────────────────────────────────┐
+    │  ● STATUS CHIP                  │
+    │  [   Start / Stop button   ]    │
+    │  ☐ Show preview window          │
+    └─────────────────────────────────┘
     """
 
     start_requested: Signal = Signal()
     stop_requested: Signal = Signal()
 
     _LABELS = {
-        "idle": "Start",
+        "idle": "Start Session",
         "building": "Starting\u2026",
-        "running": "Stop",
+        "running": "Stop Session",
         "error": "Retry",
     }
-    _COLOURS = {
-        "idle": "#888888",
-        "building": "#FFA500",
-        "running": "#44AA44",
-        "error": "#CC3333",
+    _CHIP_TEXT = {
+        "idle": "Idle",
+        "building": "Starting",
+        "running": "Running",
+        "error": "Error",
     }
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._state = "idle"
 
+        # Status chip: coloured dot + text label
+        self._dot = QLabel()
+        self._dot.setFixedSize(10, 10)
+        self._status_text = QLabel(self._CHIP_TEXT["idle"])
+        self._status_text.setObjectName("statusChipLabel")
+
+        chip_row = QHBoxLayout()
+        chip_row.setSpacing(6)
+        chip_row.addWidget(self._dot)
+        chip_row.addWidget(self._status_text)
+        chip_row.addStretch()
+
+        # Primary action button
         self._btn = QPushButton(self._LABELS["idle"])
-        self._pill = QLabel()
-        self._pill.setFixedSize(12, 12)
-        self._show_window_cb = QCheckBox("Show preview window")
+        self._btn.setObjectName("primaryButton")
+        self._btn.setMinimumHeight(36)
+
+        # Preview toggle
+        self._show_window_cb = QCheckBox("Show camera preview")
         self._show_window_cb.setChecked(False)
 
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(chip_row)
         layout.addWidget(self._btn)
-        layout.addWidget(self._pill)
         layout.addWidget(self._show_window_cb)
-        layout.addStretch()
 
         self._btn.clicked.connect(self._on_click)
         self._apply_state()
 
     # ------------------------------------------------------------------
-    # Public slots (connect RuntimeController signals here via MainWindow)
+    # Public slots (connected via MainWindow)
     # ------------------------------------------------------------------
 
     def on_runtime_started(self) -> None:
@@ -59,7 +102,7 @@ class LauncherPanel(QWidget):
         self._set_state("error")
 
     def on_start_clicked(self) -> None:
-        """Called by MainWindow after RuntimeController.start() is invoked."""
+        """Called by MainWindow immediately after start() is invoked."""
         self._set_state("building")
 
     # ------------------------------------------------------------------
@@ -77,10 +120,12 @@ class LauncherPanel(QWidget):
         self._apply_state()
 
     def _apply_state(self) -> None:
+        colour = _COLOUR[self._state]
+        self._dot.setStyleSheet(f"background-color: {colour}; border-radius: 5px;")
+        self._status_text.setText(self._CHIP_TEXT[self._state])
+        self._status_text.setStyleSheet(f"color: {colour}; font-weight: 600;")
         self._btn.setText(self._LABELS[self._state])
         self._btn.setEnabled(self._state != "building")
-        colour = self._COLOURS[self._state]
-        self._pill.setStyleSheet(f"background-color: {colour}; border-radius: 6px;")
 
     @property
     def state(self) -> str:
@@ -88,5 +133,4 @@ class LauncherPanel(QWidget):
 
     @property
     def show_window(self) -> bool:
-        """Whether the user wants the OpenCV preview window shown."""
         return self._show_window_cb.isChecked()

@@ -130,9 +130,7 @@ class GestureAugmenter:
                 high=self._config.temporal_scale_range[1],
             )
         )
-        src_indices = np.clip(
-            np.arange(T, dtype=np.float64) * factor, 0.0, float(T - 1)
-        )
+        src_indices = np.clip(np.arange(T, dtype=np.float64) * factor, 0.0, float(T - 1))
         orig_indices = np.arange(T, dtype=np.float64)
         result = np.empty_like(seq)
         for dim in range(F):

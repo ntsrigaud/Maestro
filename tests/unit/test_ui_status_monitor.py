@@ -10,28 +10,28 @@ class TestStatusMonitorUpdates:
         qtbot.addWidget(monitor)
         state = RuntimeState(mode="armed", gaze_permitted=True, active_mode="desktop")
         monitor.on_state(state)
-        assert monitor._mode_label.text() == "ARMED"
+        assert monitor._mode_val.text() == "ARMED"
 
     def test_on_state_gaze_active(self, qtbot) -> None:
         monitor = StatusMonitor()
         qtbot.addWidget(monitor)
         state = RuntimeState(mode="idle", gaze_permitted=True)
         monitor.on_state(state)
-        assert "Active" in monitor._gaze_label.text()
+        assert "Active" in monitor._gaze_val.text()
 
     def test_on_state_gaze_absent(self, qtbot) -> None:
         monitor = StatusMonitor()
         qtbot.addWidget(monitor)
         state = RuntimeState(mode="idle", gaze_permitted=False)
         monitor.on_state(state)
-        assert "Absent" in monitor._gaze_label.text()
+        assert "Absent" in monitor._gaze_val.text()
 
     def test_on_state_updates_fps(self, qtbot) -> None:
         monitor = StatusMonitor()
         qtbot.addWidget(monitor)
         state = RuntimeState(mode="idle", info={"fps": 29.8})
         monitor.on_state(state)
-        assert "29.8" in monitor._fps_label.text()
+        assert "29.8" in monitor._fps_val.text()
 
     def test_on_state_updates_confidence_bar(self, qtbot) -> None:
         monitor = StatusMonitor()

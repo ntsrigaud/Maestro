@@ -122,9 +122,7 @@ class SequenceDatasetBuilder:
             # boundary samples).  For "majority" strategy the label is chosen by
             # vote, so trailing purity is not the right quality signal.
             if self._label_strategy == "last" and self._min_trailing_label_purity > 0.0:
-                trailing_n = max(
-                    1, round(self._window_length * self._min_trailing_label_purity)
-                )
+                trailing_n = max(1, round(self._window_length * self._min_trailing_label_purity))
                 trailing_labels = labels[-trailing_n:]
                 trailing_purity = trailing_labels.count(selected_label) / trailing_n
                 if trailing_purity < self._min_trailing_label_purity:
@@ -146,9 +144,7 @@ class SequenceDatasetBuilder:
 
         return emitted
 
-    def build_from_frames(
-        self, frames: Iterable[LabeledLandmarkFrame]
-    ) -> list[SequenceSample]:
+    def build_from_frames(self, frames: Iterable[LabeledLandmarkFrame]) -> list[SequenceSample]:
         for frame in frames:
             self.add_frame(frame)
         return list(self._samples)
@@ -170,16 +166,12 @@ class SequenceDatasetBuilder:
             dtype=np.float32,
         )
         labels = np.asarray([sample.label for sample in self._samples], dtype=object)
-        label_ids = np.asarray(
-            [sample.label_id for sample in self._samples], dtype=np.int64
-        )
+        label_ids = np.asarray([sample.label_id for sample in self._samples], dtype=np.int64)
         recording_ids = np.asarray(
             [sample.recording_id for sample in self._samples],
             dtype=object,
         )
-        sample_ids = np.asarray(
-            [sample.sample_id for sample in self._samples], dtype=object
-        )
+        sample_ids = np.asarray([sample.sample_id for sample in self._samples], dtype=object)
         start_ts = np.asarray(
             [sample.start_timestamp_ms for sample in self._samples],
             dtype=np.int64,
@@ -228,11 +220,7 @@ class SequenceDatasetBuilder:
             # sample_ids / timestamps are absent in derived datasets (e.g. mirror-augmented
             # NPZs built by the dataset notebook). Provide zero/empty defaults so the loader
             # remains backward-compatible with any NPZ that only has the core fields.
-            sample_ids = (
-                data["sample_ids"]
-                if "sample_ids" in files
-                else np.empty(n, dtype=object)
-            )
+            sample_ids = data["sample_ids"] if "sample_ids" in files else np.empty(n, dtype=object)
             start_ts = (
                 data["start_timestamp_ms"]
                 if "start_timestamp_ms" in files
