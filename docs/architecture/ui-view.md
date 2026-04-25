@@ -45,9 +45,9 @@ telemetry) and an expanding content pane (Camera Preview + Settings tabs + Sessi
 
 ![Maestro UI in idle state — sidebar with Start Session button; content pane showing Configuration and Model Source tabs](../assets/screenshots/ui-idle.png)
 
-*Figure 1 — Idle state. The sidebar contains the runtime control and live telemetry. The content
+_Figure 1 — Idle state. The sidebar contains the runtime control and live telemetry. The content
 pane holds the camera preview area (collapsed when no preview is active), the tabbed settings
-editor, and the session log.*
+editor, and the session log._
 
 ---
 
@@ -357,9 +357,9 @@ delegated to `RuntimeController` and the panel signals.
 
 **Layout**: a `QSplitter(Horizontal)` divides the window into two non-collapsible panes:
 
-- *Sidebar* (fixed, 240 px) — app identity header, `LauncherPanel` inside a Control `QGroupBox`,
+- _Sidebar_ (fixed, 240 px) — app identity header, `LauncherPanel` inside a Control `QGroupBox`,
   `StatusMonitor`.
-- *Content pane* (expanding) — Camera Preview `QGroupBox` containing `PreviewWidget`, a
+- _Content pane_ (expanding) — Camera Preview `QGroupBox` containing `PreviewWidget`, a
   `QTabWidget` holding `ConfigPanel` ("Configuration" tab) and `ModelPanel` ("Model Source"
   tab), and the session log.
 
@@ -384,12 +384,12 @@ values — only state-change events derived from `RuntimeState`.
 bold coloured text label), a full-width primary action button, and an opt-in
 "Show camera preview" checkbox.
 
-| System State | Button Label    | Chip Colour |
-| ------------ | --------------- | ----------- |
-| `idle`       | Start Session   | Grey        |
-| `building`   | Starting…       | Amber       |
-| `running`    | Stop Session    | Green       |
-| `error`      | Retry           | Red         |
+| System State | Button Label  | Chip Colour |
+| ------------ | ------------- | ----------- |
+| `idle`       | Start Session | Grey        |
+| `building`   | Starting…     | Amber       |
+| `running`    | Stop Session  | Green       |
+| `error`      | Retry         | Red         |
 
 State transitions are driven by slots (`on_runtime_started`, `on_runtime_stopped`, `on_error`,
 `on_start_clicked`) connected from `MainWindow`. The panel emits `start_requested` and
@@ -416,11 +416,11 @@ the application stylesheet maps these names to green and grey text respectively.
 
 **Performance group**:
 
-| Row        | Widget   | Source                                            |
-| ---------- | -------- | ------------------------------------------------- |
-| FPS        | `QLabel` | `state.info["fps"]`                               |
-| Latency    | `QLabel` | `state.info["latency_e2e_ms"] / latency_infer_ms` |
-| Valid ratio | `QLabel` | `state.info["valid_ratio"]`                      |
+| Row         | Widget   | Source                                            |
+| ----------- | -------- | ------------------------------------------------- |
+| FPS         | `QLabel` | `state.info["fps"]`                               |
+| Latency     | `QLabel` | `state.info["latency_e2e_ms"] / latency_infer_ms` |
+| Valid ratio | `QLabel` | `state.info["valid_ratio"]`                       |
 
 Latency is displayed as a single combined value (`e2e ms / infer ms`).
 
