@@ -37,8 +37,7 @@ def _resolve_config_path(config_arg: str) -> Path:
     # /tmp is commonly used for one-off smoke configs and gets cleaned frequently.
     if path.is_absolute() and str(path).startswith("/tmp/") and default_path.exists():
         print(
-            f"Warning: config not found at {path}. "
-            f"Falling back to default config: {default_path}",
+            f"Warning: config not found at {path}. Falling back to default config: {default_path}",
             file=sys.stderr,
         )
         return default_path
@@ -65,8 +64,7 @@ def _normalize_run_dir(run_dir: str) -> Path:
     # Allow Windows drive prefixes (e.g., C:\\runs), reject other colon usage.
     if ":" in value and not re.match(r"^[A-Za-z]:([\\\\/]|$)", value):
         raise ValueError(
-            "Invalid --run-dir containing ':'. "
-            "Use a normal relative or absolute directory path."
+            "Invalid --run-dir containing ':'. Use a normal relative or absolute directory path."
         )
 
     return Path(value)

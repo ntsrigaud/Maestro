@@ -123,9 +123,7 @@ class GestureDataModule:
         self._augmentation = augmentation
 
         self._bundle: DatasetBundle | None = None
-        self._train_dataset: (
-            SequenceTensorDataset | AugmentedSequenceTensorDataset | None
-        ) = None
+        self._train_dataset: SequenceTensorDataset | AugmentedSequenceTensorDataset | None = None
         self._val_dataset: SequenceTensorDataset | None = None
         self._test_dataset: SequenceTensorDataset | None = None
         self._train_idx: np.ndarray | None = None
@@ -219,9 +217,7 @@ class GestureDataModule:
         # Choose group-aware or random split.
         unique_recs = np.unique(recording_ids)
         if self._use_group_split and len(unique_recs) >= 3:
-            train_idx, val_idx, test_idx = self._group_split_indices(
-                label_ids, recording_ids
-            )
+            train_idx, val_idx, test_idx = self._group_split_indices(label_ids, recording_ids)
         else:
             if self._use_group_split and len(unique_recs) < 3:
                 warnings.warn(
@@ -330,9 +326,7 @@ class GestureDataModule:
         all_idx = np.arange(n)
         temp_ratio = self._split.val_ratio + self._split.test_ratio
 
-        gss = GroupShuffleSplit(
-            n_splits=1, test_size=temp_ratio, random_state=self._seed
-        )
+        gss = GroupShuffleSplit(n_splits=1, test_size=temp_ratio, random_state=self._seed)
         train_idx, temp_idx = next(gss.split(all_idx, label_ids, groups=recording_ids))
 
         temp_rec_ids = recording_ids[temp_idx]
@@ -345,9 +339,7 @@ class GestureDataModule:
                 test_size=1.0 - val_share,
                 random_state=self._seed,
             )
-            rel_val, rel_test = next(
-                gss2.split(temp_idx, label_ids[temp_idx], groups=temp_rec_ids)
-            )
+            rel_val, rel_test = next(gss2.split(temp_idx, label_ids[temp_idx], groups=temp_rec_ids))
             val_idx = temp_idx[rel_val]
             test_idx = temp_idx[rel_test]
         else:
@@ -362,9 +354,7 @@ class GestureDataModule:
 
         return np.asarray(train_idx), np.asarray(val_idx), np.asarray(test_idx)
 
-    def _split_indices(
-        self, label_ids: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _split_indices(self, label_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         n = label_ids.shape[0]
         all_idx = np.arange(n)
 

@@ -35,9 +35,7 @@ class TestFeatureSchemaValidation:
             orientation_normalization=True,
         )
 
-        is_compatible, issues = validate_feature_schema_parity(
-            dataset_metadata, runtime_config
-        )
+        is_compatible, issues = validate_feature_schema_parity(dataset_metadata, runtime_config)
 
         assert is_compatible is True
         assert len(issues) == 0
@@ -73,14 +71,10 @@ class TestFeatureSchemaValidation:
         }
         runtime_config = FeaturePipelineConfig()
 
-        is_compatible, issues = validate_feature_schema_parity(
-            dataset_metadata, runtime_config
-        )
+        is_compatible, issues = validate_feature_schema_parity(dataset_metadata, runtime_config)
 
         assert is_compatible is False
-        assert any(
-            "legacy" in issue.lower() or "warning" in issue.lower() for issue in issues
-        )
+        assert any("legacy" in issue.lower() or "warning" in issue.lower() for issue in issues)
 
     def test_feature_dimensionality_mismatch_raises_error(self):
         """Datasets with wrong feature dimensionality should raise error."""
@@ -110,9 +104,7 @@ class TestFeatureSchemaValidation:
         }
         runtime_config = FeaturePipelineConfig()
 
-        is_compatible, issues = validate_feature_schema_parity(
-            dataset_metadata, runtime_config
-        )
+        is_compatible, issues = validate_feature_schema_parity(dataset_metadata, runtime_config)
 
         assert is_compatible is False
         assert any("window_length" in issue for issue in issues)
@@ -198,9 +190,7 @@ class TestDatasetCompatibilityValidation:
                 orientation_normalization=True,
             )
 
-            is_compatible, issues = validate_dataset_compatibility(
-                dataset_path, runtime_config
-            )
+            is_compatible, issues = validate_dataset_compatibility(dataset_path, runtime_config)
 
             assert is_compatible is True
 
@@ -274,8 +264,7 @@ class TestTrainingInferenceParity:
         )
 
         assert (
-            training_config.orientation_normalization
-            == inference_config.orientation_normalization
+            training_config.orientation_normalization == inference_config.orientation_normalization
         )
         assert (
             training_config.wrist_relative_normalization
