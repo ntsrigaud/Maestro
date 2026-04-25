@@ -58,9 +58,10 @@ class PreviewWidget(QLabel):
 
         h, w = frame.shape[:2]
 
-        # BGR (OpenCV) → RGB (Qt) via a reversed channel view.
-        # tobytes() materialises the bytes copy that QImage requires.
-        rgb_bytes = frame[..., ::-1].tobytes()
+        # The frame is already in RGB order: OverlayRenderer is instantiated
+        # with output_rgb=True whenever show_window=True (see bootstrap.py).
+        # Pass bytes directly to QImage — no channel copy needed.
+        rgb_bytes = frame.tobytes()
         stride = w * 3  # bytes per row (3 channels, uint8)
         image = QImage(rgb_bytes, w, h, stride, QImage.Format.Format_RGB888)
         pixmap = QPixmap.fromImage(image)
