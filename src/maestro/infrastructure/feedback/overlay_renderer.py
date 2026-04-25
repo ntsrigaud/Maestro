@@ -57,12 +57,18 @@ class OverlayRenderer:
         *,
         mirror_display: bool = False,
         command_map: dict[str, str] | None = None,
+        output_rgb: bool = False,
     ) -> None:
         self._font = cv2.FONT_HERSHEY_SIMPLEX
         self._mirror_display = mirror_display
         # command_map: gesture label → logical command ID for display lookup.
         # When None the logical command column is omitted from the pred line.
         self._command_map: dict[str, str] = command_map or {}
+        # When True the rendered canvas is converted from OpenCV's native BGR
+        # to RGB before being returned.  Set this to True when the consumer
+        # is a Qt widget (QImage.Format_RGB888) so the channel reversal is
+        # done once here rather than on every display update.
+        self._output_rgb = output_rgb
 
     def render(self, frame: FramePacket, state: RuntimeState) -> FramePacket:
         # Flip the canvas for the display if mirror mode is active.  The flip
@@ -121,6 +127,9 @@ class OverlayRenderer:
         self._put(canvas, line3, 12, 72 + y_offset)
         self._put(canvas, line4, 12, 96 + y_offset)
         self._put(canvas, line5, 12, 120 + y_offset)
+
+        if self._output_rgb:
+            canvas = canvas[..., ::-1]
 
         return FramePacket(
             frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id
