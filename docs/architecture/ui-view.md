@@ -38,6 +38,17 @@ a single controller object.
 The inference CLI path (`run_realtime.py` → `app/main.py`) never imports PySide6. The two
 entry points are completely isolated at the import boundary.
 
+### 1.4 Layout Overview
+
+The application uses a two-pane splitter layout: a fixed-width sidebar (Control + Runtime
+telemetry) and an expanding content pane (Camera Preview + Settings tabs + Session Log).
+
+![Maestro UI in idle state — sidebar with Start Session button; content pane showing Configuration and Model Source tabs](../assets/screenshots/ui-idle.png)
+
+*Figure 1 — Idle state. The sidebar contains the runtime control and live telemetry. The content
+pane holds the camera preview area (collapsed when no preview is active), the tabbed settings
+editor, and the session log.*
+
 ---
 
 ## 2. Architectural Design
@@ -63,12 +74,14 @@ graph TD
         MW["MainWindow\n(Mediator)"]
         LP["LauncherPanel\n(Start/Stop/Checkbox)"]
         SM["StatusMonitor\n(Telemetry display)"]
+        PW["PreviewWidget\n(Qt camera display)"]
         CP["ConfigPanel\n(Form editor)"]
         MP["ModelPanel\n(HF / Local selector)"]
         TI["QSystemTrayIcon\n(Ambient indicator)"]
         LOG["Session Log\n(QTextEdit)"]
         MW --- LP
         MW --- SM
+        MW --- PW
         MW --- CP
         MW --- MP
         MW --- TI
@@ -94,8 +107,10 @@ graph TD
     RM -->|"on_state callback"| RT
     RT -->|"state_ready signal (throttled)"| RC
     RC -->|"state_updated signal"| SM
+    RC -->|"state_updated signal"| PW
     RC -->|"state_updated signal"| TI
     RC -->|"state_updated signal"| LOG
+    RC -->|"runtime_stopped signal"| PW
     RC -->|"runtime_started signal"| LP
     RC -->|"runtime_started signal"| CP
     RC -->|"runtime_stopped signal"| LP
@@ -108,16 +123,18 @@ graph TD
 
 ```
 src/maestro/app/
-├── bootstrap.py          # Unchanged — composition root
-├── runtime.py            # Minimal change: on_state optional callback
-├── main.py               # Unchanged — CLI entry point
+├── bootstrap.py          # Composition root — wires all dependencies
+├── runtime.py            # Inference loop — on_state callback, no cv2.imshow
+├── main.py               # CLI entry point — Qt preview or headless path
 └── ui/
     ├── __init__.py
     ├── app_ui.py          # run_ui() — QApplication bootstrap
     ├── controller.py      # RuntimeController + _RuntimeThread
-    ├── main_window.py     # MainWindow — mediator and signal router
-    ├── launcher_panel.py  # Start/Stop button + status pill + checkbox
-    ├── status_monitor.py  # Per-frame telemetry widgets
+    ├── main_window.py     # MainWindow — QSplitter layout, mediator, signal router
+    ├── launcher_panel.py  # Start/Stop button + status chip + preview checkbox
+    ├── status_monitor.py  # Per-frame telemetry — Runtime + Performance groups
+    ├── preview_widget.py  # Qt-native camera display — converts RuntimeState.preview_frame
+    ├── cli_preview.py     # Minimal Qt window for CLI preview mode
     ├── config_panel.py    # Pydantic-driven config form
     └── model_panel.py     # HF / Local model source selector
 ```
@@ -262,16 +279,25 @@ webcam. This operation takes approximately 2–5 seconds and is intentionally no
 main thread. The `build_succeeded` signal notifies the UI when construction completes, at which
 point the launcher transitions from "Starting…" to "Running".
 
-### 4.4 cv2.imshow Behaviour
+### 4.4 Camera Preview Delivery
 
-When the user enables "Show preview window", the runtime calls `cv2.imshow()` from the worker
-thread. Because the Qt event loop is running in the main thread, this call may fail on headless
-OpenCV builds or when a Qt/OpenCV display conflict arises. The `_imshow()` helper in
-`runtime.py` wraps `cv2.imshow` in a `try/except cv2.error` block, logs a warning, and returns
-`False`. On failure, `container.show_window` is set to `False` to prevent repeated error logging
-on subsequent frames.
+Camera preview is delivered entirely through the Qt signal-slot mechanism; `cv2.imshow` is not
+used anywhere in the codebase.
 
-The "Show preview window" checkbox in `LauncherPanel` defaults to unchecked; preview is opt-in.
+When the user enables "Show camera preview", `bootstrap.py` instantiates `OverlayRenderer`
+with `output_rgb=True`. The rendered frame is attached to `RuntimeState.preview_frame` (an RGB
+`numpy` array) inside `Runtime.run()`, immediately after overlay drawing, on every frame where
+`container.show_window` is `True`.
+
+`RuntimeController` delivers the state to the main thread via the `state_updated` queued
+signal. `PreviewWidget.on_state()` — running on the main thread — reads `preview_frame`,
+constructs a `QImage(Format_RGB888)`, scales it to at most 480 px wide, and sets it as a
+`QPixmap` on the label. No copy of the frame is made; no locking is required because the worker
+thread never mutates the frame after attaching it to the state object.
+
+`PreviewWidget` starts hidden and becomes visible on the first non-`None` frame; it collapses
+again when `runtime_stopped` fires. The "Show camera preview" checkbox in `LauncherPanel`
+defaults to unchecked; preview is opt-in.
 
 ---
 
@@ -329,32 +355,41 @@ Both are safe to call from the main thread at any time.
 `MainWindow` does not contain any domain or pipeline logic. All business decisions are
 delegated to `RuntimeController` and the panel signals.
 
-**Tray icon colour convention** (mirrors `OverlayRenderer` border colours):
+**Layout**: a `QSplitter(Horizontal)` divides the window into two non-collapsible panes:
+
+- *Sidebar* (fixed, 240 px) — app identity header, `LauncherPanel` inside a Control `QGroupBox`,
+  `StatusMonitor`.
+- *Content pane* (expanding) — Camera Preview `QGroupBox` containing `PreviewWidget`, a
+  `QTabWidget` holding `ConfigPanel` ("Configuration" tab) and `ModelPanel` ("Model Source"
+  tab), and the session log.
+
+**Tray icon colour convention**:
 
 | Colour | Hex       | Meaning                               |
 | ------ | --------- | ------------------------------------- |
-| Grey   | `#888888` | Runtime stopped or gaze absent        |
-| Green  | `#44AA44` | Runtime running, gaze active          |
-| Amber  | `#FFA500` | Gesture accepted / command dispatched |
+| Grey   | `#6B7280` | Runtime stopped or gaze absent        |
+| Green  | `#059669` | Runtime running, gaze active          |
+| Amber  | `#D97706` | Gesture accepted / command dispatched |
 
 A brief amber flash (300 ms) followed by a return to green accompanies each dispatched command.
 Tray notifications display the dispatched gesture label for 800 ms.
 
-**Session log**: A read-only `QTextEdit` (maximum height 120 px) appends timestamped entries on
-mode transitions and dispatched commands. It never receives raw telemetry values — only
-state-change events derived from `RuntimeState`.
+**Session log**: A read-only `QTextEdit` (fixed height 110 px, monospace font) appends
+timestamped entries on mode transitions and dispatched commands. It never receives raw telemetry
+values — only state-change events derived from `RuntimeState`.
 
 ### 5.4 `launcher_panel.py` — LauncherPanel
 
-`LauncherPanel(QWidget)` presents a single button whose label and enabled state reflect the
-current system state, a colour-coded status pill, and an opt-in "Show preview window" checkbox.
+`LauncherPanel(QWidget)` presents a vertical layout: a status chip (10 px coloured dot +
+bold coloured text label), a full-width primary action button, and an opt-in
+"Show camera preview" checkbox.
 
-| System State | Button Label | Pill Colour |
-| ------------ | ------------ | ----------- |
-| `idle`       | Start        | Grey        |
-| `building`   | Starting…    | Amber       |
-| `running`    | Stop         | Green       |
-| `error`      | Retry        | Red         |
+| System State | Button Label    | Chip Colour |
+| ------------ | --------------- | ----------- |
+| `idle`       | Start Session   | Grey        |
+| `building`   | Starting…       | Amber       |
+| `running`    | Stop Session    | Green       |
+| `error`      | Retry           | Red         |
 
 State transitions are driven by slots (`on_runtime_started`, `on_runtime_stopped`, `on_error`,
 `on_start_clicked`) connected from `MainWindow`. The panel emits `start_requested` and
@@ -364,18 +399,30 @@ The `show_window` property reads the checkbox state and is consumed by `MainWind
 
 ### 5.5 `status_monitor.py` — StatusMonitor
 
-`StatusMonitor(QWidget)` subscribes to `RuntimeController.state_updated` via its `on_state(RuntimeState)` slot. It displays eight fields:
+`StatusMonitor(QWidget)` subscribes to `RuntimeController.state_updated` via its
+`on_state(RuntimeState)` slot. Fields are grouped into two `QGroupBox` sections:
 
-| Row             | Widget         | Source                           |
-| --------------- | -------------- | -------------------------------- |
-| Mode            | `QLabel`       | `state.mode.upper()`             |
-| Gaze            | `QLabel`       | `state.gaze_permitted`           |
-| Gesture         | `QLabel`       | `state.last_label`               |
-| Confidence      | `QProgressBar` | `state.last_confidence × 100`    |
-| FPS             | `QLabel`       | `state.info["fps"]`              |
-| Latency (e2e)   | `QLabel`       | `state.info["latency_e2e_ms"]`   |
-| Latency (infer) | `QLabel`       | `state.info["latency_infer_ms"]` |
-| Valid ratio     | `QLabel`       | `state.info["valid_ratio"]`      |
+**Runtime group**:
+
+| Row        | Widget         | Source                        |
+| ---------- | -------------- | ----------------------------- |
+| Mode       | `QLabel`       | `state.mode.upper()`          |
+| Gaze       | `QLabel`       | `state.gaze_permitted`        |
+| Gesture    | `QLabel`       | `state.last_label`            |
+| Confidence | `QProgressBar` | `state.last_confidence × 100` |
+
+The Gaze label switches `objectName` between `gazeActive` and `gazeAbsent` on each update;
+the application stylesheet maps these names to green and grey text respectively.
+
+**Performance group**:
+
+| Row        | Widget   | Source                                            |
+| ---------- | -------- | ------------------------------------------------- |
+| FPS        | `QLabel` | `state.info["fps"]`                               |
+| Latency    | `QLabel` | `state.info["latency_e2e_ms"] / latency_infer_ms` |
+| Valid ratio | `QLabel` | `state.info["valid_ratio"]`                      |
+
+Latency is displayed as a single combined value (`e2e ms / infer ms`).
 
 The widget contains no state beyond what Qt widget internals require. It never calls into the
 runtime or stores `RuntimeState` objects.
@@ -424,6 +471,43 @@ to `RuntimeController.start()`; an empty string is treated as `None` (use the de
 When the Hugging Face tab is active, `artifact_path()` returns `None` (HF download path used by
 bootstrap). When the Local tab is active, `hf_revision_override()` returns `None`.
 
+### 5.8 `preview_widget.py` — PreviewWidget
+
+`PreviewWidget(QLabel)` is the Qt-native camera display, used by both `MainWindow` and
+`CLIPreviewWindow`.
+
+On each `on_state(RuntimeState)` call:
+
+1. Reads `state.preview_frame` — an RGB `numpy` array produced by `OverlayRenderer` with
+   `output_rgb=True`. Returns immediately if the field is `None`.
+2. Wraps the array bytes in a `QImage(Format_RGB888)` with no channel copy.
+3. Scales the resulting `QPixmap` to at most 480 px wide (aspect ratio preserved).
+4. Sets the pixmap on the label and calls `show()` on the first non-`None` frame.
+
+The widget starts hidden; it collapses when `runtime_stopped` calls `hide()`.
+
+Thread safety is guaranteed by the Qt queued connection: `on_state` always executes on the
+main thread regardless of which thread emits `state_updated`.
+
+### 5.9 `cli_preview.py` — CLIPreviewWindow
+
+`CLIPreviewWindow(QMainWindow)` provides a minimal Qt window for the CLI preview path
+(`scripts/run_realtime.py` with the display enabled). It owns a `RuntimeController` and a
+`PreviewWidget`, wired with the same signal connections used in `MainWindow`.
+
+Entry from `app/main.py` (display path):
+
+```python
+app = QApplication.instance() or QApplication(sys.argv)
+window = CLIPreviewWindow()
+window.show()
+window.start(args.config, artifact_path=..., hf_revision_override=...)
+sys.exit(app.exec())
+```
+
+Key bindings: **Q** or **Escape** stops the session and closes the window.
+`closeEvent` stops the runtime and waits up to 5 000 ms for the worker thread to exit.
+
 ---
 
 ## 6. Data Flow
@@ -438,6 +522,8 @@ sequenceDiagram
     participant RC as RuntimeController
     participant WT as _RuntimeThread (worker)
     participant RM as Runtime
+    participant SM as StatusMonitor
+    participant PW as PreviewWidget
 
     User->>LP: clicks Start
     LP->>MW: start_requested signal
@@ -453,6 +539,7 @@ sequenceDiagram
         RM->>WT: on_state(state) [every 3rd frame]
         WT-->>RC: state_ready signal (queued)
         RC-->>SM: state_updated → on_state(state)
+        RC-->>PW: state_updated → on_state(state)
         RC-->>MW: state_updated → _on_tray_update(state)
         RC-->>MW: state_updated → _on_log_event(state)
     end
