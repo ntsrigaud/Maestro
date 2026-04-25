@@ -38,6 +38,7 @@ from maestro.interfaces.sequence_buffer import ISequenceBuffer
 from maestro.pipeline.activation import GestureActivationController
 from maestro.pipeline.buffering import SlidingWindowSequenceBuffer
 from maestro.pipeline.feature_engineering import LandmarkFeatureTransformer
+from maestro.pipeline.hand_selection import HandSelector
 from maestro.pipeline.stabilization import PredictionStabilizer
 from maestro.utils.config_loader import load_runtime_config
 from maestro.utils.feature_validation import validate_dataset_compatibility
@@ -50,6 +51,7 @@ class AppContainer:
     frame_source: IFrameSource
     gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
+    hand_selector: HandSelector
     feature_transformer: IFeatureTransformer
     sequence_buffer: ISequenceBuffer
     model_artifact: InferenceArtifact
@@ -81,10 +83,13 @@ def build_container(
     )
     landmark_extractor = MediaPipeHandsExtractor(
         static_image_mode=False,
-        max_num_hands=1,
         min_detection_confidence=0.7,
         min_tracking_confidence=0.5,
+    )
+    hand_selector = HandSelector(
         hand_preference=config.app.hand_preference,
+        min_handedness_conf=0.7,
+        min_track_conf=0.5,
     )
     feature_transformer = LandmarkFeatureTransformer(
         enable_orientation_normalization=config.feature_pipeline.orientation_normalization,
@@ -147,6 +152,7 @@ def build_container(
         frame_source=frame_source,
         gaze_detector=gaze_detector,
         landmark_extractor=landmark_extractor,
+        hand_selector=hand_selector,
         feature_transformer=feature_transformer,
         sequence_buffer=sequence_buffer,
         model_artifact=artifact,
