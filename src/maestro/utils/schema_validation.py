@@ -98,7 +98,5 @@ class RuntimeConfig(BaseModel):
 
     app: AppConfig
     inference: InferenceConfig
-    feature_pipeline: FeaturePipelineConfig = Field(
-        default_factory=FeaturePipelineConfig
-    )
+    feature_pipeline: FeaturePipelineConfig = Field(default_factory=FeaturePipelineConfig)
     model_source: ModelSourceConfig = Field(default_factory=ModelSourceConfig)

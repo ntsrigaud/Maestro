@@ -110,9 +110,7 @@ class Runtime:
                         gaze_permitted=False,
                         active_mode=self._active_mode,
                     )
-                    overlay_frame = self._container.overlay_renderer.render(
-                        frame, absent_state
-                    )
+                    overlay_frame = self._container.overlay_renderer.render(frame, absent_state)
                     # Attach the rendered frame so the caller (GUI widget or
                     # CLI on_state callback) can display it in its own
                     # thread-safe context.  overlay_frame.frame is a fresh
@@ -133,9 +131,7 @@ class Runtime:
                     benchmark.record_extraction((time.perf_counter() - t1) * 1000.0)
 
                 t2 = time.perf_counter()
-                feature_frame = self._container.feature_transformer.transform(
-                    landmark_packet
-                )
+                feature_frame = self._container.feature_transformer.transform(landmark_packet)
                 if benchmark is not None:
                     benchmark.record_feature((time.perf_counter() - t2) * 1000.0)
 
@@ -156,9 +152,7 @@ class Runtime:
                     if benchmark is not None:
                         benchmark.record_inference(inference_ms)
 
-                    stabilized_prediction = self._container.stabilizer.update(
-                        prediction
-                    )
+                    stabilized_prediction = self._container.stabilizer.update(prediction)
                     latest_label = stabilized_prediction.label
                     latest_conf = stabilized_prediction.confidence
 
@@ -170,9 +164,7 @@ class Runtime:
                         stabilized_prediction.reason,
                     )
 
-                    command = self._container.activation_controller.route(
-                        stabilized_prediction
-                    )
+                    command = self._container.activation_controller.route(stabilized_prediction)
                     if command is not None:
                         LOGGER.info(
                             "command: id=%r source_gesture=%r",
@@ -209,9 +201,7 @@ class Runtime:
                         "latency_e2e_ms": loop_e2e_ms,
                         "fps": fps,
                         "accepted": (
-                            bool(stabilized_prediction.accepted)
-                            if stabilized_prediction
-                            else False
+                            bool(stabilized_prediction.accepted) if stabilized_prediction else False
                         ),
                     },
                 )
