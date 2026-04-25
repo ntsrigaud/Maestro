@@ -8,9 +8,7 @@ from maestro.app.runtime import Runtime
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Maestro presentation control runtime"
-    )
+    parser = argparse.ArgumentParser(description="Maestro presentation control runtime")
     parser.add_argument(
         "--config",
         default="configs",

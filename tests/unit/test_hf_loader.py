@@ -71,9 +71,7 @@ def test_load_artifact_from_hub_calls_hf_hub_download(tmp_path: Path) -> None:
     artifact_path = tmp_path / "lstm_v1_test_inference.pt"
     _write_artifact(artifact_path)
 
-    with patch(
-        "maestro.infrastructure.model.hf_loader.hf_hub_download"
-    ) as mock_dl:
+    with patch("maestro.infrastructure.model.hf_loader.hf_hub_download") as mock_dl:
         mock_dl.return_value = str(artifact_path)
 
         from maestro.infrastructure.model.hf_loader import (
@@ -104,9 +102,7 @@ def test_load_artifact_from_hub_passes_cache_dir(tmp_path: Path) -> None:
     artifact_path = tmp_path / "model.pt"
     _write_artifact(artifact_path)
 
-    with patch(
-        "maestro.infrastructure.model.hf_loader.hf_hub_download"
-    ) as mock_dl:
+    with patch("maestro.infrastructure.model.hf_loader.hf_hub_download") as mock_dl:
         mock_dl.return_value = str(artifact_path)
 
         from maestro.infrastructure.model.hf_loader import (
