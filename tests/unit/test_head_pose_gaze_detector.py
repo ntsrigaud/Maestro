@@ -428,28 +428,139 @@ class TestClose:
 
 
 # ---------------------------------------------------------------------------
-# HeadPoseGazeDetector — _is_within_cone() with Face Detection result schema
+# HeadPoseGazeDetector — _is_within_cone() geometric proxy
 # ---------------------------------------------------------------------------
 
 
+def _make_results(keypoints: list, score: float = 0.9) -> object:
+    """Build a minimal mock MediaPipe Face Detection result with one detection."""
+    from types import SimpleNamespace
+
+    kp_ns = [SimpleNamespace(x=x, y=y) for x, y in keypoints]
+    location_data = SimpleNamespace(relative_keypoints=kp_ns)
+    detection = SimpleNamespace(location_data=location_data, score=[score])
+    return SimpleNamespace(detections=[detection])
+
+
+# Reference face: inter_eye=0.10, eye_mid=(0.45,0.40), nose_y for pitch_norm=0.55.
+# With default GazeConfig (yaw_threshold_deg=30, pitch_threshold_deg=25):
+#   yaw_limit = (26/60)*tan(30°) ≈ 0.250
+#   pitch_lo  = 0.55 - 25*0.016 = 0.15
+#   pitch_hi  = 0.55 + 25*0.016 = 0.95
+_RE = (0.40, 0.40)  # right eye
+_LE = (0.50, 0.40)  # left eye  →  inter_eye=0.10, eye_mid=(0.45,0.40)
+_NOSE_FRONTAL = (0.45, 0.455)  # yaw_norm=0.0, pitch_norm=0.55
+_MOUTH = (0.45, 0.51)
+_RIGHT_EAR = (0.34, 0.42)
+_LEFT_EAR = (0.56, 0.42)
+
+_FRONTAL_KPS = [_RE, _LE, _NOSE_FRONTAL, _MOUTH, _RIGHT_EAR, _LEFT_EAR]
+
+
 class TestIsWithinCone:
-    """Validate the Face Detection result schema path in _is_within_cone."""
+    """Geometric proxy tests for _is_within_cone()."""
+
+    # -- guard conditions ---------------------------------------------------
 
     def test_returns_false_when_no_detections(self) -> None:
-        """_is_within_cone must return False when results.detections is empty."""
         from types import SimpleNamespace
 
         det = _make_detector()
         results = SimpleNamespace(detections=[])
-        assert det._is_within_cone(results, h=480, w=640) is False
+        assert det._is_within_cone(results) is False
 
-    def test_returns_false_when_fewer_than_six_keypoints(self) -> None:
-        """_is_within_cone must return False when a detection has < 6 keypoints."""
-        from types import SimpleNamespace
-
+    def test_returns_false_when_fewer_than_three_keypoints(self) -> None:
+        """Fewer than 3 keypoints means nose is unavailable; must return False."""
         det = _make_detector()
-        kp = [SimpleNamespace(x=0.5, y=0.5)] * 3  # only 3 — malformed detection
-        location_data = SimpleNamespace(relative_keypoints=kp)
-        detection = SimpleNamespace(location_data=location_data)
-        results = SimpleNamespace(detections=[detection])
-        assert det._is_within_cone(results, h=480, w=640) is False
+        results = _make_results([(0.4, 0.4), (0.5, 0.4)])  # only 2 keypoints
+        assert det._is_within_cone(results) is False
+
+    def test_returns_false_when_low_confidence(self) -> None:
+        """A detection below min_detection_score must be rejected."""
+        det = _make_detector()  # min_detection_score defaults to 0.5
+        results = _make_results(_FRONTAL_KPS, score=0.3)
+        assert det._is_within_cone(results) is False
+
+    def test_returns_false_when_inter_eye_too_small(self) -> None:
+        """A degenerate detection with very small inter-eye distance is rejected."""
+        det = _make_detector()
+        # right_eye and left_eye only 0.005 apart → inter_eye < _MIN_INTER_EYE_RELATIVE
+        tiny_kps = [(0.500, 0.40), (0.505, 0.40), (0.502, 0.455), _MOUTH, _RIGHT_EAR, _LEFT_EAR]
+        results = _make_results(tiny_kps)
+        assert det._is_within_cone(results) is False
+
+    # -- frontal (should be within cone) ------------------------------------
+
+    def test_returns_true_for_frontal_face(self) -> None:
+        """A perfectly frontal face (yaw_norm≈0, pitch_norm≈0.55) must return True."""
+        det = _make_detector()
+        results = _make_results(_FRONTAL_KPS)
+        assert det._is_within_cone(results) is True
+
+    def test_returns_true_for_small_yaw(self) -> None:
+        """A small yaw (well within threshold) must return True."""
+        det = _make_detector()
+        # nose shifted right by 0.010 → yaw_norm = 0.010/0.10 = 0.10 (< 0.25 limit)
+        kps = list(_FRONTAL_KPS)
+        kps[2] = (0.46, 0.455)
+        results = _make_results(kps)
+        assert det._is_within_cone(results) is True
+
+    # -- yaw out of cone ---------------------------------------------------
+
+    def test_returns_false_when_yaw_exceeds_threshold(self) -> None:
+        """A nose shift producing yaw_norm > yaw_limit must return False."""
+        det = _make_detector()
+        # nose at x=0.478 → yaw_norm = (0.478-0.45)/0.10 = 0.28 > ~0.25 limit
+        kps = list(_FRONTAL_KPS)
+        kps[2] = (0.478, 0.455)
+        results = _make_results(kps)
+        assert det._is_within_cone(results) is False
+
+    def test_returns_false_when_yaw_negative_exceeds_threshold(self) -> None:
+        """Negative yaw exceeding the threshold (head turned opposite direction)."""
+        det = _make_detector()
+        kps = list(_FRONTAL_KPS)
+        kps[2] = (0.422, 0.455)  # yaw_norm = (0.422-0.45)/0.10 = -0.28
+        results = _make_results(kps)
+        assert det._is_within_cone(results) is False
+
+    # -- pitch out of cone -------------------------------------------------
+
+    def test_returns_false_when_pitch_too_high(self) -> None:
+        """pitch_norm above pitch_hi (looking too far down) returns False."""
+        det = _make_detector()
+        # pitch_norm = (nose_y - eye_mid_y) / inter_eye > 0.95
+        # nose_y = 0.40 + 0.96 * 0.10 = 0.496
+        kps = list(_FRONTAL_KPS)
+        kps[2] = (0.45, 0.496)
+        results = _make_results(kps)
+        assert det._is_within_cone(results) is False
+
+    def test_returns_false_when_pitch_too_low(self) -> None:
+        """pitch_norm below pitch_lo (looking too far up) returns False."""
+        det = _make_detector()
+        # pitch_norm = (nose_y - eye_mid_y) / inter_eye < 0.15
+        # nose_y = 0.40 + 0.14 * 0.10 = 0.414
+        kps = list(_FRONTAL_KPS)
+        kps[2] = (0.45, 0.414)
+        results = _make_results(kps)
+        assert det._is_within_cone(results) is False
+
+    # -- wider thresholds --------------------------------------------------
+
+    def test_wider_yaw_threshold_accepts_rotated_face(self) -> None:
+        """A yaw_threshold_deg=60° must accept a face that 30° rejects."""
+        cfg = GazeConfig(
+            enabled=True,
+            arm_ms=200,
+            grace_ms=1000,
+            sample_interval_frames=1,
+            yaw_threshold_deg=60.0,
+        )
+        det = _make_detector(cfg=cfg)
+        # nose at x=0.478 → yaw_norm=0.28; yaw_limit at 60°=(26/60)*tan(60°)≈0.75
+        kps = list(_FRONTAL_KPS)
+        kps[2] = (0.478, 0.455)
+        results = _make_results(kps)
+        assert det._is_within_cone(results) is True
