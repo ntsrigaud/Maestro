@@ -129,6 +129,10 @@ def build_container(
     overlay_renderer = OverlayRenderer(
         mirror_display=config.app.mirror_display,
         command_map=command_map,
+        # Produce RGB output when the preview window is active so Qt widgets
+        # (QImage.Format_RGB888) receive frames in the correct channel order
+        # without an additional per-frame copy.
+        output_rgb=show_window,
     )
     benchmark = LatencyBenchmark()
 

@@ -18,6 +18,7 @@ from maestro.app.ui.config_panel import ConfigPanel
 from maestro.app.ui.controller import RuntimeController
 from maestro.app.ui.launcher_panel import LauncherPanel
 from maestro.app.ui.model_panel import ModelPanel
+from maestro.app.ui.preview_widget import PreviewWidget
 from maestro.app.ui.status_monitor import StatusMonitor
 from maestro.domain.entities import RuntimeState
 
@@ -50,6 +51,7 @@ class MainWindow(QMainWindow):
         # --- Subcomponents ---
         self._controller = RuntimeController(parent=self)
         self._launcher = LauncherPanel()
+        self._preview = PreviewWidget()
         self._monitor = StatusMonitor()
         self._config_panel = ConfigPanel(config_path=config_path)
 
@@ -72,6 +74,7 @@ class MainWindow(QMainWindow):
         central = QWidget()
         layout = QVBoxLayout(central)
         layout.addWidget(self._launcher)
+        layout.addWidget(self._preview)
         layout.addWidget(self._monitor)
         layout.addWidget(self._config_panel)
         layout.addWidget(self._model_panel)
@@ -105,8 +108,10 @@ class MainWindow(QMainWindow):
         )
         self._controller.error_occurred.connect(self._launcher.on_error)
         self._controller.state_updated.connect(self._monitor.on_state)
+        self._controller.state_updated.connect(self._preview.on_state)
         self._controller.state_updated.connect(self._on_tray_update)
         self._controller.state_updated.connect(self._on_log_event)
+        self._controller.runtime_stopped.connect(self._preview.hide)
 
         self._config_panel.apply_requested.connect(self._on_apply_requested)
 
