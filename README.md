@@ -9,7 +9,7 @@ The system recognizes 8 hand gestures from a live webcam feed and maps them to a
 **Core pipeline:**
 
 ```
-Camera → MediaPipe Hands → Feature Engineering → Sliding Window Buffer
+Camera → MediaPipe Hands → Hand Selection → Feature Engineering → Sliding Window Buffer
 → LSTM Inference → Prediction Stabilization → Activation Controller
 → Command Dispatch → Application Adapter → OS Keyboard Events
 ```
@@ -159,7 +159,7 @@ The training pipeline includes group-aware data splitting (no recording leakage)
 | Production model         | [`ntsrigaud/maestro-lstm`](https://huggingface.co/ntsrigaud/maestro-lstm) — Macro-F1 **0.96** |
 | Model loading            | Hugging Face Hub (cached, no training required)                                               |
 | Gaze activation          | `HeadPoseGazeDetector` — sole arming mechanism                                                |
-| Test suite               | 269 tests, 0 failures                                                                         |
+| Test suite               | 282 tests, 0 failures                                                                         |
 | Tracked binary weights   | **0 MB** — all `.pt` artifacts excluded from VCS                                              |
 
 The complete development history is recorded in [docs/architecture/](docs/architecture/) and [docs/archive/work-logs/](docs/archive/work-logs/).
