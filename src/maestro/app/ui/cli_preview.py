@@ -82,7 +82,6 @@ class CLIPreviewWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def keyPressEvent(self, event: object) -> None:  # type: ignore[override]
-        from PySide6.QtCore import QEvent  # local import avoids top-level cycle
 
         key = getattr(event, "key", lambda: None)()
         if key in (Qt.Key.Key_Q, Qt.Key.Key_Escape):
