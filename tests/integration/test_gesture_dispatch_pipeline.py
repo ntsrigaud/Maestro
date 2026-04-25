@@ -643,8 +643,7 @@ class TestGazeGateIntegration:
             rate_limit_window_ms=1000,
         )
         self._patcher = patch(
-            "maestro.infrastructure.dispatch.app_adapters"
-            ".keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters" ".keyboard_adapter.pyautogui"
         )
         self.mock_pya = self._patcher.start()
 

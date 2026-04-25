@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from maestro.app.bootstrap import build_container
 from maestro.app.runtime import Runtime
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Maestro presentation control runtime"
-    )
+    parser = argparse.ArgumentParser(description="Maestro presentation control runtime")
     parser.add_argument(
         "--config",
         default="configs",
@@ -53,14 +52,38 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    container = build_container(
-        args.config,
-        model_artifact_path=args.model_artifact,
-        hf_revision_override=args.hf_revision,
-        show_window=not args.no_display,
-    )
-    runtime = Runtime(container)
-    runtime.run(benchmark_output=args.benchmark_output, max_frames=args.max_frames)
+    show_window = not args.no_display
+
+    if show_window:
+        # Qt-native preview path — identical rendering component to the GUI.
+        # RuntimeController runs inference in a QThread; CLIPreviewWindow
+        # displays frames via PreviewWidget on the main thread.
+        from PySide6.QtWidgets import QApplication
+
+        from maestro.app.ui.cli_preview import CLIPreviewWindow
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        window = CLIPreviewWindow()
+        window.show()
+        window.start(
+            args.config,
+            artifact_path=args.model_artifact,
+            hf_revision_override=args.hf_revision,
+        )
+        sys.exit(app.exec())
+    else:
+        # Headless path — no Qt dependency; benchmark and max-frames available.
+        container = build_container(
+            args.config,
+            model_artifact_path=args.model_artifact,
+            hf_revision_override=args.hf_revision,
+            show_window=False,
+        )
+        runtime = Runtime(container)
+        runtime.run(
+            benchmark_output=args.benchmark_output,
+            max_frames=args.max_frames,
+        )
 
 
 if __name__ == "__main__":

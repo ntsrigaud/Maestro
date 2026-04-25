@@ -24,9 +24,7 @@ def _landmarks(count: int = 21) -> list[SimpleNamespace]:
     return [SimpleNamespace(x=0.5, y=0.4, z=0.0) for _ in range(count)]
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_extract_returns_invalid_when_no_hand(mock_hands_cls: MagicMock) -> None:
     hands_obj = MagicMock()
     hands_obj.process.return_value = SimpleNamespace(
@@ -44,9 +42,7 @@ def test_extract_returns_invalid_when_no_hand(mock_hands_cls: MagicMock) -> None
     assert result.timestamp_ms == 100
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_extract_returns_valid_packet_for_detected_hand(
     mock_hands_cls: MagicMock,
 ) -> None:
@@ -73,9 +69,7 @@ def test_extract_returns_valid_packet_for_detected_hand(
     assert result.timestamp_ms == 100
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_extract_rejects_low_detection_confidence(mock_hands_cls: MagicMock) -> None:
     classification = SimpleNamespace(label="Left", score=0.2)
     handedness = SimpleNamespace(classification=[classification])
@@ -94,9 +88,7 @@ def test_extract_rejects_low_detection_confidence(mock_hands_cls: MagicMock) -> 
     assert result.valid is False
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_extract_rejects_low_tracking_confidence(mock_hands_cls: MagicMock) -> None:
     classification = SimpleNamespace(label="Right", score=0.98)
     handedness = SimpleNamespace(classification=[classification])
@@ -120,9 +112,7 @@ def test_extract_rejects_low_tracking_confidence(mock_hands_cls: MagicMock) -> N
     assert result.timestamp_ms == 100
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_close_calls_mediapipe_close(mock_hands_cls: MagicMock) -> None:
     hands_obj = MagicMock()
     mock_hands_cls.return_value = hands_obj
@@ -151,9 +141,7 @@ def _make_hands_obj_with_label(label: str) -> MagicMock:
     return hands_obj
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_hand_preference_right_accepts_users_right_hand(
     mock_hands_cls: MagicMock,
 ) -> None:
@@ -172,9 +160,7 @@ def test_hand_preference_right_accepts_users_right_hand(
     assert result.handedness == "Left"
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_hand_preference_right_rejects_users_left_hand(
     mock_hands_cls: MagicMock,
 ) -> None:
@@ -188,9 +174,7 @@ def test_hand_preference_right_rejects_users_left_hand(
     assert result.handedness == "Right"
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_hand_preference_left_accepts_users_left_hand(
     mock_hands_cls: MagicMock,
 ) -> None:
@@ -204,9 +188,7 @@ def test_hand_preference_left_accepts_users_left_hand(
     assert result.handedness == "Right"
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_hand_preference_left_rejects_users_right_hand(
     mock_hands_cls: MagicMock,
 ) -> None:
@@ -220,9 +202,7 @@ def test_hand_preference_left_rejects_users_right_hand(
     assert result.handedness == "Left"
 
 
-@patch(
-    "maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands"
-)
+@patch("maestro.infrastructure.mediapipe.hands_extractor.mp.solutions.hands.Hands")
 def test_hand_preference_both_accepts_any_hand(mock_hands_cls: MagicMock) -> None:
     """When hand_preference='both', either hand is accepted (no filtering applied)."""
     mock_hands_cls.return_value = _make_hands_obj_with_label("Left")
