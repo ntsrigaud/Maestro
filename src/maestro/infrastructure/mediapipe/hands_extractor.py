@@ -43,7 +43,7 @@ class MediaPipeHandsExtractor:
 
         hands: list[HandLandmarks] = []
         for handedness_proto, landmark_proto in zip(
-            result.multi_handedness, result.multi_hand_landmarks
+            result.multi_handedness, result.multi_hand_landmarks, strict=True
         ):
             cls = handedness_proto.classification[0]
             raw_landmarks = landmark_proto.landmark
@@ -70,5 +70,3 @@ class MediaPipeHandsExtractor:
 
     def close(self) -> None:
         self._hands.close()
-
-
