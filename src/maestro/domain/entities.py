@@ -74,3 +74,7 @@ class RuntimeState:
     gaze_permitted: bool = True
     active_mode: str = "unknown"
     info: dict[str, Any] = field(default_factory=dict)
+    # Rendered BGR frame for display.  Populated by Runtime when show_window is
+    # True; None otherwise.  Consumers (GUI PreviewWidget or CLI on_state
+    # callback) display this in their own thread-safe context.
+    preview_frame: Any = field(default=None)
