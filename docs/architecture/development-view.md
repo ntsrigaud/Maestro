@@ -66,12 +66,12 @@ Semantic-HGR-System/
 
 **Purpose**: Pure business concepts with no external dependencies.
 
-| Module         | Contents                                                                                                                                                       | Responsibility                                                                  |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `entities.py`  | `FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState` | Dataclasses (`slots=True`) representing pipeline state at each processing stage |
-| `enums.py`     | `RuntimeMode`                                                                                                                                                  | Finite state vocabulary as `StrEnum` type                                       |
-| `events.py`    | `DomainEvent`                                                                                                                                                  | Structured event type for telemetry and logging                                 |
-| `contracts.py` | `IRunnable`, `IClosable`                                                                                                                                       | Minimal lifecycle protocols                                                     |
+| Module         | Contents                                                                                                                                                                                           | Responsibility                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `entities.py`  | `FramePacket`, `HandLandmarks`, `MultiHandPacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState` | Dataclasses (`slots=True`) representing pipeline state at each processing stage |
+| `enums.py`     | `RuntimeMode`                                                                                                                                                                                      | Finite state vocabulary as `StrEnum` type                                       |
+| `events.py`    | `DomainEvent`                                                                                                                                                                                      | Structured event type for telemetry and logging                                 |
+| `contracts.py` | `IRunnable`, `IClosable`                                                                                                                                                                           | Minimal lifecycle protocols                                                     |
 
 **Dependency rule**: This package imports only from the Python standard library. No other package in the system may be imported here.
 
@@ -82,7 +82,7 @@ Semantic-HGR-System/
 | Interface                | Method Signature                                                    | Consumed By                   |
 | ------------------------ | ------------------------------------------------------------------- | ----------------------------- |
 | `IFrameSource`           | `read() → FramePacket`                                              | Runtime loop                  |
-| `IHandLandmarkExtractor` | `extract(FramePacket) → LandmarkPacket`                             | Runtime loop                  |
+| `IHandLandmarkExtractor` | `extract(FramePacket) → MultiHandPacket`                            | Runtime loop                  |
 | `IFeatureTransformer`    | `transform(LandmarkPacket) → FeatureFrame`                          | Runtime loop, dataset builder |
 | `ISequenceBuffer`        | `push(FeatureFrame)`, `ready() → bool`, `window() → SequenceWindow` | Runtime loop, dataset builder |
 | `IGestureModel`          | `predict(SequenceWindow) → Prediction`                              | Runtime loop                  |
@@ -118,6 +118,7 @@ Semantic-HGR-System/
 
 | Module                   | Class                         | State                                                        |
 | ------------------------ | ----------------------------- | ------------------------------------------------------------ |
+| `hand_selection.py`      | `HandSelector`                | Stateless; reads `hand_preference` config at construction    |
 | `feature_engineering.py` | `LandmarkFeatureTransformer`  | Previous frame landmarks (for velocity)                      |
 | `buffering.py`           | `SlidingWindowSequenceBuffer` | Deque of recent feature frames, step counter                 |
 | `stabilization.py`       | `PredictionStabilizer`        | EMA-smoothed probabilities, vote history deque               |
@@ -145,11 +146,11 @@ Semantic-HGR-System/
 
 **Purpose**: Application entry points and dependency wiring.
 
-| Module         | Key Components                      | Responsibility                                                            |
-| -------------- | ----------------------------------- | ------------------------------------------------------------------------- |
-| `bootstrap.py` | `AppContainer`, `build_container()` | Composition root; reads configs, loads model, instantiates all components |
-| `runtime.py`   | `Runtime`                           | Main event loop; sequential frame processing and optional UI callback     |
-| `main.py`      | `main()`, `parse_args()`            | CLI argument parsing and runtime launch (no PySide6 dependency)           |
+| Module         | Key Components                      | Responsibility                                                                                                                                                                                                                        |
+| -------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bootstrap.py` | `AppContainer`, `build_container()` | Composition root; reads configs, loads model, instantiates all components. `AppContainer` holds a `hand_selector: HandSelector` field between `landmark_extractor` and `feature_transformer`.                                         |
+| `runtime.py`   | `Runtime`                           | Main event loop; sequential frame processing and optional UI callback. The extraction step now calls `landmark_extractor.extract()` → `MultiHandPacket`, then `hand_selector.select()` → `LandmarkPacket` before feature engineering. |
+| `main.py`      | `main()`, `parse_args()`            | CLI argument parsing and runtime launch (no PySide6 dependency)                                                                                                                                                                       |
 
 **Dependency rule**: May import from all other packages. This is the only package that performs concrete instantiation.
 

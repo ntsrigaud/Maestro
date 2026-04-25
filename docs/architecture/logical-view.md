@@ -16,6 +16,7 @@ graph TB
     end
 
     subgraph Pipeline ["Pipeline Layer"]
+        HandSel["Hand<br/>Selection"]
         FeatureEng["Feature<br/>Engineering"]
         Buffering["Temporal<br/>Buffering"]
         Stabilization["Prediction<br/>Stabilization"]
@@ -32,7 +33,7 @@ graph TB
     end
 
     subgraph Domain ["Domain Layer"]
-        Entities["Domain Entities<br/>(FramePacket, LandmarkPacket,<br/>FeatureFrame, SequenceWindow,<br/>Prediction, StabilizedPrediction,<br/>ExecutableCommand, DispatchResult)"]
+        Entities["Domain Entities<br/>(FramePacket, HandLandmarks, MultiHandPacket,<br/>LandmarkPacket, FeatureFrame, SequenceWindow,<br/>Prediction, StabilizedPrediction,<br/>ExecutableCommand, DispatchResult)"]
         Interfaces["Protocol Interfaces<br/>(IFrameSource, IHandLandmarkExtractor,<br/>IFeatureTransformer, ISequenceBuffer,<br/>IGestureModel, IPredictionStabilizer,<br/>IActivationController, ICommandDispatcher,<br/>IFeedbackRenderer, IGazeIntentDetector)"]
         Enums["Enums & Contracts<br/>(RuntimeMode,<br/>IRunnable, IClosable)"]
     end
@@ -40,6 +41,7 @@ graph TB
     Bootstrap --> Camera
     Bootstrap --> MediaPipe
     Bootstrap --> LSTMModel
+    Bootstrap --> HandSel
     Bootstrap --> FeatureEng
     Bootstrap --> Buffering
     Bootstrap --> Stabilization
@@ -50,6 +52,7 @@ graph TB
 
     RuntimeLoop --> Camera
     RuntimeLoop --> MediaPipe
+    RuntimeLoop --> HandSel
     RuntimeLoop --> FeatureEng
     RuntimeLoop --> Buffering
     RuntimeLoop --> LSTMModel
@@ -77,12 +80,12 @@ graph TB
 
 The domain layer contains pure data structures and abstract contracts. It has no dependencies on external libraries.
 
-| Component               | Responsibility                                                                                                                                                                                                                                        |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Entities**            | Dataclasses (using `slots=True`) representing pipeline data at each processing stage: `FramePacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState`. |
-| **Protocol Interfaces** | Ten `typing.Protocol` definitions that specify the behavioral contract for each pipeline stage. Implementations satisfy these contracts through structural subtyping.                                                                                 |
-| **Enums**               | `RuntimeMode` (IDLE, ARMED, COOLDOWN) defines the activation state machine vocabulary.                                                                                                                                                                |
-| **Contracts**           | `IRunnable` and `IClosable` protocols for lifecycle management.                                                                                                                                                                                       |
+| Component               | Responsibility                                                                                                                                                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Entities**            | Dataclasses (using `slots=True`) representing pipeline data at each processing stage: `FramePacket`, `HandLandmarks`, `MultiHandPacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState`. |
+| **Protocol Interfaces** | Ten `typing.Protocol` definitions that specify the behavioral contract for each pipeline stage. Implementations satisfy these contracts through structural subtyping.                                                                                                                     |
+| **Enums**               | `RuntimeMode` (IDLE, ARMED, COOLDOWN) defines the activation state machine vocabulary.                                                                                                                                                                                                    |
+| **Contracts**           | `IRunnable` and `IClosable` protocols for lifecycle management.                                                                                                                                                                                                                           |
 
 ### 3.2 Infrastructure Layer
 
@@ -105,6 +108,7 @@ The pipeline layer contains stateful processing components that sit between raw 
 
 | Component                       | Interface               | Responsibility                                                                                                                                                                                                                                                                                                                               |
 | ------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **HandSelector**                | _(no Protocol)_         | Applies the user's `hand_preference` configuration to select one hand from a `MultiHandPacket`, producing a `LandmarkPacket`. Encodes the selfie-view handedness inversion (`"right"` → MP `"Left"`, `"left"` → MP `"Right"`). Marks the packet `valid=False` if the preferred hand is absent or below confidence thresholds.                |
 | **LandmarkFeatureTransformer**  | `IFeatureTransformer`   | Transforms raw 21×3 landmarks into a **147-dimensional feature vector** (feature-schema-v5) through wrist-relative centering, scale normalization, fingertip spread, wrist trajectory, velocity, joint angles, and wrist velocity in camera-normalized coordinates. Maintains per-frame state for velocity and wrist trajectory computation. |
 | **SlidingWindowSequenceBuffer** | `ISequenceBuffer`       | Accumulates feature vectors in a fixed-length deque (default 24 frames). Emits a `SequenceWindow` when the buffer is full, the step interval has elapsed, and the valid-frame ratio exceeds the minimum threshold.                                                                                                                           |
 | **PredictionStabilizer**        | `IPredictionStabilizer` | Applies three-stage filtering: (1) exponential moving average smoothing on class probabilities, (2) per-class confidence thresholding, and (3) temporal majority voting over a configurable window.                                                                                                                                          |

@@ -11,7 +11,8 @@ graph TD
     A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| B["Gaze Estimation<br/>(BlazeFace + Head Pose)"]
     B -->|gaze_permitted=false| Z["Skip to next frame"]
     B -->|gaze_permitted=true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
-    C -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
+    C -->|MultiHandPacket| Cs["Hand Selection<br/>(HandSelector)"]
+    Cs -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
     D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 24x147)"]
     E -->|SequenceWindow| F["Two-Stream LSTM<br/>(Hidden=64/stream, Fused=128, 8-Class)"]
     F -->|Prediction| G["Prediction Stabilizer<br/>(EMA + Threshold + Voting)"]
@@ -64,18 +65,27 @@ This stage does not produce a domain entity. `gaze_permitted` flows directly int
 
 **Component**: `MediaPipeHandsExtractor`  
 **Input**: `FramePacket`  
-**Output**: `LandmarkPacket`
+**Output**: `MultiHandPacket`
 
-| Field          | Type                            | Description                                        |
-| -------------- | ------------------------------- | -------------------------------------------------- |
-| `landmarks`    | `numpy.ndarray` (21×3, float32) | Hand landmark coordinates (x, y, z)                |
-| `handedness`   | `str`                           | `"Left"` or `"Right"`                              |
-| `detect_conf`  | `float`                         | Detection confidence [0, 1]                        |
-| `track_conf`   | `float`                         | Tracking confidence [0, 1]                         |
-| `timestamp_ms` | `float`                         | Inherited from input frame                         |
-| `valid`        | `bool`                          | `True` if hand detected with sufficient confidence |
+The extractor is preference-agnostic: it always configures MediaPipe with `max_num_hands=2` and returns every detected hand without filtering.
 
-The BGR frame is converted to RGB and processed by MediaPipe Hands. The model extracts 21 hand landmarks representing the wrist, palm, and finger joints. If detection confidence falls below the configured threshold (default 0.7) or no hand is detected, the packet is marked `valid=False`.
+| Field          | Type                  | Description                                           |
+| -------------- | --------------------- | ----------------------------------------------------- |
+| `hands`        | `list[HandLandmarks]` | 0–2 entries ordered by MediaPipe detection confidence |
+| `timestamp_ms` | `int`                 | Inherited from input frame                            |
+
+Each `HandLandmarks` entry contains:
+
+| Field         | Type                | Description                                        |
+| ------------- | ------------------- | -------------------------------------------------- |
+| `label`       | `str`               | MediaPipe selfie-view label: `"Left"` or `"Right"` |
+| `landmarks`   | `list[list[float]]` | 21 × [x, y, z] hand landmark coordinates           |
+| `detect_conf` | `float`             | MediaPipe handedness classification score [0, 1]   |
+| `track_conf`  | `float`             | Ratio of finite (non-NaN) landmark points [0, 1]   |
+
+The BGR frame is converted to RGB using `cv2.cvtColor` (producing a C-contiguous array required by MediaPipe's C extensions) and processed by `mediapipe.solutions.hands.Hands`. If no hands are detected, `hands` is an empty list.
+
+> **Note on handedness labels**: MediaPipe assumes a mirrored (selfie-view) frame. In a standard non-mirrored webcam feed the user's physical right hand is labelled `"Left"` and vice versa. Hand-preference resolution is delegated to `HandSelector` in Stage 4.
 
 **Landmark indices (MediaPipe convention)**:
 
@@ -86,7 +96,29 @@ The BGR frame is converted to RGB and processed by MediaPipe Hands. The model ex
 - 13–16: Ring finger
 - 17–20: Pinky finger
 
-### Stage 4: Feature Engineering
+### Stage 4: Hand Selection
+
+**Component**: `HandSelector`  
+**Input**: `MultiHandPacket`  
+**Output**: `LandmarkPacket`
+
+| Field          | Type                | Description                                                     |
+| -------------- | ------------------- | --------------------------------------------------------------- |
+| `landmarks`    | `list[list[float]]` | 21 × [x, y, z] coordinates of the selected hand                 |
+| `handedness`   | `str \| None`       | MediaPipe label of the selected hand (`"Left"` / `"Right"`)     |
+| `detect_conf`  | `float`             | Detection confidence of the selected hand [0, 1]                |
+| `track_conf`   | `float`             | Track confidence of the selected hand [0, 1]                    |
+| `timestamp_ms` | `int`               | Inherited from input                                            |
+| `valid`        | `bool`              | `True` only if a qualifying hand was found above all thresholds |
+
+`HandSelector` applies the user's `hand_preference` configuration to choose one hand from the `MultiHandPacket`:
+
+- **`hand_preference: "right"` / `"left"`**: Selects the hand whose MediaPipe label matches the inverted mapping (`"right"` → MP `"Left"`, `"left"` → MP `"Right"`). If the preferred hand is absent, the first detected hand is returned with `valid=False`.
+- **`hand_preference: "both"`**: Selects the hand with the highest `detect_conf`.
+
+A packet is marked `valid=True` only if the selected hand's `detect_conf ≥ min_handedness_conf` (default 0.7) and `track_conf ≥ min_track_conf` (default 0.5).
+
+### Stage 5: Feature Engineering
 
 **Component**: `LandmarkFeatureTransformer`  
 **Input**: `LandmarkPacket`  
@@ -123,7 +155,7 @@ The output vector is the concatenation of six feature blocks (feature-schema-v5)
 
 If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is emitted to maintain buffer alignment.
 
-### Stage 5: Temporal Buffering
+### Stage 6: Temporal Buffering
 
 **Component**: `SlidingWindowSequenceBuffer`  
 **Input**: `FeatureFrame`  
@@ -144,7 +176,7 @@ The buffer is a fixed-length deque (default length 24). Feature frames are pushe
 
 At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 24-frame window spans approximately 800 ms of hand motion, capturing sufficient temporal context for dynamic gesture recognition.
 
-### Stage 6: Two-Stream LSTM Inference
+### Stage 7: Two-Stream LSTM Inference
 
 **Component**: `TwoStreamGestureLSTM`  
 **Input**: `SequenceWindow`  
@@ -190,7 +222,7 @@ The two-stream architecture addresses the directional signal dilution identified
 
 The model runs in `torch.no_grad()` evaluation mode. `checkpoint_loader.py` validates that `artifact_type` equals `two_stream_lstm_inference` before reconstructing the model; any other artifact type raises `ValueError` to prevent silent failure.
 
-### Stage 7: Prediction Stabilization
+### Stage 8: Prediction Stabilization
 
 **Component**: `PredictionStabilizer`  
 **Input**: `Prediction`  
@@ -227,7 +259,7 @@ if not all(recent_N == candidate):
 
 Dynamic gestures use vote_window=1 (immediate response). Static holds use vote_window=3 (require 3 consecutive agreements).
 
-### Stage 8: Activation Control
+### Stage 9: Activation Control
 
 **Component**: `GestureActivationController`  
 **Input**: `StabilizedPrediction`  
@@ -250,7 +282,7 @@ A command is emitted only when:
 
 Most iterations produce `None` (no command). Commands are emitted approximately once per intentional gesture, typically separated by several seconds.
 
-### Stage 9: Command Dispatch
+### Stage 10: Command Dispatch
 
 **Component**: `CommandDispatcher` → `ApplicationAdapter` → `KeyboardAdapter`  
 **Input**: `ExecutableCommand`  
@@ -269,7 +301,7 @@ The dispatch chain applies three validation stages before OS interaction:
 2. **Rate limiting**: Sliding-window deque enforces maximum dispatch frequency.
 3. **Key name validation**: Each key in the shortcut tuple is validated against `_SAFE_KEY_NAMES`.
 
-### Stage 10: Keyboard Execution
+### Stage 11: Keyboard Execution
 
 **Component**: `KeyboardAdapter`  
 **Input**: Validated key tuple from application adapter  
@@ -329,14 +361,15 @@ from its pre-UI implementation.
 
 ## 5. Data Volume Summary
 
-| Pipeline Point  | Data Size                      | Frequency             |
-| --------------- | ------------------------------ | --------------------- |
-| Raw frame       | ~2.7 MB (1280×720×3)           | 30 Hz                 |
-| Landmark packet | 252 bytes (21×3×4)             | 30 Hz                 |
-| Feature vector  | 588 bytes (147×4)              | 30 Hz                 |
-| Sequence window | 14,112 bytes (24×147×4)        | ~10 Hz                |
-| Prediction      | ~200 bytes (8 floats + labels) | ~10 Hz                |
-| Command         | ~100 bytes                     | ~0.1 Hz (per gesture) |
+| Pipeline Point    | Data Size                      | Frequency             |
+| ----------------- | ------------------------------ | --------------------- |
+| Raw frame         | ~2.7 MB (1280×720×3)           | 30 Hz                 |
+| Multi-hand packet | 0–504 bytes (0–2 × 21×3×4)     | 30 Hz                 |
+| Landmark packet   | 252 bytes (21×3×4)             | 30 Hz                 |
+| Feature vector    | 588 bytes (147×4)              | 30 Hz                 |
+| Sequence window   | 14,112 bytes (24×147×4)        | ~10 Hz                |
+| Prediction        | ~200 bytes (8 floats + labels) | ~10 Hz                |
+| Command           | ~100 bytes                     | ~0.1 Hz (per gesture) |
 
 The pipeline progressively reduces data volume by approximately four orders of magnitude, from ~2.7 MB raw frames to ~100-byte commands.
 
