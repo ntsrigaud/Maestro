@@ -485,7 +485,14 @@ class TestIsWithinCone:
         """A degenerate detection with very small inter-eye distance is rejected."""
         det = _make_detector()
         # right_eye and left_eye only 0.005 apart → inter_eye < _MIN_INTER_EYE_RELATIVE
-        tiny_kps = [(0.500, 0.40), (0.505, 0.40), (0.502, 0.455), _MOUTH, _RIGHT_EAR, _LEFT_EAR]
+        tiny_kps = [
+            (0.500, 0.40),
+            (0.505, 0.40),
+            (0.502, 0.455),
+            _MOUTH,
+            _RIGHT_EAR,
+            _LEFT_EAR,
+        ]
         results = _make_results(tiny_kps)
         assert det._is_within_cone(results) is False
 
