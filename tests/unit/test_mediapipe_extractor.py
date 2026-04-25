@@ -225,9 +225,7 @@ def test_bgr_to_rgb_uses_cvtcolor(mock_hands_cls: MagicMock) -> None:
     )
     mock_hands_cls.return_value = hands_obj
 
-    with patch(
-        "maestro.infrastructure.mediapipe.hands_extractor.cv2.cvtColor"
-    ) as mock_cvt:
+    with patch("maestro.infrastructure.mediapipe.hands_extractor.cv2.cvtColor") as mock_cvt:
         mock_cvt.return_value = _frame_packet().frame
         MediaPipeHandsExtractor().extract(_frame_packet())
 
@@ -249,4 +247,3 @@ def test_close_calls_mediapipe_close(mock_hands_cls: MagicMock) -> None:
     extractor.close()
 
     hands_obj.close.assert_called_once()
-
