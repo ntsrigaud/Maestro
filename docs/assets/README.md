@@ -18,11 +18,11 @@ docs/assets/
 
 Screenshots follow the pattern `<scope>-<state>[--<variant>].png`:
 
-| Segment   | Purpose                                            | Examples                                 |
-| --------- | -------------------------------------------------- | ---------------------------------------- |
-| `scope`   | The surface or component being captured            | `ui`, `cli`, `config`, `tray`            |
-| `state`   | The application or component state at capture time | `idle`, `running`, `error`, `building`   |
-| `variant` | Optional disambiguator when multiple shots exist   | `--preview`, `--monitor`, `--detail`     |
+| Segment   | Purpose                                            | Examples                               |
+| --------- | -------------------------------------------------- | -------------------------------------- |
+| `scope`   | The surface or component being captured            | `ui`, `cli`, `config`, `tray`          |
+| `state`   | The application or component state at capture time | `idle`, `running`, `error`, `building` |
+| `variant` | Optional disambiguator when multiple shots exist   | `--preview`, `--monitor`, `--detail`   |
 
 Examples: `ui-running--preview.png`, `config-validation-error.png`.
 
@@ -45,9 +45,11 @@ Use paths relative to the Markdown file that contains the reference:
 
 ```markdown
 <!-- From docs/architecture/ui-view.md (two levels up from docs/assets/) -->
+
 ![Idle state](../assets/screenshots/ui-idle.png)
 
 <!-- From README.md (repo root, one level up from docs/) -->
+
 ![Running with preview](docs/assets/screenshots/ui-running-preview.png)
 ```
 
