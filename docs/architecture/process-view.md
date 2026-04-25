@@ -40,17 +40,18 @@ graph TD
     Gaze --> GazeOk{Gaze Permitted?}
     GazeOk -->|No| Render
     GazeOk -->|Yes| Extract["3. Landmark Extraction<br/>MediaPipeHandsExtractor.extract()"]
-    Extract --> Transform["4. Feature Transform<br/>LandmarkFeatureTransformer.transform()"]
-    Transform --> Buffer["5. Buffer Push<br/>SlidingWindowSequenceBuffer.push()"]
+    Extract --> Select["4. Hand Selection<br/>HandSelector.select()"]
+    Select --> Transform["5. Feature Transform<br/>LandmarkFeatureTransformer.transform()"]
+    Transform --> Buffer["6. Buffer Push<br/>SlidingWindowSequenceBuffer.push()"]
     Buffer --> Ready{Buffer Ready?}
     Ready -->|No| Render
-    Ready -->|Yes| Infer["6. Two-Stream LSTM Inference<br/>TwoStreamGestureLSTM.predict()"]
-    Infer --> Stabilize["7. Stabilize<br/>PredictionStabilizer.update()"]
-    Stabilize --> Activate["8. Activation Routing<br/>GestureActivationController.route()"]
+    Ready -->|Yes| Infer["7. Two-Stream LSTM Inference<br/>TwoStreamGestureLSTM.predict()"]
+    Infer --> Stabilize["8. Stabilize<br/>PredictionStabilizer.update()"]
+    Stabilize --> Activate["9. Activation Routing<br/>GestureActivationController.route()"]
     Activate --> HasCmd{Command?}
-    HasCmd -->|Yes| Dispatch["9. Dispatch<br/>CommandDispatcher.dispatch()"]
+    HasCmd -->|Yes| Dispatch["10. Dispatch<br/>CommandDispatcher.dispatch()"]
     HasCmd -->|No| Render
-    Dispatch --> Render["10. Render Overlay<br/>OverlayRenderer.render()"]
+    Dispatch --> Render["11. Render Overlay<br/>OverlayRenderer.render()"]
     Render --> Display["Display Frame<br/>cv2.imshow()<br/>(opt-in; GUI default: off)"]
     Display --> KeyCheck{Key Press?}
     KeyCheck -->|Q / ESC| Shutdown([Graceful Shutdown])
@@ -62,18 +63,19 @@ graph TD
 
 At 30 FPS target, each loop iteration has a ~33 ms budget. The pipeline stages consume approximately:
 
-| Stage               | Typical Latency | Notes                                               |
-| ------------------- | --------------- | --------------------------------------------------- |
-| Frame Capture       | 1–2 ms          | Blocks until frame available; buffer size = 1       |
-| Gaze Estimation     | 1–2 ms          | MediaPipe BlazeFace amortized; runs at ⅓ frame rate |
-| Landmark Extraction | 15–25 ms        | MediaPipe CPU inference; skipped if gaze absent     |
-| Feature Transform   | < 1 ms          | NumPy array operations                              |
-| Buffer Push         | < 0.1 ms        | Deque append                                        |
-| LSTM Inference      | 20–30 ms        | PyTorch CPU forward pass (when buffer ready)        |
-| Stabilization       | < 0.1 ms        | EMA + deque lookup                                  |
-| Activation Routing  | < 0.1 ms        | State machine transition                            |
-| Command Dispatch    | < 1 ms          | pyautogui call (when command emitted)               |
-| Overlay Render      | 1–2 ms          | OpenCV text/rectangle drawing                       |
+| Stage               | Typical Latency | Notes                                                |
+| ------------------- | --------------- | ---------------------------------------------------- |
+| Frame Capture       | 1–2 ms          | Blocks until frame available; buffer size = 1        |
+| Gaze Estimation     | 1–2 ms          | MediaPipe BlazeFace amortized; runs at ⅓ frame rate  |
+| Landmark Extraction | 15–25 ms        | MediaPipe CPU inference; skipped if gaze absent      |
+| Hand Selection      | < 0.1 ms        | In-memory preference filtering over 0–2 hand entries |
+| Feature Transform   | < 1 ms          | NumPy array operations                               |
+| Buffer Push         | < 0.1 ms        | Deque append                                         |
+| LSTM Inference      | 20–30 ms        | PyTorch CPU forward pass (when buffer ready)         |
+| Stabilization       | < 0.1 ms        | EMA + deque lookup                                   |
+| Activation Routing  | < 0.1 ms        | State machine transition                             |
+| Command Dispatch    | < 1 ms          | pyautogui call (when command emitted)                |
+| Overlay Render      | 1–2 ms          | OpenCV text/rectangle drawing                        |
 
 **Total end-to-end (gaze active)**: ~40–60 ms per frame (without LSTM inference), ~60–80 ms when inference triggers. Gaze estimation adds ~1–2 ms amortized per frame because BlazeFace is sampled at 10 Hz (every 3rd frame) and the result is cached. When gaze is absent, the per-frame cost drops to ~3–5 ms (capture + gaze check + render).
 
