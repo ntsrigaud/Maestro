@@ -28,8 +28,13 @@ def _make_gaze_permitted_container() -> SimpleNamespace:
     landmark_packet.valid = True
     landmark_packet.landmarks = []
 
+    multi_packet = MagicMock()
+
     landmark_extractor = MagicMock()
-    landmark_extractor.extract.return_value = landmark_packet
+    landmark_extractor.extract.return_value = multi_packet
+
+    hand_selector = MagicMock()
+    hand_selector.select.return_value = landmark_packet
 
     feature_frame = MagicMock()
     feature_frame.valid = True
@@ -58,6 +63,7 @@ def _make_gaze_permitted_container() -> SimpleNamespace:
         frame_source=frame_source,
         gaze_detector=gaze_detector,
         landmark_extractor=landmark_extractor,
+        hand_selector=hand_selector,
         feature_transformer=feature_transformer,
         sequence_buffer=sequence_buffer,
         model_artifact=MagicMock(),
@@ -97,6 +103,7 @@ def _make_gaze_absent_container() -> SimpleNamespace:
         frame_source=frame_source,
         gaze_detector=gaze_detector,
         landmark_extractor=MagicMock(),
+        hand_selector=MagicMock(),
         feature_transformer=MagicMock(),
         sequence_buffer=MagicMock(),
         model_artifact=MagicMock(),
