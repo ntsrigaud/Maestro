@@ -29,27 +29,6 @@ from maestro.utils.schema_validation import RuntimeConfig
 LOGGER = logging.getLogger(__name__)
 
 
-def _imshow(window_name: str, frame: np.ndarray) -> bool:
-    """
-    Try to display a frame using cv2.imshow.
-
-    Returns True on success, False if the display backend is unavailable
-    (e.g. headless OpenCV build or called from a non-main thread while a
-    Qt event loop is already running).  On failure a warning is logged once
-    so the caller can disable show_window for subsequent frames.
-    """
-    try:
-        cv2.imshow(window_name, frame)
-        return True
-    except cv2.error as exc:
-        LOGGER.warning(
-            "cv2.imshow unavailable (headless build or Qt thread conflict); "
-            "disabling preview window. Reason: %s",
-            exc,
-        )
-        return False
-
-
 class RuntimeDependencies(Protocol):
     config: RuntimeConfig
     frame_source: IFrameSource
@@ -135,11 +114,13 @@ class Runtime:
                     overlay_frame = self._container.overlay_renderer.render(
                         frame, absent_state
                     )
+                    # Attach the rendered frame so the caller (GUI widget or
+                    # CLI on_state callback) can display it in its own
+                    # thread-safe context.  overlay_frame.frame is a fresh
+                    # canvas copy produced by OverlayRenderer, so no
+                    # additional copy is needed.
                     if self._container.show_window:
-                        if not _imshow(app_name, overlay_frame.frame):
-                            self._container.show_window = False
-                        elif cv2.waitKey(1) & 0xFF == ord("q"):
-                            self.stop()
+                        absent_state.preview_frame = overlay_frame.frame
                     processed_frames += 1
                     if self._on_state is not None:
                         self._on_state(absent_state)
@@ -236,15 +217,15 @@ class Runtime:
                     },
                 )
 
+                overlay_frame = self._container.overlay_renderer.render(frame, state)
+                # Attach the rendered frame before emitting state so consumers
+                # (GUI PreviewWidget via Qt signal, CLI on_state callback) can
+                # display it in their own thread-safe context.
+                if self._container.show_window:
+                    state.preview_frame = overlay_frame.frame
+
                 if self._on_state is not None:
                     self._on_state(state)
-
-                overlay_frame = self._container.overlay_renderer.render(frame, state)
-                if self._container.show_window:
-                    if not _imshow(app_name, overlay_frame.frame):
-                        self._container.show_window = False
-                    elif cv2.waitKey(1) & 0xFF == ord("q"):
-                        self.stop()
 
                 if processed_frames % 30 == 0:
                     LOGGER.info(
