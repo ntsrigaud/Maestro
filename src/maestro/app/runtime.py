@@ -5,7 +5,6 @@ import time
 from collections.abc import Callable
 from typing import Protocol
 
-import cv2
 import numpy as np
 import torch
 
@@ -254,7 +253,6 @@ class Runtime:
             self._container.frame_source.close()
             self._container.gaze_detector.close()
             self._container.landmark_extractor.close()
-            cv2.destroyAllWindows()
             self._running = False
             LOGGER.info("Runtime shutdown complete.")
 
