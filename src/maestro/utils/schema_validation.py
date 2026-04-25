@@ -25,6 +25,10 @@ class GazeConfig(BaseModel):
     # Face Mesh is called every N frames; the cached result is returned for
     # intermediate frames.  At 30 FPS and N=3, Face Mesh runs at ~10 Hz.
     sample_interval_frames: int = Field(default=3, ge=1, le=30)
+    # Minimum BlazeFace detection confidence score [0, 1] required before a
+    # keypoint-based head-pose check is attempted.  Lower values accept more
+    # detections at range but increase false-positive cone membership.
+    min_detection_score: float = Field(default=0.5, gt=0.0, le=1.0)
 
 
 class AppConfig(BaseModel):
