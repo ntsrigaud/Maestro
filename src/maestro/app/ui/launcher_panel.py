@@ -14,10 +14,10 @@ from PySide6.QtWidgets import (
 # Design tokens (colours only — spacing handled by layouts)
 # ---------------------------------------------------------------------------
 _COLOUR = {
-    "idle": "#6B7280",      # neutral grey
+    "idle": "#6B7280",  # neutral grey
     "building": "#D97706",  # amber
-    "running": "#059669",   # emerald green
-    "error": "#DC2626",     # red
+    "running": "#059669",  # emerald green
+    "error": "#DC2626",  # red
 }
 
 
@@ -121,9 +121,7 @@ class LauncherPanel(QWidget):
 
     def _apply_state(self) -> None:
         colour = _COLOUR[self._state]
-        self._dot.setStyleSheet(
-            f"background-color: {colour}; border-radius: 5px;"
-        )
+        self._dot.setStyleSheet(f"background-color: {colour}; border-radius: 5px;")
         self._status_text.setText(self._CHIP_TEXT[self._state])
         self._status_text.setStyleSheet(f"color: {colour}; font-weight: 600;")
         self._btn.setText(self._LABELS[self._state])

@@ -23,9 +23,7 @@ from maestro.infrastructure.dispatch.command_dispatcher import (
 # ---------------------------------------------------------------------------
 
 
-def _command(
-    command_id: str = "next_slide", gesture: str = "swipe_right"
-) -> ExecutableCommand:
+def _command(command_id: str = "next_slide", gesture: str = "swipe_right") -> ExecutableCommand:
     return ExecutableCommand(
         command_id=command_id,
         source_gesture=gesture,
@@ -158,11 +156,7 @@ def _make_dispatcher(
     mock_adapter.execute.return_value = DispatchResult(
         success=True, command_id="next_slide", target_app="test_app", detail="ok"
     )
-    cmd_set = (
-        allowed
-        if allowed is not None
-        else {"next_slide", "previous_slide", "raise_hand"}
-    )
+    cmd_set = allowed if allowed is not None else {"next_slide", "previous_slide", "raise_hand"}
     dispatcher = CommandDispatcher(
         adapter=mock_adapter,
         allowed_commands=cmd_set,

@@ -35,8 +35,7 @@ from maestro.utils.schema_validation import GazeConfig
 # ---------------------------------------------------------------------------
 
 _MP_FACE_DETECTION = (
-    "maestro.infrastructure.gaze.head_pose_detector"
-    ".mp.solutions.face_detection.FaceDetection"
+    "maestro.infrastructure.gaze.head_pose_detector.mp.solutions.face_detection.FaceDetection"
 )
 _MONOTONIC = "maestro.infrastructure.gaze.head_pose_detector.time.monotonic"
 

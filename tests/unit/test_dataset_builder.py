@@ -76,9 +76,7 @@ def test_label_alignment_majority_strategy() -> None:
 
 
 def test_unknown_label_raises_validation_error() -> None:
-    builder = SequenceDatasetBuilder(
-        vocabulary=["swipe_right", "unknown"], window_length=4
-    )
+    builder = SequenceDatasetBuilder(vocabulary=["swipe_right", "unknown"], window_length=4)
 
     with pytest.raises(ValueError, match="Unknown label"):
         builder.add_frame(_frame(0, label="not_in_vocab"))
@@ -101,6 +99,4 @@ def test_dataset_serialization_roundtrip(tmp_path: Path) -> None:
     assert payload["label_ids"].shape == (3,)
     assert payload["metadata"]["window_length"] == 4
     assert payload["metadata"]["feature_dim"] == 147
-    np.testing.assert_array_equal(
-        payload["labels"], np.asarray(["swipe_right"] * 3, dtype=object)
-    )
+    np.testing.assert_array_equal(payload["labels"], np.asarray(["swipe_right"] * 3, dtype=object))
