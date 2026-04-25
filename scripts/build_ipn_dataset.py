@@ -73,6 +73,7 @@ from maestro.domain.entities import FramePacket  # noqa: E402
 from maestro.infrastructure.mediapipe.hands_extractor import (  # noqa: E402
     MediaPipeHandsExtractor,
 )
+from maestro.pipeline.hand_selection import HandSelector  # noqa: E402
 from maestro.training.dataset_builder import (  # noqa: E402
     LabeledLandmarkFrame,
     SequenceDatasetBuilder,
@@ -172,9 +173,13 @@ def _extract_video_worker(args: tuple[str, str, float, float]) -> tuple[str, str
 
     extractor = MediaPipeHandsExtractor(
         static_image_mode=False,
-        max_num_hands=1,
         min_detection_confidence=min_det_conf,
         min_tracking_confidence=min_track_conf,
+    )
+    hand_selector = HandSelector(
+        hand_preference="both",
+        min_handedness_conf=min_det_conf,
+        min_track_conf=min_track_conf,
     )
 
     frame_ids: list[int] = []
@@ -192,7 +197,7 @@ def _extract_video_worker(args: tuple[str, str, float, float]) -> tuple[str, str
 
         timestamp_ms = int((frame_id - 1) * 1000.0 / fps)
         packet = FramePacket(frame=bgr, timestamp_ms=timestamp_ms, frame_id=frame_id)
-        lp = extractor.extract(packet)
+        lp = hand_selector.select(extractor.extract(packet))
 
         frame_ids.append(frame_id)
         valid_flags.append(lp.valid)
