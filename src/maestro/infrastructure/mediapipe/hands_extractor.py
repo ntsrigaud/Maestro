@@ -69,8 +69,7 @@ class MediaPipeHandsExtractor:
         detect_conf = float(handedness.score)
         track_conf = valid_points / 21.0 if landmarks else 0.0
         preference_ok = (
-            self._required_label is None
-            or handedness.label.lower() == self._required_label
+            self._required_label is None or handedness.label.lower() == self._required_label
         )
         is_valid = (
             detect_conf >= self._min_detection_confidence

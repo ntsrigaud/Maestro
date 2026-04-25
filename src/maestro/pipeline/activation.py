@@ -155,10 +155,7 @@ class GestureActivationController:
             # from the last dispatched command label.  Unaccepted frames never
             # advance _last_dispatched_label, so the 2-3 unaccepted buildup frames
             # from temporal voting do not consume the rising edge.
-            if (
-                self._edge_trigger_enabled
-                and prediction.label == self._last_dispatched_label
-            ):
+            if self._edge_trigger_enabled and prediction.label == self._last_dispatched_label:
                 LOGGER.debug(
                     "activation: edge_trigger suppressed  label=%r  (same as last dispatch)",
                     prediction.label,

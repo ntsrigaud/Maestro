@@ -3,17 +3,13 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QTimer
-from PySide6.QtGui import QColor, QFont, QIcon, QPixmap
+from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QApplication,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
-    QScrollArea,
-    QSizePolicy,
     QSplitter,
     QSystemTrayIcon,
     QTabWidget,
@@ -21,7 +17,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt
 
 from maestro.app.ui.config_panel import ConfigPanel
 from maestro.app.ui.controller import RuntimeController
@@ -354,6 +349,7 @@ class MainWindow(QMainWindow):
 
         try:
             from maestro.utils.config_loader import load_runtime_config
+
             _cfg = load_runtime_config(Path(config_path))
             _model_src = _cfg.model_source
         except Exception:
@@ -490,9 +486,7 @@ class MainWindow(QMainWindow):
                 QSystemTrayIcon.MessageIcon.Information,
                 800,
             )
-            QTimer.singleShot(
-                300, lambda: self._tray.setIcon(_make_tray_icon("#059669"))
-            )
+            QTimer.singleShot(300, lambda: self._tray.setIcon(_make_tray_icon("#059669")))
         else:
             self._tray.setIcon(_make_tray_icon("#059669"))
 
@@ -503,9 +497,7 @@ class MainWindow(QMainWindow):
             self._last_mode = state.mode
         if state.info.get("accepted"):
             ts = datetime.datetime.now().strftime("%H:%M:%S")
-            self._log.append(
-                f"[{ts}] Dispatched: {state.last_label} ({state.last_confidence:.0%})"
-            )
+            self._log.append(f"[{ts}] Dispatched: {state.last_label} ({state.last_confidence:.0%})")
 
     def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason == QSystemTrayIcon.ActivationReason.Trigger:

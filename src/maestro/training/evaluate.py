@@ -121,9 +121,7 @@ def evaluate_model(
         per_class_precision={
             class_labels[idx]: float(value) for idx, value in enumerate(precision)
         },
-        per_class_recall={
-            class_labels[idx]: float(value) for idx, value in enumerate(recall)
-        },
+        per_class_recall={class_labels[idx]: float(value) for idx, value in enumerate(recall)},
         confusion_matrix=confusion_matrix(
             y_true,
             y_pred,

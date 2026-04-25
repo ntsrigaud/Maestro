@@ -55,24 +55,18 @@ class LandmarkFeatureTransformer:
         if not landmarks.valid or len(landmarks.landmarks) != 21:
             vector = self._zero_vector()
             self._clear_velocity_state()
-            return FeatureFrame(
-                vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False
-            )
+            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
 
         if not self._all_finite(landmarks.landmarks):
             vector = self._zero_vector()
             self._clear_velocity_state()
-            return FeatureFrame(
-                vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False
-            )
+            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
 
         normalized = self._normalize_positions(landmarks.landmarks)
         if normalized is None:
             vector = self._zero_vector()
             self._clear_velocity_state()
-            return FeatureFrame(
-                vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False
-            )
+            return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=False)
 
         velocity = self._compute_velocity(normalized, landmarks.timestamp_ms)
 
@@ -116,8 +110,7 @@ class LandmarkFeatureTransformer:
         # Fingertip spread: Euclidean distance of each fingertip from the
         # wrist origin in normalised space.  Distinguishes open vs. closed hand.
         spread: list[float] = [
-            self._distance(normalized[tip], [0.0, 0.0, 0.0])
-            for tip in _FINGERTIP_INDICES
+            self._distance(normalized[tip], [0.0, 0.0, 0.0]) for tip in _FINGERTIP_INDICES
         ]
 
         # Feature vector layout (147 dims):
@@ -145,9 +138,7 @@ class LandmarkFeatureTransformer:
 
         self._prev_normalized = normalized
         self._prev_timestamp_ms = landmarks.timestamp_ms
-        return FeatureFrame(
-            vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=True
-        )
+        return FeatureFrame(vector=vector, timestamp_ms=landmarks.timestamp_ms, valid=True)
 
     def _clear_velocity_state(self) -> None:
         self._prev_normalized = None
@@ -277,9 +268,7 @@ class LandmarkFeatureTransformer:
             if norm_ba < 1e-8 or norm_bc < 1e-8:
                 angles.append(0.0)
             else:
-                cos_angle = (ba[0] * bc[0] + ba[1] * bc[1] + ba[2] * bc[2]) / (
-                    norm_ba * norm_bc
-                )
+                cos_angle = (ba[0] * bc[0] + ba[1] * bc[1] + ba[2] * bc[2]) / (norm_ba * norm_bc)
                 # Clamp to [-1, 1] for numerical safety before arccos.
                 angles.append(math.acos(max(-1.0, min(1.0, cos_angle))))
         return angles

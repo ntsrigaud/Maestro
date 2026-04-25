@@ -15,9 +15,7 @@ def _feature(index: int, *, valid: bool = True) -> FeatureFrame:
 
 
 def test_buffer_not_ready_until_window_filled() -> None:
-    buffer = SlidingWindowSequenceBuffer(
-        window_length=4, window_step=2, min_valid_ratio=0.5
-    )
+    buffer = SlidingWindowSequenceBuffer(window_length=4, window_step=2, min_valid_ratio=0.5)
 
     buffer.push(_feature(1))
     buffer.push(_feature(2))
@@ -30,9 +28,7 @@ def test_buffer_not_ready_until_window_filled() -> None:
 
 
 def test_window_emits_and_honors_step() -> None:
-    buffer = SlidingWindowSequenceBuffer(
-        window_length=4, window_step=2, min_valid_ratio=0.5
-    )
+    buffer = SlidingWindowSequenceBuffer(window_length=4, window_step=2, min_valid_ratio=0.5)
 
     for i in range(4):
         buffer.push(_feature(i))
@@ -50,9 +46,7 @@ def test_window_emits_and_honors_step() -> None:
 
 
 def test_buffer_enforces_min_valid_ratio() -> None:
-    buffer = SlidingWindowSequenceBuffer(
-        window_length=5, window_step=1, min_valid_ratio=0.8
-    )
+    buffer = SlidingWindowSequenceBuffer(window_length=5, window_step=1, min_valid_ratio=0.8)
 
     items = [
         _feature(0, valid=True),
@@ -83,9 +77,7 @@ def test_buffer_enforces_min_valid_ratio() -> None:
 
 
 def test_window_raises_if_not_ready() -> None:
-    buffer = SlidingWindowSequenceBuffer(
-        window_length=3, window_step=1, min_valid_ratio=1.0
-    )
+    buffer = SlidingWindowSequenceBuffer(window_length=3, window_step=1, min_valid_ratio=1.0)
     buffer.push(_feature(1, valid=True))
 
     with pytest.raises(RuntimeError, match="not ready"):

@@ -52,9 +52,7 @@ _COOLDOWN_MS = 800
 _ACTIVATION_HOLD_MS = _T_BASE_MS
 
 
-def _pred(
-    label: str, accepted: bool = True, confidence: float = 0.95
-) -> StabilizedPrediction:
+def _pred(label: str, accepted: bool = True, confidence: float = 0.95) -> StabilizedPrediction:
     return StabilizedPrediction(label=label, confidence=confidence, accepted=accepted)
 
 
@@ -85,7 +83,8 @@ def _make_dispatcher(
 
 
 def _arm_controller(
-    controller: GestureActivationController, mock_time: MagicMock  # noqa: ARG001
+    controller: GestureActivationController,
+    mock_time: MagicMock,  # noqa: ARG001
 ) -> None:
     """Transition the controller from IDLE to ARMED."""
     controller.rearm()
@@ -135,9 +134,7 @@ class TestActivationStateMachine:
 
     def test_idle_on_missing_hands(self):
         # Patch _now_ms during construction AND rearm() so _last_active_ms starts at 0.
-        with patch.object(
-            GestureActivationController, "_now_ms", staticmethod(lambda: 0)
-        ):
+        with patch.object(GestureActivationController, "_now_ms", staticmethod(lambda: 0)):
             controller = _make_controller()
             controller.rearm()  # IDLE → ARMED; _last_active_ms = 0 while still patched
         assert controller.mode is RuntimeMode.ARMED
@@ -310,9 +307,7 @@ class TestIntegrationRateLimiting:
         from maestro.domain.entities import ExecutableCommand
 
         results = []
-        with patch(
-            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
-        ):
+        with patch("maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"):
             for i in range(5):
                 cmd = ExecutableCommand(
                     command_id="scroll_forward",
@@ -643,7 +638,7 @@ class TestGazeGateIntegration:
             rate_limit_window_ms=1000,
         )
         self._patcher = patch(
-            "maestro.infrastructure.dispatch.app_adapters" ".keyboard_adapter.pyautogui"
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         )
         self.mock_pya = self._patcher.start()
 
@@ -722,9 +717,7 @@ class TestGazeGateIntegration:
             "zoom_in",
             "zoom_out",
         ):
-            with patch.object(
-                type(self.controller), "_now_ms", staticmethod(lambda _t=t: _t)
-            ):
+            with patch.object(type(self.controller), "_now_ms", staticmethod(lambda _t=t: _t)):
                 cmd = self.controller.route(_pred(gesture))
             assert cmd is None, f"Expected no command for {gesture} when gaze is absent"
             t += 50

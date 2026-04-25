@@ -320,9 +320,7 @@ class HeadPoseGazeDetector:
                 ):
                     self._state = _GazeState.ACTIVE
                     self._stability_start_ms = None
-                    LOGGER.debug(
-                        "Gaze: ACQUIRING → ACTIVE (stable for %d ms)", self._cfg.arm_ms
-                    )
+                    LOGGER.debug("Gaze: ACQUIRING → ACTIVE (stable for %d ms)", self._cfg.arm_ms)
 
         elif self._state is _GazeState.ACTIVE:
             if not within_cone:

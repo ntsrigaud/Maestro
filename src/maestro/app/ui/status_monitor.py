@@ -17,6 +17,7 @@ from maestro.domain.entities import RuntimeState
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _stat_pair(label_text: str) -> tuple[QLabel, QLabel]:
     """Return (key_label, value_label) for a stat row."""
     key = QLabel(label_text)
@@ -71,9 +72,12 @@ class StatusMonitor(QWidget):
         self._confidence_bar.setFormat("%v %")
         self._confidence_bar.setFixedHeight(14)
 
-        k_mode = QLabel("Mode"); k_mode.setObjectName("statKey")
-        k_gaze = QLabel("Gaze"); k_gaze.setObjectName("statKey")
-        k_gesture = QLabel("Gesture"); k_gesture.setObjectName("statKey")
+        k_mode = QLabel("Mode")
+        k_mode.setObjectName("statKey")
+        k_gaze = QLabel("Gaze")
+        k_gaze.setObjectName("statKey")
+        k_gesture = QLabel("Gesture")
+        k_gesture.setObjectName("statKey")
 
         rg.addWidget(k_mode, 0, 0)
         rg.addWidget(self._mode_val, 0, 1)
@@ -89,12 +93,18 @@ class StatusMonitor(QWidget):
         pg = QGridLayout(perf_box)
         pg.setColumnStretch(1, 1)
 
-        k_fps = QLabel("FPS"); k_fps.setObjectName("statKey")
-        k_lat = QLabel("Latency"); k_lat.setObjectName("statKey")
-        k_vr = QLabel("Valid ratio"); k_vr.setObjectName("statKey")
-        self._fps_val = QLabel("—"); self._fps_val.setObjectName("statValue")
-        self._latency_val = QLabel("—"); self._latency_val.setObjectName("statValue")
-        self._valid_ratio_val = QLabel("—"); self._valid_ratio_val.setObjectName("statValue")
+        k_fps = QLabel("FPS")
+        k_fps.setObjectName("statKey")
+        k_lat = QLabel("Latency")
+        k_lat.setObjectName("statKey")
+        k_vr = QLabel("Valid ratio")
+        k_vr.setObjectName("statKey")
+        self._fps_val = QLabel("—")
+        self._fps_val.setObjectName("statValue")
+        self._latency_val = QLabel("—")
+        self._latency_val.setObjectName("statValue")
+        self._valid_ratio_val = QLabel("—")
+        self._valid_ratio_val.setObjectName("statValue")
 
         pg.addWidget(k_fps, 0, 0)
         pg.addWidget(self._fps_val, 0, 1)

@@ -118,9 +118,7 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             weight_decay=float(train_data.get("weight_decay", 1e-4)),
             grad_clip_norm=float(train_data.get("grad_clip_norm", 1.0)),
             early_stopping_patience=int(train_data.get("early_stopping_patience", 7)),
-            early_stopping_min_delta=float(
-                train_data.get("early_stopping_min_delta", 1e-4)
-            ),
+            early_stopping_min_delta=float(train_data.get("early_stopping_min_delta", 1e-4)),
             seed=int(train_data.get("seed", 42)),
             num_workers=int(train_data.get("num_workers", 0)),
             class_weighting=bool(train_data.get("class_weighting", True)),
@@ -223,14 +221,10 @@ def _build_criterion(
     return nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
 
-def _build_class_weights(
-    datamodule: GestureDataModule, device: torch.device
-) -> torch.Tensor:
+def _build_class_weights(datamodule: GestureDataModule, device: torch.device) -> torch.Tensor:
     distribution = datamodule.label_distribution()
     labels = datamodule.class_labels
-    counts = torch.tensor(
-        [distribution[label] for label in labels], dtype=torch.float32
-    )
+    counts = torch.tensor([distribution[label] for label in labels], dtype=torch.float32)
     weights = torch.sum(counts) / (counts * len(labels))
     return weights.to(device)
 
@@ -374,9 +368,7 @@ def train_lstm(
             }
         )
 
-        improved = (
-            best_val_loss - val_report.loss
-        ) > config.training.early_stopping_min_delta
+        improved = (best_val_loss - val_report.loss) > config.training.early_stopping_min_delta
         if improved:
             best_val_loss = val_report.loss
             best_epoch = epoch
@@ -399,9 +391,7 @@ def train_lstm(
         if epochs_without_improve >= config.training.early_stopping_patience:
             break
 
-    checkpoint_payload = torch.load(
-        checkpoint_path, map_location=device, weights_only=False
-    )
+    checkpoint_payload = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint_payload["model_state_dict"])
 
     val_report = evaluate_model(
