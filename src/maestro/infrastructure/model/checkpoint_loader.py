@@ -24,9 +24,7 @@ def _build_model_from_artifact(
             This prevents silent failure when an unexpected artifact is loaded.
     """
     model_name = str(model_config.get("model_name", ""))
-    if not (
-        artifact_type.startswith("two_stream") or model_name.startswith("two_stream")
-    ):
+    if not (artifact_type.startswith("two_stream") or model_name.startswith("two_stream")):
         raise ValueError(
             f"Unsupported artifact type {artifact_type!r} (model_name={model_name!r}). "
             "Only two_stream_lstm artifacts are supported. "
@@ -95,17 +93,11 @@ def load_inference_artifact(
         model=model,
         model_version=str(payload.get("artifact_version", "unknown")),
         class_labels=[str(x) for x in class_labels],
-        feature_schema_version=str(
-            feature_schema.get("feature_schema_version", "unknown")
-        ),
-        feature_dim=int(
-            feature_schema.get("feature_dim") or model_config["input_size"]
-        ),
+        feature_schema_version=str(feature_schema.get("feature_schema_version", "unknown")),
+        feature_dim=int(feature_schema.get("feature_dim") or model_config["input_size"]),
         window_length=int(feature_schema.get("window_length", 24)),
         window_step=int(feature_schema.get("window_step", 3)),
-        orientation_normalization=bool(
-            feature_schema.get("orientation_normalization", False)
-        ),
+        orientation_normalization=bool(feature_schema.get("orientation_normalization", False)),
         artifact_path=path,
     )
 

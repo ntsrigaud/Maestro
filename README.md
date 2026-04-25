@@ -16,6 +16,8 @@ Camera → MediaPipe Hands → Feature Engineering → Sliding Window Buffer
 
 A **PySide6 graphical interface** provides runtime control, live telemetry monitoring, configuration editing, and model selection — all without interfering with the inference pipeline. The inference loop runs in a background `QThread`; the UI receives state updates through Qt signal-slot connections at approximately 10 Hz.
 
+![Maestro running with live camera preview — ARMED mode, swipe_left gesture detected at 79% confidence](docs/assets/screenshots/ui-running-preview.png)
+
 **Two launch modes:**
 
 | Mode    | Script                    | Description                                             |

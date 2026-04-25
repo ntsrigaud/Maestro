@@ -38,9 +38,7 @@ def _landmark_packet(index: int, *, valid: bool = True) -> LandmarkPacket:
 
 def test_phase3_feature_to_sequence_window_flow() -> None:
     transformer = LandmarkFeatureTransformer()
-    buffer = SlidingWindowSequenceBuffer(
-        window_length=6, window_step=2, min_valid_ratio=0.8
-    )
+    buffer = SlidingWindowSequenceBuffer(window_length=6, window_step=2, min_valid_ratio=0.8)
 
     for i in range(6):
         feature = transformer.transform(_landmark_packet(i, valid=True))
@@ -58,9 +56,7 @@ def test_phase3_feature_to_sequence_window_flow() -> None:
 
 def test_phase3_pipeline_blocks_low_valid_ratio_windows() -> None:
     transformer = LandmarkFeatureTransformer()
-    buffer = SlidingWindowSequenceBuffer(
-        window_length=5, window_step=1, min_valid_ratio=0.8
-    )
+    buffer = SlidingWindowSequenceBuffer(window_length=5, window_step=1, min_valid_ratio=0.8)
 
     validity_pattern = [True, True, False, False, True]
     for i, is_valid in enumerate(validity_pattern):

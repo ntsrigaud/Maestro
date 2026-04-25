@@ -84,12 +84,12 @@ class TestLandmarkMirrorPolicy:
         result = renderer.render(frame, state)
         row = self._dot_row()
 
-        assert self._is_dot_pixel(
-            result.frame, row, self._dot_col_raw(0.2)
-        ), "Non-mirror: dot at raw x=0.2 must appear near col 128"
-        assert not self._is_dot_pixel(
-            result.frame, row, self._dot_col_mirror(0.2)
-        ), "Non-mirror: dot must NOT appear at the mirrored column"
+        assert self._is_dot_pixel(result.frame, row, self._dot_col_raw(0.2)), (
+            "Non-mirror: dot at raw x=0.2 must appear near col 128"
+        )
+        assert not self._is_dot_pixel(result.frame, row, self._dot_col_mirror(0.2)), (
+            "Non-mirror: dot must NOT appear at the mirrored column"
+        )
 
     def test_mirror_places_landmark_at_inverted_x(self) -> None:
         """With mirroring, landmark at raw x=0.2 is drawn at the inverted column."""
@@ -100,12 +100,12 @@ class TestLandmarkMirrorPolicy:
         result = renderer.render(frame, state)
         row = self._dot_row()
 
-        assert self._is_dot_pixel(
-            result.frame, row, self._dot_col_mirror(0.2)
-        ), "Mirror: dot at raw x=0.2 must appear at mirrored col (≈512)"
-        assert not self._is_dot_pixel(
-            result.frame, row, self._dot_col_raw(0.2)
-        ), "Mirror: dot must NOT appear at the raw column"
+        assert self._is_dot_pixel(result.frame, row, self._dot_col_mirror(0.2)), (
+            "Mirror: dot at raw x=0.2 must appear at mirrored col (≈512)"
+        )
+        assert not self._is_dot_pixel(result.frame, row, self._dot_col_raw(0.2)), (
+            "Mirror: dot must NOT appear at the raw column"
+        )
 
     def test_mirror_does_not_affect_frame_dimensions(self) -> None:
         renderer = OverlayRenderer(mirror_display=True)
@@ -148,9 +148,7 @@ def test_render_does_not_mutate_original_frame() -> None:
         original = np.zeros((100, 100, 3), dtype=np.uint8)
         frame = FramePacket(frame=original, timestamp_ms=0, frame_id=0)
         renderer.render(frame, _make_state(landmarks=[[0.5, 0.5, 0.0]]))
-        assert (
-            original.sum() == 0
-        ), f"Original frame must not be mutated (mirror={mirror})"
+        assert original.sum() == 0, f"Original frame must not be mutated (mirror={mirror})"
 
 
 # ---------------------------------------------------------------------------
@@ -202,21 +200,19 @@ def test_mirror_symmetry_of_two_landmarks() -> None:
 
     # Non-mirror: dot at x=0.3 lands at raw col 192
     raw_result = renderer_raw.render(_make_frame(WIDTH, HEIGHT), state_03)
-    assert is_dot(
-        raw_result.frame, col_03_raw
-    ), "Non-mirror: dot at raw x=0.3 must appear at col 192"
-    assert not is_dot(
-        raw_result.frame, col_03_mirror
-    ), "Non-mirror: dot must NOT appear at mirror col 448"
+    assert is_dot(raw_result.frame, col_03_raw), (
+        "Non-mirror: dot at raw x=0.3 must appear at col 192"
+    )
+    assert not is_dot(raw_result.frame, col_03_mirror), (
+        "Non-mirror: dot must NOT appear at mirror col 448"
+    )
 
     # Mirror: dot at raw x=0.3 lands at mirrored col 448
     mirror_result = renderer_mirror.render(_make_frame(WIDTH, HEIGHT), state_03)
-    assert is_dot(
-        mirror_result.frame, col_03_mirror
-    ), "Mirror: dot at raw x=0.3 must appear at mirrored col 448"
-    assert not is_dot(
-        mirror_result.frame, col_03_raw
-    ), "Mirror: dot must NOT appear at raw col 192"
+    assert is_dot(mirror_result.frame, col_03_mirror), (
+        "Mirror: dot at raw x=0.3 must appear at mirrored col 448"
+    )
+    assert not is_dot(mirror_result.frame, col_03_raw), "Mirror: dot must NOT appear at raw col 192"
 
 
 # ---------------------------------------------------------------------------
@@ -337,9 +333,7 @@ class TestGazeBorder:
 # ---------------------------------------------------------------------------
 
 
-def _has_any_non_black_pixel_in_row(
-    frame: np.ndarray, y: int, *, tolerance: int = 5
-) -> bool:
+def _has_any_non_black_pixel_in_row(frame: np.ndarray, y: int, *, tolerance: int = 5) -> bool:
     """Return True if any pixel in the frame row at y-offset is brighter than black."""
     row_start = max(0, y - tolerance)
     row_end = min(frame.shape[0], y + tolerance)
@@ -352,9 +346,7 @@ class TestModeBadge:
 
     WIDTH, HEIGHT = 640, 480
 
-    def _make_desktop_state(
-        self, active_mode: str, label: str = "unknown"
-    ) -> RuntimeState:
+    def _make_desktop_state(self, active_mode: str, label: str = "unknown") -> RuntimeState:
         return RuntimeState(
             mode="armed",
             last_label=label,
@@ -369,9 +361,9 @@ class TestModeBadge:
         state = self._make_desktop_state("desktop\u00b7workspace")
         result = renderer.render(frame, state)
         # Row 18 (badge y) should contain non-black pixels (the badge text).
-        assert _has_any_non_black_pixel_in_row(
-            result.frame, 18
-        ), "Mode badge text must produce visible pixels near row 18"
+        assert _has_any_non_black_pixel_in_row(result.frame, 18), (
+            "Mode badge text must produce visible pixels near row 18"
+        )
 
     def test_no_mode_badge_when_active_mode_is_unknown(self) -> None:
         """Default 'unknown' active_mode must NOT render a white badge row.
@@ -403,9 +395,7 @@ class TestModeBadge:
         cmap = {"open_palm_hold": "mission_control", "unknown": "no_action"}
         renderer = OverlayRenderer(mirror_display=False, command_map=cmap)
         frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
-        state = self._make_desktop_state(
-            "desktop\u00b7workspace", label="open_palm_hold"
-        )
+        state = self._make_desktop_state("desktop\u00b7workspace", label="open_palm_hold")
         result = renderer.render(frame, state)
         assert result.frame.shape == (self.HEIGHT, self.WIDTH, 3)
 
@@ -441,14 +431,14 @@ class TestModeBadge:
         result = renderer.render(frame, state)
         assert result.frame.shape == (self.HEIGHT, self.WIDTH, 3)
         # Badge row must be lit (mode badge present).
-        assert _has_any_non_black_pixel_in_row(
-            result.frame, 18
-        ), "Phase 4 gate: badge row must contain visible pixels"
+        assert _has_any_non_black_pixel_in_row(result.frame, 18), (
+            "Phase 4 gate: badge row must contain visible pixels"
+        )
         # Pred ring must exist (non-black background in the pred line area).
         pred_y = 48 + 24  # y_offset=24 because active_mode != 'unknown'
-        assert _has_any_non_black_pixel_in_row(
-            result.frame, pred_y
-        ), "Phase 4 gate: pred ring must contain visible pixels"
+        assert _has_any_non_black_pixel_in_row(result.frame, pred_y), (
+            "Phase 4 gate: pred ring must contain visible pixels"
+        )
 
 
 class TestPredRingColours:
@@ -456,9 +446,7 @@ class TestPredRingColours:
 
     WIDTH, HEIGHT = 640, 480
 
-    def _render_ring(
-        self, mode: str, active_mode: str = "desktop\u00b7workspace"
-    ) -> np.ndarray:
+    def _render_ring(self, mode: str, active_mode: str = "desktop\u00b7workspace") -> np.ndarray:
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
         state = RuntimeState(

@@ -97,9 +97,7 @@ def build_container(
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if model_artifact_path:
-        artifact = load_inference_artifact(
-            artifact_path=model_artifact_path, device=device
-        )
+        artifact = load_inference_artifact(artifact_path=model_artifact_path, device=device)
     else:
         artifact = _load_model_from_source(
             config=config,
@@ -265,9 +263,7 @@ def _load_command_map(path: Path) -> dict[str, str]:
         raise ValueError(f"Command map file must contain a YAML mapping: {path}")
     mapping = payload.get("gesture_commands", {})
     if not isinstance(mapping, dict):
-        raise ValueError(
-            f"Command map file must contain a 'gesture_commands' mapping: {path}"
-        )
+        raise ValueError(f"Command map file must contain a 'gesture_commands' mapping: {path}")
     return {str(k): str(v) for k, v in mapping.items() if k and v}
 
 
