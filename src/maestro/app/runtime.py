@@ -22,6 +22,7 @@ from maestro.interfaces.gaze_detector import IGazeIntentDetector
 from maestro.interfaces.landmark_extractor import IHandLandmarkExtractor
 from maestro.interfaces.sequence_buffer import ISequenceBuffer
 from maestro.pipeline.activation import GestureActivationController
+from maestro.pipeline.hand_selection import HandSelector
 from maestro.pipeline.stabilization import PredictionStabilizer
 from maestro.utils.schema_validation import RuntimeConfig
 
@@ -33,6 +34,7 @@ class RuntimeDependencies(Protocol):
     frame_source: IFrameSource
     gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
+    hand_selector: HandSelector
     feature_transformer: IFeatureTransformer
     sequence_buffer: ISequenceBuffer
     model_artifact: InferenceArtifact
@@ -126,7 +128,8 @@ class Runtime:
                     continue
 
                 t1 = time.perf_counter()
-                landmark_packet = self._container.landmark_extractor.extract(frame)
+                multi_packet = self._container.landmark_extractor.extract(frame)
+                landmark_packet = self._container.hand_selector.select(multi_packet)
                 if benchmark is not None:
                     benchmark.record_extraction((time.perf_counter() - t1) * 1000.0)
 
