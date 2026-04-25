@@ -73,7 +73,9 @@ def run_phase2_benchmark(frames: int) -> BenchmarkResult:
             min_detection_confidence=0.7,
             min_tracking_confidence=0.5,
         )
-        hand_selector = HandSelector(hand_preference="both", min_handedness_conf=0.7, min_track_conf=0.5)
+        hand_selector = HandSelector(
+            hand_preference="both", min_handedness_conf=0.7, min_track_conf=0.5
+        )
         start = time.perf_counter()
         for i in range(frames):
             packet = _frame_packet(i)

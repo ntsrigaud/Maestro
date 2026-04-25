@@ -15,7 +15,6 @@ from __future__ import annotations
 from maestro.domain.entities import HandLandmarks, LandmarkPacket, MultiHandPacket
 from maestro.pipeline.hand_selection import HandSelector
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -62,7 +61,9 @@ def test_returns_invalid_when_no_hands_detected() -> None:
 def test_both_preference_picks_highest_confidence_hand() -> None:
     """With 'both', the hand with highest detect_conf is selected."""
     selector = HandSelector(hand_preference="both")
-    result = selector.select(_packet(_hand("Right", detect_conf=0.80), _hand("Left", detect_conf=0.92)))
+    result = selector.select(
+        _packet(_hand("Right", detect_conf=0.80), _hand("Left", detect_conf=0.92))
+    )
 
     assert result.valid is True
     assert result.handedness == "Left"
@@ -113,7 +114,9 @@ def test_right_preference_selects_second_hand_when_wrong_hand_first() -> None:
     """The preferred hand at index 1 must be chosen over the wrong hand at index 0."""
     selector = HandSelector(hand_preference="right")
     # MP returns wrong hand first
-    result = selector.select(_packet(_hand("Right", detect_conf=0.99), _hand("Left", detect_conf=0.80)))
+    result = selector.select(
+        _packet(_hand("Right", detect_conf=0.99), _hand("Left", detect_conf=0.80))
+    )
 
     assert result.valid is True
     assert result.handedness == "Left"

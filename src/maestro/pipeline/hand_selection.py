@@ -28,9 +28,9 @@ from maestro.domain.entities import HandLandmarks, LandmarkPacket, MultiHandPack
 # appear in a raw (non-mirrored) webcam frame.
 # ``None`` means no filtering: any detected hand is accepted.
 _USER_TO_MEDIAPIPE_LABEL: dict[str, str | None] = {
-    "right": "left",   # user's right hand → MediaPipe "Left"
-    "left": "right",   # user's left hand  → MediaPipe "Right"
-    "both": None,      # accept either hand
+    "right": "left",  # user's right hand → MediaPipe "Left"
+    "left": "right",  # user's left hand  → MediaPipe "Right"
+    "both": None,  # accept either hand
 }
 
 
