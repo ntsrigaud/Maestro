@@ -13,6 +13,7 @@ from maestro.domain.entities import FramePacket
 from maestro.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
 )
+from maestro.pipeline.hand_selection import HandSelector
 
 
 @dataclass(slots=True)
@@ -72,11 +73,12 @@ def run_phase2_benchmark(frames: int) -> BenchmarkResult:
             min_detection_confidence=0.7,
             min_tracking_confidence=0.5,
         )
+        hand_selector = HandSelector(hand_preference="both", min_handedness_conf=0.7, min_track_conf=0.5)
         start = time.perf_counter()
         for i in range(frames):
             packet = _frame_packet(i)
             t0 = time.perf_counter()
-            result = extractor.extract(packet)
+            result = hand_selector.select(extractor.extract(packet))
             frame_times_ms.append((time.perf_counter() - t0) * 1000.0)
             if result.valid:
                 valid_count += 1
