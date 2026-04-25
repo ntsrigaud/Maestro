@@ -12,6 +12,30 @@ class FramePacket:
 
 
 @dataclass(slots=True)
+class HandLandmarks:
+    """Landmarks and quality metadata for a single detected hand."""
+
+    label: str  # MediaPipe label: "Left" or "Right" (selfie-view convention)
+    landmarks: list[list[float]]  # 21 × [x, y, z] in normalised image coordinates
+    detect_conf: float  # MediaPipe handedness classification score [0, 1]
+    track_conf: float  # fraction of finite landmark coordinates [0, 1]
+
+
+@dataclass(slots=True)
+class MultiHandPacket:
+    """Raw output from the hand landmark extractor: data for all detected hands.
+
+    ``hands`` contains 0–2 entries (one per MediaPipe detection).  The order
+    mirrors MediaPipe's internal detection ordering (highest confidence first).
+    Hand-preference selection is deliberately deferred to the pipeline
+    (``HandSelector``) so the extractor remains stateless and preference-agnostic.
+    """
+
+    hands: list[HandLandmarks]
+    timestamp_ms: int
+
+
+@dataclass(slots=True)
 class LandmarkPacket:
     landmarks: list[list[float]]
     handedness: str | None
