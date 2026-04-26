@@ -10,16 +10,12 @@ Run from the repository root:
 """
 from __future__ import annotations
 
-import math
-import os
-import struct
 import subprocess
 import sys
-import zlib
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw, ImageFilter
+    from PIL import Image, ImageDraw
 except ImportError:
     sys.exit("Pillow is required: pip install pillow")
 
@@ -113,7 +109,6 @@ def make_icon(size: int = 1024) -> Image.Image:
     S = size
     scale = S / 1024.0
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
 
     # ── Background: vertical gradient in rounded rect ────────────────
     bg_layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
