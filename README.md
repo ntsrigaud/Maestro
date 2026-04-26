@@ -20,10 +20,12 @@ A **PySide6 graphical interface** provides runtime control, live telemetry monit
 
 **Two launch modes:**
 
-| Mode    | Script                    | Description                                             |
-| ------- | ------------------------- | ------------------------------------------------------- |
-| **GUI** | `scripts/run_ui.py`       | PySide6 control panel with monitoring and config editor |
-| **CLI** | `scripts/run_realtime.py` | Headless inference only; no PySide6 dependency          |
+| Mode    | Entry point  | Description                                             |
+| ------- | ------------ | ------------------------------------------------------- |
+| **GUI** | `maestro-ui` | PySide6 control panel with monitoring and config editor |
+| **CLI** | `maestro`    | Headless inference only; no PySide6 dependency          |
+
+For developers who prefer script-based invocation, `scripts/run_ui.py` and `scripts/run_realtime.py` remain available as thin wrappers.
 
 **Gesture vocabulary** (IPN Hand dataset, 8 classes):
 
@@ -38,23 +40,56 @@ A **PySide6 graphical interface** provides runtime control, live telemetry monit
 | `zoom_out`       | Zoom out view             | G11             |
 | `unknown`        | No action (noise class)   | D0X + B0A + B0B |
 
-## Quick Start
+## Installation
 
-**GUI (recommended)** — control panel with live monitoring and configuration editor:
+### Option A — Standalone application (recommended for end users)
+
+Download the pre-built bundle for your platform from the [GitHub Releases](https://github.com/ntsrigaud/Maestro/releases) page:
+
+| Platform    | Download              | Action                                                             |
+| ----------- | --------------------- | ------------------------------------------------------------------ |
+| **macOS**   | `Maestro-macos.dmg`   | Open the DMG, drag Maestro to Applications, double-click to launch |
+| **Windows** | `Maestro-windows.zip` | Extract the archive, run `Maestro.exe` inside the folder           |
+
+No Python installation required. The model is downloaded from Hugging Face Hub on first launch and cached locally.
+
+### Option B — pip install (Python users)
 
 ```bash
-pip install -e ".[dev,training,huggingface]"
-python scripts/run_ui.py
+pip install -e ".[ui]"   # installs PySide6, opencv-python, and all runtime deps
+maestro-ui               # launch the GUI
+maestro --no-display     # launch headless (CLI)
 ```
 
-**CLI** — headless inference only:
+On first launch the application copies its factory-default configuration to:
+
+| Platform | Location                                         |
+| -------- | ------------------------------------------------ |
+| macOS    | `~/Library/Application Support/Maestro/configs/` |
+| Windows  | `%APPDATA%\Maestro\configs\`                     |
+| Linux    | `~/.config/Maestro/configs/`                     |
+
+Edit the YAML files there to change camera, hand preference, or gesture mappings. Set `MAESTRO_CONFIG_DIR` to override the location entirely.
+
+## Quick Start (development)
+
+**GUI:**
 
 ```bash
-pip install -e ".[huggingface]"
-python scripts/run_realtime.py --config configs
+pip install -e ".[ui,dev]"
+maestro-ui
+# or: python scripts/run_ui.py
 ```
 
-The default configuration (`configs/model_source.yaml`) loads the production model from [Hugging Face Hub](https://huggingface.co/ntsrigaud/maestro-lstm) on first run. The artifact is cached locally by `huggingface_hub` and requires no re-download on subsequent runs.
+**CLI (headless):**
+
+```bash
+pip install -e ".[ui]"
+maestro --no-display
+# or: python scripts/run_realtime.py --no-display
+```
+
+The model is loaded from [Hugging Face Hub](https://huggingface.co/ntsrigaud/maestro-lstm) on first run and cached locally. No re-download on subsequent runs.
 
 **Developers** (linting, type-checking, and tests):
 
@@ -64,6 +99,17 @@ ruff check .
 mypy src/
 pytest -m "not training"
 ```
+
+## Building from Source
+
+Build a standalone application bundle (no Python required by the end user):
+
+```bash
+make build
+# Output: dist/Maestro.app (macOS) or dist/Maestro/Maestro.exe (Windows)
+```
+
+This uses [PyInstaller](https://pyinstaller.org/) with the included `maestro.spec` to bundle MediaPipe models, config files, and all dependencies into a self-contained executable. Pre-built binaries for macOS and Windows are also produced by the GitHub Actions [build workflow](.github/workflows/build.yml) on every tagged release.
 
 ## Training Setup
 
@@ -112,7 +158,7 @@ Key directories:
 | `configs/`     | YAML configuration (app, inference, model, gestures, thresholds)                                                                   |
 | `scripts/`     | CLI entry points (`run_ui.py`, `run_realtime.py`, data, training)                                                                  |
 | `models/`      | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/maestro-lstm) |
-| `tests/`       | Unit, integration, and system tests (269 total)                                                                                    |
+| `tests/`       | Unit, integration, and system tests (282 total)                                                                                    |
 | `docs/`        | Architecture docs, guides, and decision records                                                                                    |
 
 ### GUI Architecture
