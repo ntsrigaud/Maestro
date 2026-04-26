@@ -8,6 +8,7 @@ Produces:
 Run from the repository root:
     python tools/generate_icon.py
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -24,13 +25,13 @@ ASSETS = ROOT / "docs" / "assets"
 ASSETS.mkdir(parents=True, exist_ok=True)
 
 # ── Brand colours ────────────────────────────────────────────────────────────
-BG_TOP = (17, 24, 39)       # #111827
-BG_BOT = (30, 27, 75)       # #1E1B4B
+BG_TOP = (17, 24, 39)  # #111827
+BG_BOT = (30, 27, 75)  # #1E1B4B
 HAND_TOP = (226, 232, 240)  # #E2E8F0
 HAND_BOT = (165, 180, 252)  # #A5B4FC
-RING = (129, 140, 248)      # #818CF8
-GLOW = (99, 102, 241)       # #6366F1
-DOT = (224, 231, 255)       # #E0E7FF
+RING = (129, 140, 248)  # #818CF8
+GLOW = (99, 102, 241)  # #6366F1
+DOT = (224, 231, 255)  # #E0E7FF
 
 
 def lerp_colour(a: tuple, b: tuple, t: float) -> tuple:
@@ -51,16 +52,14 @@ def make_hand_mask(size: int) -> Image.Image:
     def rect_rounded(x, y, w, h, r, *, angle=0.0, cx=None, cy=None):
         """Draw a rounded rectangle, optionally rotated around (cx,cy)."""
         if angle == 0.0:
-            d.rounded_rectangle([sc(x), sc(y), sc(x + w), sc(y + h)],
-                                 radius=sc(r), fill=white)
+            d.rounded_rectangle([sc(x), sc(y), sc(x + w), sc(y + h)], radius=sc(r), fill=white)
         else:
             # Render into a temp image then rotate and paste
             margin = int(max(w, h) * scale * 1.5)
             tmp = Image.new("RGBA", (margin * 2, margin * 2), (0, 0, 0, 0))
             td = ImageDraw.Draw(tmp)
             ox, oy = margin - sc(w) // 2, margin - sc(h) // 2
-            td.rounded_rectangle([ox, oy, ox + sc(w), oy + sc(h)],
-                                  radius=sc(r), fill=white)
+            td.rounded_rectangle([ox, oy, ox + sc(w), oy + sc(h)], radius=sc(r), fill=white)
             tmp = tmp.rotate(-angle, resample=Image.BICUBIC, expand=False)
             px = int((cx if cx is not None else x + w / 2) * scale) - margin
             py = int((cy if cy is not None else y + h / 2) * scale) - margin
@@ -82,8 +81,9 @@ def make_hand_mask(size: int) -> Image.Image:
     return img
 
 
-def vertical_gradient_rgba(size: int, y_top: int, y_bot: int,
-                            col_top: tuple, col_bot: tuple, alpha: int = 255) -> Image.Image:
+def vertical_gradient_rgba(
+    size: int, y_top: int, y_bot: int, col_top: tuple, col_bot: tuple, alpha: int = 255
+) -> Image.Image:
     """Return RGBA image filled with a vertical gradient from col_top to col_bot."""
     S = size
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
@@ -95,9 +95,17 @@ def vertical_gradient_rgba(size: int, y_top: int, y_bot: int,
     return img
 
 
-def draw_ring(draw: ImageDraw.ImageDraw, cx: float, cy: float,
-              rx: float, ry: float, col: tuple, width: int, alpha: int,
-              scale: float) -> None:
+def draw_ring(
+    draw: ImageDraw.ImageDraw,
+    cx: float,
+    cy: float,
+    rx: float,
+    ry: float,
+    col: tuple,
+    width: int,
+    alpha: int,
+    scale: float,
+) -> None:
     x0 = int((cx - rx) * scale)
     y0 = int((cy - ry) * scale)
     x1 = int((cx + rx) * scale)
@@ -175,10 +183,12 @@ def make_icon(size: int = 1024) -> Image.Image:
             [cx_d - dr, cy_d - dr, cx_d + dr, cy_d + dr],
             fill=(*GLOW, a),
         )
-    draw2.ellipse([cx_d - r_outer, cy_d - r_outer, cx_d + r_outer, cy_d + r_outer],
-                  fill=(*RING, 220))
-    draw2.ellipse([cx_d - r_inner, cy_d - r_inner, cx_d + r_inner, cy_d + r_inner],
-                  fill=(*DOT, 255))
+    draw2.ellipse(
+        [cx_d - r_outer, cy_d - r_outer, cx_d + r_outer, cy_d + r_outer], fill=(*RING, 220)
+    )
+    draw2.ellipse(
+        [cx_d - r_inner, cy_d - r_inner, cx_d + r_inner, cy_d + r_inner], fill=(*DOT, 255)
+    )
 
     return img
 
@@ -208,6 +218,7 @@ def build_icns(png_1024: Path, out: Path) -> None:
         check=True,
     )
     import shutil
+
     shutil.rmtree(iconset)
     print(f"  ✓ {out.relative_to(ROOT)}")
 
@@ -217,8 +228,7 @@ def build_ico(png_1024: Path, out: Path) -> None:
     master = Image.open(png_1024)
     sizes = [16, 32, 48, 64, 128, 256]
     imgs = [master.resize((s, s), Image.LANCZOS) for s in sizes]
-    imgs[0].save(out, format="ICO", sizes=[(s, s) for s in sizes],
-                 append_images=imgs[1:])
+    imgs[0].save(out, format="ICO", sizes=[(s, s) for s in sizes], append_images=imgs[1:])
     print(f"  ✓ {out.relative_to(ROOT)}")
 
 
