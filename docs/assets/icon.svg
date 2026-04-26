@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1E1B4B"/>
+    </linearGradient>
+    <linearGradient id="handFill" x1="512" y1="175" x2="512" y2="790" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#A5B4FC"/>
+    </linearGradient>
+    <linearGradient id="thumbFill" x1="274" y1="480" x2="274" y2="710" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#A5B4FC"/>
+    </linearGradient>
+    <radialGradient id="bgGlow" cx="512" cy="500" r="340" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4F46E5" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#4F46E5" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="ringGlow" x="-40%" y="-200%" width="180%" height="600%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="dotGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+  <circle cx="512" cy="500" r="340" fill="url(#bgGlow)"/>
+  <rect x="312" y="530" width="400" height="255" rx="80" ry="80" fill="url(#handFill)"/>
+  <rect x="322" y="220" width="98" height="340" rx="49" ry="49" fill="url(#handFill)"/>
+  <rect x="444" y="172" width="98" height="375" rx="49" ry="49" fill="url(#handFill)"/>
+  <rect x="566" y="220" width="98" height="340" rx="49" ry="49" fill="url(#handFill)"/>
+  <rect x="680" y="278" width="86" height="282" rx="43" ry="43" fill="url(#handFill)"/>
+  <rect x="222" y="490" width="108" height="222" rx="54" ry="54" fill="url(#thumbFill)"
+        transform="rotate(-20 276 601)"/>
+  <ellipse cx="512" cy="787" rx="195" ry="26"
+           fill="none" stroke="#6366F1" stroke-width="28"
+           opacity="0.40" filter="url(#ringGlow)"/>
+  <ellipse cx="512" cy="787" rx="190" ry="22"
+           fill="none" stroke="#818CF8" stroke-width="8" opacity="0.95"/>
+  <ellipse cx="512" cy="787" rx="174" ry="13"
+           fill="none" stroke="#C7D2FE" stroke-width="3" opacity="0.60"/>
+  <circle cx="493" cy="142" r="22" fill="#6366F1" opacity="0.80" filter="url(#dotGlow)"/>
+  <circle cx="493" cy="142" r="12" fill="#E0E7FF"/>
+</svg>
