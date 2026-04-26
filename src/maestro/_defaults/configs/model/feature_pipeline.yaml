@@ -1,0 +1,43 @@
+# Feature pipeline configuration for training and inference parity
+#
+# These settings control how raw hand landmarks are transformed into feature vectors.
+# They MUST be identical between dataset generation (training) and runtime inference.
+#
+# Changes to these settings require:
+# 1. Regenerating the training dataset
+# 2. Retraining the LSTM model
+# 3. Updating model metadata with new feature schema version
+
+feature_pipeline:
+  # Normalize positions relative to wrist (landmark 0)
+  # Always enabled; standard practice for pose-based systems
+  wrist_relative_normalization: true
+
+  # Scale normalization using palm reference distance (landmark 9)
+  # Always enabled; provides scale invariance
+  scale_normalization: true
+
+  # Optional: Canonicalize hand orientation to fixed reference frame
+  # When enabled, applies rotation matrix to align hand pose to canonical axes
+  # CAUTION: Changing this value requires dataset regeneration and model retraining
+  # Disabled for feature-schema-v4: orientation normalization re-expresses velocity in a
+  # palm-local frame that rotates between frames, adding inter-class noise for directional
+  # gestures (swipe_right / swipe_up / swipe_down) and reducing recall by 13–22%.
+  # Camera-space positions provide an implicit directional cue that is lost when enabled.
+  orientation_normalization: false
+
+  # Compute temporal velocity features (derivatives of normalized positions)
+  # Always enabled; improves dynamic gesture recognition
+  velocity_features: true
+
+  # Feature vector structure (feature-schema-v5, 147 dims):
+  # [0:63]    normalised positions (21 × 3)
+  # [63:68]   fingertip spread (5)
+  # [68:71]   wrist trajectory — net displacement from oldest frame (3)
+  # [71:134]  wrist-relative velocity (21 × 3)
+  # [134:144] joint angles (10)
+  # [144:147] wrist velocity in camera-normalized coordinates (3)  ← v5
+  #
+  # The wrist velocity block (v5) encodes the instantaneous translational speed
+  # of the wrist in camera space, providing an explicit directional signal for
+  # swipe and scroll gestures that is absent in the wrist-relative velocity block.
