@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from maestro.app._paths import get_config_dir
 from maestro.app.ui.config_panel import ConfigPanel
 from maestro.app.ui.controller import RuntimeController
 from maestro.app.ui.launcher_panel import LauncherPanel
@@ -26,7 +27,7 @@ from maestro.app.ui.preview_widget import PreviewWidget
 from maestro.app.ui.status_monitor import StatusMonitor
 from maestro.domain.entities import RuntimeState
 
-_DEFAULT_CONFIG_PATH = "configs"
+_DEFAULT_CONFIG_PATH: str = ""  # resolved lazily via get_config_dir()
 
 # ---------------------------------------------------------------------------
 # Application stylesheet
@@ -329,9 +330,9 @@ class MainWindow(QMainWindow):
     No panel talks to RuntimeController directly.
     """
 
-    def __init__(self, config_path: str = _DEFAULT_CONFIG_PATH) -> None:
+    def __init__(self, config_path: str | None = None) -> None:
         super().__init__()
-        self._config_path = config_path
+        self._config_path = config_path or str(get_config_dir())
         self._last_mode = ""
         self.setWindowTitle("Maestro — Gesture Control")
         self.setMinimumSize(760, 540)
