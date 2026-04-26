@@ -346,12 +346,12 @@ class MainWindow(QMainWindow):
         self._launcher = LauncherPanel()
         self._preview = PreviewWidget()
         self._monitor = StatusMonitor()
-        self._config_panel = ConfigPanel(config_path=config_path)
+        self._config_panel = ConfigPanel(config_path=self._config_path)
 
         try:
             from maestro.utils.config_loader import load_runtime_config
 
-            _cfg = load_runtime_config(Path(config_path))
+            _cfg = load_runtime_config(Path(self._config_path))
             _model_src = _cfg.model_source
         except Exception:
             _model_src = None
