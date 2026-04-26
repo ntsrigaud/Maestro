@@ -30,10 +30,16 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      - name: Install Qt system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libegl1 libgl1 libxcb-cursor0
+
       - name: Install dev dependencies
         run: pip install -e ".[dev]"
 
       - name: Run tests (non-training)
+        env:
+          QT_QPA_PLATFORM: ${{ runner.os == 'Linux' && 'offscreen' || '' }}
         run: pytest -m "not training" -q
 
   # ── macOS .app bundle ────────────────────────────────────────────────────
@@ -57,7 +63,7 @@ jobs:
           pip install -e ".[ui,build]"
 
       - name: Build with PyInstaller
-        run: pyinstaller --noconfirm maestro.spec
+        run: pyinstaller --clean --noconfirm maestro.spec
 
       - name: Verify bundle
         run: test -d dist/Maestro.app
@@ -100,7 +106,7 @@ jobs:
           pip install -e ".[ui,build]"
 
       - name: Build with PyInstaller
-        run: pyinstaller --noconfirm maestro.spec
+        run: pyinstaller --clean --noconfirm maestro.spec
 
       - name: Verify executable
         run: Test-Path dist\Maestro\Maestro.exe
