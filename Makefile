@@ -51,8 +51,12 @@ build-onefile: install-build ## Build a single-file executable (slower startup)
 	    src/maestro/app/ui/app_ui.py
 	@echo "✓ Output: dist/Maestro"
 
-clean: ## Remove Python caches and build artifacts
+generate-icon: ## Re-generate icon assets (PNG / ICNS / ICO) from tools/generate_icon.py
+	python tools/generate_icon.py
+
+clean: ## Remove Python caches, build artifacts, and icon scratch files
 	rm -rf build/ dist/
 	find . -type d \( -name __pycache__ -o -name "*.egg-info" -o -name .mypy_cache -o -name .ruff_cache \) -exec rm -rf {} +
+	rm -f docs/assets/icon_preview.png docs/assets/icon.iconset
 
 # Credits: https://www.kdnuggets.com/the-case-for-makefiles-in-python-projects-and-how-to-get-started
