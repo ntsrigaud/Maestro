@@ -1,0 +1,8 @@
+app_name: presentation-controller
+camera_index: 0
+command_map: command_map_presentation.yaml
+frame_height: 720
+frame_width: 1280
+hand_preference: right
+mirror_display: true
+target_fps: 30
