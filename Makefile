@@ -44,7 +44,7 @@ run-ui: ## Launch PySide6 GUI
 
 build: install-build ## Build standalone app bundle via PyInstaller
 	@echo "Building Maestro standalone application..."
-	pyinstaller --noconfirm maestro.spec
+	pyinstaller --clean --noconfirm maestro.spec
 	@echo ""
 	@if [ "$$(uname)" = "Darwin" ]; then \
 	    echo "✓ macOS bundle: dist/Maestro.app"; \
