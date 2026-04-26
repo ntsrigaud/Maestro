@@ -39,6 +39,8 @@ CONFIGS_SRC = ROOT / "configs"
 datas = [
     # Maestro runtime configuration (user-editable defaults)
     (str(CONFIGS_SRC), "configs"),
+    # Application icon (used by get_app_icon() at runtime)
+    (str(ROOT / "docs" / "assets" / "icon.png"), "docs/assets"),
 ]
 
 # MediaPipe ships its own model files and protobuf descriptors as data.
@@ -124,7 +126,7 @@ if sys.platform == "darwin":
         strip=False,
         upx=True,
         console=False,  # GUI app — no terminal window
-        # icon="docs/assets/icon.icns",  # Uncomment when icon is ready
+        icon="docs/assets/icon.icns",
     )
     coll = COLLECT(  # noqa: F821
         exe,
@@ -138,7 +140,7 @@ if sys.platform == "darwin":
     app = BUNDLE(  # noqa: F821
         coll,
         name="Maestro.app",
-        # icon="docs/assets/icon.icns",
+        icon="docs/assets/icon.icns",
         bundle_identifier="com.ntsrigaud.maestro",
         info_plist={
             "CFBundleDisplayName": "Maestro",
@@ -167,5 +169,5 @@ else:
         upx_exclude=[],
         runtime_tmpdir=None,
         console=False,
-        # icon="docs/assets/icon.ico",  # Uncomment when icon is ready
+        icon="docs/assets/icon.ico",
     )
