@@ -124,3 +124,26 @@ def get_config_dir() -> Path:
     _copy_defaults_to_user_dir(_user_config_dir())
     LOGGER.info("Config dir initialised at: %s", user_configs)
     return user_configs
+
+
+def get_app_icon() -> Path | None:
+    """Return the path to the application icon PNG, or ``None`` if not found.
+
+    Searches in order:
+    1. PyInstaller bundle (``sys._MEIPASS/docs/assets/icon.png``)
+    2. Repository root ``docs/assets/icon.png`` (development)
+    """
+    # PyInstaller bundle
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        p = Path(sys._MEIPASS) / "docs" / "assets" / "icon.png"  # type: ignore[attr-defined]
+        if p.exists():
+            return p
+
+    # Development: walk up from this file to find the repo root
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "docs" / "assets" / "icon.png"
+        if candidate.exists():
+            return candidate
+
+    return None
