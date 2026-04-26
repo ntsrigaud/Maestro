@@ -93,8 +93,9 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         # Exclude training / notebook extras to keep binary size down
+        # NOTE: matplotlib must NOT be excluded — mediapipe.python.solutions.drawing_utils
+        # imports matplotlib.pyplot at module level, which would cause a crash on startup.
         "sklearn",
-        "matplotlib",
         "seaborn",
         "pandas",
         "jupyter",
