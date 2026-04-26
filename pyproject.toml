@@ -47,12 +47,24 @@ dev = [
   "types-PyYAML>=6.0.12",
   "types-PyAutoGUI",
 ]
+build = [
+  "pyinstaller>=6.0.0",
+]
+
+[project.scripts]
+maestro = "maestro.app.main:main"
+
+[project.gui-scripts]
+maestro-ui = "maestro.app.ui.app_ui:run_ui"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"maestro._defaults" = ["configs/**/*.yaml", "configs/**/*.yml"]
 
 [tool.ruff]
 line-length = 100
