@@ -70,22 +70,40 @@ class TestPresentationAdapterNavigation:
 
 
 class TestPresentationAdapterZoom:
-    def test_zoom_in_view_sends_modifier_equal(self):
+    def test_zoom_in_view_calls_zoom_positive(self):
         kb = _mock_keyboard()
         adapter = PresentationAdapter(keyboard=kb)
         result = adapter.execute("zoom_in_view")
-        # Modifier varies by platform; verify the second key is "equal".
-        args = kb.press_hotkey.call_args[0]
-        assert args[-1] == "equal"
+        kb.zoom.assert_called_once()
+        clicks, = kb.zoom.call_args.args
+        assert clicks > 0, "zoom_in_view must pass a positive click count"
         assert result.success is True
 
-    def test_zoom_out_view_sends_modifier_minus(self):
+    def test_zoom_out_view_calls_zoom_negative(self):
         kb = _mock_keyboard()
         adapter = PresentationAdapter(keyboard=kb)
         result = adapter.execute("zoom_out_view")
-        args = kb.press_hotkey.call_args[0]
-        assert args[-1] == "minus"
+        kb.zoom.assert_called_once()
+        clicks, = kb.zoom.call_args.args
+        assert clicks < 0, "zoom_out_view must pass a negative click count"
         assert result.success is True
+
+    def test_zoom_in_view_passes_modifier(self):
+        """Modifier key must be forwarded so the correct OS zoom is triggered."""
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        adapter.execute("zoom_in_view")
+        _, kwargs = kb.zoom.call_args
+        assert "modifier" in kwargs, "zoom() must receive the modifier kwarg"
+        assert kwargs["modifier"] in {"command", "ctrl"}
+
+    def test_zoom_out_view_passes_modifier(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        adapter.execute("zoom_out_view")
+        _, kwargs = kb.zoom.call_args
+        assert "modifier" in kwargs
+        assert kwargs["modifier"] in {"command", "ctrl"}
 
 
 # ---------------------------------------------------------------------------
