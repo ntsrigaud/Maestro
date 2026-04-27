@@ -98,17 +98,17 @@ Semantic-HGR-System/
 
 **Purpose**: Concrete implementations wrapping external libraries.
 
-| Subpackage               | Module                    | Class                                                      | External Dependency |
-| ------------------------ | ------------------------- | ---------------------------------------------------------- | ------------------- |
-| `camera/`                | `opencv_source.py`        | `OpenCVFrameSource`                                        | OpenCV              |
-| `mediapipe/`             | `hands_extractor.py`      | `MediaPipeHandsExtractor`                                  | MediaPipe           |
-| `model/`                 | `checkpoint_loader.py`    | `InferenceArtifact`, loader functions                      | PyTorch             |
-| `dispatch/`              | `command_dispatcher.py`   | `CommandDispatcher`                                        | —                   |
-| `dispatch/app_adapters/` | `keyboard_adapter.py`     | `KeyboardAdapter`                                          | pyautogui           |
-| `dispatch/app_adapters/` | `presentation_adapter.py` | `PresentationAdapter` (slide navigation, zoom, start/stop) | —                   |
-| `feedback/`              | `overlay_renderer.py`     | `OverlayRenderer`                                          | OpenCV              |
-| `gaze/`                  | `head_pose_detector.py`   | `HeadPoseGazeDetector`                                     | MediaPipe, OpenCV   |
-| `gaze/`                  | `null_detector.py`        | `NullGazeDetector`                                         | —                   |
+| Subpackage               | Module                    | Class                                                      | External Dependency      |
+| ------------------------ | ------------------------- | ---------------------------------------------------------- | ------------------------ |
+| `camera/`                | `opencv_source.py`        | `OpenCVFrameSource`                                        | OpenCV                   |
+| `mediapipe/`             | `hands_extractor.py`      | `MediaPipeHandsExtractor`                                  | MediaPipe                |
+| `model/`                 | `checkpoint_loader.py`    | `InferenceArtifact`, loader functions                      | PyTorch                  |
+| `dispatch/`              | `command_dispatcher.py`   | `CommandDispatcher`                                        | —                        |
+| `dispatch/app_adapters/` | `keyboard_adapter.py`     | `KeyboardAdapter`                                          | pyautogui                |
+| `dispatch/app_adapters/` | `presentation_adapter.py` | `PresentationAdapter` (slide navigation, zoom, start/stop) | —                        |
+| `feedback/`              | `overlay_renderer.py`     | `OverlayRenderer`                                          | OpenCV                   |
+| `gaze/`                  | `head_pose_detector.py`   | `HeadPoseGazeDetector`                                     | MediaPipe, OpenCV, NumPy |
+| `gaze/`                  | `null_detector.py`        | `NullGazeDetector`                                         | —                        |
 
 **Dependency rule**: May import domain entities, interfaces, and external libraries. Must not import from pipeline, training, or app packages.
 

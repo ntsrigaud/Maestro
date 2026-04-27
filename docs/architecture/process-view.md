@@ -83,31 +83,31 @@ At 30 FPS target, each loop iteration has a ~33 ms budget. The pipeline stages c
 
 ### 4.1 Gaze Intent Detector State Machine
 
-The proposed `HeadPoseGazeDetector` maintains an independent four-state machine that acts as the outermost pipeline gate:
+`HeadPoseGazeDetector` maintains an independent four-state machine that acts as the outermost pipeline gate:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> GAZE_ABSENT
+    [*] --> ABSENT
 
-    GAZE_ABSENT --> GAZE_ACQUIRING : Head pose within threshold
-    GAZE_ACQUIRING --> GAZE_ACTIVE : Stable gaze for >= 500 ms
-    GAZE_ACQUIRING --> GAZE_ABSENT : Gaze broken before threshold
-    GAZE_ACTIVE --> GAZE_LOSING : Head pose leaves threshold
-    GAZE_LOSING --> GAZE_ACTIVE : Gaze recovered within grace period
-    GAZE_LOSING --> GAZE_ABSENT : Grace period elapsed (5 s)
+    ABSENT --> ACQUIRING : Head pose within threshold
+    ACQUIRING --> ACTIVE : Stable gaze for arm_ms (default 500 ms)
+    ACQUIRING --> ABSENT : Gaze broken before threshold
+    ACTIVE --> LOSING : Head pose leaves threshold
+    LOSING --> ACTIVE : Gaze recovered within grace period
+    LOSING --> ABSENT : Grace period elapsed (grace_ms, default 5 s)
 ```
 
-**GAZE_ABSENT**: No face detected or head pose exceeds angular thresholds. All hand landmark extraction, LSTM inference, and activation routing are bypassed. Any ongoing gesture activation hold timer is reset.
+**ABSENT**: No face detected or head pose exceeds angular thresholds. All hand landmark extraction, LSTM inference, and activation routing are bypassed. Any ongoing gesture activation hold timer is reset.
 
-**GAZE_ACQUIRING**: A qualifying head pose has been detected. An internal stability timer starts. The gesture pipeline remains inactive until the state advances to GAZE_ACTIVE, preventing instantaneous arming when the user glances briefly toward the camera.
+**ACQUIRING**: A qualifying head pose has been detected. An internal stability timer starts. The gesture pipeline remains inactive until the state advances to ACTIVE, preventing instantaneous arming when the user glances briefly toward the camera.
 
-**GAZE_ACTIVE**: Head pose has been within thresholds continuously for `gaze_arm_ms` (default 500 ms). The downstream gesture pipeline is fully operational. This is the only state in which `GestureActivationController.route()` is invoked.
+**ACTIVE**: Head pose has been within thresholds continuously for `arm_ms` (default 500 ms). The downstream gesture pipeline is fully operational. This is the only state in which `GestureActivationController.route()` is invoked.
 
-**GAZE_LOSING**: Head pose has left the acceptance window. A grace timer starts. If the user looks back before the grace period elapses (`gaze_grace_ms`, default 5000 ms), no state change in the gesture controller occurs. This prevents disarming during natural head movements mid-presentation.
+**LOSING**: Head pose has left the acceptance window. A grace timer starts. If the user looks back before the grace period elapses (`grace_ms`, default 5000 ms), no state change in the gesture controller occurs. This prevents disarming during natural head movements mid-presentation.
 
 ### 4.2 Gesture Activation State Machine
 
-The `GestureActivationController` implements a three-state finite state machine that governs command emission. It operates only while the gaze detector is in GAZE_ACTIVE:
+The `GestureActivationController` implements a three-state finite state machine that governs command emission. It operates only while the gaze detector is in ACTIVE state:
 
 ```mermaid
 stateDiagram-v2
