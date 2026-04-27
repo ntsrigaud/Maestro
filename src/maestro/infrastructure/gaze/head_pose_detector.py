@@ -1,69 +1,4 @@
-"""Head-pose-based gaze intent detector using MediaPipe Face Detection (full-range).
-
-Geometric implementation
-------------------------
-This module replaces the previous PnP-based angle estimator with a
-scale-invariant geometric proxy that works reliably at camera distances up to
-approximately 3 m — well beyond the 1–1.5 m practical limit of the
-``cv2.solvePnP`` approach it supersedes.
-
-Root cause of the previous range failure
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The original implementation used MediaPipe's BlazeFace short-range model
-(``model_selection=0``) and fed its 6 sparse keypoints into ``cv2.solvePnP``
-to recover head rotation angles.  Two compounding problems caused failure at
-distances beyond ~1 m:
-
-1. **BlazeFace short-range model** is optimised for faces subtending >200 px.
-   At 2 m in a 640×480 frame the face is ~40 px wide.  Keypoint localisation
-   error (±3–5 px) becomes a >10 % error relative to the ~30 px inter-eye
-   span, breaking the PnP correspondence.
-
-2. **PnP instability from sparse noisy keypoints.**  ``cv2.solvePnP`` is
-   highly sensitive to measurement noise when only 6 points are available.
-   At 2 m, ±5 px keypoint jitter propagates to ±15–40° in the recovered
-   Euler angles, causing random oscillation across the ±30°/±25° acceptance
-   boundary every frame even for a stationary frontal face.
-
-Geometric proxy approach (this implementation)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Instead of recovering absolute Euler angles we compute two *dimensionless
-ratios* of keypoint coordinates.  Because both the numerator and denominator
-of each ratio scale proportionally with face size (hence camera distance),
-the ratios are distance-invariant as long as a face is detected at all:
-
-    yaw_norm  = (nose_x − eye_mid_x) / inter_eye_dist
-    pitch_norm = (nose_y − eye_mid_y) / inter_eye_dist
-
-where all coordinates are in the relative [0, 1] keypoint space returned
-by MediaPipe Face Detection.
-
-Geometric derivation of threshold mapping
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For a generic adult face model (Farkas 1994 anthropometric reference):
-nose-to-eye-plane Z-depth ≈ 26 mm, inter-eye distance ≈ 60 mm.
-
-Under perspective projection the horizontal shift of the nose relative to
-the eye midpoint satisfies:
-
-    yaw_norm ≈ (26 / 60) · tan(θ_yaw)  =  0.433 · tan(θ_yaw)
-
-The ``yaw_threshold_deg`` config parameter is converted to the ratio limit
-via this exact formula.  For the default 30° this gives ≈ 0.25 — the nose
-must stay within 25 % of the inter-eye distance from the eye midpoint.
-
-Pitch uses an empirical linear approximation around the frontal-face neutral
-value (pitch_norm ≈ 0.55):
-
-    pitch_half_window = pitch_threshold_deg · 0.016
-
-giving ≈ ±0.40 around neutral at the default ±25° threshold.
-
-Both the full-range BlazeFace model (``model_selection=1``, rated ≤5 m) and
-the configurable ``min_detection_score`` gate ensure that low-confidence
-detections at range or during partial occlusion are rejected before the
-geometric check, keeping the acceptance cone conservative.
-"""
+"""Head-pose-based gaze intent detector using MediaPipe Face Detection and solvePnP."""
 
 from __future__ import annotations
 
@@ -75,6 +10,7 @@ from enum import Enum, auto
 
 import cv2
 import mediapipe as mp
+import numpy as np
 
 from maestro.domain.entities import FramePacket
 from maestro.utils.schema_validation import GazeConfig
@@ -82,34 +18,42 @@ from maestro.utils.schema_validation import GazeConfig
 LOGGER = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Geometric proxy calibration constants
+# Six-point PnP face model (MediaPipe Face Detection keypoints)
 # ---------------------------------------------------------------------------
-# These dimensionless constants map the angular acceptance-cone thresholds
-# from GazeConfig into the scale-invariant keypoint-ratio space.  They are
-# derived from the Farkas (1994) adult face anthropometric norms:
+# Canonical 3-D coordinates (millimetres) for the 6 keypoints produced by
+# mp.solutions.face_detection.FaceDetection.  Face Detection corresponds to
+# the BlazeFace short-range model — the detection stage that previously ran
+# inside the Face Mesh pipeline.  Using Face Detection directly eliminates
+# the heavyweight 256×256 Face Mesh network.
 #
-#   nose-to-eye-plane Z-depth  ≈ 26 mm
-#   inter-eye distance         ≈ 60 mm
-#   nose-to-eye-midpoint Y     ≈ 33 mm  →  neutral pitch_norm ≈ 33/60 ≈ 0.55
+# Keypoint order (fixed by MediaPipe Face Detection):
+#   0 → right eye centre
+#   1 → left eye centre
+#   2 → nose tip
+#   3 → mouth centre
+#   4 → right ear tragion
+#   5 → left ear tragion
 #
-# yaw_norm ≈ _YAW_NORM_FACTOR · tan(θ_yaw), derived as 26/60 ≈ 0.433.
-_YAW_NORM_FACTOR: float = 26.0 / 60.0
+# The coordinate system is face-centred: origin at the nose tip, X rightward,
+# Y upward, Z toward the camera.  Values adapted from the Bosphorus generic
+# face model (Savran et al., 2008).
+_MODEL_POINTS_3D = np.array(
+    [
+        [30.0, 32.7, -26.0],  # 0  right eye centre
+        [-30.0, 32.7, -26.0],  # 1  left eye centre
+        [0.0, 0.0, 0.0],  # 2  nose tip (origin)
+        [0.0, -20.0, -14.0],  # 3  mouth centre
+        [77.5, 0.0, -44.5],  # 4  right ear tragion
+        [-77.5, 0.0, -44.5],  # 5  left ear tragion
+    ],
+    dtype=np.float64,
+)
 
-# Neutral (frontal, 0° pitch) value of pitch_norm.
-_PITCH_NEUTRAL_NORM: float = 0.55
+# Zero distortion coefficients.  The barrel distortion of typical webcam
+# lenses is modest and does not materially affect the head-pose angle
+# estimates at the ±30°/±25° acceptance-cone granularity used here.
+_DIST_COEFFS = np.zeros((4, 1), dtype=np.float64)
 
-# Linear pitch sensitivity: pitch_norm changes approximately this many units
-# per degree of head elevation.  Calibrated from face model geometry.
-_PITCH_NORM_PER_DEG: float = 0.016
-
-# Minimum inter-eye distance in relative [0, 1] image coordinates.  Rejects
-# faces whose bounding box is so small that keypoint noise dominates
-# (typically faces at >3 m in a 640 px-wide frame).
-_MIN_INTER_EYE_RELATIVE: float = 0.020
-
-
-# ---------------------------------------------------------------------------
-# Internal state machine enum
 
 # ---------------------------------------------------------------------------
 # Internal state machine enum
@@ -124,13 +68,57 @@ class _GazeState(Enum):
 
 
 # ---------------------------------------------------------------------------
+# Euler-angle extraction
+# ---------------------------------------------------------------------------
+
+
+def _euler_yaw_pitch(rotation_matrix: np.ndarray) -> tuple[float, float]:
+    """Return (roll_deg, head_turn_deg) from a 3×3 object-to-camera rotation.
+
+    Uses the ZYX Euler decomposition of the rotation matrix R produced by
+    ``cv2.Rodrigues(rvec)`` after a ``cv2.solvePnP`` call.
+
+    In OpenCV camera coordinates (X right, Y down, Z forward into scene) the
+    decomposition yields:
+
+    * First angle  α (``yaw`` below)   = rotation around camera-Z (forward).
+      In practice this captures **head tilt** (ear-toward-shoulder roll).
+    * Second angle β (``pitch`` below) = rotation around camera-Y (down).
+      In practice this captures **head turn** (looking left/right, i.e. yaw
+      in world terms).  This is the critical angle for the acceptance cone.
+    * Third  angle γ (roll)            = rotation around camera-X (right).
+      Captures nodding up/down; not returned — less relevant for a camera
+      positioned at screen level.
+
+    For a face looking directly at the camera both returned angles are ≈ 0°.
+
+    Returns
+    -------
+    (yaw_deg, pitch_deg) :
+        yaw_deg   — head tilt / roll  (camera-Z rotation; checked vs yaw_threshold).
+        pitch_deg — head turn L/R     (camera-Y rotation; checked vs pitch_threshold).
+    """
+    sy = math.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
+    singular = sy < 1e-6
+
+    if not singular:
+        pitch = math.atan2(-rotation_matrix[2, 0], sy)
+        yaw = math.atan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+    else:
+        # Gimbal-lock fallback: yaw is indeterminate; set to zero.
+        pitch = math.atan2(-rotation_matrix[2, 0], sy)
+        yaw = 0.0
+
+    return math.degrees(yaw), math.degrees(pitch)
+
+
+# ---------------------------------------------------------------------------
 # HeadPoseGazeDetector
 # ---------------------------------------------------------------------------
 
 
 class HeadPoseGazeDetector:
-    """Gaze-intent detector using MediaPipe Face Detection (full-range) and
-    scale-invariant geometric head-pose estimation.
+    """Gaze-intent detector based on MediaPipe Face Mesh and PnP head-pose.
 
     Implements ``IGazeIntentDetector`` structurally (duck-typed Protocol).
 
@@ -138,10 +126,9 @@ class HeadPoseGazeDetector:
     camera (states GAZE_ACTIVE or GAZE_LOSING within the grace period) and
     ``False`` otherwise.
 
-    Face Detection is sampled once every ``config.sample_interval_frames``
-    frames; the cached boolean is returned on intermediate frames.  At 30 FPS
-    with the default ``sample_interval_frames=3`` the amortised per-loop cost
-    is ~2 ms.
+    Face Mesh is sampled once every ``config.sample_interval_frames`` frames;
+    the cached boolean is returned on intermediate frames.  At 30 FPS with the
+    default ``sample_interval_frames=3`` the amortised per-loop cost is ~2 ms.
 
     State machine
     -------------
@@ -172,21 +159,17 @@ class HeadPoseGazeDetector:
         self._cfg = config
         self._on_gaze_lost = on_gaze_lost
 
-        # Full-range BlazeFace model (model_selection=1) supports detection
-        # up to approximately 5 m, vs ≤2 m for the short-range model=0.
-        # The min_detection_confidence threshold is set from config so that
-        # low-confidence detections at range are rejected at the C++ level.
         self._face_detection = mp.solutions.face_detection.FaceDetection(
-            model_selection=1,  # full-range model (≤ 5 m)
-            min_detection_confidence=self._cfg.min_detection_score,
+            model_selection=0,  # short-range model (≤ 2 m), optimal for webcam
+            min_detection_confidence=0.5,
         )
 
         self._state: _GazeState = _GazeState.ABSENT
         self._stability_start_ms: float | None = None
         self._grace_start_ms: float | None = None
 
-        # Frame counter drives sub-sampling; starts at 0 so the very first
-        # call always triggers a Face Detection evaluation.
+        # Frame counter drives the sub-sampling; starts at 0 so the very
+        # first call always triggers a Face Mesh evaluation.
         self._frame_counter: int = 0
         self._last_permitted: bool = False
 
@@ -203,12 +186,14 @@ class HeadPoseGazeDetector:
     def update(self, frame: FramePacket) -> bool:
         """Advance the gaze state machine and return ``gaze_permitted``."""
         if self._frame_counter % self._cfg.sample_interval_frames == 0:
-            # A C-contiguous RGB copy is required; a reversed-stride view
-            # (frame[:, :, ::-1]) can cause silent failures in some MediaPipe
-            # C extensions that require contiguous memory.
+            h, w = frame.frame.shape[:2]
+            # Use cv2.cvtColor to produce a C-contiguous RGB copy.  A
+            # reversed-stride view (frame[:, :, ::-1]) can cause silent
+            # failures in some solvePnP and MediaPipe C extensions that
+            # require contiguous memory.
             rgb = cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
             results = self._face_detection.process(rgb)
-            within_cone = self._is_within_cone(results)
+            within_cone = self._is_within_cone(results, h, w)
             now_ms = time.monotonic() * 1000.0
             self._transition(within_cone, now_ms)
             self._last_permitted = self._state in (_GazeState.ACTIVE, _GazeState.LOSING)
@@ -242,81 +227,62 @@ class HeadPoseGazeDetector:
         self._on_gaze_lost = callback
 
     # ------------------------------------------------------------------
-    # Geometric head-pose estimation
+    # Head-pose estimation
     # ------------------------------------------------------------------
 
-    def _is_within_cone(self, results) -> bool:  # type: ignore[no-untyped-def]
-        """Return True if the detected head pose is within the acceptance cone.
-
-        Uses scale-invariant geometric ratios of the BlazeFace keypoints
-        rather than PnP pose estimation.  See module docstring for the
-        derivation and calibration of the angular-threshold mapping.
-
-        Keypoint layout (fixed by MediaPipe Face Detection):
-            0 → right eye centre  (appears on LEFT in a frontal-face image)
-            1 → left eye centre   (appears on RIGHT in a frontal-face image)
-            2 → nose tip
-        """
+    def _is_within_cone(self, results, h: int, w: int) -> bool:  # type: ignore[no-untyped-def]
+        """Return True if the detected head pose is within the acceptance cone."""
         if not results.detections:
             return False
 
-        det = results.detections[0]
-
-        # The min_detection_confidence passed to FaceDetection is the primary
-        # filter.  This secondary Python-level check guards against edge cases
-        # where the C++ layer emits marginal results that narrowly satisfy the
-        # C-level threshold.
-        if not det.score or det.score[0] < self._cfg.min_detection_score:
+        keypoints = results.detections[0].location_data.relative_keypoints
+        if len(keypoints) < 6:
             return False
 
-        keypoints = det.location_data.relative_keypoints
-        if len(keypoints) < 3:
+        image_points = np.array(
+            [[kp.x * w, kp.y * h] for kp in keypoints],
+            dtype=np.float64,
+        )
+
+        # Approximate camera intrinsics from the image width.  A focal length
+        # equal to the image width gives a ~53° diagonal FoV, which is typical
+        # for consumer webcams (Logitech C920: 78° diagonal = ~53° vertical).
+        focal_length = float(w)
+        camera_matrix = np.array(
+            [
+                [focal_length, 0.0, w / 2.0],
+                [0.0, focal_length, h / 2.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float64,
+        )
+
+        success, rvec, _ = cv2.solvePnP(
+            _MODEL_POINTS_3D,
+            image_points,
+            camera_matrix,
+            _DIST_COEFFS,
+            flags=cv2.SOLVEPNP_ITERATIVE,
+        )
+        if not success:
             return False
 
-        # Relative image coordinates in [0.0, 1.0].
-        re_x, re_y = keypoints[0].x, keypoints[0].y  # right eye
-        le_x, le_y = keypoints[1].x, keypoints[1].y  # left eye
-        no_x, no_y = keypoints[2].x, keypoints[2].y  # nose tip
+        rmat, _ = cv2.Rodrigues(rvec)
+        yaw_deg, pitch_deg = _euler_yaw_pitch(rmat)
 
-        # Scale reference: Euclidean inter-eye distance in relative coords.
-        inter_eye = math.hypot(le_x - re_x, le_y - re_y)
-        if inter_eye < _MIN_INTER_EYE_RELATIVE:
-            return False  # face too small (extreme range) or degenerate detection
-
-        eye_mid_x = (re_x + le_x) * 0.5
-        eye_mid_y = (re_y + le_y) * 0.5
-
-        # --- Yaw proxy ---
-        # yaw_norm = (nose_x − eye_midpoint_x) / inter_eye_dist
-        # ≈ _YAW_NORM_FACTOR · tan(θ_yaw) for small-to-moderate yaw angles.
-        # → 0.0 when frontal; grows toward ±0.25 at ±30° for an average face.
-        yaw_norm = (no_x - eye_mid_x) / inter_eye
-        yaw_limit = _YAW_NORM_FACTOR * math.tan(math.radians(self._cfg.yaw_threshold_deg))
-
-        # --- Pitch proxy ---
-        # pitch_norm = (nose_y − eye_midpoint_y) / inter_eye_dist
-        # ≈ _PITCH_NEUTRAL_NORM at 0° elevation; shifts by _PITCH_NORM_PER_DEG
-        # per degree of elevation (positive pitch_norm = nose below eye level).
-        pitch_norm = (no_y - eye_mid_y) / inter_eye
-        pitch_half = self._cfg.pitch_threshold_deg * _PITCH_NORM_PER_DEG
-        pitch_lo = _PITCH_NEUTRAL_NORM - pitch_half
-        pitch_hi = _PITCH_NEUTRAL_NORM + pitch_half
-
-        within = abs(yaw_norm) <= yaw_limit and pitch_lo <= pitch_norm <= pitch_hi
+        within = (
+            abs(yaw_deg) <= self._cfg.yaw_threshold_deg
+            and abs(pitch_deg) <= self._cfg.pitch_threshold_deg
+        )
         LOGGER.debug(
-            "Gaze geometry: yaw_norm=%.3f(±%.3f) pitch_norm=%.3f([%.3f,%.3f]) → within=%s",
-            yaw_norm,
-            yaw_limit,
-            pitch_norm,
-            pitch_lo,
-            pitch_hi,
+            "Gaze pose: tilt=%.1f°(±%.0f°) turn=%.1f°(±%.0f°) → within=%s",
+            yaw_deg,
+            self._cfg.yaw_threshold_deg,
+            pitch_deg,
+            self._cfg.pitch_threshold_deg,
             within,
         )
         return within
-
-    # ------------------------------------------------------------------
-    # State machine
-    # ------------------------------------------------------------------
 
     def _transition(self, within_cone: bool, now_ms: float) -> None:
         """Advance the four-state machine given current cone membership."""

@@ -428,136 +428,164 @@ class TestClose:
 
 
 # ---------------------------------------------------------------------------
-# HeadPoseGazeDetector — _is_within_cone() geometric proxy
+# HeadPoseGazeDetector — _is_within_cone() with BlazeFace + PnP
 # ---------------------------------------------------------------------------
 
+# Patch targets for cv2 functions called inside _is_within_cone.
+_CV2_SOLVEPNP = "maestro.infrastructure.gaze.head_pose_detector.cv2.solvePnP"
+_CV2_RODRIGUES = "maestro.infrastructure.gaze.head_pose_detector.cv2.Rodrigues"
 
-def _make_results(keypoints: list, score: float = 0.9) -> object:
+# Six relative keypoints matching the BlazeFace output schema:
+# right_eye, left_eye, nose_tip, mouth_center, right_ear_tragion, left_ear_tragion.
+_SIX_KPS = [
+    (0.40, 0.40),  # right eye
+    (0.60, 0.40),  # left eye
+    (0.50, 0.50),  # nose tip
+    (0.50, 0.60),  # mouth center
+    (0.30, 0.45),  # right ear tragion
+    (0.70, 0.45),  # left ear tragion
+]
+
+
+def _make_results(keypoints: list) -> object:
     """Build a minimal mock MediaPipe Face Detection result with one detection."""
     from types import SimpleNamespace
 
     kp_ns = [SimpleNamespace(x=x, y=y) for x, y in keypoints]
     location_data = SimpleNamespace(relative_keypoints=kp_ns)
-    detection = SimpleNamespace(location_data=location_data, score=[score])
+    detection = SimpleNamespace(location_data=location_data)
     return SimpleNamespace(detections=[detection])
 
 
-# Reference face: inter_eye=0.10, eye_mid=(0.45,0.40), nose_y for pitch_norm=0.55.
-# With default GazeConfig (yaw_threshold_deg=30, pitch_threshold_deg=25):
-#   yaw_limit = (26/60)*tan(30°) ≈ 0.250
-#   pitch_lo  = 0.55 - 25*0.016 = 0.15
-#   pitch_hi  = 0.55 + 25*0.016 = 0.95
-_RE = (0.40, 0.40)  # right eye
-_LE = (0.50, 0.40)  # left eye  →  inter_eye=0.10, eye_mid=(0.45,0.40)
-_NOSE_FRONTAL = (0.45, 0.455)  # yaw_norm=0.0, pitch_norm=0.55
-_MOUTH = (0.45, 0.51)
-_RIGHT_EAR = (0.34, 0.42)
-_LEFT_EAR = (0.56, 0.42)
+def _make_rmat(yaw_deg: float = 0.0, pitch_deg: float = 0.0) -> np.ndarray:
+    """Return a 3×3 rotation matrix encoding the given yaw and pitch angles.
 
-_FRONTAL_KPS = [_RE, _LE, _NOSE_FRONTAL, _MOUTH, _RIGHT_EAR, _LEFT_EAR]
+    Uses ZYX decomposition to match _euler_yaw_pitch():
+      yaw   → rotation about camera-Z axis (head tilt / roll).
+      pitch → rotation about camera-Y axis (head turn left/right).
+    """
+    y = np.radians(yaw_deg)
+    p = np.radians(pitch_deg)
+    rz = np.array(
+        [
+            [np.cos(y), -np.sin(y), 0.0],
+            [np.sin(y), np.cos(y), 0.0],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+    ry = np.array(
+        [
+            [np.cos(p), 0.0, np.sin(p)],
+            [0.0, 1.0, 0.0],
+            [-np.sin(p), 0.0, np.cos(p)],
+        ],
+        dtype=np.float64,
+    )
+    return rz @ ry
 
 
 class TestIsWithinCone:
-    """Geometric proxy tests for _is_within_cone()."""
+    """PnP head-pose path tests for _is_within_cone()."""
 
     # -- guard conditions ---------------------------------------------------
 
     def test_returns_false_when_no_detections(self) -> None:
+        """_is_within_cone must return False when results.detections is empty."""
         from types import SimpleNamespace
 
         det = _make_detector()
         results = SimpleNamespace(detections=[])
-        assert det._is_within_cone(results) is False
+        assert det._is_within_cone(results, h=480, w=640) is False
 
-    def test_returns_false_when_fewer_than_three_keypoints(self) -> None:
-        """Fewer than 3 keypoints means nose is unavailable; must return False."""
+    def test_returns_false_when_fewer_than_six_keypoints(self) -> None:
+        """_is_within_cone must return False when a detection has < 6 keypoints."""
+        from types import SimpleNamespace
+
         det = _make_detector()
-        results = _make_results([(0.4, 0.4), (0.5, 0.4)])  # only 2 keypoints
-        assert det._is_within_cone(results) is False
+        kp = [SimpleNamespace(x=0.5, y=0.5)] * 3  # only 3 — malformed detection
+        location_data = SimpleNamespace(relative_keypoints=kp)
+        detection = SimpleNamespace(location_data=location_data)
+        results = SimpleNamespace(detections=[detection])
+        assert det._is_within_cone(results, h=480, w=640) is False
 
-    def test_returns_false_when_low_confidence(self) -> None:
-        """A detection below min_detection_score must be rejected."""
-        det = _make_detector()  # min_detection_score defaults to 0.5
-        results = _make_results(_FRONTAL_KPS, score=0.3)
-        assert det._is_within_cone(results) is False
-
-    def test_returns_false_when_inter_eye_too_small(self) -> None:
-        """A degenerate detection with very small inter-eye distance is rejected."""
+    def test_returns_false_when_solvepnp_fails(self) -> None:
+        """_is_within_cone must return False when cv2.solvePnP reports failure."""
         det = _make_detector()
-        # right_eye and left_eye only 0.005 apart → inter_eye < _MIN_INTER_EYE_RELATIVE
-        tiny_kps = [
-            (0.500, 0.40),
-            (0.505, 0.40),
-            (0.502, 0.455),
-            _MOUTH,
-            _RIGHT_EAR,
-            _LEFT_EAR,
-        ]
-        results = _make_results(tiny_kps)
-        assert det._is_within_cone(results) is False
+        results = _make_results(_SIX_KPS)
+        with patch(_CV2_SOLVEPNP, return_value=(False, None, None)):
+            assert det._is_within_cone(results, h=480, w=640) is False
 
     # -- frontal (should be within cone) ------------------------------------
 
     def test_returns_true_for_frontal_face(self) -> None:
-        """A perfectly frontal face (yaw_norm≈0, pitch_norm≈0.55) must return True."""
+        """A perfectly frontal pose (yaw≈0°, pitch≈0°) must return True."""
         det = _make_detector()
-        results = _make_results(_FRONTAL_KPS)
-        assert det._is_within_cone(results) is True
+        results = _make_results(_SIX_KPS)
+        dummy_rvec = np.zeros((3, 1))
+        rmat = _make_rmat(yaw_deg=0.0, pitch_deg=0.0)
+        with (
+            patch(_CV2_SOLVEPNP, return_value=(True, dummy_rvec, None)),
+            patch(_CV2_RODRIGUES, return_value=(rmat, None)),
+        ):
+            assert det._is_within_cone(results, h=480, w=640) is True
 
-    def test_returns_true_for_small_yaw(self) -> None:
-        """A small yaw (well within threshold) must return True."""
+    def test_returns_true_for_small_angles_within_thresholds(self) -> None:
+        """Yaw=20° and pitch=20° (within defaults of 30° and 25°) must return True."""
         det = _make_detector()
-        # nose shifted right by 0.010 → yaw_norm = 0.010/0.10 = 0.10 (< 0.25 limit)
-        kps = list(_FRONTAL_KPS)
-        kps[2] = (0.46, 0.455)
-        results = _make_results(kps)
-        assert det._is_within_cone(results) is True
+        results = _make_results(_SIX_KPS)
+        dummy_rvec = np.zeros((3, 1))
+        rmat = _make_rmat(yaw_deg=20.0, pitch_deg=20.0)
+        with (
+            patch(_CV2_SOLVEPNP, return_value=(True, dummy_rvec, None)),
+            patch(_CV2_RODRIGUES, return_value=(rmat, None)),
+        ):
+            assert det._is_within_cone(results, h=480, w=640) is True
 
     # -- yaw out of cone ---------------------------------------------------
 
     def test_returns_false_when_yaw_exceeds_threshold(self) -> None:
-        """A nose shift producing yaw_norm > yaw_limit must return False."""
+        """A yaw angle exceeding yaw_threshold_deg (default 30°) must return False."""
         det = _make_detector()
-        # nose at x=0.478 → yaw_norm = (0.478-0.45)/0.10 = 0.28 > ~0.25 limit
-        kps = list(_FRONTAL_KPS)
-        kps[2] = (0.478, 0.455)
-        results = _make_results(kps)
-        assert det._is_within_cone(results) is False
+        results = _make_results(_SIX_KPS)
+        dummy_rvec = np.zeros((3, 1))
+        rmat = _make_rmat(yaw_deg=45.0, pitch_deg=0.0)  # 45° > 30° threshold
+        with (
+            patch(_CV2_SOLVEPNP, return_value=(True, dummy_rvec, None)),
+            patch(_CV2_RODRIGUES, return_value=(rmat, None)),
+        ):
+            assert det._is_within_cone(results, h=480, w=640) is False
 
     def test_returns_false_when_yaw_negative_exceeds_threshold(self) -> None:
-        """Negative yaw exceeding the threshold (head turned opposite direction)."""
+        """Negative yaw exceeding threshold (head turned opposite direction) returns False."""
         det = _make_detector()
-        kps = list(_FRONTAL_KPS)
-        kps[2] = (0.422, 0.455)  # yaw_norm = (0.422-0.45)/0.10 = -0.28
-        results = _make_results(kps)
-        assert det._is_within_cone(results) is False
+        results = _make_results(_SIX_KPS)
+        dummy_rvec = np.zeros((3, 1))
+        rmat = _make_rmat(yaw_deg=-45.0, pitch_deg=0.0)  # −45° < −30° threshold
+        with (
+            patch(_CV2_SOLVEPNP, return_value=(True, dummy_rvec, None)),
+            patch(_CV2_RODRIGUES, return_value=(rmat, None)),
+        ):
+            assert det._is_within_cone(results, h=480, w=640) is False
 
     # -- pitch out of cone -------------------------------------------------
 
-    def test_returns_false_when_pitch_too_high(self) -> None:
-        """pitch_norm above pitch_hi (looking too far down) returns False."""
+    def test_returns_false_when_pitch_exceeds_threshold(self) -> None:
+        """A pitch angle exceeding pitch_threshold_deg (default 25°) must return False."""
         det = _make_detector()
-        # pitch_norm = (nose_y - eye_mid_y) / inter_eye > 0.95
-        # nose_y = 0.40 + 0.96 * 0.10 = 0.496
-        kps = list(_FRONTAL_KPS)
-        kps[2] = (0.45, 0.496)
-        results = _make_results(kps)
-        assert det._is_within_cone(results) is False
-
-    def test_returns_false_when_pitch_too_low(self) -> None:
-        """pitch_norm below pitch_lo (looking too far up) returns False."""
-        det = _make_detector()
-        # pitch_norm = (nose_y - eye_mid_y) / inter_eye < 0.15
-        # nose_y = 0.40 + 0.14 * 0.10 = 0.414
-        kps = list(_FRONTAL_KPS)
-        kps[2] = (0.45, 0.414)
-        results = _make_results(kps)
-        assert det._is_within_cone(results) is False
+        results = _make_results(_SIX_KPS)
+        dummy_rvec = np.zeros((3, 1))
+        rmat = _make_rmat(yaw_deg=0.0, pitch_deg=35.0)  # 35° > 25° threshold
+        with (
+            patch(_CV2_SOLVEPNP, return_value=(True, dummy_rvec, None)),
+            patch(_CV2_RODRIGUES, return_value=(rmat, None)),
+        ):
+            assert det._is_within_cone(results, h=480, w=640) is False
 
     # -- wider thresholds --------------------------------------------------
 
     def test_wider_yaw_threshold_accepts_rotated_face(self) -> None:
-        """A yaw_threshold_deg=60° must accept a face that 30° rejects."""
+        """A yaw_threshold_deg=60° must accept a pose that the default 30° rejects."""
         cfg = GazeConfig(
             enabled=True,
             arm_ms=200,
@@ -566,8 +594,11 @@ class TestIsWithinCone:
             yaw_threshold_deg=60.0,
         )
         det = _make_detector(cfg=cfg)
-        # nose at x=0.478 → yaw_norm=0.28; yaw_limit at 60°=(26/60)*tan(60°)≈0.75
-        kps = list(_FRONTAL_KPS)
-        kps[2] = (0.478, 0.455)
-        results = _make_results(kps)
-        assert det._is_within_cone(results) is True
+        results = _make_results(_SIX_KPS)
+        dummy_rvec = np.zeros((3, 1))
+        rmat = _make_rmat(yaw_deg=45.0, pitch_deg=0.0)  # 45° > 30° but < 60°
+        with (
+            patch(_CV2_SOLVEPNP, return_value=(True, dummy_rvec, None)),
+            patch(_CV2_RODRIGUES, return_value=(rmat, None)),
+        ):
+            assert det._is_within_cone(results, h=480, w=640) is True
