@@ -1,12 +1,29 @@
 """Presentation controller adapter.
 
-Maps the eight IPN Hand gesture commands to universal keyboard shortcuts for
+Maps the eight IPN Hand gesture commands to universal input actions for
 presentation software (PowerPoint, Keynote, Google Slides, LibreOffice Impress).
-Commands are injected via OS-level keyboard simulation; no application-process
-detection is required — the shortcut is delivered to whichever window holds focus.
+Input is delivered via OS-level keyboard and scroll simulation; no
+application-process detection is required — the action is delivered to whichever
+window holds focus.
 
 All keyboard injection is delegated to :class:`KeyboardAdapter` so that every
 simulated keystroke is validated against the safe-key allowlist before dispatch.
+
+Zoom implementation
+-------------------
+Zoom is implemented via modifier+scroll (Cmd+Scroll on macOS, Ctrl+Scroll on
+Windows and Linux) rather than keyboard shortcuts (Cmd/Ctrl+=/-).  This choice
+provides correct behaviour across all target presentation applications:
+
+- **PowerPoint (Windows / macOS)**: Has no reliable zoom keyboard shortcut;
+  Ctrl/Cmd+Scroll is the standard zoom input accepted by PowerPoint's slide
+  canvas in editing view.
+- **Keynote (macOS)**: Accepts both Cmd+= and Cmd+Scroll; scroll is preferred
+  for consistency.
+- **Google Slides (browser)**: Ctrl/Cmd+Scroll triggers browser viewport zoom,
+  equivalent to Ctrl/Cmd+= but more consistent across browsers.
+- **LibreOffice Impress (all platforms)**: Has no Ctrl+= zoom shortcut;
+  Ctrl+Scroll is the only reliable zoom mechanism.
 """
 
 from __future__ import annotations
@@ -79,9 +96,9 @@ class PresentationAdapter:
             case "scroll_back":
                 self._keyboard.press_hotkey("up")
             case "zoom_in_view":
-                self._keyboard.press_hotkey(self._zoom_modifier, "equal")
+                self._keyboard.zoom(3, modifier=self._zoom_modifier)
             case "zoom_out_view":
-                self._keyboard.press_hotkey(self._zoom_modifier, "minus")
+                self._keyboard.zoom(-3, modifier=self._zoom_modifier)
             case "start_stop_presentation":
                 self._keyboard.press_hotkey(*self._slideshow_keys)
             case "no_action":
