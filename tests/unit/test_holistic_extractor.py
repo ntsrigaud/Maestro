@@ -5,11 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import numpy as np
-import pytest
 
 from maestro.domain.entities import FramePacket, HolisticPacket
 from maestro.pipeline import graph_schema
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -18,7 +16,6 @@ from maestro.pipeline import graph_schema
 
 def _blank_frame_packet(width: int = 320, height: int = 240, ts: int = 0) -> FramePacket:
     """Return a FramePacket with a black BGR image."""
-    import cv2
 
     bgr = np.zeros((height, width, 3), dtype=np.uint8)
     return FramePacket(frame=bgr, timestamp_ms=ts, frame_id=1)
@@ -42,10 +39,14 @@ def _make_mock_result(
     result = MagicMock()
 
     # Right hand — 21 landmarks.
-    result.right_hand_landmarks = [_lm(0.1 * i % 1.0, 0.2, 0.0) for i in range(21)] if has_right_hand else []
+    result.right_hand_landmarks = (
+        [_lm(0.1 * i % 1.0, 0.2, 0.0) for i in range(21)] if has_right_hand else []
+    )
 
     # Left hand — 21 landmarks.
-    result.left_hand_landmarks = [_lm(0.9 - 0.1 * i % 1.0, 0.2, 0.0) for i in range(21)] if has_left_hand else []
+    result.left_hand_landmarks = (
+        [_lm(0.9 - 0.1 * i % 1.0, 0.2, 0.0) for i in range(21)] if has_left_hand else []
+    )
 
     # Pose — 33 landmarks (full MediaPipe Pose set).
     result.pose_landmarks = [_lm(0.5, 0.5 + 0.01 * i, 0.0) for i in range(33)] if has_pose else []

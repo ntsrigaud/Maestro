@@ -10,13 +10,12 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
 import torch
 
 from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM, STGCNBlock, _GraphConv
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 def _build_model(**kwargs) -> STGCN_LSTM:
     defaults = dict(
@@ -38,6 +37,7 @@ def _batch(B: int = 4, T: int = 24, N: int = 67, C: int = 3) -> torch.Tensor:
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
+
 
 class TestSTGCNLSTMForward:
     def test_output_shape_standard(self) -> None:

@@ -69,17 +69,17 @@ import yaml
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from maestro.domain.entities import FramePacket, LabeledGraphFrame  # noqa: E402
+from maestro.domain.entities import LabeledGraphFrame  # noqa: E402
 from maestro.infrastructure.mediapipe.holistic_extractor import (  # noqa: E402
-    HolisticLandmarkExtractor,
     _DEFAULT_CACHE as _DEFAULT_MODEL_CACHE,
+)
+from maestro.infrastructure.mediapipe.holistic_extractor import (
     _ensure_model,
     _is_nan,
 )
 from maestro.pipeline import graph_schema  # noqa: E402
 from maestro.training.dataset_builder import (  # noqa: E402
     GraphSequenceDatasetBuilder,
-    GraphSequenceSample,
 )
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,6 @@ def _parse_holistic_raw(
     are stored in the cache so that normalisation can be applied consistently
     at assembly time via ``graph_schema.normalise_graph_frame()``.
     """
-    import math as _math
 
     keypoints = np.zeros((graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32)
     valid_mask = np.zeros(graph_schema.NUM_NODES, dtype=bool)
@@ -287,7 +286,7 @@ def _load_cache(cache_path: Path) -> VideoLandmarks:
             video_stem=cache_path.stem,
             fps=float(data["fps"]),
             frame_ids=data["frame_ids"],
-            keypoints=data["keypoints"],   # (N, 67, 3)
+            keypoints=data["keypoints"],  # (N, 67, 3)
             valid_mask=data["valid_mask"],  # (N, 67)
         )
 
@@ -521,7 +520,7 @@ def assemble_dataset(
                 timestamp_ms = int((frame_id - 1) * 1000.0 / vl.fps)
 
                 lf = LabeledGraphFrame(
-                    keypoints=vl.keypoints[idx],    # (67, 3) raw
+                    keypoints=vl.keypoints[idx],  # (67, 3) raw
                     valid_mask=vl.valid_mask[idx],  # (67,) bool
                     label=vocab_label,
                     recording_id=recording_id,
