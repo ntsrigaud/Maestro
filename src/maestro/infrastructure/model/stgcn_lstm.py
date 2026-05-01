@@ -37,6 +37,8 @@ class _GraphConv(nn.Module):
                       a buffer so it is saved with the model state dict.
     """
 
+    A: torch.Tensor  # normalised adjacency buffer — declared for mypy
+
     def __init__(
         self,
         in_channels: int,
