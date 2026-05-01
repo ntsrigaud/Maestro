@@ -13,7 +13,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from maestro.training.augmentation import AugmentationConfig
-from maestro.training.datamodule import DataSplitConfig, GestureDataModule
+from maestro.training.datamodule import DataSplitConfig, GestureDataModule, GraphGestureDataModule
 from maestro.training.evaluate import EvaluationReport, evaluate_model
 from maestro.utils.reproducibility import seed_everything
 
@@ -26,6 +26,13 @@ class ModelConfig:
     num_layers: int
     dropout: float
     num_classes: int
+    # STGCN-specific fields (only used when model_name starts with "stgcn").
+    num_nodes: int = 67
+    num_coords: int = 3
+    stgcn_channels: tuple[int, ...] = (64, 128)
+    num_stgcn_layers: int = 2
+    lstm_hidden: int = 128
+    lstm_layers: int = 2
 
 
 @dataclass(slots=True)
@@ -55,6 +62,7 @@ class ExportConfig:
     checkpoint_dir: str
     exported_dir: str
     feature_schema_version: str
+    graph_schema_version: str = "graph-schema-v1"
 
 
 @dataclass(slots=True)
@@ -110,6 +118,13 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             num_layers=int(model_data.get("num_layers", 2)),
             dropout=float(model_data.get("dropout", 0.3)),
             num_classes=int(model_data.get("num_classes", 8)),
+            # STGCN fields — ignored for two_stream models.
+            num_nodes=int(model_data.get("num_nodes", 67)),
+            num_coords=int(model_data.get("num_coords", 3)),
+            stgcn_channels=tuple(int(c) for c in model_data.get("stgcn_channels", [64, 128])),
+            num_stgcn_layers=int(model_data.get("num_stgcn_layers", 2)),
+            lstm_hidden=int(model_data.get("lstm_hidden", 128)),
+            lstm_layers=int(model_data.get("lstm_layers", 2)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
@@ -141,6 +156,12 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             feature_schema_version=str(
                 export_data.get("feature_schema_version", "feature-schema-v1")
             ),
+            graph_schema_version=str(
+                export_data.get(
+                    "graph_schema_version",
+                    train_data.get("graph_schema_version", "graph-schema-v1"),
+                )
+            ),
         ),
         augmentation=_parse_augmentation_config(payload.get("augmentation")),
     )
@@ -163,37 +184,78 @@ def _parse_augmentation_config(
 
 
 def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
-    """Instantiate :class:`TwoStreamGestureLSTM` from *config*.
+    """Instantiate the appropriate model from *config*.
 
-    Raises:
-        ValueError: If *config.model_name* does not identify a two-stream model.
+    Dispatches based on ``config.model_name``:
+    * ``two_stream_*`` → :class:`TwoStreamGestureLSTM`
+    * ``stgcn_*``      → :class:`STGCN_LSTM`
     """
-    if not config.model_name.startswith("two_stream"):
-        raise ValueError(
-            f"Unsupported model_name {config.model_name!r}. "
-            "Only two_stream_* models are supported. "
-            "Use configs/model/two_stream_lstm.yaml."
-        )
+    if config.model_name.startswith("stgcn"):
+        from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM
 
-    from maestro.infrastructure.model.two_stream_lstm import (
-        TwoStreamGestureLSTM,
+        return STGCN_LSTM(
+            num_nodes=config.num_nodes,
+            num_coords=config.num_coords,
+            stgcn_channels=config.stgcn_channels,
+            num_stgcn_layers=config.num_stgcn_layers,
+            lstm_hidden=config.lstm_hidden,
+            lstm_layers=config.lstm_layers,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+        ).to(device)
+
+    if config.model_name.startswith("two_stream"):
+        from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+
+        return TwoStreamGestureLSTM(
+            input_size=config.input_size,
+            hidden_size=config.hidden_size,
+            num_layers=config.num_layers,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+        ).to(device)
+
+    raise ValueError(
+        f"Unsupported model_name {config.model_name!r}. "
+        "Supported prefixes: 'stgcn_', 'two_stream_'."
     )
-
-    return TwoStreamGestureLSTM(
-        input_size=config.input_size,
-        hidden_size=config.hidden_size,
-        num_layers=config.num_layers,
-        dropout=config.dropout,
-        num_classes=config.num_classes,
-    ).to(device)
 
 
 def create_datamodule(
     *,
     dataset_path: str | Path,
     config: TrainingPipelineConfig,
-) -> GestureDataModule:
-    datamodule = GestureDataModule(
+) -> GestureDataModule | GraphGestureDataModule:
+    """Create and set up the appropriate data module for *config.model.model_name*.
+
+    * ``stgcn_*`` models → :class:`GraphGestureDataModule`
+    * ``two_stream_*``   → :class:`GestureDataModule`
+    """
+    if config.model.model_name.startswith("stgcn"):
+        from maestro.training.augmentation import GraphAugmentationConfig, GraphGestureAugmenter  # noqa: F401
+
+        graph_aug: Any = None
+        if config.augmentation is not None:
+            graph_aug = GraphAugmentationConfig(
+                temporal_scale_range=config.augmentation.temporal_scale_range,
+                spatial_jitter_sigma=config.augmentation.spatial_jitter_sigma,
+                apply_prob=config.augmentation.apply_prob,
+                mirror_flip_prob=config.augmentation.mirror_flip_prob,
+            )
+
+        dm: GraphGestureDataModule = GraphGestureDataModule(
+            dataset_path=dataset_path,
+            batch_size=config.training.batch_size,
+            split=config.split,
+            seed=config.training.seed,
+            num_workers=config.training.num_workers,
+            pin_memory=False,
+            graph_augmentation=graph_aug,
+        )
+        dm.setup()
+        return dm
+
+    flat_dm: GestureDataModule = GestureDataModule(
         dataset_path=dataset_path,
         batch_size=config.training.batch_size,
         split=config.split,
@@ -202,8 +264,8 @@ def create_datamodule(
         pin_memory=False,
         augmentation=config.augmentation,
     )
-    datamodule.setup()
-    return datamodule
+    flat_dm.setup()
+    return flat_dm
 
 
 def _build_criterion(
@@ -221,7 +283,9 @@ def _build_criterion(
     return nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
 
-def _build_class_weights(datamodule: GestureDataModule, device: torch.device) -> torch.Tensor:
+def _build_class_weights(
+    datamodule: GestureDataModule | GraphGestureDataModule, device: torch.device
+) -> torch.Tensor:
     distribution = datamodule.label_distribution()
     labels = datamodule.class_labels
     counts = torch.tensor([distribution[label] for label in labels], dtype=torch.float32)
@@ -279,11 +343,13 @@ def train_lstm(
     seed_everything(config.training.seed)
     datamodule = create_datamodule(dataset_path=dataset_path, config=config)
 
-    if datamodule.feature_dim != config.model.input_size:
-        raise ValueError(
-            "Model input_size does not match dataset feature_dim: "
-            f"input_size={config.model.input_size}, feature_dim={datamodule.feature_dim}"
-        )
+    # For flat-feature models, verify input_size matches the dataset.
+    if not config.model.model_name.startswith("stgcn") and hasattr(datamodule, "feature_dim"):
+        if datamodule.feature_dim != config.model.input_size:  # type: ignore[union-attr]
+            raise ValueError(
+                "Model input_size does not match dataset feature_dim: "
+                f"input_size={config.model.input_size}, feature_dim={datamodule.feature_dim}"  # type: ignore[union-attr]
+            )
 
     if datamodule.num_classes != config.model.num_classes:
         raise ValueError(
