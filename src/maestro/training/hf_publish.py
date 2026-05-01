@@ -65,7 +65,7 @@ _GRAPH_SCHEMA_DESCRIPTION = """\
 |-------|-------|--------|-------------|
 | `right_hand` | 0–20 | x, y, z | MediaPipe right-hand landmarks (21 nodes) |
 | `left_hand` | 21–41 | x, y, z | MediaPipe left-hand landmarks (21 nodes) |
-| `pose` | 42–52 | x, y, z | 11 selected MediaPipe Pose landmarks (wrists, elbows, shoulders, ears, eyes, nose) |
+| `pose` | 42–52 | x, y, z | 11 MediaPipe Pose landmarks (shoulders, elbows, wrists, ears, nose) |
 | `face` | 53–66 | x, y, z | 14 selected MediaPipe Face Mesh contour points |
 
 Coordinates are wrist-anchor normalised: translated by the mean of both wrist positions
