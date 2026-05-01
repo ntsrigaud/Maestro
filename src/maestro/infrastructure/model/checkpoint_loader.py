@@ -20,11 +20,31 @@ def _build_model_from_artifact(
     """Instantiate the correct model class from *artifact_type* / *model_config*.
 
     Dispatches on ``artifact_type`` (preferred) then falls back to ``model_name``:
+    * ``dual_stgcn_lstm_inference`` → :class:`DualBranchSTGCN_LSTM`
     * ``stgcn_lstm_inference``      → :class:`STGCN_LSTM`
     * ``two_stream_lstm_inference`` → :class:`TwoStreamGestureLSTM`
     """
     model_name = str(model_config.get("model_name", ""))
-    is_stgcn = artifact_type.startswith("stgcn") or model_name.startswith("stgcn")
+    is_dual_stgcn = artifact_type.startswith("dual_stgcn") or model_name.startswith("dual_stgcn")
+    is_stgcn = not is_dual_stgcn and (
+        artifact_type.startswith("stgcn") or model_name.startswith("stgcn")
+    )
+
+    if is_dual_stgcn:
+        from maestro.infrastructure.model.dual_branch_stgcn_lstm import DualBranchSTGCN_LSTM
+
+        channels_raw = model_config.get("stgcn_channels", [64, 128, 256])
+        return DualBranchSTGCN_LSTM(
+            num_nodes=int(model_config.get("num_nodes", 67)),
+            num_coords=int(model_config.get("num_coords", 3)),
+            phono_proj_dim=int(model_config.get("phono_proj_dim", 128)),
+            phono_conv_channels=int(model_config.get("phono_conv_channels", 256)),
+            phono_lstm_hidden=int(model_config.get("lstm_hidden", 256)),
+            phono_lstm_layers=int(model_config.get("lstm_layers", 2)),
+            stgcn_channels=tuple(int(c) for c in channels_raw),
+            dropout=float(model_config.get("dropout", 0.3)),
+            num_classes=int(model_config["num_classes"]),
+        ).to(device)
 
     if is_stgcn:
         from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM
@@ -54,7 +74,8 @@ def _build_model_from_artifact(
 
     raise ValueError(
         f"Unsupported artifact type {artifact_type!r} (model_name={model_name!r}). "
-        "Supported types: 'stgcn_lstm_inference', 'two_stream_lstm_inference'."
+        "Supported types: 'dual_stgcn_lstm_inference', 'stgcn_lstm_inference', "
+        "'two_stream_lstm_inference'."
     )
 
 
@@ -113,11 +134,15 @@ def load_inference_artifact(
         artifact_path=path,
     )
 
-    is_stgcn = artifact_type.startswith("stgcn") or str(
-        model_config.get("model_name", "")
-    ).startswith("stgcn")
+    _model_name_loaded = str(model_config.get("model_name", ""))
+    is_dual_stgcn = artifact_type.startswith("dual_stgcn") or _model_name_loaded.startswith(
+        "dual_stgcn"
+    )
+    is_stgcn = not is_dual_stgcn and (
+        artifact_type.startswith("stgcn") or _model_name_loaded.startswith("stgcn")
+    )
 
-    if is_stgcn:
+    if is_dual_stgcn or is_stgcn:
         gs = payload.get("graph_schema", {})
         base.graph_schema_version = str(gs.get("graph_schema_version", "unknown"))
         base.num_nodes = int(gs.get("num_nodes", model_config.get("num_nodes", 67)))
