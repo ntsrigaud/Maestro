@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -94,3 +95,51 @@ def export_inference_artifact(
 
     torch.save(payload, artifact_path)
     return artifact_path
+
+
+def update_model_registry(
+    *,
+    registry_path: str | Path,
+    model_version: str,
+    checkpoint_path: str | Path,
+    exported_path: str | Path,
+    class_labels: list[str],
+    dataset_metadata: dict[str, Any],
+    feature_schema_version: str = "",
+    graph_schema_version: str = "",
+    training_data_version: str = "unknown",
+) -> None:
+    """Append a new model entry to the JSON registry file.
+
+    Supports both flat-feature (two_stream) and graph-schema (stgcn) models.
+    Pass *graph_schema_version* for STGCN models, *feature_schema_version* for
+    two-stream models.
+    """
+    path = Path(registry_path)
+    if path.exists():
+        registry: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        registry = {"models": []}
+
+    entry: dict[str, Any] = {
+        "model_version": model_version,
+        "training_data_version": training_data_version,
+        "class_labels": class_labels,
+        "checkpoint_path": str(checkpoint_path),
+        "exported_path": str(exported_path),
+        "checkpoint_checksum": compute_sha256(checkpoint_path),
+        "created_at": datetime.now(UTC).isoformat(),
+        "window_length": int(dataset_metadata.get("window_length", 24)),
+        "window_step": int(dataset_metadata.get("window_step", 3)),
+    }
+
+    if graph_schema_version:
+        entry["graph_schema_version"] = graph_schema_version
+        entry["num_nodes"] = int(dataset_metadata.get("num_nodes", 67))
+        entry["num_coords"] = int(dataset_metadata.get("num_coords", 3))
+    else:
+        entry["feature_schema_version"] = feature_schema_version
+        entry["feature_dim"] = int(dataset_metadata.get("feature_dim", 0))
+
+    registry.setdefault("models", []).append(entry)
+    path.write_text(json.dumps(registry, indent=2, default=str), encoding="utf-8")
