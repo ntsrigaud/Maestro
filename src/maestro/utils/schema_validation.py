@@ -86,6 +86,40 @@ class FeaturePipelineConfig(BaseModel):
     velocity_features: bool = True
 
 
+class TwoStreamModelConfig(BaseModel):
+    """Config schema for the two_stream_lstm model family."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_name: str
+    input_size: int = Field(ge=1)
+    hidden_size: int = Field(ge=1)
+    num_layers: int = Field(ge=1, le=8)
+    dropout: float = Field(ge=0.0, le=1.0)
+    num_classes: int = Field(ge=2)
+
+
+class STGCNModelConfig(BaseModel):
+    """Config schema for the stgcn_lstm model family (graph-schema-v1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_name: str
+    # Graph topology.
+    num_nodes: int = Field(default=67, ge=1)
+    num_coords: int = Field(default=3, ge=1)
+    # STGCN backbone.
+    stgcn_channels: list[int] = Field(default=[64, 128], min_length=1)
+    num_stgcn_layers: int = Field(default=2, ge=1, le=8)
+    # Recurrent head.
+    lstm_hidden: int = Field(default=128, ge=1)
+    lstm_layers: int = Field(default=2, ge=1, le=8)
+    # Regularisation.
+    dropout: float = Field(default=0.3, ge=0.0, le=1.0)
+    # Output.
+    num_classes: int = Field(default=8, ge=2)
+
+
 class ModelSourceConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
