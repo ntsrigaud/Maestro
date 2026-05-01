@@ -74,7 +74,6 @@ from maestro.infrastructure.mediapipe.holistic_extractor import (  # noqa: E402
     _DEFAULT_CACHE as _DEFAULT_MODEL_CACHE,
 )
 from maestro.infrastructure.mediapipe.holistic_extractor import (
-    _ensure_model,
     _is_nan,
 )
 from maestro.pipeline import graph_schema  # noqa: E402
