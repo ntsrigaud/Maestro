@@ -140,22 +140,23 @@ class VideoLandmarks:
 # ---------------------------------------------------------------------------
 
 
-def _parse_holistic_raw(
+def _parse_holistic_legacy(
     result: Any,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Parse a HolisticLandmarkerResult into raw (67, 3) keypoints + bool mask.
+    """Parse a legacy mp.solutions.holistic result into (67, 3) keypoints + mask.
 
-    No normalisation is applied — raw MediaPipe image-normalised coordinates
-    are stored in the cache so that normalisation can be applied consistently
-    at assembly time via ``graph_schema.normalise_graph_frame()``.
+    The legacy solutions API returns ``NormalizedLandmarkList`` objects that
+    expose landmarks via a ``.landmark`` attribute, unlike the task-based API
+    which returns plain lists.  No normalisation is applied — raw coordinates
+    are stored in the per-video cache; ``graph_schema.normalise_graph_frame()``
+    is applied at assembly time.
     """
-
     keypoints = np.zeros((graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32)
     valid_mask = np.zeros(graph_schema.NUM_NODES, dtype=bool)
 
     rh = result.right_hand_landmarks
     if rh:
-        for i, lm in enumerate(rh[:21]):
+        for i, lm in enumerate(rh.landmark[:21]):
             if not _is_nan(lm):
                 keypoints[i] = [lm.x, lm.y, lm.z]
                 valid_mask[i] = True
@@ -163,7 +164,7 @@ def _parse_holistic_raw(
     lh_offset = graph_schema.NODE_INDEX_MAP["left_hand"][0]
     lh = result.left_hand_landmarks
     if lh:
-        for i, lm in enumerate(lh[:21]):
+        for i, lm in enumerate(lh.landmark[:21]):
             idx = i + lh_offset
             if not _is_nan(lm):
                 keypoints[idx] = [lm.x, lm.y, lm.z]
@@ -173,8 +174,8 @@ def _parse_holistic_raw(
     if pose:
         for gi, mp_i in enumerate(graph_schema.POSE_LANDMARK_INDICES):
             idx = graph_schema.NODE_INDEX_MAP["pose"][0] + gi
-            if mp_i < len(pose):
-                lm = pose[mp_i]
+            if mp_i < len(pose.landmark):
+                lm = pose.landmark[mp_i]
                 if not _is_nan(lm):
                     keypoints[idx] = [lm.x, lm.y, lm.z]
                     valid_mask[idx] = True
@@ -183,8 +184,8 @@ def _parse_holistic_raw(
     if face:
         for gi, mp_i in enumerate(graph_schema.FACE_LANDMARK_INDICES):
             idx = graph_schema.NODE_INDEX_MAP["face"][0] + gi
-            if mp_i < len(face):
-                lm = face[mp_i]
+            if mp_i < len(face.landmark):
+                lm = face.landmark[mp_i]
                 if not _is_nan(lm):
                     keypoints[idx] = [lm.x, lm.y, lm.z]
                     valid_mask[idx] = True
@@ -223,50 +224,38 @@ def _extract_video_worker(args: tuple[str, str, str, float, float]) -> tuple[str
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 
-    # Initialise task-based HolisticLandmarker directly (VIDEO mode).
-    _BaseOptions = mp.tasks.BaseOptions
-    _HolisticLandmarker = mp.tasks.vision.HolisticLandmarker
-    _HolisticLandmarkerOptions = mp.tasks.vision.HolisticLandmarkerOptions
-    _RunningMode = mp.tasks.vision.RunningMode
-
-    options = _HolisticLandmarkerOptions(
-        base_options=_BaseOptions(model_asset_path=model_path_str),
-        running_mode=_RunningMode.VIDEO,
-        min_face_detection_confidence=min_det_conf,
-        min_face_landmarks_confidence=min_track_conf,
-        min_face_suppression_threshold=0.3,
-        min_pose_detection_confidence=min_det_conf,
-        min_pose_landmarks_confidence=min_track_conf,
-        min_pose_suppression_threshold=0.3,
-        min_hand_landmarks_confidence=min_track_conf,
-        output_face_blendshapes=False,
-        output_segmentation_mask=False,
-    )
-    landmarker = _HolisticLandmarker.create_from_options(options)
-
+    # Use the legacy mp.solutions.holistic.Holistic API for offline extraction.
+    # The task-based HolisticLandmarker (mp.tasks.vision) triggers a fatal
+    # SIGABRT on CPU-only headless Linux due to an assertion in the inference
+    # feedback manager when EGL/GPU is unavailable.  The legacy solutions API
+    # does not use that mechanism and is stable for offline dataset building.
     frame_ids: list[int] = []
     keypoints_list: list[np.ndarray] = []
     valid_mask_list: list[np.ndarray] = []
 
-    frame_id = 1  # 1-indexed to match IPN annotations
-    while True:
-        ret, bgr = cap.read()
-        if not ret:
-            break
+    with mp.solutions.holistic.Holistic(
+        static_image_mode=False,
+        model_complexity=1,
+        min_detection_confidence=min_det_conf,
+        min_tracking_confidence=min_track_conf,
+        enable_segmentation=False,
+    ) as holistic:
+        frame_id = 1  # 1-indexed to match IPN annotations
+        while True:
+            ret, bgr = cap.read()
+            if not ret:
+                break
 
-        timestamp_ms = int((frame_id - 1) * 1000.0 / fps)
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        result = landmarker.detect_for_video(mp_image, timestamp_ms)
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+            result = holistic.process(rgb)
 
-        kp, vm = _parse_holistic_raw(result)
-        frame_ids.append(frame_id)
-        keypoints_list.append(kp)
-        valid_mask_list.append(vm)
-        frame_id += 1
+            kp, vm = _parse_holistic_legacy(result)
+            frame_ids.append(frame_id)
+            keypoints_list.append(kp)
+            valid_mask_list.append(vm)
+            frame_id += 1
 
     cap.release()
-    landmarker.close()
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
@@ -798,15 +787,18 @@ def main() -> None:
     # Phase 1 — extract / load per-video landmark caches.
     # -----------------------------------------------------------------------
     # Resolve holistic model path (download if needed).
+    # The legacy mp.solutions.holistic.Holistic API used by _extract_video_worker
+    # bundles its own model weights inside the mediapipe package and does not
+    # require the separate HolisticLandmarker .task file.  We keep the
+    # model_path argument for API compatibility but no longer download anything.
     model_path = Path(args.model_path) if args.model_path else _DEFAULT_MODEL_CACHE
-    _ensure_model(model_path)
 
     cache_paths = extract_all_landmarks(
         video_dir=video_dir,
         video_stems=needed_videos,
         cache_dir=cache_dir,
         num_workers=num_workers,
-        model_path=str(model_path),
+        model_path=str(model_path),  # kept for arg-tuple compatibility, unused by worker
         min_detection_confidence=args.min_detection_confidence,
         min_tracking_confidence=args.min_tracking_confidence,
         no_cache=args.no_cache,
