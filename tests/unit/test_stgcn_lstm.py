@@ -109,7 +109,8 @@ class TestAdjacencyBuffer:
     def test_adjacency_shape(self) -> None:
         model = _build_model(num_nodes=67)
         A = model.adjacency
-        assert A.shape == (67, 67), f"Expected (67,67) got {A.shape}"
+        # Partitioned adjacency: (K=3, N, N)
+        assert A.shape == (3, 67, 67), f"Expected (3,67,67) got {A.shape}"
 
     def test_adjacency_survives_state_dict_roundtrip(self) -> None:
         model = _build_model()
@@ -121,18 +122,30 @@ class TestAdjacencyBuffer:
         assert torch.allclose(model.adjacency, model2.adjacency)
 
     def test_custom_adjacency_accepted(self) -> None:
+        # (N,N) single matrix is stored as (1,N,N) for backward compat.
         A = torch.eye(67)
         model = _build_model(adjacency=A)
-        assert torch.allclose(model.adjacency, A)
+        assert model.adjacency.shape == (1, 67, 67)
+        assert torch.allclose(model.adjacency[0], A)
 
 
 class TestGraphConv:
-    def test_output_shape(self) -> None:
+    def test_output_shape_single_matrix(self) -> None:
+        """(N,N) adjacency is auto-expanded to (1,N,N)."""
         A = torch.eye(10)
         gcn = _GraphConv(in_channels=3, out_channels=16, adjacency=A)
         x = torch.randn(2, 6, 10, 3)  # (B, T, N, C_in)
         out = gcn(x)
         assert out.shape == (2, 6, 10, 16)
+
+    def test_output_shape_partitioned(self) -> None:
+        """(K,N,N) partitioned adjacency."""
+        K, N = 3, 10
+        A = torch.eye(N).unsqueeze(0).expand(K, -1, -1).contiguous()
+        gcn = _GraphConv(in_channels=3, out_channels=16, adjacency=A)
+        x = torch.randn(2, 6, N, 3)
+        out = gcn(x)
+        assert out.shape == (2, 6, N, 16)
 
 
 class TestSTGCNBlock:
