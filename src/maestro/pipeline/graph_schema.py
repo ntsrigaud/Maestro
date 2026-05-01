@@ -8,6 +8,8 @@ Schema version: graph-schema-v1
 
 from __future__ import annotations
 
+from collections import deque
+
 import numpy as np
 
 # ---------------------------------------------------------------------------
@@ -227,6 +229,108 @@ def normalise_adjacency(A: np.ndarray) -> np.ndarray:
     d_inv_sqrt = np.where(degree > 0.0, 1.0 / np.sqrt(degree), 0.0)
     D_inv_sqrt = np.diag(d_inv_sqrt)
     return D_inv_sqrt @ A_hat @ D_inv_sqrt
+
+
+def _node_bfs_distances() -> np.ndarray:
+    """Compute topological BFS distances from each subgraph's root node.
+
+    Subgraph roots (chosen as the anatomically central anchor):
+    - Right hand  (nodes  0–20): node  0  (wrist)
+    - Left hand   (nodes 21–41): node 21  (wrist)
+    - Pose        (nodes 42–52): node 42  (nose — most-connected pose node)
+    - Face        (nodes 53–66): node 64  (nose tip — bridge to pose nose)
+
+    Nodes that are unreachable within their subgraph (disconnected face
+    components) are assigned distance 0 so they land in the centrifugal
+    partition alongside root-level nodes.
+
+    Returns:
+        ``np.ndarray`` of shape ``(67,)``, dtype ``int32``.
+    """
+    A = build_adjacency()
+    distances = np.zeros(NUM_NODES, dtype=np.int32)
+
+    subgraphs: list[tuple[list[int], int]] = [
+        (list(range(0, 21)), 0),    # right hand, root = wrist
+        (list(range(21, 42)), 21),  # left hand,  root = wrist
+        (list(range(42, 53)), 42),  # pose,        root = nose
+        (list(range(53, 67)), 64),  # face,        root = nose tip
+    ]
+    for nodes, root in subgraphs:
+        bfs_dist: dict[int, int] = {n: -1 for n in nodes}
+        bfs_dist[root] = 0
+        queue: deque[int] = deque([root])
+        while queue:
+            u = queue.popleft()
+            for v in nodes:
+                if A[u, v] > 0 and bfs_dist[v] == -1:
+                    bfs_dist[v] = bfs_dist[u] + 1
+                    queue.append(v)
+        for n in nodes:
+            distances[n] = bfs_dist[n] if bfs_dist[n] >= 0 else 0
+
+    return distances
+
+
+def build_partitioned_adjacency() -> np.ndarray:
+    """Build K=3 spatial-configuration partitioned adjacency matrices.
+
+    Implements the partitioning strategy from Yan et al. (AAAI 2018):
+
+    - Partition 0 (root / self): self-connections ``I``.
+    - Partition 1 (centripetal): edges ``(i→j)`` where ``dist[j] < dist[i]``
+      (neighbour is closer to the subgraph root than the current node).
+    - Partition 2 (centrifugal): edges ``(i→j)`` where ``dist[j] ≥ dist[i]``
+      and ``i ≠ j`` (neighbour is farther from or equidistant to root).
+
+    Distances are computed per subgraph using BFS from the anatomical root
+    (see ``_node_bfs_distances``).  Cross-wrist edges that span subgraphs are
+    assigned using each endpoint's distance within its own subgraph.
+
+    Returns:
+        ``np.ndarray`` of shape ``(3, 67, 67)``, dtype ``float32``.
+    """
+    N = NUM_NODES
+    A_bin = build_adjacency()   # (N, N) binary, no self-loops
+    dist = _node_bfs_distances()  # (N,) int32
+
+    A_self = np.eye(N, dtype=np.float32)
+    A_cent = np.zeros((N, N), dtype=np.float32)   # centripetal
+    A_cfug = np.zeros((N, N), dtype=np.float32)   # centrifugal
+
+    for i in range(N):
+        for j in range(N):
+            if i == j or A_bin[i, j] == 0:
+                continue
+            if dist[j] < dist[i]:
+                A_cent[i, j] = 1.0   # j closer to root
+            else:
+                A_cfug[i, j] = 1.0   # j same distance or farther
+
+    return np.stack([A_self, A_cent, A_cfug], axis=0)  # (3, N, N)
+
+
+def normalise_partitioned_adjacency(partitions: np.ndarray) -> np.ndarray:
+    """Row-normalise each of the K partition matrices: ``D_k^{-1} A_k``.
+
+    Unlike the symmetric normalisation used for the unified adjacency,
+    per-partition row normalisation preserves directionality while ensuring
+    that each node's aggregated contribution sums to one regardless of degree.
+
+    Args:
+        partitions: Array of shape ``(K, N, N)``.
+
+    Returns:
+        Normalised array of the same shape, dtype ``float32``.
+    """
+    K, N, _ = partitions.shape
+    out = np.zeros_like(partitions, dtype=np.float32)
+    for k in range(K):
+        D = partitions[k].sum(axis=1)          # (N,)
+        D_inv = np.zeros_like(D)
+        D_inv[D > 0] = 1.0 / D[D > 0]         # avoid divide-by-zero for isolated nodes
+        out[k] = np.diag(D_inv) @ partitions[k]
+    return out
 
 
 def normalise_graph_frame(frame: np.ndarray) -> np.ndarray:
