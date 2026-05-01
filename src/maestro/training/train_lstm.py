@@ -33,6 +33,9 @@ class ModelConfig:
     num_stgcn_layers: int = 2
     lstm_hidden: int = 128
     lstm_layers: int = 2
+    # Dual-branch STGCN phonological branch fields (only used for "dual_stgcn_*").
+    phono_proj_dim: int = 128
+    phono_conv_channels: int = 256
 
 
 @dataclass(slots=True)
@@ -125,6 +128,8 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             num_stgcn_layers=int(model_data.get("num_stgcn_layers", 2)),
             lstm_hidden=int(model_data.get("lstm_hidden", 128)),
             lstm_layers=int(model_data.get("lstm_layers", 2)),
+            phono_proj_dim=int(model_data.get("phono_proj_dim", 128)),
+            phono_conv_channels=int(model_data.get("phono_conv_channels", 256)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
@@ -187,9 +192,25 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
     """Instantiate the appropriate model from *config*.
 
     Dispatches based on ``config.model_name``:
-    * ``two_stream_*`` → :class:`TwoStreamGestureLSTM`
-    * ``stgcn_*``      → :class:`STGCN_LSTM`
+    * ``two_stream_*``  → :class:`TwoStreamGestureLSTM`
+    * ``stgcn_*``       → :class:`STGCN_LSTM`
+    * ``dual_stgcn_*``  → :class:`DualBranchSTGCN_LSTM`
     """
+    if config.model_name.startswith("dual_stgcn"):
+        from maestro.infrastructure.model.dual_branch_stgcn_lstm import DualBranchSTGCN_LSTM
+
+        return DualBranchSTGCN_LSTM(
+            num_nodes=config.num_nodes,
+            num_coords=config.num_coords,
+            phono_proj_dim=config.phono_proj_dim,
+            phono_conv_channels=config.phono_conv_channels,
+            phono_lstm_hidden=config.lstm_hidden,
+            phono_lstm_layers=config.lstm_layers,
+            stgcn_channels=config.stgcn_channels,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+        ).to(device)
+
     if config.model_name.startswith("stgcn"):
         from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM
 
@@ -217,7 +238,7 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
 
     raise ValueError(
         f"Unsupported model_name {config.model_name!r}. "
-        "Supported prefixes: 'stgcn_', 'two_stream_'."
+        "Supported prefixes: 'dual_stgcn_', 'stgcn_', 'two_stream_'."
     )
 
 
@@ -228,10 +249,15 @@ def create_datamodule(
 ) -> GestureDataModule | GraphGestureDataModule:
     """Create and set up the appropriate data module for *config.model.model_name*.
 
-    * ``stgcn_*`` models → :class:`GraphGestureDataModule`
-    * ``two_stream_*``   → :class:`GestureDataModule`
+    * ``dual_stgcn_*`` models → :class:`GraphGestureDataModule`
+    * ``stgcn_*`` models       → :class:`GraphGestureDataModule`
+    * ``two_stream_*``         → :class:`GestureDataModule`
     """
-    if config.model.model_name.startswith("stgcn"):
+    is_graph_model = (
+        config.model.model_name.startswith("dual_stgcn")
+        or config.model.model_name.startswith("stgcn")
+    )
+    if is_graph_model:
         from maestro.training.augmentation import (  # noqa: F401
             GraphAugmentationConfig,
             GraphGestureAugmenter,
