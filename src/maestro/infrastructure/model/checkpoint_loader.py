@@ -17,31 +17,45 @@ def _build_model_from_artifact(
     artifact_type: str,
     device: torch.device,
 ) -> torch.nn.Module:
-    """Instantiate :class:`TwoStreamGestureLSTM` from *artifact_type*.
+    """Instantiate the correct model class from *artifact_type* / *model_config*.
 
-    Raises:
-        ValueError: If *artifact_type* does not identify a two-stream artifact.
-            This prevents silent failure when an unexpected artifact is loaded.
+    Dispatches on ``artifact_type`` (preferred) then falls back to ``model_name``:
+    * ``stgcn_lstm_inference``      → :class:`STGCN_LSTM`
+    * ``two_stream_lstm_inference`` → :class:`TwoStreamGestureLSTM`
     """
     model_name = str(model_config.get("model_name", ""))
-    if not (artifact_type.startswith("two_stream") or model_name.startswith("two_stream")):
-        raise ValueError(
-            f"Unsupported artifact type {artifact_type!r} (model_name={model_name!r}). "
-            "Only two_stream_lstm artifacts are supported. "
-            "Verify that model_source.yaml points to the correct HF Hub filename."
-        )
+    is_stgcn = artifact_type.startswith("stgcn") or model_name.startswith("stgcn")
 
-    from maestro.infrastructure.model.two_stream_lstm import (
-        TwoStreamGestureLSTM,  # noqa: PLC0415
+    if is_stgcn:
+        from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM
+
+        channels_raw = model_config.get("stgcn_channels", [64, 128])
+        return STGCN_LSTM(
+            num_nodes=int(model_config.get("num_nodes", 67)),
+            num_coords=int(model_config.get("num_coords", 3)),
+            stgcn_channels=tuple(int(c) for c in channels_raw),
+            num_stgcn_layers=int(model_config.get("num_stgcn_layers", 2)),
+            lstm_hidden=int(model_config.get("lstm_hidden", 128)),
+            lstm_layers=int(model_config.get("lstm_layers", 2)),
+            dropout=float(model_config.get("dropout", 0.3)),
+            num_classes=int(model_config["num_classes"]),
+        ).to(device)
+
+    if artifact_type.startswith("two_stream") or model_name.startswith("two_stream"):
+        from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+
+        return TwoStreamGestureLSTM(
+            input_size=int(model_config["input_size"]),
+            hidden_size=int(model_config["hidden_size"]),
+            num_layers=int(model_config["num_layers"]),
+            dropout=float(model_config["dropout"]),
+            num_classes=int(model_config["num_classes"]),
+        ).to(device)
+
+    raise ValueError(
+        f"Unsupported artifact type {artifact_type!r} (model_name={model_name!r}). "
+        "Supported types: 'stgcn_lstm_inference', 'two_stream_lstm_inference'."
     )
-
-    return TwoStreamGestureLSTM(
-        input_size=int(model_config["input_size"]),
-        hidden_size=int(model_config["hidden_size"]),
-        num_layers=int(model_config["num_layers"]),
-        dropout=float(model_config["dropout"]),
-        num_classes=int(model_config["num_classes"]),
-    ).to(device)
 
 
 @dataclass(slots=True)
@@ -49,12 +63,18 @@ class InferenceArtifact:
     model: torch.nn.Module
     model_version: str
     class_labels: list[str]
-    feature_schema_version: str
-    feature_dim: int
-    window_length: int
-    window_step: int
-    orientation_normalization: bool
     artifact_path: Path
+    # Flat-feature schema fields (two_stream_* models).
+    feature_schema_version: str = "unknown"
+    feature_dim: int = 0
+    window_length: int = 24
+    window_step: int = 3
+    orientation_normalization: bool = False
+    # Graph schema fields (stgcn_* models).
+    graph_schema_version: str = "unknown"
+    num_nodes: int = 0
+    num_coords: int = 0
+    adjacency: torch.Tensor | None = None
 
 
 def load_inference_artifact(
@@ -72,15 +92,12 @@ def load_inference_artifact(
 
     model_config = payload.get("model_config")
     class_labels = payload.get("class_labels")
-    feature_schema = payload.get("feature_schema")
     state_dict = payload.get("model_state_dict")
 
     if not isinstance(model_config, dict):
         raise ValueError(f"Artifact missing model_config: {path}")
     if not isinstance(class_labels, list) or not class_labels:
         raise ValueError(f"Artifact missing class_labels: {path}")
-    if not isinstance(feature_schema, dict):
-        raise ValueError(f"Artifact missing feature_schema: {path}")
     if state_dict is None:
         raise ValueError(f"Artifact missing model_state_dict: {path}")
 
@@ -89,17 +106,40 @@ def load_inference_artifact(
     model.load_state_dict(state_dict)
     model.eval()
 
-    return InferenceArtifact(
+    base = InferenceArtifact(
         model=model,
         model_version=str(payload.get("artifact_version", "unknown")),
         class_labels=[str(x) for x in class_labels],
-        feature_schema_version=str(feature_schema.get("feature_schema_version", "unknown")),
-        feature_dim=int(feature_schema.get("feature_dim") or model_config["input_size"]),
-        window_length=int(feature_schema.get("window_length", 24)),
-        window_step=int(feature_schema.get("window_step", 3)),
-        orientation_normalization=bool(feature_schema.get("orientation_normalization", False)),
         artifact_path=path,
     )
+
+    is_stgcn = artifact_type.startswith("stgcn") or str(
+        model_config.get("model_name", "")
+    ).startswith("stgcn")
+
+    if is_stgcn:
+        gs = payload.get("graph_schema", {})
+        base.graph_schema_version = str(gs.get("graph_schema_version", "unknown"))
+        base.num_nodes = int(gs.get("num_nodes", model_config.get("num_nodes", 67)))
+        base.num_coords = int(gs.get("num_coords", model_config.get("num_coords", 3)))
+        base.window_length = int(gs.get("window_length", 24))
+        base.window_step = int(gs.get("window_step", 3))
+        raw_adj = gs.get("adjacency")
+        if raw_adj is not None:
+            base.adjacency = (
+                raw_adj if isinstance(raw_adj, torch.Tensor) else torch.as_tensor(raw_adj)
+            ).float()
+    else:
+        fs = payload.get("feature_schema", {})
+        if not isinstance(fs, dict):
+            raise ValueError(f"Artifact missing feature_schema: {path}")
+        base.feature_schema_version = str(fs.get("feature_schema_version", "unknown"))
+        base.feature_dim = int(fs.get("feature_dim") or model_config.get("input_size", 0))
+        base.window_length = int(fs.get("window_length", 24))
+        base.window_step = int(fs.get("window_step", 3))
+        base.orientation_normalization = bool(fs.get("orientation_normalization", False))
+
+    return base
 
 
 def validate_runtime_compatibility(
