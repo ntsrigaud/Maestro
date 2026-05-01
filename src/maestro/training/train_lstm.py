@@ -232,7 +232,10 @@ def create_datamodule(
     * ``two_stream_*``   → :class:`GestureDataModule`
     """
     if config.model.model_name.startswith("stgcn"):
-        from maestro.training.augmentation import GraphAugmentationConfig, GraphGestureAugmenter  # noqa: F401
+        from maestro.training.augmentation import (  # noqa: F401
+            GraphAugmentationConfig,
+            GraphGestureAugmenter,
+        )
 
         graph_aug: Any = None
         if config.augmentation is not None:

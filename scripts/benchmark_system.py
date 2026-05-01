@@ -16,10 +16,10 @@ from maestro.infrastructure.mediapipe.hands_extractor import (
 )
 from maestro.pipeline.hand_selection import HandSelector
 
-
 # ---------------------------------------------------------------------------
 # Shared result types
 # ---------------------------------------------------------------------------
+
 
 @dataclass(slots=True)
 class BenchmarkResult:
@@ -41,6 +41,7 @@ class STGCNBenchmarkResult:
       - p95_end_to_end_ms  < 50 ms
       - median_end_to_end_ms < 35 ms
     """
+
     frames: int
     total_seconds: float
     throughput_fps: float
@@ -65,6 +66,7 @@ class STGCNBenchmarkResult:
 # ---------------------------------------------------------------------------
 # Helper factories
 # ---------------------------------------------------------------------------
+
 
 def _frame_packet(frame_id: int) -> FramePacket:
     return FramePacket(
@@ -92,6 +94,7 @@ def _build_hands_response(mode: str) -> SimpleNamespace:
 # ---------------------------------------------------------------------------
 # Phase 2 (legacy two-stream) benchmark
 # ---------------------------------------------------------------------------
+
 
 def run_phase2_benchmark(frames: int) -> BenchmarkResult:
     pattern = ["valid"] * 7 + ["no_hand"] * 2 + ["low_conf"]
@@ -155,9 +158,10 @@ def run_phase2_benchmark(frames: int) -> BenchmarkResult:
 # STGCN-LSTM benchmark
 # ---------------------------------------------------------------------------
 
+
 def _build_synthetic_holistic_packet() -> SimpleNamespace:
     """Return a mock HolisticPacket with synthetic (67, 3) keypoints."""
-    from maestro.pipeline.graph_schema import NUM_NODES, NUM_COORDS
+    from maestro.pipeline.graph_schema import NUM_COORDS, NUM_NODES
 
     keypoints = np.random.randn(NUM_NODES, NUM_COORDS).astype(np.float32)
     valid_mask = np.ones(NUM_NODES, dtype=bool)
@@ -193,9 +197,7 @@ def run_stgcn_benchmark(frames: int) -> STGCNBenchmarkResult:
     rng = np.random.default_rng(42)
 
     # Build model on CPU
-    adjacency = torch.from_numpy(
-        normalise_adjacency(build_adjacency()).astype(np.float32)
-    )
+    adjacency = torch.from_numpy(normalise_adjacency(build_adjacency()).astype(np.float32))
     model = STGCN_LSTM(
         num_nodes=NUM_NODES,
         num_coords=NUM_COORDS,
@@ -289,6 +291,7 @@ def run_stgcn_benchmark(frames: int) -> STGCNBenchmarkResult:
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Maestro latency benchmark. Supports legacy Phase 2 pipeline "
@@ -312,7 +315,7 @@ def main() -> None:
     if args.model == "stgcn_lstm_v1":
         result = run_stgcn_benchmark(args.frames)
         print("STGCN_BENCHMARK_START")
-        print(f"model=stgcn_lstm_v1")
+        print("model=stgcn_lstm_v1")
         print(f"frames={result.frames}")
         print(f"total_seconds={result.total_seconds:.6f}")
         print(f"throughput_fps={result.throughput_fps:.2f}")

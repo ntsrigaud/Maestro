@@ -53,11 +53,11 @@ class _GraphConv(nn.Module):
         # x: (B, T, N, C_in)
         B, T, N, _ = x.shape
         # Flatten B×T for graph convolution.
-        x_flat = x.reshape(B * T, N, -1)                            # (B*T, N, C_in)
+        x_flat = x.reshape(B * T, N, -1)  # (B*T, N, C_in)
         # Graph conv: A_hat @ x_flat @ W
         out = torch.bmm(self.A.unsqueeze(0).expand(B * T, -1, -1), x_flat)  # (B*T, N, C_in)
-        out = out @ self.weight + self.bias                          # (B*T, N, C_out)
-        return out.reshape(B, T, N, -1)                             # (B, T, N, C_out)
+        out = out @ self.weight + self.bias  # (B*T, N, C_out)
+        return out.reshape(B, T, N, -1)  # (B, T, N, C_out)
 
 
 class STGCNBlock(nn.Module):
@@ -103,7 +103,9 @@ class STGCNBlock(nn.Module):
 
         # --- Multi-scale temporal convolution (two branches → concat → project) ---
         self.tcn_a = nn.Conv1d(out_channels, half, temporal_kernel, stride=stride, padding=pad_a)
-        self.tcn_b = nn.Conv1d(out_channels, half, temporal_kernel + 2, stride=stride, padding=pad_b)
+        self.tcn_b = nn.Conv1d(
+            out_channels, half, temporal_kernel + 2, stride=stride, padding=pad_b
+        )
         self.tcn_bn = nn.BatchNorm1d(out_channels)
 
         # --- Residual ---
@@ -124,28 +126,28 @@ class STGCNBlock(nn.Module):
         B, T, N, _ = x.shape
 
         # 1. Spatial graph conv.
-        out = self.gcn(x)               # (B, T, N, C_out)
+        out = self.gcn(x)  # (B, T, N, C_out)
         # BatchNorm over (B*T*N) flattened to (B*T*N, C_out).
         out_bn = self.bn_gcn(out.reshape(-1, out.shape[-1])).reshape(B, T, N, -1)
 
         # 2. Temporal conv — operate per-node: reshape to (B*N, C_out, T).
-        t_in = out_bn.permute(0, 2, 3, 1).reshape(B * N, -1, T)     # (B*N, C_out, T)
-        ta = self.tcn_a(t_in)                                         # (B*N, half, T')
-        tb = self.tcn_b(t_in)                                         # (B*N, half, T')
-        t_out = torch.cat([ta, tb], dim=1)                            # (B*N, C_out, T')
+        t_in = out_bn.permute(0, 2, 3, 1).reshape(B * N, -1, T)  # (B*N, C_out, T)
+        ta = self.tcn_a(t_in)  # (B*N, half, T')
+        tb = self.tcn_b(t_in)  # (B*N, half, T')
+        t_out = torch.cat([ta, tb], dim=1)  # (B*N, C_out, T')
         T_new = t_out.shape[-1]
-        t_out = self.tcn_bn(t_out)                                    # (B*N, C_out, T')
+        t_out = self.tcn_bn(t_out)  # (B*N, C_out, T')
         t_out = t_out.reshape(B, N, -1, T_new).permute(0, 3, 1, 2)  # (B, T', N, C_out)
 
         # 3. Residual.
         if self.residual:
             # skip path: same temporal conv → (B*N, C_out, T').
-            x_skip = x.permute(0, 2, 3, 1).reshape(B * N, -1, T)     # (B*N, C_in, T)
-            x_skip = self.skip_proj(x_skip)                           # (B*N, C_out, T')
+            x_skip = x.permute(0, 2, 3, 1).reshape(B * N, -1, T)  # (B*N, C_in, T)
+            x_skip = self.skip_proj(x_skip)  # (B*N, C_out, T')
             x_skip = x_skip.reshape(B, N, -1, T_new).permute(0, 3, 1, 2)
             t_out = t_out + x_skip
 
-        return self.act(t_out)                                         # (B, T', N, C_out)
+        return self.act(t_out)  # (B, T', N, C_out)
 
 
 class _BahdanauAttention(nn.Module):
@@ -157,8 +159,8 @@ class _BahdanauAttention(nn.Module):
 
     def forward(self, lstm_out: torch.Tensor) -> torch.Tensor:
         # lstm_out: (B, T, H)
-        scores = self.attn(lstm_out).squeeze(-1)   # (B, T)
-        weights = F.softmax(scores, dim=-1)         # (B, T)
+        scores = self.attn(lstm_out).squeeze(-1)  # (B, T)
+        weights = F.softmax(scores, dim=-1)  # (B, T)
         return (lstm_out * weights.unsqueeze(-1)).sum(dim=1)  # (B, H)
 
 
@@ -221,9 +223,7 @@ class STGCN_LSTM(nn.Module):
         if adjacency is None:
             from maestro.pipeline.graph_schema import build_adjacency, normalise_adjacency
 
-            A = torch.from_numpy(
-                normalise_adjacency(build_adjacency()).astype("float32")
-            )
+            A = torch.from_numpy(normalise_adjacency(build_adjacency()).astype("float32"))
         else:
             A = adjacency.float()
 
@@ -276,19 +276,19 @@ class STGCN_LSTM(nn.Module):
         """
         # x: (B, T, N, C)
         for block in self.stgcn_blocks:
-            x = block(x)                                   # (B, T', N, C_out)
+            x = block(x)  # (B, T', N, C_out)
 
         # Pool over nodes.
-        x = x.mean(dim=2)                                  # (B, T', C_out)
+        x = x.mean(dim=2)  # (B, T', C_out)
 
         # LSTM.
-        lstm_out, _ = self.lstm(x)                         # (B, T', lstm_hidden)
+        lstm_out, _ = self.lstm(x)  # (B, T', lstm_hidden)
 
         # Attention pooling.
-        context = self.attention(lstm_out)                  # (B, lstm_hidden)
+        context = self.attention(lstm_out)  # (B, lstm_hidden)
 
         # Head.
-        return self.head(self.dropout(context))             # (B, num_classes)
+        return self.head(self.dropout(context))  # (B, num_classes)
 
     def count_parameters(self) -> int:
         """Return total number of trainable parameters."""

@@ -11,7 +11,7 @@ from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 from maestro.training.augmentation import AugmentationConfig, GestureAugmenter
-from maestro.training.dataset_builder import GraphSequenceDatasetBuilder, SequenceDatasetBuilder
+from maestro.training.dataset_builder import SequenceDatasetBuilder
 
 
 class SequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
@@ -460,12 +460,12 @@ class AugmentedGraphSequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tens
 
 @dataclass(slots=True)
 class GraphDatasetBundle:
-    sequences: np.ndarray        # (M, T, N, C)
+    sequences: np.ndarray  # (M, T, N, C)
     labels: np.ndarray
     label_ids: np.ndarray
     recording_ids: np.ndarray
-    adjacency: np.ndarray        # (N, N)
-    valid_masks: np.ndarray      # (M, T, N)
+    adjacency: np.ndarray  # (N, N)
+    valid_masks: np.ndarray  # (M, T, N)
     metadata: dict[str, Any]
 
 
@@ -721,12 +721,8 @@ class GraphGestureDataModule:
         unique_temp = np.unique(temp_rec_ids)
         if len(unique_temp) >= 2:
             val_share = self._split.val_ratio / temp_ratio
-            gss2 = GroupShuffleSplit(
-                n_splits=1, test_size=1.0 - val_share, random_state=self._seed
-            )
-            rel_val, rel_test = next(
-                gss2.split(temp_idx, label_ids[temp_idx], groups=temp_rec_ids)
-            )
+            gss2 = GroupShuffleSplit(n_splits=1, test_size=1.0 - val_share, random_state=self._seed)
+            rel_val, rel_test = next(gss2.split(temp_idx, label_ids[temp_idx], groups=temp_rec_ids))
             val_idx = temp_idx[rel_val]
             test_idx = temp_idx[rel_test]
         else:
@@ -743,7 +739,11 @@ class GraphGestureDataModule:
         stratify = label_ids if self._split.stratified else None
         try:
             train_idx, temp_idx = train_test_split(
-                all_idx, test_size=temp_ratio, random_state=self._seed, shuffle=True, stratify=stratify
+                all_idx,
+                test_size=temp_ratio,
+                random_state=self._seed,
+                shuffle=True,
+                stratify=stratify,
             )
         except ValueError:
             train_idx, temp_idx = train_test_split(
@@ -754,10 +754,18 @@ class GraphGestureDataModule:
         stratify2 = temp_labels if self._split.stratified else None
         try:
             val_idx, test_idx = train_test_split(
-                temp_idx, test_size=1.0 - val_share, random_state=self._seed, shuffle=True, stratify=stratify2
+                temp_idx,
+                test_size=1.0 - val_share,
+                random_state=self._seed,
+                shuffle=True,
+                stratify=stratify2,
             )
         except ValueError:
             val_idx, test_idx = train_test_split(
-                temp_idx, test_size=1.0 - val_share, random_state=self._seed, shuffle=True, stratify=None
+                temp_idx,
+                test_size=1.0 - val_share,
+                random_state=self._seed,
+                shuffle=True,
+                stratify=None,
             )
         return np.asarray(train_idx), np.asarray(val_idx), np.asarray(test_idx)

@@ -8,27 +8,25 @@ Verifies that:
 4. The Runtime hot-loop can run N frames using the STGCN pipeline (no camera
    required — all I/O is mocked).
 """
+
 from __future__ import annotations
 
-import io
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
-import pytest
 import torch
 
 from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM
 from maestro.pipeline.graph_schema import (
+    NUM_COORDS,
+    NUM_NODES,
     WINDOW_LENGTH,
     WINDOW_STEP,
-    NUM_NODES,
-    NUM_COORDS,
     build_adjacency,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -99,7 +97,7 @@ class TestExportLoadRoundtrip:
         tmp_path: Path,
     ) -> object:
         """Build a minimal TrainingResult-like namespace."""
-        from maestro.training.train_lstm import TrainingResult, EvaluationReport
+        from maestro.training.train_lstm import EvaluationReport, TrainingResult
 
         dummy_report = EvaluationReport(
             loss=0.0,
@@ -150,8 +148,8 @@ class TestExportLoadRoundtrip:
         )
 
     def test_roundtrip_preserves_weights(self, tmp_path: Path) -> None:
-        from maestro.training.export_checkpoint import export_inference_artifact
         from maestro.infrastructure.model.checkpoint_loader import load_inference_artifact
+        from maestro.training.export_checkpoint import export_inference_artifact
 
         model = _make_model()
         model.eval()
@@ -190,9 +188,7 @@ class TestExportLoadRoundtrip:
         result = self._make_result(model, tmp_path)
         config = self._make_config()
 
-        artifact_path = export_inference_artifact(
-            result=result, config=config, export_dir=tmp_path
-        )
+        artifact_path = export_inference_artifact(result=result, config=config, export_dir=tmp_path)
         payload = torch.load(artifact_path, map_location="cpu", weights_only=False)
         assert payload["artifact_type"] == "stgcn_lstm_inference"
         assert "graph_schema" in payload
@@ -242,7 +238,7 @@ class TestGraphDataModuleSynthetic:
         return path
 
     def test_datamodule_loads_and_splits(self, tmp_path: Path) -> None:
-        from maestro.training.datamodule import GraphGestureDataModule, DataSplitConfig
+        from maestro.training.datamodule import DataSplitConfig, GraphGestureDataModule
 
         npz_path = self._make_npz(tmp_path, num_samples=20)
         dm = GraphGestureDataModule(
@@ -276,8 +272,8 @@ class TestSTGCNRuntimeHotLoop:
         self, model: STGCN_LSTM, num_nodes: int = NUM_NODES, num_coords: int = NUM_COORDS
     ) -> SimpleNamespace:
         """Build a minimal container that exercises the STGCN branch in Runtime."""
-        from maestro.pipeline.graph_buffering import GraphSequenceBuffer
         from maestro.domain.entities import HolisticPacket
+        from maestro.pipeline.graph_buffering import GraphSequenceBuffer
 
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
@@ -290,9 +286,7 @@ class TestSTGCNRuntimeHotLoop:
         # HolisticLandmarkExtractor mock — returns valid keypoints.
         keypoints = np.zeros((num_nodes, num_coords), dtype=np.float32)
         valid_mask = np.ones(num_nodes, dtype=bool)
-        holistic_packet = HolisticPacket(
-            keypoints=keypoints, valid_mask=valid_mask, timestamp_ms=0
-        )
+        holistic_packet = HolisticPacket(keypoints=keypoints, valid_mask=valid_mask, timestamp_ms=0)
 
         holistic_extractor = MagicMock()
         holistic_extractor.extract.return_value = holistic_packet
@@ -386,6 +380,7 @@ class TestSTGCNRuntimeHotLoop:
         stabilizer_calls: list[int] = []
 
         original_update = container.stabilizer.update
+
         def counting_update(pred):  # noqa: E306
             stabilizer_calls.append(1)
             return original_update(pred)

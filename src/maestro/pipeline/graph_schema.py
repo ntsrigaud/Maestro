@@ -58,19 +58,19 @@ _POSE_OFFSET: int = NODE_INDEX_MAP["pose"][0]  # 42
 # Indices are from the 468-point MediaPipe Face Mesh topology.
 # ---------------------------------------------------------------------------
 FACE_LANDMARK_INDICES: list[int] = [
-    10,   # forehead centre
+    10,  # forehead centre
     152,  # chin
     234,  # left cheek (face-right from model's POV)
     454,  # right cheek
-    33,   # left eye outer corner
+    33,  # left eye outer corner
     263,  # right eye outer corner
-    61,   # left mouth corner
+    61,  # left mouth corner
     291,  # right mouth corner
-    13,   # upper lip centre
-    14,   # lower lip centre
+    13,  # upper lip centre
+    14,  # lower lip centre
     168,  # nose bridge
-    1,    # nose tip
-    57,   # left jaw
+    1,  # nose tip
+    57,  # left jaw
     287,  # right jaw
 ]
 _FACE_OFFSET: int = NODE_INDEX_MAP["face"][0]  # 53
@@ -80,15 +80,30 @@ _FACE_OFFSET: int = NODE_INDEX_MAP["face"][0]  # 53
 # ---------------------------------------------------------------------------
 _HAND_EDGES: list[tuple[int, int]] = [
     # Thumb
-    (0, 1), (1, 2), (2, 3), (3, 4),
+    (0, 1),
+    (1, 2),
+    (2, 3),
+    (3, 4),
     # Index
-    (0, 5), (5, 6), (6, 7), (7, 8),
+    (0, 5),
+    (5, 6),
+    (6, 7),
+    (7, 8),
     # Middle
-    (0, 9), (9, 10), (10, 11), (11, 12),
+    (0, 9),
+    (9, 10),
+    (10, 11),
+    (11, 12),
     # Ring
-    (0, 13), (13, 14), (14, 15), (15, 16),
+    (0, 13),
+    (13, 14),
+    (14, 15),
+    (15, 16),
     # Pinky
-    (0, 17), (17, 18), (18, 19), (19, 20),
+    (0, 17),
+    (17, 18),
+    (18, 19),
+    (19, 20),
 ]
 
 # ---------------------------------------------------------------------------
@@ -97,21 +112,21 @@ _HAND_EDGES: list[tuple[int, int]] = [
 _G = _POSE_OFFSET  # base offset = 42
 _POSE_EDGES: list[tuple[int, int]] = [
     # Shoulders
-    (_G + 5, _G + 6),   # left shoulder (47) — right shoulder (48)
+    (_G + 5, _G + 6),  # left shoulder (47) — right shoulder (48)
     # Left arm
-    (_G + 5, _G + 7),   # left shoulder (47) — left elbow (49)
-    (_G + 7, _G + 9),   # left elbow (49) — left wrist (51)
+    (_G + 5, _G + 7),  # left shoulder (47) — left elbow (49)
+    (_G + 7, _G + 9),  # left elbow (49) — left wrist (51)
     # Right arm
-    (_G + 6, _G + 8),   # right shoulder (48) — right elbow (50)
+    (_G + 6, _G + 8),  # right shoulder (48) — right elbow (50)
     (_G + 8, _G + 10),  # right elbow (50) — right wrist (52)
     # Nose to shoulders
-    (_G + 0, _G + 5),   # nose (42) — left shoulder (47)
-    (_G + 0, _G + 6),   # nose (42) — right shoulder (48)
+    (_G + 0, _G + 5),  # nose (42) — left shoulder (47)
+    (_G + 0, _G + 6),  # nose (42) — right shoulder (48)
     # Eyes / ears
-    (_G + 0, _G + 1),   # nose (42) — left eye inner (43)
-    (_G + 0, _G + 2),   # nose (42) — right eye inner (44)
-    (_G + 1, _G + 3),   # left eye inner (43) — left ear (45)
-    (_G + 2, _G + 4),   # right eye inner (44) — right ear (46)
+    (_G + 0, _G + 1),  # nose (42) — left eye inner (43)
+    (_G + 0, _G + 2),  # nose (42) — right eye inner (44)
+    (_G + 1, _G + 3),  # left eye inner (43) — left ear (45)
+    (_G + 2, _G + 4),  # right eye inner (44) — right ear (46)
 ]
 
 # ---------------------------------------------------------------------------
@@ -120,7 +135,7 @@ _POSE_EDGES: list[tuple[int, int]] = [
 #   Left hand wrist:  graph node 21 → left pose wrist:  graph node 51
 # ---------------------------------------------------------------------------
 _CROSS_EDGES: list[tuple[int, int]] = [
-    (0, 52),   # right hand wrist → right pose wrist
+    (0, 52),  # right hand wrist → right pose wrist
     (21, 51),  # left hand wrist  → left pose wrist
 ]
 
@@ -130,20 +145,20 @@ _CROSS_EDGES: list[tuple[int, int]] = [
 _F = _FACE_OFFSET  # base offset = 53
 _FACE_EDGES: list[tuple[int, int]] = [
     # Forehead → cheeks
-    (_F + 0, _F + 2),   # forehead (53) — left cheek (55)
-    (_F + 0, _F + 3),   # forehead (53) — right cheek (56)
+    (_F + 0, _F + 2),  # forehead (53) — left cheek (55)
+    (_F + 0, _F + 3),  # forehead (53) — right cheek (56)
     # Cheeks → chin
-    (_F + 2, _F + 1),   # left cheek (55) — chin (54)
-    (_F + 3, _F + 1),   # right cheek (56) — chin (54)
+    (_F + 2, _F + 1),  # left cheek (55) — chin (54)
+    (_F + 3, _F + 1),  # right cheek (56) — chin (54)
     # Eye corners
-    (_F + 4, _F + 5),   # left eye outer (57) — right eye outer (58)
+    (_F + 4, _F + 5),  # left eye outer (57) — right eye outer (58)
     # Mouth
-    (_F + 6, _F + 7),   # left mouth corner (59) — right mouth corner (60)
-    (_F + 8, _F + 9),   # upper lip (61) — lower lip (62)
+    (_F + 6, _F + 7),  # left mouth corner (59) — right mouth corner (60)
+    (_F + 8, _F + 9),  # upper lip (61) — lower lip (62)
     # Nose
-    (_F + 10, _F + 11), # nose bridge (63) — nose tip (64)
+    (_F + 10, _F + 11),  # nose bridge (63) — nose tip (64)
     # Jaw
-    (_F + 12, _F + 13), # left jaw (65) — right jaw (66)
+    (_F + 12, _F + 13),  # left jaw (65) — right jaw (66)
     # Connect face to pose nose
     (_G + 0, _F + 11),  # pose nose (42) — face nose tip (64)
 ]
@@ -239,7 +254,7 @@ def normalise_graph_frame(frame: np.ndarray) -> np.ndarray:
     """
     frame = frame.astype(np.float32)
 
-    rh_wrist = frame[0]   # right hand wrist
+    rh_wrist = frame[0]  # right hand wrist
     lh_wrist = frame[21]  # left hand wrist
 
     rh_present = np.any(rh_wrist != 0.0)

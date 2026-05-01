@@ -9,7 +9,6 @@ from maestro.domain.entities import GraphFrame
 from maestro.pipeline.graph_buffering import GraphSequenceBuffer
 from maestro.pipeline.graph_schema import NUM_COORDS, NUM_NODES
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
