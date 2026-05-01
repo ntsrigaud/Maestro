@@ -212,6 +212,42 @@ def build_adjacency() -> np.ndarray:
     return A
 
 
+def build_fully_connected_partitioned_adjacency() -> np.ndarray:
+    """Build K=3 partitioned adjacency for a **fully-connected dense** graph.
+
+    Every node is connected to every other node.  The centripetal / centrifugal
+    partition assignment is derived from the anatomical BFS distances (computed
+    on the sparse skeleton graph) so that edges retain meaningful semantic
+    direction even in the dense case:
+
+    - Partition 0 (self): ``I_N``
+    - Partition 1 (centripetal): ``A_fc[i, j] = 1`` when ``j ≠ i`` and
+      ``dist[j] < dist[i]`` (neighbour is closer to its subgraph root).
+    - Partition 2 (centrifugal): ``A_fc[i, j] = 1`` when ``j ≠ i`` and
+      ``dist[j] ≥ dist[i]`` (neighbour is equidistant or farther from root).
+
+    Returns:
+        ``np.ndarray`` of shape ``(3, 67, 67)``, dtype ``float32``.
+    """
+    N = NUM_NODES
+    dist = _node_bfs_distances()  # (N,) anatomical BFS distances
+
+    A_self = np.eye(N, dtype=np.float32)
+    A_cent = np.zeros((N, N), dtype=np.float32)
+    A_cfug = np.zeros((N, N), dtype=np.float32)
+
+    for i in range(N):
+        for j in range(N):
+            if i == j:
+                continue
+            if dist[j] < dist[i]:
+                A_cent[i, j] = 1.0
+            else:
+                A_cfug[i, j] = 1.0
+
+    return np.stack([A_self, A_cent, A_cfug], axis=0)  # (3, N, N)
+
+
 def normalise_adjacency(A: np.ndarray) -> np.ndarray:
     """Return the degree-normalised adjacency: ``D^{-1/2} (A + I) D^{-1/2}``.
 
