@@ -161,3 +161,107 @@ class GestureAugmenter:
         result = seq.copy()
         result[:, _X_COORD_DIMS] *= -1
         return result
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Graph-space augmentation (graph-schema-v1, shape (T, N, C))
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Node index ranges for mirror-flip hand swap.
+_RIGHT_HAND_SLICE = slice(0, 21)   # nodes 0–20  (MediaPipe right hand)
+_LEFT_HAND_SLICE = slice(21, 42)   # nodes 21–41 (MediaPipe left hand)
+_X_COORD_IDX: int = 0              # coordinate dimension for horizontal axis
+
+
+@dataclass(slots=True)
+class GraphAugmentationConfig:
+    """Hyper-parameters for on-the-fly graph sequence augmentation.
+
+    All augmentations are applied independently per sample with probability
+    *apply_prob*.
+    """
+
+    # Speed factor drawn uniformly from this range.
+    temporal_scale_range: tuple[float, float] = (0.8, 1.2)
+    # Std-dev of Gaussian noise added to every node coordinate.
+    spatial_jitter_sigma: float = 0.005
+    # Per-augmentation application probability.
+    apply_prob: float = 0.5
+    # Mirror-flip probability.
+    mirror_flip_prob: float = 0.5
+    # Optional seed for reproducibility.
+    seed: int | None = None
+
+
+class GraphGestureAugmenter:
+    """Augmenter for graph sequences of shape ``(T, N, C)``.
+
+    Augmentations:
+    * **Temporal scale** — resample time axis to simulate speed variation.
+    * **Spatial jitter** — add Gaussian noise to all node coordinates.
+    * **Mirror flip** — negate x-axis and swap right/left hand node blocks.
+
+    Each call to :meth:`augment` returns a new array; the input is never mutated.
+    """
+
+    def __init__(self, config: GraphAugmentationConfig) -> None:
+        self._config = config
+        self._rng = np.random.default_rng(config.seed)
+
+    def augment(self, sequence: np.ndarray) -> np.ndarray:
+        """Return an augmented copy of *sequence* (shape ``(T, N, C)``).
+
+        Augmentations are applied in order:
+        temporal scale → spatial jitter → mirror flip.
+        """
+        result = sequence.copy()
+        if self._rng.random() < self._config.apply_prob:
+            result = self._temporal_scale(result)
+        if self._rng.random() < self._config.apply_prob:
+            result = self._spatial_jitter(result)
+        if self._rng.random() < self._config.mirror_flip_prob:
+            result = self._mirror_flip(result)
+        return result
+
+    # ------------------------------------------------------------------
+    # Private augmentation kernels
+    # ------------------------------------------------------------------
+
+    def _temporal_scale(self, seq: np.ndarray) -> np.ndarray:
+        """Resample the time axis to simulate gestures at different speeds."""
+        T, N, C = seq.shape
+        factor = float(
+            self._rng.uniform(
+                low=self._config.temporal_scale_range[0],
+                high=self._config.temporal_scale_range[1],
+            )
+        )
+        src_indices = np.clip(np.arange(T, dtype=np.float64) * factor, 0.0, float(T - 1))
+        orig_indices = np.arange(T, dtype=np.float64)
+        result = np.empty_like(seq)
+        # Interpolate each (node, coord) channel independently.
+        flat = seq.reshape(T, N * C)
+        for dim in range(N * C):
+            result.reshape(T, N * C)[:, dim] = np.interp(src_indices, orig_indices, flat[:, dim])
+        return result
+
+    def _spatial_jitter(self, seq: np.ndarray) -> np.ndarray:
+        """Add Gaussian noise to all node coordinates."""
+        noise = self._rng.normal(
+            loc=0.0,
+            scale=self._config.spatial_jitter_sigma,
+            size=seq.shape,
+        ).astype(seq.dtype)
+        return seq + noise
+
+    def _mirror_flip(self, seq: np.ndarray) -> np.ndarray:
+        """Mirror the gesture: negate x-axis and swap right/left hand nodes."""
+        result = seq.copy()
+        # Negate the x-coordinate for all nodes.
+        result[:, :, _X_COORD_IDX] *= -1
+        # Swap right-hand and left-hand node blocks so the model sees the
+        # correct semantic layout for the mirrored handedness.
+        rh = result[:, _RIGHT_HAND_SLICE, :].copy()
+        result[:, _RIGHT_HAND_SLICE, :] = result[:, _LEFT_HAND_SLICE, :]
+        result[:, _LEFT_HAND_SLICE, :] = rh
+        return result
