@@ -168,9 +168,9 @@ class GestureAugmenter:
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Node index ranges for mirror-flip hand swap.
-_RIGHT_HAND_SLICE = slice(0, 21)   # nodes 0–20  (MediaPipe right hand)
-_LEFT_HAND_SLICE = slice(21, 42)   # nodes 21–41 (MediaPipe left hand)
-_X_COORD_IDX: int = 0              # coordinate dimension for horizontal axis
+_RIGHT_HAND_SLICE = slice(0, 21)  # nodes 0–20  (MediaPipe right hand)
+_LEFT_HAND_SLICE = slice(21, 42)  # nodes 21–41 (MediaPipe left hand)
+_X_COORD_IDX: int = 0  # coordinate dimension for horizontal axis
 
 
 @dataclass(slots=True)

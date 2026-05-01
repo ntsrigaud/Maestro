@@ -284,7 +284,7 @@ class GraphSequenceSample:
     recording_id: str
     label: str
     label_id: int
-    sequence: np.ndarray    # (T, N, C)
+    sequence: np.ndarray  # (T, N, C)
     valid_masks: np.ndarray  # (T, N)
     start_timestamp_ms: int
     end_timestamp_ms: int
@@ -417,9 +417,7 @@ class GraphSequenceDatasetBuilder:
 
         return emitted
 
-    def build_from_frames(
-        self, frames: Iterable[LabeledGraphFrame]
-    ) -> list[GraphSequenceSample]:
+    def build_from_frames(self, frames: Iterable[LabeledGraphFrame]) -> list[GraphSequenceSample]:
         for frame in frames:
             self.add_frame(frame)
         return list(self._samples)
@@ -436,7 +434,7 @@ class GraphSequenceDatasetBuilder:
         if not self._samples:
             raise RuntimeError("No sequence samples have been generated")
 
-        sequences = np.stack([s.sequence for s in self._samples], axis=0)       # (N, T, NN, C)
+        sequences = np.stack([s.sequence for s in self._samples], axis=0)  # (N, T, NN, C)
         valid_masks = np.stack([s.valid_masks for s in self._samples], axis=0)  # (N, T, NN)
         labels = np.asarray([s.label for s in self._samples], dtype=object)
         label_ids = np.asarray([s.label_id for s in self._samples], dtype=np.int64)

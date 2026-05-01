@@ -98,7 +98,7 @@ class HolisticPacket:
     Zero-filled slots indicate undetected nodes; consult ``valid_mask`` per node.
     """
 
-    keypoints: np.ndarray   # shape (67, 3) — normalised coordinate space
+    keypoints: np.ndarray  # shape (67, 3) — normalised coordinate space
     valid_mask: np.ndarray  # shape (67,)  — bool: True = landmark detected
     timestamp_ms: int
 
@@ -111,17 +111,17 @@ class GraphFrame:
     ``valid`` reflects whether the frame meets the minimum valid-node threshold.
     """
 
-    nodes: np.ndarray       # shape (N, C) — normalised keypoint coordinates
+    nodes: np.ndarray  # shape (N, C) — normalised keypoint coordinates
     valid_mask: np.ndarray  # shape (N,)   — bool per-node detection validity
     timestamp_ms: int
-    valid: bool             # True if min_valid_ratio threshold is satisfied
+    valid: bool  # True if min_valid_ratio threshold is satisfied
 
 
 @dataclass(slots=True)
 class LabeledGraphFrame:
     """A graph frame paired with its annotation label for dataset construction."""
 
-    keypoints: np.ndarray   # (67, 3) — raw (pre-normalisation) MediaPipe coordinates
+    keypoints: np.ndarray  # (67, 3) — raw (pre-normalisation) MediaPipe coordinates
     valid_mask: np.ndarray  # (67,)   — bool per-node detection validity
     label: str
     recording_id: str

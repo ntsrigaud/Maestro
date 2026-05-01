@@ -175,9 +175,7 @@ class Runtime:
                             stabilized_prediction.reason,
                         )
 
-                        command = self._container.activation_controller.route(
-                            stabilized_prediction
-                        )
+                        command = self._container.activation_controller.route(stabilized_prediction)
                         if command is not None:
                             LOGGER.info(
                                 "command: id=%r source_gesture=%r",
@@ -237,9 +235,7 @@ class Runtime:
                             stabilized_prediction.reason,
                         )
 
-                        command = self._container.activation_controller.route(
-                            stabilized_prediction
-                        )
+                        command = self._container.activation_controller.route(stabilized_prediction)
                         if command is not None:
                             LOGGER.info(
                                 "command: id=%r source_gesture=%r",

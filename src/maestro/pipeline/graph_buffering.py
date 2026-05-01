@@ -100,7 +100,7 @@ class GraphSequenceBuffer:
         self._last_emit_push = self._push_count
 
         sequences = np.stack([f.nodes for f in ordered], axis=0).astype(np.float32)  # (T, N, C)
-        valid_masks = np.stack([f.valid_mask for f in ordered], axis=0)              # (T, N)
+        valid_masks = np.stack([f.valid_mask for f in ordered], axis=0)  # (T, N)
 
         return sequences, valid_masks
 

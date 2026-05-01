@@ -214,4 +214,3 @@ def validate_graph_schema_compatibility(
         )
 
     return len(issues) == 0, issues
-
