@@ -42,10 +42,11 @@ Branch 2 — STGCN (3 blocks, fully-connected graph)
   adjacency (all nodes attend to all nodes; centripetal / centrifugal split
   derived from anatomical BFS distances).
 
+  Each block follows the paper's SCN→TCN→BN→ReLU→Dropout→+Residual order:
     (B, T, N, C)
-      → STGCNBlock(C   → 64,  K=3, residual=True)
-      → STGCNBlock(64  → 128, K=3, residual=True)
-      → STGCNBlock(128 → 256, K=3, residual=True)
+      → STGCNBlock(C   → 64,  K=3, residual=True, dropout=p)
+      → STGCNBlock(64  → 128, K=3, residual=True, dropout=p)
+      → STGCNBlock(128 → 256, K=3, residual=True, dropout=p)
       → mean-pool over N                     (B, T, 256)
       → mean-pool over T                     (B, 256)
 
@@ -506,6 +507,7 @@ class DualBranchSTGCN_LSTM(nn.Module):
                     A,
                     temporal_kernel=3,
                     residual=True,
+                    dropout=dropout,
                 )
             )
             in_ch = out_ch

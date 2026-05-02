@@ -59,9 +59,7 @@ def _shape_trace() -> None:
             bn_out = block.bn_gcn(gcn_out.reshape(-1, gcn_out.shape[-1])).reshape(_B, _T, _N, -1)
 
             t_in = bn_out.permute(0, 2, 3, 1).reshape(_B * _N, -1, _T)
-            ta = block.tcn_a(t_in)
-            tb = block.tcn_b(t_in)
-            t_out = torch.cat([ta, tb], dim=1)
+            t_out = block.tcn(t_in)
             T_new = t_out.shape[-1]
             t_out_bn = block.tcn_bn(t_out)
             t_out_reshaped = t_out_bn.reshape(_B, _N, -1, T_new).permute(0, 3, 1, 2)

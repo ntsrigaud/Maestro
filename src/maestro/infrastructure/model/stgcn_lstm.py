@@ -78,23 +78,28 @@ class _GraphConv(nn.Module):
 class STGCNBlock(nn.Module):
     """Spatial Temporal Graph Convolutional block.
 
-    Applies multi-scale temporal convolution followed by 1-hop graph
-    convolution, batch norm, and an optional residual connection.
+    Implements the STGCNBlock as shown in the paper block diagram:
 
-    Temporal conv uses two parallel branches: kernel sizes ``temporal_kernel``
-    and ``temporal_kernel+2``, concatenated then projected back to
-    ``out_channels`` via a 1×1 conv.  This captures both fine- and
-    coarse-grained motion cues without doubling the parameter budget.
+        SCN (spatial graph conv)
+        → TCN (single temporal conv)
+        → BN → ReLU → Dropout
+        → + Residual
+
+    The ReLU and Dropout are applied *before* the residual addition
+    (pre-activation style), matching the paper's block diagram.  No ReLU
+    is applied after the residual sum.
 
     Args:
         in_channels:    Node feature channels in.
         out_channels:   Node feature channels out.
         adjacency:      Normalised adjacency ``(N, N)`` tensor.
-        temporal_kernel: Base temporal convolution kernel size (default 3).
+        temporal_kernel: Temporal convolution kernel size (default 3).
         stride:         Temporal stride (default 1).
         residual:       Whether to add a residual connection (default True).
                         If ``in_channels != out_channels`` a linear projection
                         is used for the skip path.
+        dropout:        Dropout probability applied inside the block, after
+                        ReLU and before the residual addition (default 0.0).
     """
 
     def __init__(
@@ -106,22 +111,24 @@ class STGCNBlock(nn.Module):
         temporal_kernel: int = 3,
         stride: int = 1,
         residual: bool = True,
+        dropout: float = 0.0,
     ) -> None:
         super().__init__()
-        half = out_channels // 2
-        pad_a = temporal_kernel // 2
-        pad_b = (temporal_kernel + 2) // 2
+        pad = temporal_kernel // 2
 
         # --- Spatial graph convolution ---
         self.gcn = _GraphConv(in_channels, out_channels, adjacency)
         self.bn_gcn = nn.BatchNorm1d(out_channels)
 
-        # --- Multi-scale temporal convolution (two branches → concat → project) ---
-        self.tcn_a = nn.Conv1d(out_channels, half, temporal_kernel, stride=stride, padding=pad_a)
-        self.tcn_b = nn.Conv1d(
-            out_channels, half, temporal_kernel + 2, stride=stride, padding=pad_b
+        # --- Temporal convolution (single-scale, matching paper block diagram) ---
+        self.tcn = nn.Conv1d(
+            out_channels, out_channels, temporal_kernel, stride=stride, padding=pad
         )
         self.tcn_bn = nn.BatchNorm1d(out_channels)
+
+        # --- Activation and per-block dropout (before residual, per paper diagram) ---
+        self.act = nn.ReLU(inplace=True)
+        self.block_dropout = nn.Dropout(dropout)
 
         # --- Residual ---
         self.residual = residual
@@ -134,35 +141,33 @@ class STGCNBlock(nn.Module):
             else:
                 self.skip_proj = nn.Identity()
 
-        self.act = nn.ReLU(inplace=True)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (B, T, N, C_in)
         B, T, N, _ = x.shape
 
-        # 1. Spatial graph conv.
+        # 1. Spatial graph conv + BN.
         out = self.gcn(x)  # (B, T, N, C_out)
-        # BatchNorm over (B*T*N) flattened to (B*T*N, C_out).
         out_bn = self.bn_gcn(out.reshape(-1, out.shape[-1])).reshape(B, T, N, -1)
 
         # 2. Temporal conv — operate per-node: reshape to (B*N, C_out, T).
         t_in = out_bn.permute(0, 2, 3, 1).reshape(B * N, -1, T)  # (B*N, C_out, T)
-        ta = self.tcn_a(t_in)  # (B*N, half, T')
-        tb = self.tcn_b(t_in)  # (B*N, half, T')
-        t_out = torch.cat([ta, tb], dim=1)  # (B*N, C_out, T')
+        t_out = self.tcn(t_in)  # (B*N, C_out, T')
         T_new = t_out.shape[-1]
         t_out = self.tcn_bn(t_out)  # (B*N, C_out, T')
         t_out = t_out.reshape(B, N, -1, T_new).permute(0, 3, 1, 2)  # (B, T', N, C_out)
 
-        # 3. Residual.
+        # 3. ReLU → Dropout (before residual, per paper block diagram).
+        t_out = self.act(t_out)
+        t_out = self.block_dropout(t_out)
+
+        # 4. Residual addition (no ReLU after, per paper block diagram).
         if self.residual:
-            # skip path: same temporal conv → (B*N, C_out, T').
             x_skip = x.permute(0, 2, 3, 1).reshape(B * N, -1, T)  # (B*N, C_in, T)
             x_skip = self.skip_proj(x_skip)  # (B*N, C_out, T')
             x_skip = x_skip.reshape(B, N, -1, T_new).permute(0, 3, 1, 2)
             t_out = t_out + x_skip
 
-        return self.act(t_out)  # (B, T', N, C_out)
+        return t_out  # (B, T', N, C_out)
 
 
 class _BahdanauAttention(nn.Module):
