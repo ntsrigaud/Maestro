@@ -28,7 +28,7 @@ def export_inference_artifact(
     """Export production inference artifact with model + schema metadata.
 
     For ``two_stream_*`` models the artifact contains a ``feature_schema`` dict
-    (backward-compatible).  For ``stgcn_*`` models it contains a ``graph_schema``
+    (backward-compatible).  For ``dual_stgcn_*`` models it contains a ``graph_schema``
     dict with the adjacency matrix and node/coord counts.
     """
     path = Path(export_dir)
@@ -37,13 +37,10 @@ def export_inference_artifact(
     artifact_path = path / f"{result.model_version}_inference.pt"
 
     is_dual_stgcn = config.model.model_name.startswith("dual_stgcn")
-    is_stgcn = not is_dual_stgcn and config.model.model_name.startswith("stgcn")
-    is_graph_model = is_dual_stgcn or is_stgcn
+    is_graph_model = is_dual_stgcn
 
     if is_dual_stgcn:
         artifact_type = "dual_stgcn_lstm_inference"
-    elif is_stgcn:
-        artifact_type = "stgcn_lstm_inference"
     else:
         artifact_type = "two_stream_lstm_inference"
 
@@ -57,18 +54,6 @@ def export_inference_artifact(
             "lstm_hidden": config.model.lstm_hidden,
             "lstm_layers": config.model.lstm_layers,
             "stgcn_channels": list(config.model.stgcn_channels),
-            "dropout": config.model.dropout,
-            "num_classes": config.model.num_classes,
-        }
-    elif is_stgcn:
-        model_config_dict = {
-            "model_name": config.model.model_name,
-            "num_nodes": config.model.num_nodes,
-            "num_coords": config.model.num_coords,
-            "stgcn_channels": list(config.model.stgcn_channels),
-            "num_stgcn_layers": config.model.num_stgcn_layers,
-            "lstm_hidden": config.model.lstm_hidden,
-            "lstm_layers": config.model.lstm_layers,
             "dropout": config.model.dropout,
             "num_classes": config.model.num_classes,
         }
