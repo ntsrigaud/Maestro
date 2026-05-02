@@ -71,11 +71,12 @@ class TestPhonologicalFeatureExtractor:
     def test_joint_angles_in_valid_range(self) -> None:
         """Finger joint angles must lie in [0, π] radians."""
         import math
+
         extractor = _PhonologicalFeatureExtractor()
         x = _batch(B=2, T=8)
         out = extractor(x)
         # First 15 features per hand = joint angles, both hands: indices 0-14 and 28-42
-        right_angles = out[..., :15]   # (B, T, 15)
+        right_angles = out[..., :15]  # (B, T, 15)
         left_angles = out[..., 28:43]  # (B, T, 15)
         assert right_angles.min().item() >= 0.0
         assert right_angles.max().item() <= math.pi + 1e-5
@@ -124,7 +125,7 @@ class TestSelfAttentionQKV:
         # Compute attention matrix directly to verify
         Q = attn.W_q(H)
         K = attn.W_k(H)
-        scale = 32 ** -0.5
+        scale = 32**-0.5
         alpha = torch.softmax(torch.bmm(Q, K.transpose(1, 2)) * scale, dim=-1)
         sums = alpha.sum(dim=-1)  # (3, 12) — each row sums to 1
         assert torch.allclose(sums, torch.ones_like(sums), atol=1e-5)
@@ -207,6 +208,7 @@ class TestDualBranchForward:
         with torch.no_grad():
             out = model(_batch())
         import torch.nn.functional as F
+
         probs = F.softmax(out, dim=-1)
         assert not torch.allclose(out, probs, atol=1e-3), "Output should be logits, not probs"
 
@@ -259,10 +261,10 @@ class TestDualBranchAdjacency:
 
         A = build_fully_connected_partitioned_adjacency()  # (3, 67, 67) unnormalised
         off_diag_mask = ~np.eye(67, dtype=bool)
-        part_sum = A.sum(axis=0)                           # (67, 67)
-        assert np.all(
-            part_sum[off_diag_mask] == 1.0
-        ), "Each off-diagonal edge must appear in exactly one partition."
+        part_sum = A.sum(axis=0)  # (67, 67)
+        assert np.all(part_sum[off_diag_mask] == 1.0), (
+            "Each off-diagonal edge must appear in exactly one partition."
+        )
         diag_mask = np.eye(67, dtype=bool)
         assert np.all(A[0][diag_mask] == 1.0), "Partition 0 must be identity."
         assert np.all(A[1][diag_mask] == 0.0), "Partition 1 must have no self-loops."
@@ -355,4 +357,3 @@ class TestDualBranchDispatch:
         device = torch.device("cpu")
         model = _build_model(cfg.model, device)
         assert isinstance(model, STGCN_LSTM)
-

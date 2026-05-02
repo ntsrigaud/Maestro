@@ -252,10 +252,9 @@ def create_datamodule(
     * ``stgcn_*`` models       → :class:`GraphGestureDataModule`
     * ``two_stream_*``         → :class:`GestureDataModule`
     """
-    is_graph_model = (
-        config.model.model_name.startswith("dual_stgcn")
-        or config.model.model_name.startswith("stgcn")
-    )
+    is_graph_model = config.model.model_name.startswith(
+        "dual_stgcn"
+    ) or config.model.model_name.startswith("stgcn")
     if is_graph_model:
         from maestro.training.augmentation import (  # noqa: F401
             GraphAugmentationConfig,
