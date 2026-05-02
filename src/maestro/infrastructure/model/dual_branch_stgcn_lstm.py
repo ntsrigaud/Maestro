@@ -42,7 +42,7 @@ Branch 2 — STGCN (3 blocks, fully-connected graph)
   adjacency (all nodes attend to all nodes; centripetal / centrifugal split
   derived from anatomical BFS distances).
 
-  Each block follows the paper's SCN→TCN→BN→ReLU→Dropout→+Residual order:
+  Each block follows the Yan et al. ST-GCN convention (SCN→BN→ReLU→TCN→BN→Dropout→+Residual→ReLU):
     (B, T, N, C)
       → STGCNBlock(C   → 64,  K=3, residual=True, dropout=p)
       → STGCNBlock(64  → 128, K=3, residual=True, dropout=p)
@@ -228,13 +228,13 @@ def _extract_hand_features(
     acc = vel[:, 1:] - vel[:, :-1]  # (B, T-1)
     acc = torch.cat([acc[:, :1], acc], dim=1)  # (B, T)
 
-    # Curvature: (d_{k-1,k} + d_{k,k+1}) / d_{k-1,k+1}  ─ pad boundaries
-    d_prev = torch.cat([vel[:, :1], vel[:, :-1]], dim=1)  # shift right
+    # Curvature: (d_{k-1,k} + d_{k,k+1}) / d_{k-1,k+1}  Eq. 4  ─ pad boundaries
+    # vel[k] = dist(P_{k-1}, P_k); d_next[k] = vel[k+1] = dist(P_k, P_{k+1})
     d_next = torch.cat([vel[:, 1:], vel[:, -1:]], dim=1)  # shift left
     p_prev = torch.cat([position[:, :1], position[:, :-1]], dim=1)
     p_next = torch.cat([position[:, 1:], position[:, -1:]], dim=1)
-    chord = (p_next - p_prev).norm(dim=-1) + 1e-8  # (B, T)
-    curv = (d_prev + d_next) / chord  # (B, T)
+    chord = (p_next - p_prev).norm(dim=-1) + 1e-8  # dist(P_{k-1}, P_{k+1})
+    curv = (vel + d_next) / chord  # Eq. 4: (dist(P_{k-1},P_k) + dist(P_k,P_{k+1})) / chord
 
     motion = torch.stack([vel, acc, curv], dim=-1)  # (B, T, 3)
 
