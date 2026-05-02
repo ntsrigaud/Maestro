@@ -23,6 +23,9 @@ from maestro.infrastructure.gaze import HeadPoseGazeDetector, NullGazeDetector
 from maestro.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
 )
+from maestro.infrastructure.mediapipe.holistic_extractor import (
+    HolisticLandmarkExtractor,
+)
 from maestro.infrastructure.model.checkpoint_loader import (
     InferenceArtifact,
     load_inference_artifact,
@@ -38,6 +41,7 @@ from maestro.interfaces.sequence_buffer import ISequenceBuffer
 from maestro.pipeline.activation import GestureActivationController
 from maestro.pipeline.buffering import SlidingWindowSequenceBuffer
 from maestro.pipeline.feature_engineering import LandmarkFeatureTransformer
+from maestro.pipeline.graph_buffering import GraphSequenceBuffer
 from maestro.pipeline.hand_selection import HandSelector
 from maestro.pipeline.stabilization import PredictionStabilizer
 from maestro.utils.config_loader import load_runtime_config
@@ -61,6 +65,9 @@ class AppContainer:
     overlay_renderer: IFeedbackRenderer
     benchmark: LatencyBenchmark
     show_window: bool
+    # DualBranchSTGCN-LSTM components (set when artifact_type == "dual_stgcn_lstm_inference").
+    holistic_extractor: HolisticLandmarkExtractor | None = None
+    graph_buffer: GraphSequenceBuffer | None = None
 
 
 def build_container(
@@ -81,24 +88,6 @@ def build_container(
         frame_height=config.app.frame_height,
         target_fps=config.app.target_fps,
     )
-    landmark_extractor = MediaPipeHandsExtractor(
-        static_image_mode=False,
-        min_detection_confidence=0.7,
-        min_tracking_confidence=0.5,
-    )
-    hand_selector = HandSelector(
-        hand_preference=config.app.hand_preference,
-        min_handedness_conf=0.7,
-        min_track_conf=0.5,
-    )
-    feature_transformer = LandmarkFeatureTransformer(
-        enable_orientation_normalization=config.feature_pipeline.orientation_normalization,
-    )
-    sequence_buffer = SlidingWindowSequenceBuffer(
-        window_length=config.inference.window_length,
-        window_step=config.inference.window_step,
-        min_valid_ratio=config.inference.min_valid_ratio,
-    )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if model_artifact_path:
@@ -111,6 +100,58 @@ def build_container(
         )
 
     validate_runtime_compatibility(runtime_config=config, artifact=artifact)
+
+    # Decide which extraction pipeline to build based on the artifact type.
+    is_stgcn = artifact.graph_schema_version != "unknown"
+
+    holistic_extractor: HolisticLandmarkExtractor | None = None
+    graph_buffer: GraphSequenceBuffer | None = None
+
+    if is_stgcn:
+        holistic_extractor = HolisticLandmarkExtractor()
+        graph_buffer = GraphSequenceBuffer(
+            window_length=artifact.window_length,
+            window_step=artifact.window_step,
+        )
+        # Legacy pipeline components are required by AppContainer but unused in
+        # the STGCN hot loop — create lightweight placeholders.
+        landmark_extractor: IHandLandmarkExtractor = MediaPipeHandsExtractor(
+            static_image_mode=False,
+            min_detection_confidence=0.7,
+            min_tracking_confidence=0.5,
+        )
+        hand_selector = HandSelector(
+            hand_preference=config.app.hand_preference,
+            min_handedness_conf=0.7,
+            min_track_conf=0.5,
+        )
+        feature_transformer: IFeatureTransformer = LandmarkFeatureTransformer(
+            enable_orientation_normalization=False,
+        )
+        sequence_buffer: ISequenceBuffer = SlidingWindowSequenceBuffer(
+            window_length=config.inference.window_length,
+            window_step=config.inference.window_step,
+            min_valid_ratio=config.inference.min_valid_ratio,
+        )
+    else:
+        landmark_extractor = MediaPipeHandsExtractor(
+            static_image_mode=False,
+            min_detection_confidence=0.7,
+            min_tracking_confidence=0.5,
+        )
+        hand_selector = HandSelector(
+            hand_preference=config.app.hand_preference,
+            min_handedness_conf=0.7,
+            min_track_conf=0.5,
+        )
+        feature_transformer = LandmarkFeatureTransformer(
+            enable_orientation_normalization=config.feature_pipeline.orientation_normalization,
+        )
+        sequence_buffer = SlidingWindowSequenceBuffer(
+            window_length=config.inference.window_length,
+            window_step=config.inference.window_step,
+            min_valid_ratio=config.inference.min_valid_ratio,
+        )
 
     stabilizer = PredictionStabilizer(
         default_threshold=float(thresholds.get("acceptance_default", 0.85)),
@@ -162,6 +203,8 @@ def build_container(
         overlay_renderer=overlay_renderer,
         benchmark=benchmark,
         show_window=show_window,
+        holistic_extractor=holistic_extractor,
+        graph_buffer=graph_buffer,
     )
 
 
