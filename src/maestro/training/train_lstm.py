@@ -192,9 +192,8 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
     """Instantiate the appropriate model from *config*.
 
     Dispatches based on ``config.model_name``:
-    * ``two_stream_*``  → :class:`TwoStreamGestureLSTM`
-    * ``stgcn_*``       → :class:`STGCN_LSTM`
     * ``dual_stgcn_*``  → :class:`DualBranchSTGCN_LSTM`
+    * ``two_stream_*``  → :class:`TwoStreamGestureLSTM`
     """
     if config.model_name.startswith("dual_stgcn"):
         from maestro.infrastructure.model.dual_branch_stgcn_lstm import DualBranchSTGCN_LSTM
@@ -206,20 +205,6 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
             phono_lstm_hidden=config.lstm_hidden,
             phono_lstm_layers=config.lstm_layers,
             stgcn_channels=config.stgcn_channels,
-            dropout=config.dropout,
-            num_classes=config.num_classes,
-        ).to(device)
-
-    if config.model_name.startswith("stgcn"):
-        from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM
-
-        return STGCN_LSTM(
-            num_nodes=config.num_nodes,
-            num_coords=config.num_coords,
-            stgcn_channels=config.stgcn_channels,
-            num_stgcn_layers=config.num_stgcn_layers,
-            lstm_hidden=config.lstm_hidden,
-            lstm_layers=config.lstm_layers,
             dropout=config.dropout,
             num_classes=config.num_classes,
         ).to(device)
@@ -237,7 +222,7 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
 
     raise ValueError(
         f"Unsupported model_name {config.model_name!r}. "
-        "Supported prefixes: 'dual_stgcn_', 'stgcn_', 'two_stream_'."
+        "Supported prefixes: 'dual_stgcn_', 'two_stream_'."
     )
 
 
@@ -249,12 +234,9 @@ def create_datamodule(
     """Create and set up the appropriate data module for *config.model.model_name*.
 
     * ``dual_stgcn_*`` models → :class:`GraphGestureDataModule`
-    * ``stgcn_*`` models       → :class:`GraphGestureDataModule`
     * ``two_stream_*``         → :class:`GestureDataModule`
     """
-    is_graph_model = config.model.model_name.startswith(
-        "dual_stgcn"
-    ) or config.model.model_name.startswith("stgcn")
+    is_graph_model = config.model.model_name.startswith("dual_stgcn")
     if is_graph_model:
         from maestro.training.augmentation import (  # noqa: F401
             GraphAugmentationConfig,
