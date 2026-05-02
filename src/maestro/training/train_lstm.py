@@ -202,7 +202,6 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
         return DualBranchSTGCN_LSTM(
             num_nodes=config.num_nodes,
             num_coords=config.num_coords,
-            phono_proj_dim=config.phono_proj_dim,
             phono_conv_channels=config.phono_conv_channels,
             phono_lstm_hidden=config.lstm_hidden,
             phono_lstm_layers=config.lstm_layers,

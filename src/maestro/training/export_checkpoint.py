@@ -53,7 +53,6 @@ def export_inference_artifact(
             "model_name": config.model.model_name,
             "num_nodes": config.model.num_nodes,
             "num_coords": config.model.num_coords,
-            "phono_proj_dim": config.model.phono_proj_dim,
             "phono_conv_channels": config.model.phono_conv_channels,
             "lstm_hidden": config.model.lstm_hidden,
             "lstm_layers": config.model.lstm_layers,
