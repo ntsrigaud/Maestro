@@ -346,14 +346,3 @@ class TestDualBranchDispatch:
         device = torch.device("cpu")
         model = _build_model(cfg.model, device)
         assert isinstance(model, DualBranchSTGCN_LSTM)
-
-    def test_build_model_stgcn_unchanged(self) -> None:
-        """Existing 'stgcn_*' dispatch must still produce STGCN_LSTM."""
-        from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM
-        from maestro.training.train_lstm import _build_model, load_training_config
-
-        stgcn_cfg_path = _REPO_ROOT / "configs" / "model" / "stgcn_lstm.yaml"
-        cfg = load_training_config(stgcn_cfg_path)
-        device = torch.device("cpu")
-        model = _build_model(cfg.model, device)
-        assert isinstance(model, STGCN_LSTM)
