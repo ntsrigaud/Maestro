@@ -1,0 +1,96 @@
+# ── EnhancedTwoStreamLSTM — IPN 32-frame comparison configuration ─────────────
+#
+# This config trains the improved two_stream_attn architecture:
+#   - Bidirectional LSTMs (forward + backward context)
+#   - Multi-Head Self-Attention (Q/K/V, 4 heads) replacing Bahdanau
+#   - Feature projection layers (symmetrize 73/74 → proj_dim before LSTM)
+#   - Cross-stream gating (motion context modulates pose, and vice versa)
+#   - Deeper GELU MLP head with LayerNorm
+#   - AdamW optimiser with label_smoothing=0.1 (from training pipeline)
+#
+# Dataset: build with --window-length 32 --window-step 1
+#   python scripts/build_ipn_dataset.py \
+#       --window-length 32 --window-step 1 \
+#       --output-npz data/processed/ipn_dataset_v5_w32.npz
+#
+# ── Regression analysis (why TwoStreamLSTM-v1 plateaued at ~78%) ─────────────
+#
+#   1. Severe overfitting: train acc 95.6% vs val acc 79.5% at best epoch 33.
+#      The 16% generalisation gap indicates insufficient regularisation.
+#      Fix: AdamW (proper weight-decay decoupling), label_smoothing=0.1,
+#           higher weight_decay (5e-4), larger batch_size (128).
+#
+#   2. Unidirectional LSTM misses backward context.  For a fixed window buffer,
+#      bidirectionality is applicable and gives +2-5% on skeleton datasets.
+#
+#   3. Bahdanau attention (Linear(H,1)) is single-head and scalar-scored.
+#      Multi-head Q/K/V attention explores multiple temporal subspaces.
+#
+#   4. No stream interaction after pooling.  Cross-stream gating adds a lightweight
+#      modulation path (motion → pose and pose → motion).
+#
+# ── IPN research baseline targets (GTX 1080ti) ───────────────────────────────
+#   ResNeXt-101  RGB-Flow  86.32%   50.8 ms
+#   ResNeXt-101  RGB       83.59%   27.7 ms
+#   C3D          RGB       77.75%   76.2 ms   ← v1 TwoStreamLSTM parity
+#   Target       Skeleton  ≥ 85%    < 5 ms    ← this config
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_v1
+  input_size: 147 # total feature dims (feature-schema-v5)
+  hidden_size: 64 # per-direction per-stream; BiLSTM output = 2×64 = 128
+  num_layers: 2
+  dropout: 0.3
+  num_classes: 8 # must match dataset vocabulary (set by build_ipn_dataset.py)
+  # EnhancedTwoStreamLSTM-specific fields
+  num_heads: 4 # MHA heads; must divide 2×hidden_size = 128 evenly
+  proj_dim: 64 # feature projection output dim (73/74 → 64 before LSTM)
+
+# ── Design notes ─────────────────────────────────────────────────────────────
+# Approximate parameter budget:
+#   proj_a / proj_b    2 × ~5 K              ≈  10 K
+#   BiLSTM-A           2-layer bidir (64)     ≈ 165 K
+#   BiLSTM-B           2-layer bidir (64)     ≈ 165 K
+#   MHA-A / MHA-B      2 × (4×128² + bias)   ≈ 132 K
+#   Cross-gates × 2    2 × 128²               ≈  33 K
+#   Head MLP           256→128→C              ≈  35 K
+#   Total                                     ≈ 540 K  (vs 182 K for v1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+training:
+  epochs: 100
+  batch_size: 128 # larger batch → more stable gradient estimates
+  learning_rate: 0.0003 # slightly higher LR benefits BiLSTM + attention
+  weight_decay: 0.0005 # stronger weight decay to combat the 16% overfit gap
+  grad_clip_norm: 1.0
+  early_stopping_patience: 20
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.1 # regularises overconfident predictions
+  seed: 42
+  num_workers: 0
+  class_weighting: false # balanced by stratified split + augmentation
+
+splits:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 7 # more patience before LR reduction (attention needs time)
+  min_lr: 0.000001
+
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+
+augmentation:
+  enabled: true
+  temporal_scale_range: [0.75, 1.25] # slightly wider than v1 (0.8–1.2)
+  spatial_jitter_sigma: 0.008 # marginally higher jitter for regularisation
+  apply_prob: 0.6 # apply augmentation more aggressively
+  mirror_flip_prob: 0.5 # horizontal left↔right swap with label inversion
