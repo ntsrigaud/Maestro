@@ -55,12 +55,8 @@ def _shape_trace() -> None:
             _B, _T, _N, _ = h.shape
 
             gcn_out = block.gcn(h)
-            print(
-                f"  Block {idx + 1} GCN out              : {tuple(gcn_out.shape)}"
-            )
-            bn_out = block.bn_gcn(gcn_out.reshape(-1, gcn_out.shape[-1])).reshape(
-                _B, _T, _N, -1
-            )
+            print(f"  Block {idx + 1} GCN out              : {tuple(gcn_out.shape)}")
+            bn_out = block.bn_gcn(gcn_out.reshape(-1, gcn_out.shape[-1])).reshape(_B, _T, _N, -1)
 
             t_in = bn_out.permute(0, 2, 3, 1).reshape(_B * _N, -1, _T)
             ta = block.tcn_a(t_in)
@@ -69,15 +65,11 @@ def _shape_trace() -> None:
             T_new = t_out.shape[-1]
             t_out_bn = block.tcn_bn(t_out)
             t_out_reshaped = t_out_bn.reshape(_B, _N, -1, T_new).permute(0, 3, 1, 2)
-            print(
-                f"  Block {idx + 1} TCN out              : {tuple(t_out_reshaped.shape)}"
-            )
+            print(f"  Block {idx + 1} TCN out              : {tuple(t_out_reshaped.shape)}")
 
             # Full block forward
             h = block(h)
-            print(
-                f"  Block {idx + 1} block out             : {tuple(h.shape)}"
-            )
+            print(f"  Block {idx + 1} block out             : {tuple(h.shape)}")
 
         # Pool
         pooled = h.mean(dim=2)
@@ -165,18 +157,20 @@ def _adjacency_checks() -> None:
     print("3. ADJACENCY CHECKS")
     print(SEPARATOR)
 
-    raw = build_partitioned_adjacency()   # (3, 67, 67)
+    raw = build_partitioned_adjacency()  # (3, 67, 67)
     norm = normalise_partitioned_adjacency(raw)
 
     print(f"  Raw partitions shape         : {raw.shape}")
 
     # Partition 0: identity
     import numpy as np
+
     id_ok = np.allclose(raw[0], np.eye(NUM_NODES))
     print(f"  Partition 0 = identity       : {'✓' if id_ok else '✗'}")
 
     # Partition 1 + 2 cover all edges in the raw binary adjacency
     from maestro.pipeline.graph_schema import build_adjacency
+
     A_bin = build_adjacency()
     union = (raw[1] + raw[2]) > 0
     missing = (A_bin > 0) & ~union

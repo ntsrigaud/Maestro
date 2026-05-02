@@ -287,7 +287,7 @@ def _node_bfs_distances() -> np.ndarray:
     distances = np.zeros(NUM_NODES, dtype=np.int32)
 
     subgraphs: list[tuple[list[int], int]] = [
-        (list(range(0, 21)), 0),    # right hand, root = wrist
+        (list(range(0, 21)), 0),  # right hand, root = wrist
         (list(range(21, 42)), 21),  # left hand,  root = wrist
         (list(range(42, 53)), 42),  # pose,        root = nose
         (list(range(53, 67)), 64),  # face,        root = nose tip
@@ -327,21 +327,21 @@ def build_partitioned_adjacency() -> np.ndarray:
         ``np.ndarray`` of shape ``(3, 67, 67)``, dtype ``float32``.
     """
     N = NUM_NODES
-    A_bin = build_adjacency()   # (N, N) binary, no self-loops
+    A_bin = build_adjacency()  # (N, N) binary, no self-loops
     dist = _node_bfs_distances()  # (N,) int32
 
     A_self = np.eye(N, dtype=np.float32)
-    A_cent = np.zeros((N, N), dtype=np.float32)   # centripetal
-    A_cfug = np.zeros((N, N), dtype=np.float32)   # centrifugal
+    A_cent = np.zeros((N, N), dtype=np.float32)  # centripetal
+    A_cfug = np.zeros((N, N), dtype=np.float32)  # centrifugal
 
     for i in range(N):
         for j in range(N):
             if i == j or A_bin[i, j] == 0:
                 continue
             if dist[j] < dist[i]:
-                A_cent[i, j] = 1.0   # j closer to root
+                A_cent[i, j] = 1.0  # j closer to root
             else:
-                A_cfug[i, j] = 1.0   # j same distance or farther
+                A_cfug[i, j] = 1.0  # j same distance or farther
 
     return np.stack([A_self, A_cent, A_cfug], axis=0)  # (3, N, N)
 
@@ -362,9 +362,9 @@ def normalise_partitioned_adjacency(partitions: np.ndarray) -> np.ndarray:
     K, N, _ = partitions.shape
     out = np.zeros_like(partitions, dtype=np.float32)
     for k in range(K):
-        D = partitions[k].sum(axis=1)          # (N,)
+        D = partitions[k].sum(axis=1)  # (N,)
         D_inv = np.zeros_like(D)
-        D_inv[D > 0] = 1.0 / D[D > 0]         # avoid divide-by-zero for isolated nodes
+        D_inv[D > 0] = 1.0 / D[D > 0]  # avoid divide-by-zero for isolated nodes
         out[k] = np.diag(D_inv) @ partitions[k]
     return out
 
