@@ -20,26 +20,9 @@ def _build_model_from_artifact(
     """Instantiate the correct model class from *artifact_type* / *model_config*.
 
     Dispatches on ``artifact_type`` (preferred) then falls back to ``model_name``:
-    * ``dual_stgcn_lstm_inference`` → :class:`DualBranchSTGCN_LSTM`
     * ``two_stream_lstm_inference`` → :class:`TwoStreamGestureLSTM`
     """
     model_name = str(model_config.get("model_name", ""))
-    is_dual_stgcn = artifact_type.startswith("dual_stgcn") or model_name.startswith("dual_stgcn")
-
-    if is_dual_stgcn:
-        from maestro.infrastructure.model.dual_branch_stgcn_lstm import DualBranchSTGCN_LSTM
-
-        channels_raw = model_config.get("stgcn_channels", [64, 128, 256])
-        return DualBranchSTGCN_LSTM(
-            num_nodes=int(model_config.get("num_nodes", 67)),
-            num_coords=int(model_config.get("num_coords", 3)),
-            phono_conv_channels=int(model_config.get("phono_conv_channels", 256)),
-            phono_lstm_hidden=int(model_config.get("lstm_hidden", 256)),
-            phono_lstm_layers=int(model_config.get("lstm_layers", 2)),
-            stgcn_channels=tuple(int(c) for c in channels_raw),
-            dropout=float(model_config.get("dropout", 0.3)),
-            num_classes=int(model_config["num_classes"]),
-        ).to(device)
 
     if artifact_type.startswith("two_stream") or model_name.startswith("two_stream"):
         from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
@@ -54,7 +37,7 @@ def _build_model_from_artifact(
 
     raise ValueError(
         f"Unsupported artifact type {artifact_type!r} (model_name={model_name!r}). "
-        "Supported types: 'dual_stgcn_lstm_inference', 'two_stream_lstm_inference'."
+        "Supported types: 'two_stream_lstm_inference'."
     )
 
 
@@ -70,11 +53,6 @@ class InferenceArtifact:
     window_length: int = 24
     window_step: int = 3
     orientation_normalization: bool = False
-    # Graph schema fields (stgcn_* models).
-    graph_schema_version: str = "unknown"
-    num_nodes: int = 0
-    num_coords: int = 0
-    adjacency: torch.Tensor | None = None
 
 
 def load_inference_artifact(
@@ -114,31 +92,15 @@ def load_inference_artifact(
     )
 
     _model_name_loaded = str(model_config.get("model_name", ""))
-    is_dual_stgcn = artifact_type.startswith("dual_stgcn") or _model_name_loaded.startswith(
-        "dual_stgcn"
-    )
 
-    if is_dual_stgcn:
-        gs = payload.get("graph_schema", {})
-        base.graph_schema_version = str(gs.get("graph_schema_version", "unknown"))
-        base.num_nodes = int(gs.get("num_nodes", model_config.get("num_nodes", 67)))
-        base.num_coords = int(gs.get("num_coords", model_config.get("num_coords", 3)))
-        base.window_length = int(gs.get("window_length", 24))
-        base.window_step = int(gs.get("window_step", 3))
-        raw_adj = gs.get("adjacency")
-        if raw_adj is not None:
-            base.adjacency = (
-                raw_adj if isinstance(raw_adj, torch.Tensor) else torch.as_tensor(raw_adj)
-            ).float()
-    else:
-        fs = payload.get("feature_schema", {})
-        if not isinstance(fs, dict):
-            raise ValueError(f"Artifact missing feature_schema: {path}")
-        base.feature_schema_version = str(fs.get("feature_schema_version", "unknown"))
-        base.feature_dim = int(fs.get("feature_dim") or model_config.get("input_size", 0))
-        base.window_length = int(fs.get("window_length", 24))
-        base.window_step = int(fs.get("window_step", 3))
-        base.orientation_normalization = bool(fs.get("orientation_normalization", False))
+    fs = payload.get("feature_schema", {})
+    if not isinstance(fs, dict):
+        raise ValueError(f"Artifact missing feature_schema: {path}")
+    base.feature_schema_version = str(fs.get("feature_schema_version", "unknown"))
+    base.feature_dim = int(fs.get("feature_dim") or model_config.get("input_size", 0))
+    base.window_length = int(fs.get("window_length", 24))
+    base.window_step = int(fs.get("window_step", 3))
+    base.orientation_normalization = bool(fs.get("orientation_normalization", False))
 
     return base
 

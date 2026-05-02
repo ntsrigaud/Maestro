@@ -70,16 +70,24 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from maestro.domain.entities import LabeledGraphFrame  # noqa: E402
-from maestro.infrastructure.mediapipe.holistic_extractor import (  # noqa: E402
-    _DEFAULT_CACHE as _DEFAULT_MODEL_CACHE,
-)
-from maestro.infrastructure.mediapipe.holistic_extractor import (
-    _is_nan,
-)
 from maestro.pipeline import graph_schema  # noqa: E402
 from maestro.training.dataset_builder import (  # noqa: E402
     GraphSequenceDatasetBuilder,
 )
+
+# Default model cache path (mirrors the constant formerly in holistic_extractor).
+_DEFAULT_MODEL_CACHE = Path.home() / ".cache" / "maestro" / "holistic_landmarker.task"
+
+
+def _is_nan(lm: object) -> bool:
+    """Return True if any coordinate of *lm* is NaN."""
+    import math
+
+    return (
+        math.isnan(getattr(lm, "x", 0.0))
+        or math.isnan(getattr(lm, "y", 0.0))
+        or math.isnan(getattr(lm, "z", 0.0))
+    )
 
 logger = logging.getLogger(__name__)
 
