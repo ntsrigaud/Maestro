@@ -65,7 +65,7 @@ class AppContainer:
     overlay_renderer: IFeedbackRenderer
     benchmark: LatencyBenchmark
     show_window: bool
-    # STGCN-LSTM pipeline components (set only when artifact_type == "stgcn_lstm_inference").
+    # DualBranchSTGCN-LSTM components (set when artifact_type == "dual_stgcn_lstm_inference").
     holistic_extractor: HolisticLandmarkExtractor | None = None
     graph_buffer: GraphSequenceBuffer | None = None
 
