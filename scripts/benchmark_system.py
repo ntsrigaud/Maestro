@@ -171,40 +171,37 @@ def _build_synthetic_holistic_packet() -> SimpleNamespace:
 
 def run_stgcn_benchmark(frames: int) -> STGCNBenchmarkResult:
     """
-    Deterministic STGCN-LSTM latency benchmark.
+    Deterministic DualBranchSTGCN-LSTM latency benchmark.
 
     Extraction is mocked (returns synthetic keypoints) so that the benchmark
     is reproducible without a camera or the IPN dataset.  Model inference
-    uses the actual STGCN_LSTM forward pass on CPU.
+    uses the actual DualBranchSTGCN_LSTM forward pass on CPU.
 
     Phase 5.3 gate values:
-      - mean_infer_ms          < 15 ms   (STGCN-LSTM forward pass)
+      - mean_infer_ms          < 15 ms   (DualBranchSTGCN-LSTM forward pass)
       - median_end_to_end_ms   < 35 ms
       - p95_end_to_end_ms      < 50 ms
     """
     from maestro.domain.entities import GraphFrame
-    from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM
+    from maestro.infrastructure.model.dual_branch_stgcn_lstm import DualBranchSTGCN_LSTM
     from maestro.pipeline.graph_buffering import GraphSequenceBuffer
     from maestro.pipeline.graph_schema import (
         NUM_COORDS,
         NUM_NODES,
         WINDOW_LENGTH,
         WINDOW_STEP,
-        build_adjacency,
-        normalise_adjacency,
     )
 
     rng = np.random.default_rng(42)
 
-    # Build model on CPU
-    adjacency = torch.from_numpy(normalise_adjacency(build_adjacency()).astype(np.float32))
-    model = STGCN_LSTM(
+    # Build model on CPU (adjacency is auto-built from graph schema defaults)
+    model = DualBranchSTGCN_LSTM(
         num_nodes=NUM_NODES,
         num_coords=NUM_COORDS,
-        adjacency=adjacency,
-        stgcn_channels=(64, 128),
-        lstm_hidden=128,
-        lstm_layers=2,
+        phono_conv_channels=256,
+        phono_lstm_hidden=256,
+        phono_lstm_layers=2,
+        stgcn_channels=(64, 128, 256),
         num_classes=8,
         dropout=0.0,  # no dropout at inference
     )
@@ -301,7 +298,7 @@ def main() -> None:
         "--model",
         type=str,
         default="two_stream",
-        choices=["two_stream", "stgcn_lstm_v1"],
+        choices=["two_stream", "dual_stgcn"],
         help="Pipeline to benchmark (default: two_stream — legacy Phase 2)",
     )
     parser.add_argument(
@@ -312,10 +309,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.model == "stgcn_lstm_v1":
+    if args.model == "dual_stgcn":
         result = run_stgcn_benchmark(args.frames)
         print("STGCN_BENCHMARK_START")
-        print("model=stgcn_lstm_v1")
+        print("model=dual_stgcn_lstm_v1")
         print(f"frames={result.frames}")
         print(f"total_seconds={result.total_seconds:.6f}")
         print(f"throughput_fps={result.throughput_fps:.2f}")
