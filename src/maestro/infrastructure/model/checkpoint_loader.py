@@ -37,7 +37,6 @@ def _build_model_from_artifact(
         return DualBranchSTGCN_LSTM(
             num_nodes=int(model_config.get("num_nodes", 67)),
             num_coords=int(model_config.get("num_coords", 3)),
-            phono_proj_dim=int(model_config.get("phono_proj_dim", 128)),
             phono_conv_channels=int(model_config.get("phono_conv_channels", 256)),
             phono_lstm_hidden=int(model_config.get("lstm_hidden", 256)),
             phono_lstm_layers=int(model_config.get("lstm_layers", 2)),
