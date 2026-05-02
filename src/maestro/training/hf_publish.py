@@ -293,14 +293,14 @@ with torch.no_grad():
 If you use this model, please cite the original paper this architecture is adapted from:
 
 ```bibtex
-@article{dual_stgcn_sign_2025,
-  title   = {A Study on the {STGCN-LSTM} Sign Language Recognition Model Based on
-             Phonological Features of Sign Language},
-  journal = {IEEE Access},
-  year    = {2025},
-  doi     = {10.1109/ACCESS.2025.10965662},
-  url     = {https://ieeexplore.ieee.org/document/10965662}
-}
+@article{{dual_stgcn_sign_2025,
+  title   = {{A Study on the {{STGCN-LSTM}} Sign Language Recognition Model Based on
+             Phonological Features of Sign Language}},
+  journal = {{IEEE Access}},
+  year    = {{2025}},
+  doi     = {{10.1109/ACCESS.2025.10965662}},
+  url     = {{https://ieeexplore.ieee.org/document/10965662}}
+}}
 ```
 
 ## Environmental Impact
@@ -831,10 +831,35 @@ def publish_to_huggingface(
         result=result, config=config, test_report=test_report, repo_id=repo_id
     )
 
-    is_stgcn = config.model.model_name.startswith("stgcn")
+    is_dual_stgcn = config.model.model_name.startswith("dual_stgcn")
+    is_stgcn = not is_dual_stgcn and config.model.model_name.startswith("stgcn")
 
-    if is_stgcn:
+    if is_dual_stgcn:
         model_config_snapshot: dict[str, Any] = {
+            "model_name": config.model.model_name,
+            "num_nodes": getattr(config.model, "num_nodes", 67),
+            "num_coords": getattr(config.model, "num_coords", 3),
+            "phono_proj_dim": getattr(config.model, "phono_proj_dim", 128),
+            "phono_conv_channels": getattr(config.model, "phono_conv_channels", 256),
+            "lstm_hidden": getattr(config.model, "lstm_hidden", 256),
+            "lstm_layers": getattr(config.model, "lstm_layers", 2),
+            "stgcn_channels": list(getattr(config.model, "stgcn_channels", [64, 128, 256])),
+            "dropout": config.model.dropout,
+            "num_classes": config.model.num_classes,
+        }
+        schema_snapshot: dict[str, Any] = {
+            "graph_schema": {
+                "graph_schema_version": getattr(
+                    config.export, "graph_schema_version", "graph-schema-v1"
+                ),
+                "num_nodes": getattr(config.model, "num_nodes", 67),
+                "num_coords": getattr(config.model, "num_coords", 3),
+                "window_length": result.dataset_metadata.get("window_length", 24),
+                "window_step": result.dataset_metadata.get("window_step", 3),
+            }
+        }
+    elif is_stgcn:
+        model_config_snapshot = {
             "model_name": config.model.model_name,
             "num_nodes": getattr(config.model, "num_nodes", 67),
             "num_coords": getattr(config.model, "num_coords", 3),
@@ -844,7 +869,7 @@ def publish_to_huggingface(
             "dropout": config.model.dropout,
             "num_classes": config.model.num_classes,
         }
-        schema_snapshot: dict[str, Any] = {
+        schema_snapshot = {
             "graph_schema": {
                 "graph_schema_version": getattr(
                     config.export, "graph_schema_version", "graph-schema-v1"
