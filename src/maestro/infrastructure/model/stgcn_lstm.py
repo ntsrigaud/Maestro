@@ -74,16 +74,17 @@ class _GraphConv(nn.Module):
 class STGCNBlock(nn.Module):
     """Spatial Temporal Graph Convolutional block.
 
-    Implements the STGCNBlock as shown in the paper block diagram:
+    Implements the canonical ST-GCN block from Yan et al. (AAAI 2018) as
+    referenced by the paper.  The execution order is:
 
-        SCN (spatial graph conv)
-        → TCN (single temporal conv)
-        → BN → ReLU → Dropout
+        SCN (spatial graph conv) → BN → ReLU
+        → TCN (single temporal conv) → BN → Dropout
         → + Residual
+        → ReLU
 
-    The ReLU and Dropout are applied *before* the residual addition
-    (pre-activation style), matching the paper's block diagram.  No ReLU
-    is applied after the residual sum.
+    ReLU is applied between GCN and TCN (activating the spatial output before
+    temporal mixing) and again after the residual addition, matching the
+    standard ST-GCN convention (``relu(tcn_out + residual)`` in Yan et al.).
 
     Args:
         in_channels:    Node feature channels in.
@@ -94,8 +95,8 @@ class STGCNBlock(nn.Module):
         residual:       Whether to add a residual connection (default True).
                         If ``in_channels != out_channels`` a linear projection
                         is used for the skip path.
-        dropout:        Dropout probability applied inside the block, after
-                        ReLU and before the residual addition (default 0.0).
+        dropout:        Dropout probability applied after the temporal BN and
+                        before the residual addition (default 0.0).
     """
 
     def __init__(
@@ -141,29 +142,27 @@ class STGCNBlock(nn.Module):
         # x: (B, T, N, C_in)
         B, T, N, _ = x.shape
 
-        # 1. Spatial graph conv + BN.
+        # 1. Spatial graph conv → BN → ReLU (Yan et al.: BN+ReLU on GCN output before TCN).
         out = self.gcn(x)  # (B, T, N, C_out)
         out_bn = self.bn_gcn(out.reshape(-1, out.shape[-1])).reshape(B, T, N, -1)
+        out_act = F.relu(out_bn)  # ReLU between GCN and TCN
 
-        # 2. Temporal conv — operate per-node: reshape to (B*N, C_out, T).
-        t_in = out_bn.permute(0, 2, 3, 1).reshape(B * N, -1, T)  # (B*N, C_out, T)
+        # 2. Temporal conv → BN → Dropout, operating per-node: (B*N, C_out, T).
+        t_in = out_act.permute(0, 2, 3, 1).reshape(B * N, -1, T)  # (B*N, C_out, T)
         t_out = self.tcn(t_in)  # (B*N, C_out, T')
         T_new = t_out.shape[-1]
-        t_out = self.tcn_bn(t_out)  # (B*N, C_out, T')
+        t_out = self.tcn_bn(t_out)  # BN after temporal conv
+        t_out = self.block_dropout(t_out)  # Dropout before residual
         t_out = t_out.reshape(B, N, -1, T_new).permute(0, 3, 1, 2)  # (B, T', N, C_out)
 
-        # 3. ReLU → Dropout (before residual, per paper block diagram).
-        t_out = self.act(t_out)
-        t_out = self.block_dropout(t_out)
-
-        # 4. Residual addition (no ReLU after, per paper block diagram).
+        # 3. Residual addition → ReLU (Yan et al.: relu(tcn_out + residual)).
         if self.residual:
             x_skip = x.permute(0, 2, 3, 1).reshape(B * N, -1, T)  # (B*N, C_in, T)
             x_skip = self.skip_proj(x_skip)  # (B*N, C_out, T')
             x_skip = x_skip.reshape(B, N, -1, T_new).permute(0, 3, 1, 2)
             t_out = t_out + x_skip
 
-        return t_out  # (B, T', N, C_out)
+        return self.act(t_out)  # Final ReLU after residual (standard ST-GCN)
 
 
 class _BahdanauAttention(nn.Module):
