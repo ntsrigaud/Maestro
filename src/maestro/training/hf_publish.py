@@ -72,6 +72,247 @@ Coordinates are wrist-anchor normalised: translated by the mean of both wrist po
 and scaled by the inter-wrist distance.
 """
 
+_PHONOLOGICAL_FEATURE_DESCRIPTION = """\
+Per frame, Branch 1 computes the λ(k) feature vector (56-dim, parameter-free):
+
+| Component | Symbol | Dims | Description |
+|-----------|--------|------|-------------|
+| Finger joint angles | H(k) — β_ij | 15×2=30 | Angle at each non-endpoint joint (PIP/DIP/IP) via
+arccos of adjacent bone vectors; both hands |
+| Inter-finger angles | H(k) — ω_i | 4×2=8 | Angle between adjacent MCP vectors from wrist
+(thumb–index, index–middle, middle–ring, ring–pinky); both hands |
+| Palm direction | n(k) | 3×2=6 | Unit normal of wrist→index-MCP × wrist→pinky-MCP; both hands |
+| Hand position | l(k) | 3×2=6 | Middle-finger MCP coordinates; both hands |
+| Motion | μ(k) | 3×2=6 | Velocity, acceleration, curvature of middle-MCP trajectory; both hands |
+
+**Total**: 56-dim per frame. No learnable parameters in feature extraction.
+
+Note: The original paper uses SVM top-3 hand-shape labels (s ∈ [0,60]) for H(k).
+This implementation uses the raw geometric angles directly for end-to-end differentiability.
+"""
+
+_DUAL_STGCN_MODEL_CARD_TEMPLATE = """\
+---
+language:
+- en
+license: mit
+tags:
+- gesture-recognition
+- hand-gesture
+- pytorch
+- mediapipe
+- temporal-model
+- graph-neural-network
+- stgcn
+- dual-branch
+- phonological-features
+datasets:
+- IPN-Hand
+metrics:
+- accuracy
+- f1
+model-index:
+- name: {model_version}
+  results:
+  - task:
+      type: gesture-recognition
+    dataset:
+      name: IPN Hand
+      type: IPN-Hand
+    metrics:
+    - type: accuracy
+      value: {test_accuracy:.4f}
+    - type: f1
+      value: {test_f1:.4f}
+---
+
+# {model_version}
+
+A real-time hand gesture classifier trained on the
+[IPN Hand dataset](https://gibranbenitez.github.io/IPN_Hand/).
+
+This model is part of the **Maestro** pipeline that enables touchless
+control of presentation and meeting software through hand gestures captured from a
+standard webcam using MediaPipe Holistic for landmark extraction.
+
+## Model Description
+
+- **Architecture**: {architecture}
+- **Parameters**: {num_params:,}
+- **Input**: `(batch, 24, 67, 3)` — 24-frame sliding window, 67-node graph, 3 coordinates
+- **Output**: Softmax logits over {num_classes} gesture classes
+- **Graph schema**: `{graph_schema_version}` — 67 nodes (hands + pose + face)
+- **Reference**: Implemented from [IEEE 10965662](https://ieeexplore.ieee.org/document/10965662)
+
+## Architecture
+
+This model implements a dual-branch fusion architecture from:
+
+> *"A Study on the STGCN-LSTM Sign Language Recognition Model Based on Phonological
+> Features of Sign Language"*, IEEE 2025 (doi: 10.1109/ACCESS.2025.10965662).
+
+Adapted for the IPN Hand skeleton dataset (67-node graph-schema-v1) and
+hand gesture classification rather than sign language recognition.
+
+### Branch 1 — Phonological SA-ConvLSTM
+
+Extracts structured geometric phonological features **λ(k)** per frame, then
+processes them through a Spatial-Attention ConvLSTM pipeline (Eq. 1–8 of the paper).
+
+**λ(k) feature extraction** (parameter-free, deterministic):
+
+{phono_feat_description}
+
+**SA-ConvLSTM pipeline**:
+
+```
+λ(k): (B, T, 56)
+  → Conv1d({phono_conv_channels}, k=3) + BN + ReLU  →  (B, T, {phono_conv_channels})
+  → LSTM(hidden={lstm_hidden}, layers={lstm_layers}) →  (B, T, {lstm_hidden})
+  → Self-attention Q/K/V (Eq. 6–8) + residual gate  →  (B, T, {lstm_hidden})
+  → Bahdanau temporal attention                      →  (B, {lstm_hidden})
+```
+
+**Self-attention (Eq. 6–8)**:
+$$Q = W_q H_t, \quad K = W_k H_t, \quad V = W_v H_t$$
+$$\alpha_{{i,j}} = \text{{softmax}}_j\!\left(
+    \frac{{Q_i K_j^T}}{{\sqrt{{D}}}}\right),\quad Z_i = \sum_j \alpha_{{i,j}} V_j$$
+$$\hat{{H}}_t = w_f \cdot Z + H_t \quad (\text{{learnable residual gate}})$$
+
+### Branch 2 — STGCN (3 blocks, fully-connected graph)
+
+Three STGCNBlocks (Yan et al., AAAI 2018) on a K=3 partitioned fully-connected
+adjacency over all 67 nodes. Partitions derived from anatomical BFS distances:
+self (I₆₇), centripetal, centrifugal.
+
+```
+(B, T, 67, 3)
+  → STGCNBlock(3   →  64, K=3, residual=True)
+  → STGCNBlock(64  → 128, K=3, residual=True)
+  → STGCNBlock(128 → 256, K=3, residual=True)
+  → mean-pool over N and T                    →  (B, 256)
+```
+
+### Fusion
+
+```
+cat(Branch1={lstm_hidden}, Branch2=256) → (B, {fusion_dim})
+→ Dropout({dropout}) → Linear({fusion_dim} → {num_classes}) → (B, {num_classes})
+```
+
+## Gesture Classes
+
+| Class | Description |
+|-------|-------------|
+{class_table}
+
+## Graph Schema (`{graph_schema_version}`)
+
+{graph_schema_description}
+
+## How to Use
+
+```python
+import torch
+from huggingface_hub import hf_hub_download
+from maestro.infrastructure.model.checkpoint_loader import load_inference_artifact
+
+# Download the artifact (cached after first call)
+local_path = hf_hub_download(
+    repo_id="{repo_id}",
+    filename="{model_version}_inference.pt",
+)
+
+# Load the artifact (includes model, class labels, and graph schema)
+artifact = load_inference_artifact(
+    artifact_path=local_path,
+    device=torch.device("cpu"),
+)
+artifact.model.eval()
+
+# Extract 67-node holistic keypoints via HolisticLandmarkExtractor,
+# fill a 24-frame GraphSequenceBuffer, then:
+with torch.no_grad():
+    # tensor shape: (batch=1, T=24, N=67, C=3)
+    window_tensor = torch.tensor(window_np, dtype=torch.float32).unsqueeze(0)
+    logits = artifact.model(window_tensor)
+    pred_class = artifact.class_labels[logits.argmax(dim=1).item()]
+```
+
+## Training Dataset
+
+- **Source**: IPN Hand database — multi-subject, multi-session gesture recordings
+- **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
+- **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
+- **Graph**: 67 nodes — 42 hand + 11 pose + 14 face contour landmarks
+- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.003;
+  label-aware offline horizontal mirror (swipe_left ↔ swipe_right, node-block swap)
+
+## Training Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Architecture | {architecture} |
+| Phono feature dim | 56 (28 per hand, parameter-free) |
+| Phono conv channels | {phono_conv_channels} |
+| LSTM hidden | {lstm_hidden} |
+| LSTM layers | {lstm_layers} |
+| STGCN channels | {stgcn_channels} |
+| Dropout | {dropout} |
+| Learning rate | {learning_rate} |
+| Batch size | {batch_size} |
+| Max epochs | {epochs} |
+| Early stopping patience | {patience} |
+| Class weighting | ✓ inverse-frequency |
+| LR scheduler | ReduceLROnPlateau (factor=0.5, patience=5) |
+
+## Evaluation Results (Test Set)
+
+| Metric | Value |
+|--------|-------|
+| Accuracy | {test_accuracy:.1%} |
+| Macro F1 | {test_f1:.1%} |
+
+### Per-Class Recall
+
+| Class | Recall |
+|-------|--------|
+{per_class_table}
+
+## Limitations and Risks
+
+- Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
+  skin tones, or lighting conditions not represented in training data.
+- The `unknown` class represents background/transition frames. At runtime, predictions
+  are filtered through per-class confidence thresholds defined in `production_ipn.yaml`.
+- Requires **mediapipe>=0.10.14** for landmark extraction at inference time.
+- Not intended for safety-critical or accessibility-critical applications.
+
+## Citation
+
+If you use this model, please cite the original paper this architecture is adapted from:
+
+```bibtex
+@article{dual_stgcn_sign_2025,
+  title   = {A Study on the {STGCN-LSTM} Sign Language Recognition Model Based on
+             Phonological Features of Sign Language},
+  journal = {IEEE Access},
+  year    = {2025},
+  doi     = {10.1109/ACCESS.2025.10965662},
+  url     = {https://ieeexplore.ieee.org/document/10965662}
+}
+```
+
+## Environmental Impact
+
+Training was performed on CPU. Estimated training time: ~20 minutes.
+Estimated CO₂ equivalent: negligible (<0.01 kg CO₂eq).
+
+---
+
+*Generated by the Maestro training pipeline on {created_at}.*
+"""
+
 _STGCN_MODEL_CARD_TEMPLATE = """\
 ---
 language:
@@ -397,10 +638,50 @@ def _build_model_card(
     test_report: EvaluationReport,
     repo_id: str = "ntsrigaud/maestro-lstm",
 ) -> str:
+    is_dual_stgcn = config.model.model_name.startswith("dual_stgcn")
     is_stgcn = config.model.model_name.startswith("stgcn")
     num_params = _count_parameters(result.model)
     num_classes_active = len(result.class_labels) - 1  # subtract unknown
     created_at = datetime.now(UTC).strftime("%Y-%m-%d")
+
+    if is_dual_stgcn:
+        lstm_hidden = getattr(config.model, "lstm_hidden", 256)
+        phono_conv_channels = getattr(config.model, "phono_conv_channels", 256)
+        lstm_layers = getattr(config.model, "lstm_layers", 2)
+        stgcn_channels = getattr(config.model, "stgcn_channels", (64, 128, 256))
+        fusion_dim = lstm_hidden + stgcn_channels[-1]
+        architecture = (
+            f"DualBranchSTGCN_LSTM "
+            f"(phono_feat=56, conv={phono_conv_channels}, "
+            f"lstm={lstm_hidden}×{lstm_layers}, "
+            f"stgcn={list(stgcn_channels)}, fusion={fusion_dim})"
+        )
+        return _DUAL_STGCN_MODEL_CARD_TEMPLATE.format(
+            model_version=result.model_version,
+            repo_id=repo_id,
+            architecture=architecture,
+            num_params=num_params,
+            num_classes=config.model.num_classes,
+            num_classes_active=num_classes_active,
+            graph_schema_version=getattr(config.export, "graph_schema_version", "graph-schema-v1"),
+            graph_schema_description=_GRAPH_SCHEMA_DESCRIPTION,
+            phono_feat_description=_PHONOLOGICAL_FEATURE_DESCRIPTION,
+            class_table=_build_class_table(result.class_labels),
+            test_accuracy=test_report.accuracy,
+            test_f1=test_report.macro_f1,
+            phono_conv_channels=phono_conv_channels,
+            lstm_hidden=lstm_hidden,
+            lstm_layers=lstm_layers,
+            stgcn_channels=list(stgcn_channels),
+            fusion_dim=fusion_dim,
+            dropout=config.model.dropout,
+            learning_rate=config.training.learning_rate,
+            batch_size=config.training.batch_size,
+            epochs=config.training.epochs,
+            patience=config.training.early_stopping_patience,
+            per_class_table=_build_per_class_table(test_report.per_class_recall),
+            created_at=created_at,
+        )
 
     if is_stgcn:
         architecture = (
