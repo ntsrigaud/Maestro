@@ -23,7 +23,7 @@ model:
   hidden_size: 64       # per-stream hidden size; fused layer receives 2×64 = 128
   num_layers: 2
   dropout: 0.3
-  num_classes: 8
+  num_classes: 12       # all 11 IPN gesture classes + unknown
 
 # ── Design notes ─────────────────────────────────────────────────────────────
 # Stream A (Pose, 73 dims):
