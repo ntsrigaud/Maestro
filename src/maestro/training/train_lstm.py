@@ -384,7 +384,7 @@ def train_lstm(
     if config.scheduler.enabled:
         scheduler = ReduceLROnPlateau(
             optimizer,
-            mode="min",
+            mode="max",  # maximise val_macro_f1
             factor=config.scheduler.factor,
             patience=config.scheduler.patience,
             min_lr=config.scheduler.min_lr,
@@ -400,7 +400,8 @@ def train_lstm(
     run_dir = Path(run_root_dir) / model_version
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    best_val_loss = float("inf")
+    best_val_f1 = -float("inf")
+    best_val_loss = float("inf")  # tracked for reporting only
     best_epoch = 0
     epochs_without_improve = 0
     history: list[dict[str, float]] = []
@@ -428,7 +429,7 @@ def train_lstm(
         )
 
         if scheduler is not None:
-            scheduler.step(val_report.loss)
+            scheduler.step(val_report.macro_f1)
 
         current_lr = float(optimizer.param_groups[0]["lr"])
         history.append(
@@ -443,9 +444,10 @@ def train_lstm(
             }
         )
 
-        improved = (best_val_loss - val_report.loss) > config.training.early_stopping_min_delta
+        improved = (val_report.macro_f1 - best_val_f1) > config.training.early_stopping_min_delta
         if improved:
-            best_val_loss = val_report.loss
+            best_val_f1 = val_report.macro_f1
+            best_val_loss = val_report.loss  # track for reporting
             best_epoch = epoch
             epochs_without_improve = 0
             torch.save(
@@ -456,6 +458,7 @@ def train_lstm(
                     "dataset_metadata": datamodule.metadata,
                     "feature_schema_version": config.export.feature_schema_version,
                     "best_epoch": best_epoch,
+                    "best_val_f1": best_val_f1,
                     "best_val_loss": best_val_loss,
                 },
                 checkpoint_path,
@@ -487,6 +490,7 @@ def train_lstm(
     training_summary = {
         "model_version": model_version,
         "best_epoch": best_epoch,
+        "best_val_f1": best_val_f1,
         "best_val_loss": best_val_loss,
         "history": history,
         "val_report": val_report.to_dict(),
