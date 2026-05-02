@@ -2,7 +2,9 @@
 
 Covers:
   - Forward-pass output shape.
-  - Phonological branch and STGCN branch sub-module shapes.
+  - Phonological feature extractor: output shape, value ranges.
+  - Full Q/K/V self-attention: output shape, residual, weight normalisation.
+  - Phonological branch sub-module shapes.
   - Adjacency buffer shape (3, 67, 67) and dtype.
   - Custom adjacency accepted without error.
   - Batch size 1 (BatchNorm edge case).
@@ -19,9 +21,11 @@ from pathlib import Path
 import torch
 
 from maestro.infrastructure.model.dual_branch_stgcn_lstm import (
+    PHONO_FEAT_DIM,
     DualBranchSTGCN_LSTM,
     _PhonologicalBranch,
-    _SpatialAttnPool,
+    _PhonologicalFeatureExtractor,
+    _SelfAttentionQKV,
 )
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -34,7 +38,6 @@ def _build_model(**kwargs) -> DualBranchSTGCN_LSTM:
     defaults: dict = dict(
         num_nodes=67,
         num_coords=3,
-        phono_proj_dim=64,
         phono_conv_channels=128,
         phono_lstm_hidden=128,
         phono_lstm_layers=2,
@@ -50,27 +53,86 @@ def _batch(B: int = 4, T: int = 24, N: int = 67, C: int = 3) -> torch.Tensor:
     return torch.randn(B, T, N, C)
 
 
-# ── _SpatialAttnPool ─────────────────────────────────────────────────────────
+# ── _PhonologicalFeatureExtractor ─────────────────────────────────────────────
 
 
-class TestSpatialAttnPool:
+class TestPhonologicalFeatureExtractor:
     def test_output_shape(self) -> None:
-        layer = _SpatialAttnPool(in_dim=32)
-        x = torch.randn(4, 24, 67, 32)
-        out = layer(x)
-        assert out.shape == (4, 24, 32), f"Expected (4,24,32) got {out.shape}"
+        extractor = _PhonologicalFeatureExtractor()
+        x = _batch(B=4, T=24)
+        out = extractor(x)
+        assert out.shape == (4, 24, PHONO_FEAT_DIM), (
+            f"Expected (4,24,{PHONO_FEAT_DIM}) got {out.shape}"
+        )
 
-    def test_weights_sum_to_one(self) -> None:
-        """Attention weights over N nodes must sum to 1 at each (B, T) cell."""
-        import torch.nn.functional as F
+    def test_phono_feat_dim_is_56(self) -> None:
+        assert PHONO_FEAT_DIM == 56
 
-        layer = _SpatialAttnPool(in_dim=16)
-        x = torch.randn(2, 10, 67, 16)
-        # Manually compute weights to verify normalisation
-        scores = layer.score(x).squeeze(-1)   # (2, 10, 67)
-        weights = F.softmax(scores, dim=2)     # (2, 10, 67)
-        sums = weights.sum(dim=2)              # (2, 10) — all should be ≈1
+    def test_joint_angles_in_valid_range(self) -> None:
+        """Finger joint angles must lie in [0, π] radians."""
+        import math
+        extractor = _PhonologicalFeatureExtractor()
+        x = _batch(B=2, T=8)
+        out = extractor(x)
+        # First 15 features per hand = joint angles, both hands: indices 0-14 and 28-42
+        right_angles = out[..., :15]   # (B, T, 15)
+        left_angles = out[..., 28:43]  # (B, T, 15)
+        assert right_angles.min().item() >= 0.0
+        assert right_angles.max().item() <= math.pi + 1e-5
+        assert left_angles.min().item() >= 0.0
+        assert left_angles.max().item() <= math.pi + 1e-5
+
+    def test_no_learnable_parameters(self) -> None:
+        extractor = _PhonologicalFeatureExtractor()
+        params = list(extractor.parameters())
+        assert len(params) == 0, "Feature extractor must have no learnable params"
+
+    def test_batch_size_one(self) -> None:
+        extractor = _PhonologicalFeatureExtractor()
+        out = extractor(_batch(B=1))
+        assert out.shape == (1, 24, PHONO_FEAT_DIM)
+
+
+# ── _SelfAttentionQKV ─────────────────────────────────────────────────────────
+
+
+class TestSelfAttentionQKV:
+    def test_output_shape_preserved(self) -> None:
+        attn = _SelfAttentionQKV(dim=64)
+        H = torch.randn(4, 24, 64)
+        out = attn(H)
+        assert out.shape == H.shape, f"Expected {H.shape} got {out.shape}"
+
+    def test_residual_connection(self) -> None:
+        """With W_q, W_k, W_v zeroed and w_f=0, output must equal input."""
+        attn = _SelfAttentionQKV(dim=8)
+        # Zero out all projection weights so Z = 0; set w_f = 0 so output = H
+        with torch.no_grad():
+            attn.W_q.weight.zero_()
+            attn.W_k.weight.zero_()
+            attn.W_v.weight.zero_()
+            attn.w_f.zero_()
+        H = torch.randn(2, 10, 8)
+        out = attn(H)
+        # Residual: w_f * Z + H = 0 * 0 + H = H
+        assert torch.allclose(out, H, atol=1e-6), "Residual branch failed"
+
+    def test_attention_weights_sum_to_one(self) -> None:
+        """Softmax over the key dimension must sum to 1."""
+        attn = _SelfAttentionQKV(dim=32)
+        H = torch.randn(3, 12, 32)
+        # Compute attention matrix directly to verify
+        Q = attn.W_q(H)
+        K = attn.W_k(H)
+        scale = 32 ** -0.5
+        alpha = torch.softmax(torch.bmm(Q, K.transpose(1, 2)) * scale, dim=-1)
+        sums = alpha.sum(dim=-1)  # (3, 12) — each row sums to 1
         assert torch.allclose(sums, torch.ones_like(sums), atol=1e-5)
+
+    def test_w_f_is_learnable_parameter(self) -> None:
+        attn = _SelfAttentionQKV(dim=16)
+        param_names = {n for n, _ in attn.named_parameters()}
+        assert "w_f" in param_names
 
 
 # ── _PhonologicalBranch ───────────────────────────────────────────────────────
@@ -79,9 +141,6 @@ class TestSpatialAttnPool:
 class TestPhonologicalBranch:
     def test_output_shape(self) -> None:
         branch = _PhonologicalBranch(
-            num_nodes=67,
-            num_coords=3,
-            proj_dim=64,
             conv_channels=128,
             lstm_hidden=128,
             lstm_layers=2,
@@ -95,9 +154,6 @@ class TestPhonologicalBranch:
 
     def test_batch_size_one(self) -> None:
         branch = _PhonologicalBranch(
-            num_nodes=67,
-            num_coords=3,
-            proj_dim=64,
             conv_channels=128,
             lstm_hidden=128,
             lstm_layers=1,
@@ -107,6 +163,16 @@ class TestPhonologicalBranch:
         with torch.no_grad():
             out = branch(_batch(B=1))
         assert out.shape == (1, 128)
+
+    def test_has_self_attention_block(self) -> None:
+        branch = _PhonologicalBranch(conv_channels=64, lstm_hidden=64, lstm_layers=1, dropout=0.0)
+        assert hasattr(branch, "self_attn"), "Branch must have a self_attn (SA block)"
+        assert isinstance(branch.self_attn, _SelfAttentionQKV)
+
+    def test_has_feature_extractor(self) -> None:
+        branch = _PhonologicalBranch(conv_channels=64, lstm_hidden=64, lstm_layers=1, dropout=0.0)
+        assert hasattr(branch, "feature_extractor")
+        assert isinstance(branch.feature_extractor, _PhonologicalFeatureExtractor)
 
 
 # ── DualBranchSTGCN_LSTM ──────────────────────────────────────────────────────
@@ -140,8 +206,6 @@ class TestDualBranchForward:
         model.eval()
         with torch.no_grad():
             out = model(_batch())
-        # If softmax were applied, values would all be in (0, 1) and sum to 1.
-        # Raw logits can be negative and won't sum to 1.
         import torch.nn.functional as F
         probs = F.softmax(out, dim=-1)
         assert not torch.allclose(out, probs, atol=1e-3), "Output should be logits, not probs"
@@ -195,13 +259,10 @@ class TestDualBranchAdjacency:
 
         A = build_fully_connected_partitioned_adjacency()  # (3, 67, 67) unnormalised
         off_diag_mask = ~np.eye(67, dtype=bool)
-        # Across the three partitions, each off-diagonal entry must be 1 in
-        # exactly one partition and 0 in the other two.
         part_sum = A.sum(axis=0)                           # (67, 67)
         assert np.all(
             part_sum[off_diag_mask] == 1.0
         ), "Each off-diagonal edge must appear in exactly one partition."
-        # Diagonal must be covered by partition 0 only (self partition = I).
         diag_mask = np.eye(67, dtype=bool)
         assert np.all(A[0][diag_mask] == 1.0), "Partition 0 must be identity."
         assert np.all(A[1][diag_mask] == 0.0), "Partition 1 must have no self-loops."
@@ -219,7 +280,6 @@ class TestDualBranchParameters:
         model = DualBranchSTGCN_LSTM(
             num_nodes=67,
             num_coords=3,
-            phono_proj_dim=128,
             phono_conv_channels=256,
             phono_lstm_hidden=256,
             phono_lstm_layers=2,
@@ -236,7 +296,6 @@ class TestDualBranchOverfit:
         """Model can overfit a tiny batch (checks gradient flow)."""
         torch.manual_seed(0)
         model = _build_model(
-            phono_proj_dim=32,
             phono_conv_channels=64,
             phono_lstm_hidden=64,
             phono_lstm_layers=1,
@@ -273,7 +332,6 @@ class TestDualBranchDispatch:
         assert cfg.model.num_nodes == 67
         assert cfg.model.num_coords == 3
         assert cfg.model.stgcn_channels == (64, 128, 256)
-        assert cfg.model.phono_proj_dim == 128
         assert cfg.model.phono_conv_channels == 256
         assert cfg.model.lstm_hidden == 256
         assert cfg.model.lstm_layers == 2
@@ -297,3 +355,4 @@ class TestDualBranchDispatch:
         device = torch.device("cpu")
         model = _build_model(cfg.model, device)
         assert isinstance(model, STGCN_LSTM)
+
