@@ -3,12 +3,12 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Protocol
 
 import numpy as np
 import torch
 
-from maestro.domain.entities import GraphFrame, Prediction, RuntimeState, SequenceWindow
+from maestro.domain.entities import Prediction, RuntimeState, SequenceWindow
 from maestro.evaluation.benchmark_latency import (
     LatencyBenchmark,
     write_latency_report,
@@ -44,9 +44,6 @@ class RuntimeDependencies(Protocol):
     overlay_renderer: IFeedbackRenderer
     benchmark: LatencyBenchmark
     show_window: bool
-    # Optional STGCN pipeline components (None for two_stream models).
-    holistic_extractor: Any
-    graph_buffer: Any
 
 
 class Runtime:
@@ -131,140 +128,70 @@ class Runtime:
                     continue
 
                 t1 = time.perf_counter()
-                is_stgcn = getattr(self._container, "graph_buffer", None) is not None
+                multi_packet = self._container.landmark_extractor.extract(frame)
+                landmark_packet = self._container.hand_selector.select(multi_packet)
+                if benchmark is not None:
+                    benchmark.record_extraction((time.perf_counter() - t1) * 1000.0)
 
-                if is_stgcn:
-                    # ── STGCN extraction path ──────────────────────────────
-                    holistic_packet = self._container.holistic_extractor.extract(frame)
-                    # Convert HolisticPacket → GraphFrame.
-                    any_hand_valid = bool(holistic_packet.valid_mask[:42].any())
-                    graph_frame = GraphFrame(
-                        nodes=holistic_packet.keypoints,
-                        valid_mask=holistic_packet.valid_mask,
-                        timestamp_ms=holistic_packet.timestamp_ms,
-                        valid=any_hand_valid,
+                t2 = time.perf_counter()
+                feature_frame = self._container.feature_transformer.transform(landmark_packet)
+                if benchmark is not None:
+                    benchmark.record_feature((time.perf_counter() - t2) * 1000.0)
+
+                self._container.sequence_buffer.push(feature_frame)
+
+                processed_frames += 1
+                if landmark_packet.valid:
+                    valid_landmarks += 1
+
+                stabilized_prediction = None
+                if self._container.sequence_buffer.ready():
+                    window = self._container.sequence_buffer.window()
+                    emitted_windows += 1
+
+                    infer_start = time.perf_counter()
+                    prediction = self._predict(window)
+                    inference_ms = (time.perf_counter() - infer_start) * 1000.0
+                    if benchmark is not None:
+                        benchmark.record_inference(inference_ms)
+
+                    stabilized_prediction = self._container.stabilizer.update(prediction)
+                    latest_label = stabilized_prediction.label
+                    latest_conf = stabilized_prediction.confidence
+
+                    LOGGER.debug(
+                        "stabilizer: label=%r conf=%.2f accepted=%s reason=%s",
+                        stabilized_prediction.label,
+                        stabilized_prediction.confidence,
+                        stabilized_prediction.accepted,
+                        stabilized_prediction.reason,
                     )
-                    if benchmark is not None:
-                        benchmark.record_extraction((time.perf_counter() - t1) * 1000.0)
 
-                    self._container.graph_buffer.push(graph_frame)
-                    processed_frames += 1
-                    if any_hand_valid:
-                        valid_landmarks += 1
-
-                    stabilized_prediction = None
-                    if self._container.graph_buffer.ready():
-                        sequences, _valid_masks = self._container.graph_buffer.window()
-                        emitted_windows += 1
-
-                        infer_start = time.perf_counter()
-                        prediction = self._predict_graph(sequences)
-                        inference_ms = (time.perf_counter() - infer_start) * 1000.0
-                        if benchmark is not None:
-                            benchmark.record_inference(inference_ms)
-
-                        stabilized_prediction = self._container.stabilizer.update(prediction)
-                        latest_label = stabilized_prediction.label
-                        latest_conf = stabilized_prediction.confidence
-
-                        LOGGER.debug(
-                            "stabilizer: label=%r conf=%.2f accepted=%s reason=%s",
-                            stabilized_prediction.label,
-                            stabilized_prediction.confidence,
-                            stabilized_prediction.accepted,
-                            stabilized_prediction.reason,
+                    command = self._container.activation_controller.route(stabilized_prediction)
+                    if command is not None:
+                        LOGGER.info(
+                            "command: id=%r source_gesture=%r",
+                            command.command_id,
+                            command.source_gesture,
+                        )
+                        result = self._container.dispatcher.dispatch(command)
+                        LOGGER.info(
+                            "dispatch: success=%s detail=%s",
+                            result.success,
+                            result.detail,
                         )
 
-                        command = self._container.activation_controller.route(stabilized_prediction)
-                        if command is not None:
-                            LOGGER.info(
-                                "command: id=%r source_gesture=%r",
-                                command.command_id,
-                                command.source_gesture,
-                            )
-                            result = self._container.dispatcher.dispatch(command)
-                            LOGGER.info(
-                                "dispatch: success=%s detail=%s",
-                                result.success,
-                                result.detail,
-                            )
-
-                    elapsed = time.perf_counter() - start_time
-                    fps = (processed_frames / elapsed) if elapsed > 0 else 0.0
-                    mode = str(self._container.activation_controller.mode)
-                    valid_ratio = self._container.graph_buffer.current_valid_ratio()
-
-                else:
-                    # ── Two-stream extraction path ─────────────────────────
-                    multi_packet = self._container.landmark_extractor.extract(frame)
-                    landmark_packet = self._container.hand_selector.select(multi_packet)
-                    if benchmark is not None:
-                        benchmark.record_extraction((time.perf_counter() - t1) * 1000.0)
-
-                    t2 = time.perf_counter()
-                    feature_frame = self._container.feature_transformer.transform(landmark_packet)
-                    if benchmark is not None:
-                        benchmark.record_feature((time.perf_counter() - t2) * 1000.0)
-
-                    self._container.sequence_buffer.push(feature_frame)
-
-                    processed_frames += 1
-                    if landmark_packet.valid:
-                        valid_landmarks += 1
-
-                    stabilized_prediction = None
-                    if self._container.sequence_buffer.ready():
-                        window = self._container.sequence_buffer.window()
-                        emitted_windows += 1
-
-                        infer_start = time.perf_counter()
-                        prediction = self._predict(window)
-                        inference_ms = (time.perf_counter() - infer_start) * 1000.0
-                        if benchmark is not None:
-                            benchmark.record_inference(inference_ms)
-
-                        stabilized_prediction = self._container.stabilizer.update(prediction)
-                        latest_label = stabilized_prediction.label
-                        latest_conf = stabilized_prediction.confidence
-
-                        LOGGER.debug(
-                            "stabilizer: label=%r conf=%.2f accepted=%s reason=%s",
-                            stabilized_prediction.label,
-                            stabilized_prediction.confidence,
-                            stabilized_prediction.accepted,
-                            stabilized_prediction.reason,
-                        )
-
-                        command = self._container.activation_controller.route(stabilized_prediction)
-                        if command is not None:
-                            LOGGER.info(
-                                "command: id=%r source_gesture=%r",
-                                command.command_id,
-                                command.source_gesture,
-                            )
-                            result = self._container.dispatcher.dispatch(command)
-                            LOGGER.info(
-                                "dispatch: success=%s detail=%s",
-                                result.success,
-                                result.detail,
-                            )
-
-                    elapsed = time.perf_counter() - start_time
-                    fps = (processed_frames / elapsed) if elapsed > 0 else 0.0
-                    mode = str(self._container.activation_controller.mode)
-                    valid_ratio = self._container.sequence_buffer.current_valid_ratio()
+                elapsed = time.perf_counter() - start_time
+                fps = (processed_frames / elapsed) if elapsed > 0 else 0.0
+                mode = str(self._container.activation_controller.mode)
+                valid_ratio = self._container.sequence_buffer.current_valid_ratio()
 
                 loop_e2e_ms = (time.perf_counter() - loop_start) * 1000.0
                 if benchmark is not None:
                     benchmark.record_end_to_end(loop_e2e_ms)
 
-                # Build state dict — landmark info differs by pipeline type.
-                if is_stgcn:
-                    window_ready = self._container.graph_buffer.ready()
-                    landmarks_info: Any = None
-                else:
-                    window_ready = self._container.sequence_buffer.ready()
-                    landmarks_info = landmark_packet.landmarks  # type: ignore[union-attr]
+                window_ready = self._container.sequence_buffer.ready()
+                landmarks_info = landmark_packet.landmarks  # type: ignore[union-attr]
 
                 state = RuntimeState(
                     mode=mode,
@@ -321,10 +248,7 @@ class Runtime:
 
             self._container.frame_source.close()
             self._container.gaze_detector.close()
-            if getattr(self._container, "holistic_extractor", None) is not None:
-                self._container.holistic_extractor.close()
-            else:
-                self._container.landmark_extractor.close()
+            self._container.landmark_extractor.close()
             self._running = False
             LOGGER.info("Runtime shutdown complete.")
 
@@ -332,34 +256,6 @@ class Runtime:
         features = np.asarray(sequence.features, dtype=np.float32)
         tensor = torch.from_numpy(features).unsqueeze(0)
 
-        model = self._container.model_artifact.model
-        device = next(model.parameters()).device
-        tensor = tensor.to(device)
-
-        with torch.no_grad():
-            logits = model(tensor)
-            probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
-
-        labels = self._container.model_artifact.class_labels
-        class_probs = {label: float(probs[idx]) for idx, label in enumerate(labels)}
-        top_idx = int(np.argmax(probs))
-        return Prediction(
-            class_probs=class_probs,
-            top_class=labels[top_idx],
-            confidence=float(probs[top_idx]),
-        )
-
-    def _predict_graph(self, sequences: np.ndarray) -> Prediction:
-        """Run inference for the STGCN-LSTM model.
-
-        Args:
-            sequences: ``(T, N, C)`` float32 graph sequence from
-                :class:`~maestro.pipeline.graph_buffering.GraphSequenceBuffer`.
-
-        Returns:
-            :class:`~maestro.domain.entities.Prediction` with class probabilities.
-        """
-        tensor = torch.from_numpy(sequences.astype(np.float32)).unsqueeze(0)  # (1, T, N, C)
         model = self._container.model_artifact.model
         device = next(model.parameters()).device
         tensor = tensor.to(device)

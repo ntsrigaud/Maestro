@@ -84,25 +84,6 @@ class ExecutableCommand:
     issued_at_ms: int
 
 
-# ---------------------------------------------------------------------------
-# Graph-based pipeline entities (graph-schema-v1)
-# These supplement (and will eventually replace) the flat-feature entities.
-# ---------------------------------------------------------------------------
-
-
-@dataclass(slots=True)
-class HolisticPacket:
-    """Output from HolisticLandmarkExtractor: 67 normalised keypoints.
-
-    ``keypoints`` are wrist-anchor normalised (via ``graph_schema.normalise_graph_frame``).
-    Zero-filled slots indicate undetected nodes; consult ``valid_mask`` per node.
-    """
-
-    keypoints: np.ndarray  # shape (67, 3) — normalised coordinate space
-    valid_mask: np.ndarray  # shape (67,)  — bool: True = landmark detected
-    timestamp_ms: int
-
-
 @dataclass(slots=True)
 class GraphFrame:
     """A single graph-structured gesture frame ready for buffering.
