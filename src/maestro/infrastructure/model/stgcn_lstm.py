@@ -67,12 +67,12 @@ class _GraphConv(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (B, T, N, C_in)
         B, T, N, C_in = x.shape
-        x_flat = x.reshape(B * T, N, C_in)                            # (BT, N, Cin)
+        x_flat = x.reshape(B * T, N, C_in)  # (BT, N, Cin)
         # Aggregate neighbours per partition: (K, BT, N, Cin)
         agg = torch.einsum("knm,bmc->kbnc", self.A, x_flat)
         # Apply per-partition weights and sum: (BT, N, Cout)
         out = torch.einsum("kbnc,kco->bno", agg, self.weight) + self.bias
-        return out.reshape(B, T, N, -1)                                # (B, T, N, Cout)
+        return out.reshape(B, T, N, -1)  # (B, T, N, Cout)
 
 
 class STGCNBlock(nn.Module):
@@ -243,9 +243,7 @@ class STGCN_LSTM(nn.Module):
             )
 
             A = torch.from_numpy(
-                normalise_partitioned_adjacency(
-                    build_partitioned_adjacency()
-                ).astype("float32")
+                normalise_partitioned_adjacency(build_partitioned_adjacency()).astype("float32")
             )  # (3, N, N)
         else:
             if adjacency.dim() == 2:

@@ -82,8 +82,8 @@ from maestro.infrastructure.model.stgcn_lstm import (
 
 # Right hand joint indices (MediaPipe layout)
 _R_WRIST = 0
-_R_THUMB = (1, 2, 3, 4)   # CMC, MCP, IP, TIP
-_R_INDEX = (5, 6, 7, 8)   # MCP, PIP, DIP, TIP
+_R_THUMB = (1, 2, 3, 4)  # CMC, MCP, IP, TIP
+_R_INDEX = (5, 6, 7, 8)  # MCP, PIP, DIP, TIP
 _R_MIDDLE = (9, 10, 11, 12)
 _R_RING = (13, 14, 15, 16)
 _R_PINKY = (17, 18, 19, 20)
@@ -102,24 +102,33 @@ _L_PINKY = tuple(i + _L_OFFSET for i in _R_PINKY)
 # Each tuple: (parent_node, pivot_node, child_node).
 _JOINT_ANGLE_TRIPLES_RIGHT: list[tuple[int, int, int]] = [
     # Thumb: CMC(1), MCP(2), IP(3)
-    (_R_WRIST, 1, 2), (1, 2, 3), (2, 3, 4),
+    (_R_WRIST, 1, 2),
+    (1, 2, 3),
+    (2, 3, 4),
     # Index: wrist(0), MCP(5), PIP(6), DIP(7)
-    (_R_WRIST, 5, 6), (5, 6, 7), (6, 7, 8),
+    (_R_WRIST, 5, 6),
+    (5, 6, 7),
+    (6, 7, 8),
     # Middle
-    (_R_WRIST, 9, 10), (9, 10, 11), (10, 11, 12),
+    (_R_WRIST, 9, 10),
+    (9, 10, 11),
+    (10, 11, 12),
     # Ring
-    (_R_WRIST, 13, 14), (13, 14, 15), (14, 15, 16),
+    (_R_WRIST, 13, 14),
+    (13, 14, 15),
+    (14, 15, 16),
     # Pinky
-    (_R_WRIST, 17, 18), (17, 18, 19), (18, 19, 20),
+    (_R_WRIST, 17, 18),
+    (17, 18, 19),
+    (18, 19, 20),
 ]
 _JOINT_ANGLE_TRIPLES_LEFT: list[tuple[int, int, int]] = [
-    (a + _L_OFFSET, b + _L_OFFSET, c + _L_OFFSET)
-    for a, b, c in _JOINT_ANGLE_TRIPLES_RIGHT
+    (a + _L_OFFSET, b + _L_OFFSET, c + _L_OFFSET) for a, b, c in _JOINT_ANGLE_TRIPLES_RIGHT
 ]
 
 # Inter-finger angle pairs: vectors from wrist to MCP of each finger;
 # 4 adjacent pairs per hand (thumb MCP=2, index MCP=5, middle=9, ring=13, pinky=17).
-_INTER_FINGER_MCP_RIGHT = [2, 5, 9, 13, 17]   # 5 entries → 4 pairs
+_INTER_FINGER_MCP_RIGHT = [2, 5, 9, 13, 17]  # 5 entries → 4 pairs
 _INTER_FINGER_MCP_LEFT = [i + _L_OFFSET for i in _INTER_FINGER_MCP_RIGHT]
 
 # Middle-finger MCP (landmark for hand position / motion)
@@ -147,9 +156,7 @@ def _safe_angle(v1: torch.Tensor, v2: torch.Tensor) -> torch.Tensor:
     Returns:
         (...,) angle in radians.
     """
-    cos = (v1 * v2).sum(-1) / (
-        v1.norm(dim=-1) * v2.norm(dim=-1) + 1e-8
-    )
+    cos = (v1 * v2).sum(-1) / (v1.norm(dim=-1) * v2.norm(dim=-1) + 1e-8)
     return torch.arccos(cos.clamp(-1.0 + 1e-7, 1.0 - 1e-7))
 
 
@@ -183,13 +190,13 @@ def _extract_hand_features(
     # ── 15 joint angles ──────────────────────────────────────────────────────
     joint_angles: list[torch.Tensor] = []
     for a, b, c in joint_triples:
-        pa = x[:, :, a, :]   # (B, T, 3) — parent
-        pb = x[:, :, b, :]   # pivot
-        pc = x[:, :, c, :]   # child
-        v1 = pa - pb          # vector toward parent
-        v2 = pc - pb          # vector toward child
+        pa = x[:, :, a, :]  # (B, T, 3) — parent
+        pb = x[:, :, b, :]  # pivot
+        pc = x[:, :, c, :]  # child
+        v1 = pa - pb  # vector toward parent
+        v2 = pc - pb  # vector toward child
         joint_angles.append(_safe_angle(v1, v2).unsqueeze(-1))  # (B,T,1)
-    h_shape = torch.cat(joint_angles, dim=-1)                   # (B, T, 15)
+    h_shape = torch.cat(joint_angles, dim=-1)  # (B, T, 15)
 
     # ── 4 inter-finger angles (adjacent MCP vectors from wrist) ──────────────
     wrist = x[:, :, wrist_idx, :]  # (B, T, 3)
@@ -198,37 +205,37 @@ def _extract_hand_features(
         v1 = x[:, :, inter_mcp[i], :] - wrist
         v2 = x[:, :, inter_mcp[i + 1], :] - wrist
         inter_angles.append(_safe_angle(v1, v2).unsqueeze(-1))  # (B,T,1)
-    h_inter = torch.cat(inter_angles, dim=-1)                   # (B, T, 4)
+    h_inter = torch.cat(inter_angles, dim=-1)  # (B, T, 4)
 
     # ── Palm normal: cross(wrist→index_MCP, wrist→pinky_MCP) ─────────────────
-    v_index = x[:, :, index_mcp, :] - wrist   # (B, T, 3)
+    v_index = x[:, :, index_mcp, :] - wrist  # (B, T, 3)
     v_pinky = x[:, :, pinky_mcp, :] - wrist
-    normal = torch.linalg.cross(v_index, v_pinky, dim=-1)       # (B, T, 3)
+    normal = torch.linalg.cross(v_index, v_pinky, dim=-1)  # (B, T, 3)
     norm_mag = normal.norm(dim=-1, keepdim=True) + 1e-8
-    normal = normal / norm_mag                                   # unit normal
+    normal = normal / norm_mag  # unit normal
 
     # ── Hand position: middle-finger MCP coordinates ──────────────────────────
-    position = x[:, :, middle_mcp, :]                           # (B, T, 3)
+    position = x[:, :, middle_mcp, :]  # (B, T, 3)
 
     # ── Motion: velocity, acceleration, curvature of middle-MCP trajectory ────
     # Velocity: frame-to-frame Euclidean distance  (B, T, 1) — pad frame 0
-    diff = position[:, 1:, :] - position[:, :-1, :]             # (B, T-1, 3)
-    vel = diff.norm(dim=-1)                                      # (B, T-1)
-    vel = torch.cat([vel[:, :1], vel], dim=1)                    # (B, T)
+    diff = position[:, 1:, :] - position[:, :-1, :]  # (B, T-1, 3)
+    vel = diff.norm(dim=-1)  # (B, T-1)
+    vel = torch.cat([vel[:, :1], vel], dim=1)  # (B, T)
 
     # Acceleration: Δvelocity, pad frame 0
-    acc = vel[:, 1:] - vel[:, :-1]                              # (B, T-1)
-    acc = torch.cat([acc[:, :1], acc], dim=1)                   # (B, T)
+    acc = vel[:, 1:] - vel[:, :-1]  # (B, T-1)
+    acc = torch.cat([acc[:, :1], acc], dim=1)  # (B, T)
 
     # Curvature: (d_{k-1,k} + d_{k,k+1}) / d_{k-1,k+1}  ─ pad boundaries
-    d_prev = torch.cat([vel[:, :1], vel[:, :-1]], dim=1)        # shift right
-    d_next = torch.cat([vel[:, 1:], vel[:, -1:]], dim=1)        # shift left
+    d_prev = torch.cat([vel[:, :1], vel[:, :-1]], dim=1)  # shift right
+    d_next = torch.cat([vel[:, 1:], vel[:, -1:]], dim=1)  # shift left
     p_prev = torch.cat([position[:, :1], position[:, :-1]], dim=1)
     p_next = torch.cat([position[:, 1:], position[:, -1:]], dim=1)
-    chord = (p_next - p_prev).norm(dim=-1) + 1e-8               # (B, T)
-    curv = (d_prev + d_next) / chord                            # (B, T)
+    chord = (p_next - p_prev).norm(dim=-1) + 1e-8  # (B, T)
+    curv = (d_prev + d_next) / chord  # (B, T)
 
-    motion = torch.stack([vel, acc, curv], dim=-1)              # (B, T, 3)
+    motion = torch.stack([vel, acc, curv], dim=-1)  # (B, T, 3)
 
     return torch.cat([h_shape, h_inter, normal, position, motion], dim=-1)  # (B,T,28)
 
@@ -301,7 +308,7 @@ class _SelfAttentionQKV(nn.Module):
         self.W_v = nn.Linear(dim, dim, bias=False)
         # Learnable scalar residual gate (initialised to 1)
         self.w_f = nn.Parameter(torch.ones(1))
-        self.scale = dim ** -0.5
+        self.scale = dim**-0.5
 
     def forward(self, H: torch.Tensor) -> torch.Tensor:
         """Apply self-attention and residual.
@@ -312,14 +319,14 @@ class _SelfAttentionQKV(nn.Module):
         Returns:
             ``(B, T, D)`` — attention output with residual.
         """
-        Q = self.W_q(H)                             # (B, T, D)
+        Q = self.W_q(H)  # (B, T, D)
         K = self.W_k(H)
         V = self.W_v(H)
         # e_{i,j} = Q_i · K_j^T  →  (B, T, T)
         attn = torch.bmm(Q, K.transpose(1, 2)) * self.scale
-        alpha = F.softmax(attn, dim=-1)             # (B, T, T)
-        Z = torch.bmm(alpha, V)                     # (B, T, D)
-        return self.w_f * Z + H                     # residual (Eq. 8)
+        alpha = F.softmax(attn, dim=-1)  # (B, T, T)
+        Z = torch.bmm(alpha, V)  # (B, T, D)
+        return self.w_f * Z + H  # residual (Eq. 8)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -385,17 +392,17 @@ class _PhonologicalBranch(nn.Module):
             x: ``(B, T, N, C)`` raw skeleton tensor.
         """
         # Compute λ(k) phonological features
-        h = self.feature_extractor(x)          # (B, T, 56)
+        h = self.feature_extractor(x)  # (B, T, 56)
 
         # Temporal conv: needs (B, C, T)
         h = self.temporal_conv(h.permute(0, 2, 1))  # (B, conv_ch, T)
-        h = h.permute(0, 2, 1)                       # (B, T, conv_ch)
+        h = h.permute(0, 2, 1)  # (B, T, conv_ch)
 
         # LSTM
-        lstm_out, _ = self.lstm(h)              # (B, T, lstm_hidden)
+        lstm_out, _ = self.lstm(h)  # (B, T, lstm_hidden)
 
         # Full Q/K/V self-attention with residual (SA block)
-        sa_out = self.self_attn(lstm_out)       # (B, T, lstm_hidden)
+        sa_out = self.self_attn(lstm_out)  # (B, T, lstm_hidden)
 
         # Bahdanau temporal attention → (B, lstm_hidden)
         return self.temporal_attn(sa_out)
@@ -528,12 +535,12 @@ class DualBranchSTGCN_LSTM(nn.Module):
         # Branch 2: 3 × STGCN → global pool → (B, stgcn_out_dim)
         h = x
         for block in self.stgcn_blocks:
-            h = block(h)            # (B, T', N, C_out)
+            h = block(h)  # (B, T', N, C_out)
         stgcn_feat = h.mean(dim=(1, 2))  # mean over T and N → (B, C_out)
 
         # Fusion: concatenate, dropout, classify
         fused = torch.cat([phono_feat, stgcn_feat], dim=-1)  # (B, fusion_dim)
-        return self.head(self.dropout(fused))                 # (B, num_classes)
+        return self.head(self.dropout(fused))  # (B, num_classes)
 
     def count_parameters(self) -> int:
         """Return total number of trainable parameters."""
