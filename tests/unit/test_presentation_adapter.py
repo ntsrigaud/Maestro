@@ -75,7 +75,7 @@ class TestPresentationAdapterZoom:
         adapter = PresentationAdapter(keyboard=kb)
         result = adapter.execute("zoom_in_view")
         kb.zoom.assert_called_once()
-        clicks, = kb.zoom.call_args.args
+        (clicks,) = kb.zoom.call_args.args
         assert clicks > 0, "zoom_in_view must pass a positive click count"
         assert result.success is True
 
@@ -84,7 +84,7 @@ class TestPresentationAdapterZoom:
         adapter = PresentationAdapter(keyboard=kb)
         result = adapter.execute("zoom_out_view")
         kb.zoom.assert_called_once()
-        clicks, = kb.zoom.call_args.args
+        (clicks,) = kb.zoom.call_args.args
         assert clicks < 0, "zoom_out_view must pass a negative click count"
         assert result.success is True
 
