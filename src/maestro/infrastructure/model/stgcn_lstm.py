@@ -1,21 +1,17 @@
-"""STGCN-LSTM gesture classifier for graph-schema-v1 input.
+"""Shared STGCN building blocks used by DualBranchSTGCN_LSTM.
 
-Architecture:
-  Input  : (B, T, N, C) — T=24 frames, N=67 nodes, C=3 coords
-  Block 1: STGCNBlock(in_channels=3,  out_channels=64,  temporal_kernel=3, residual=True)
-  Block 2: STGCNBlock(in_channels=64, out_channels=128, temporal_kernel=3, residual=True)
-  Pool   : mean-pool over node dimension → (B, T, 128)
-  LSTM   : 2-layer LSTM hidden_size=128 → (B, T, 128)
-  Attn   : additive attention → context (B, 128)
-  Head   : Dropout + Linear(128, num_classes)
+This module exposes the following re-usable components:
+  - :class:`_GraphConv`         — K-partition spatial graph convolution.
+  - :class:`STGCNBlock`         — One SCN→TCN→BN→ReLU→Dropout→+Residual block.
+  - :class:`_BahdanauAttention` — Additive temporal attention over LSTM output.
 
-Graph convolution uses K=3 spatial-configuration partitioned adjacency matrices
-following Yan et al. (AAAI 2018): self-connections, centripetal neighbours, and
-centrifugal neighbours each with an independent weight matrix.  Residual
-connections are always active; a 1×1 Conv1d projection is used when the number
-of channels changes between blocks.
+The authoritative model for this project is :class:`DualBranchSTGCN_LSTM`
+(see ``dual_branch_stgcn_lstm.py``), which implements the full dual-branch
+phonological SA-ConvLSTM architecture from:
 
-Parameter budget: ≤500 K total.
+  "A Study on the STGCN-LSTM Sign Language Recognition Model Based on
+   Phonological Features of Sign Language", IEEE 2025.
+   https://ieeexplore.ieee.org/document/10965662
 
 References:
   Yan et al., "Spatial Temporal Graph Convolutional Networks for Skeleton-Based
@@ -182,144 +178,3 @@ class _BahdanauAttention(nn.Module):
         scores = self.attn(lstm_out).squeeze(-1)  # (B, T)
         weights = F.softmax(scores, dim=-1)  # (B, T)
         return (lstm_out * weights.unsqueeze(-1)).sum(dim=1)  # (B, H)
-
-
-class STGCN_LSTM(nn.Module):
-    """Spatial-Temporal Graph CNN + LSTM gesture classifier.
-
-    The forward pass is::
-
-        (B, T, N, C)
-          → STGCNBlock × 2     [K=3 partitioned GCN + TCN, residual always on]
-          → mean-pool over N   [(B, T, 128)]
-          → 2-layer LSTM        [(B, T, lstm_hidden)]
-          → attention pool      [(B, lstm_hidden)]
-          → Dropout + Linear    [(B, num_classes)]
-
-    The K=3 partitioned adjacency matrices are registered as a buffer and
-    embedded in the checkpoint, so no external graph file is needed at
-    inference time.
-
-    Args:
-        num_nodes:      Number of graph nodes (default 67).
-        num_coords:     Coordinate channels per node (default 3).
-        stgcn_channels: Tuple of (c1, c2) output channels for the two STGCN
-                        blocks (default (64, 128)).
-        num_stgcn_layers: Number of STGCN blocks (1 or 2; default 2).
-        lstm_hidden:    LSTM hidden state size (default 128).
-        lstm_layers:    Number of stacked LSTM layers (default 2).
-        dropout:        Dropout probability before the classification head
-                        (default 0.3).
-        num_classes:    Number of gesture classes (default 8).
-        adjacency:      Pre-computed adjacency tensor.  Shape ``(K, N, N)``
-                        for K-partition mode, or ``(N, N)`` for single-matrix
-                        mode.  If ``None``, the K=3 partitioned adjacency is
-                        built from ``maestro.pipeline.graph_schema``.
-    """
-
-    def __init__(
-        self,
-        *,
-        num_nodes: int = 67,
-        num_coords: int = 3,
-        stgcn_channels: tuple[int, ...] = (64, 128),
-        num_stgcn_layers: int = 2,
-        lstm_hidden: int = 128,
-        lstm_layers: int = 2,
-        dropout: float = 0.3,
-        num_classes: int = 8,
-        adjacency: torch.Tensor | None = None,
-    ) -> None:
-        super().__init__()
-
-        self.num_nodes = num_nodes
-        self.num_coords = num_coords
-        self.stgcn_channels = stgcn_channels
-        self.num_stgcn_layers = num_stgcn_layers
-        self.lstm_hidden = lstm_hidden
-        self.lstm_layers = lstm_layers
-        self.dropout_p = dropout
-        self.num_classes = num_classes
-
-        if adjacency is None:
-            from maestro.pipeline.graph_schema import (
-                build_partitioned_adjacency,
-                normalise_partitioned_adjacency,
-            )
-
-            A = torch.from_numpy(
-                normalise_partitioned_adjacency(build_partitioned_adjacency()).astype("float32")
-            )  # (3, N, N)
-        else:
-            if adjacency.dim() == 2:
-                A = adjacency.float().unsqueeze(0)  # (1, N, N) — backward compat
-            else:
-                A = adjacency.float()  # (K, N, N)
-
-        # Register so the matrix is saved in the state dict.
-        self.register_buffer("adjacency", A)
-
-        # Build STGCN blocks — residual always enabled; projection used when
-        # channel counts differ between input and output.
-        blocks: list[nn.Module] = []
-        in_ch = num_coords
-        for i in range(num_stgcn_layers):
-            out_ch = stgcn_channels[min(i, len(stgcn_channels) - 1)]
-            blocks.append(
-                STGCNBlock(
-                    in_ch,
-                    out_ch,
-                    A,
-                    temporal_kernel=3,
-                    residual=True,
-                )
-            )
-            in_ch = out_ch
-        self.stgcn_blocks = nn.ModuleList(blocks)
-
-        stgcn_out_dim = stgcn_channels[min(num_stgcn_layers - 1, len(stgcn_channels) - 1)]
-
-        # LSTM.
-        self.lstm = nn.LSTM(
-            input_size=stgcn_out_dim,
-            hidden_size=lstm_hidden,
-            num_layers=lstm_layers,
-            batch_first=True,
-            dropout=dropout if lstm_layers > 1 else 0.0,
-        )
-
-        # Attention.
-        self.attention = _BahdanauAttention(lstm_hidden)
-
-        # Head.
-        self.dropout = nn.Dropout(dropout)
-        self.head = nn.Linear(lstm_hidden, num_classes)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Classify a batch of gesture windows.
-
-        Args:
-            x: Float tensor ``(B, T, N, C)``.
-
-        Returns:
-            Logits ``(B, num_classes)``.
-        """
-        # x: (B, T, N, C)
-        for block in self.stgcn_blocks:
-            x = block(x)  # (B, T', N, C_out)
-
-        # Pool over nodes.
-        x = x.mean(dim=2)  # (B, T', C_out)
-
-        # LSTM.
-        lstm_out, _ = self.lstm(x)  # (B, T', lstm_hidden)
-
-        # Attention pooling.
-        context = self.attention(lstm_out)  # (B, lstm_hidden)
-
-        # Head.
-        return self.head(self.dropout(context))  # (B, num_classes)
-
-    def count_parameters(self) -> int:
-        """Return total number of trainable parameters."""
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
