@@ -11,8 +11,13 @@ model:
   stgcn_channels: [64, 128, 256] # 3 STGCNBlocks; fully-connected K=3 adj
   num_stgcn_layers: 3
   # ── Phonological SA-ConvLSTM branch (Branch 1) ───────────────────────────
-  phono_proj_dim: 128 # per-node projection dimension
-  phono_conv_channels: 256 # temporal Conv1d output channels
+  # Branch 1 computes structured geometric phonological features λ(k) per frame:
+  #   H(k): 15 finger joint angles + 4 inter-finger angles (both hands = 38)
+  #   n(k): palm unit normal (cross product wrist→index-MCP × wrist→pinky-MCP, both hands = 6)
+  #   l(k): middle-finger MCP position (both hands = 6)
+  #   μ(k): velocity, acceleration, curvature of middle-MCP trajectory (both hands = 6)
+  #   phono_feat_dim = 56 (28 per hand × 2 hands, no learnable extraction)
+  phono_conv_channels: 256 # temporal Conv1d output channels (input=56)
   lstm_hidden: 256 # LSTM hidden size (also used as phono_lstm_hidden)
   lstm_layers: 2 # LSTM layers    (also used as phono_lstm_layers)
   # ── Regularisation & output ───────────────────────────────────────────────
@@ -24,10 +29,12 @@ model:
 # Input: (B, T=24, N=67, C=3) — graph-schema-v1 normalised skeleton sequence
 #
 # Branch 1 — Phonological SA-ConvLSTM
-#   node_proj   : Linear(3 → 128)          per node, broadcast over (B, T, N)
-#   spatial_attn: Linear(128 → 1) → softmax_N → weighted sum → (B, T, 128)
-#   temporal_conv: Conv1d(128 → 256, k=3) + BN + ReLU → (B, T, 256)
+#   feature_extractor: _PhonologicalFeatureExtractor (no params)
+#     → λ(k) = [joint_angles(19×2), palm_normal(3×2), position(3×2), motion(3×2)]
+#     → (B, T, 56) — deterministic geometric features
+#   temporal_conv: Conv1d(56 → 256, k=3) + BN + ReLU → (B, T, 256)
 #   lstm         : LSTM(256 → 256, layers=2) → (B, T, 256)
+#   self_attn    : Q/K/V self-attention (Eq.6-8) + residual (w_f·Z + H) → (B, T, 256)
 #   attn         : Bahdanau temporal attention → (B, 256)
 #
 # Branch 2 — STGCN (3 blocks, fully-connected K=3 partitioned adjacency)
