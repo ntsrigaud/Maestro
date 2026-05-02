@@ -73,6 +73,8 @@ from maestro.domain.entities import LabeledGraphFrame  # noqa: E402
 from maestro.pipeline import graph_schema  # noqa: E402
 from maestro.training.dataset_builder import (  # noqa: E402
     GraphSequenceDatasetBuilder,
+    LabeledLandmarkFrame,
+    SequenceDatasetBuilder,
 )
 
 # Default model cache path (mirrors the constant formerly in holistic_extractor).
@@ -539,7 +541,7 @@ def assemble_dataset(
 # ---------------------------------------------------------------------------
 
 
-def _compute_class_stats(builder: GraphSequenceDatasetBuilder) -> dict[str, Any]:
+def _compute_class_stats(builder: GraphSequenceDatasetBuilder | SequenceDatasetBuilder) -> dict[str, Any]:
     from collections import Counter
 
     label_counts = Counter(s.label for s in builder.samples)
@@ -548,6 +550,111 @@ def _compute_class_stats(builder: GraphSequenceDatasetBuilder) -> dict[str, Any]
         "class_distribution": dict(label_counts),
         "num_classes": len(label_counts),
     }
+
+
+def assemble_flat_dataset(
+    annotations: list[AnnotationRow],
+    cache_paths: dict[str, Path],
+    vocabulary: list[str],
+    *,
+    window_length: int,
+    window_step: int,
+    min_valid_ratio: float,
+    label_strategy: str,
+    max_unknown_segments_per_source: int,
+    max_unknown_frames_per_segment: int,
+    seed: int,
+) -> SequenceDatasetBuilder:
+    """Feed annotated right-hand landmarks into a ``SequenceDatasetBuilder``.
+
+    Extracts right-hand keypoints (nodes 0-20) from the holistic cache and
+    produces a flat feature-schema-v5 dataset compatible with
+    ``GestureDataModule`` and ``TwoStreamGestureLSTM``.
+    """
+    rng = random.Random(seed)
+
+    builder = SequenceDatasetBuilder(
+        vocabulary=vocabulary,
+        window_length=window_length,
+        window_step=window_step,
+        min_valid_ratio=min_valid_ratio,
+        label_strategy=label_strategy,
+    )
+
+    all_mapped: list[tuple[str, AnnotationRow]] = []
+    for row in annotations:
+        if row.ipn_label not in IPN_TO_VOCAB:
+            continue
+        all_mapped.append((row.video, row))
+
+    subsampled_unknown = _subsample_unknown_segments(
+        [r for _, r in all_mapped if IPN_TO_VOCAB[r.ipn_label] == "unknown"],
+        max_unknown_segments_per_source,
+        rng,
+    )
+    unknown_set = {id(r) for r in subsampled_unknown}
+
+    final_by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
+    for video, row in all_mapped:
+        if IPN_TO_VOCAB[row.ipn_label] == "unknown":
+            if id(row) not in unknown_set:
+                continue
+        final_by_video[video].append(row)
+
+    for segs in final_by_video.values():
+        segs.sort(key=lambda r: r.t_start)
+
+    total_windows = 0
+    missing_cache = 0
+
+    for video_stem, segments in sorted(final_by_video.items()):
+        cache_path = cache_paths.get(video_stem)
+        if cache_path is None or not cache_path.exists():
+            logger.warning("No cache for video '%s', skipping.", video_stem)
+            missing_cache += 1
+            continue
+
+        vl = _load_cache(cache_path)
+        fid_to_idx = {int(fid): i for i, fid in enumerate(vl.frame_ids)}
+
+        for seg_idx, seg in enumerate(segments):
+            vocab_label = IPN_TO_VOCAB[seg.ipn_label]
+            recording_id = f"{video_stem}:seg{seg_idx:04d}"
+
+            t_end_effective = seg.t_end
+            if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
+                t_end_effective = min(
+                    seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1
+                )
+
+            seg_windows_before = len(builder.samples)
+            for frame_id in range(seg.t_start, t_end_effective + 1):
+                idx = fid_to_idx.get(frame_id)
+                if idx is None:
+                    continue
+
+                timestamp_ms = int((frame_id - 1) * 1000.0 / vl.fps)
+                # Extract right-hand keypoints (nodes 0-20 in graph layout).
+                rh_kps = vl.keypoints[idx, :21]  # (21, 3) raw coordinates
+                rh_valid = bool(vl.valid_mask[idx, :21].any())
+
+                lf = LabeledLandmarkFrame(
+                    recording_id=recording_id,
+                    timestamp_ms=timestamp_ms,
+                    label=vocab_label,
+                    landmarks=rh_kps.tolist(),
+                    valid=rh_valid,
+                    handedness="Right",
+                )
+                builder.add_frame(lf)
+
+            total_windows += len(builder.samples) - seg_windows_before
+
+    if missing_cache > 0:
+        logger.warning("%d video(s) had no cache and were skipped.", missing_cache)
+
+    logger.info("Flat assembly complete: %d sliding-window samples generated.", total_windows)
+    return builder
 
 
 def _load_vocabulary(vocab_config_path: Path) -> list[str]:
@@ -725,9 +832,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Random seed for unknown-segment subsampling (default: 42).",
     )
     p.add_argument(
+        "--format",
+        default="graph",
+        choices=["graph", "flat"],
+        help=(
+            "Output format: 'graph' (default) produces graph-schema-v1 NPZ with "
+            "sequences shape (N,T,67,3); 'flat' produces feature-schema-v5 NPZ with "
+            "sequences shape (N,T,147) compatible with TwoStreamGestureLSTM and "
+            "GestureDataModule."
+        ),
+    )
+    p.add_argument(
         "--graph-schema-version",
         default=graph_schema.GRAPH_SCHEMA_VERSION,
-        help="Graph schema version tag embedded in the NPZ metadata.",
+        help="Graph schema version tag embedded in the NPZ metadata (graph format only).",
     )
     p.add_argument(
         "--metadata-json",
@@ -817,7 +935,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Phase 2 — assemble sliding-window dataset.
     # -----------------------------------------------------------------------
-    builder = assemble_dataset(
+    assemble_kwargs = dict(
         annotations=annotations,
         cache_paths=cache_paths,
         vocabulary=vocabulary,
@@ -829,6 +947,15 @@ def main() -> None:
         max_unknown_frames_per_segment=args.max_unknown_frames_per_segment,
         seed=args.seed,
     )
+
+    if args.format == "flat":
+        logger.info("Building flat feature-schema-v5 dataset (right-hand, 147 dims)…")
+        builder: SequenceDatasetBuilder | GraphSequenceDatasetBuilder = assemble_flat_dataset(
+            **assemble_kwargs
+        )
+    else:
+        logger.info("Building graph-schema-v1 dataset (holistic, 67 nodes × 3 coords)…")
+        builder = assemble_dataset(**assemble_kwargs)
 
     if not builder.samples:
         logger.error(
@@ -859,10 +986,12 @@ def main() -> None:
     # Save NPZ and metadata.
     # -----------------------------------------------------------------------
     output_npz.parent.mkdir(parents=True, exist_ok=True)
-    builder.save_npz(
-        output_npz,
-        graph_schema_version=args.graph_schema_version,
-    )
+    if args.format == "flat":
+        assert isinstance(builder, SequenceDatasetBuilder)
+        builder.save_npz(output_npz, feature_schema_version="feature-schema-v5")
+    else:
+        assert isinstance(builder, GraphSequenceDatasetBuilder)
+        builder.save_npz(output_npz, graph_schema_version=args.graph_schema_version)
     logger.info("Dataset saved → %s  (%d samples)", output_npz, len(builder.samples))
 
     stats = _compute_class_stats(builder)
@@ -871,16 +1000,17 @@ def main() -> None:
     metadata_path = Path(
         args.metadata_json if args.metadata_json else str(output_npz) + ".metadata.json"
     )
-    _save_metadata(
-        metadata_path=metadata_path,
-        annotations_used=len(annotations),
-        cache_paths=cache_paths,
-        vocabulary=vocabulary,
-        window_length=args.window_length,
-        window_step=args.window_step,
-        stats=stats,
-        graph_schema_version=args.graph_schema_version,
-    )
+    if args.format == "graph":
+        _save_metadata(
+            metadata_path=metadata_path,
+            annotations_used=len(annotations),
+            cache_paths=cache_paths,
+            vocabulary=vocabulary,
+            window_length=args.window_length,
+            window_step=args.window_step,
+            stats=stats,
+            graph_schema_version=args.graph_schema_version,
+        )
 
 
 if __name__ == "__main__":
