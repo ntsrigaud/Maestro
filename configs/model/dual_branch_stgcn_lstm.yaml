@@ -58,12 +58,12 @@ model:
 # ─────────────────────────────────────────────────────────────────────────────
 
 training:
-  epochs: 40
+  epochs: 80 # more epochs needed at lr=1e-4
   batch_size: 32
-  learning_rate: 0.001
+  learning_rate: 0.0001 # paper: "learning rates for STGCN and SA-ConvLSTM set to 1e-4"
   weight_decay: 0.0001
   grad_clip_norm: 1.0
-  early_stopping_patience: 7
+  early_stopping_patience: 20 # adjusted for slower convergence at lr=1e-4
   early_stopping_min_delta: 0.0001
   seed: 42
   num_workers: 0
@@ -78,7 +78,7 @@ splits:
 scheduler:
   enabled: true
   factor: 0.5
-  patience: 3
+  patience: 10 # allow more epochs at each lr level before reducing
   min_lr: 0.000001
 
 export:
