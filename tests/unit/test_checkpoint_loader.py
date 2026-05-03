@@ -8,29 +8,33 @@ from maestro.infrastructure.model.checkpoint_loader import (
     load_inference_artifact,
     validate_runtime_compatibility,
 )
-from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 from maestro.utils.schema_validation import RuntimeConfig
 
 
 def _write_artifact(path: Path) -> None:
-    model = TwoStreamGestureLSTM(
+    model = EnhancedTwoStreamLSTM(
         input_size=147,
         hidden_size=64,
         num_layers=2,
         dropout=0.1,
         num_classes=8,
+        num_heads=4,
+        proj_dim=64,
     )
     payload = {
-        "artifact_type": "two_stream_lstm_inference",
-        "artifact_version": "two_stream_test_v1",
+        "artifact_type": "two_stream_attn_inference",
+        "artifact_version": "two_stream_attn_test_v1",
         "model_state_dict": model.state_dict(),
         "model_config": {
-            "model_name": "two_stream_lstm_v1",
+            "model_name": "two_stream_attn_v1",
             "input_size": 147,
             "hidden_size": 64,
             "num_layers": 2,
             "dropout": 0.1,
             "num_classes": 8,
+            "num_heads": 4,
+            "proj_dim": 64,
         },
         "class_labels": [
             "open_palm_hold",
@@ -62,7 +66,7 @@ def test_load_inference_artifact(tmp_path: Path) -> None:
         device=torch.device("cpu"),
     )
 
-    assert artifact.model_version == "two_stream_test_v1"
+    assert artifact.model_version == "two_stream_attn_test_v1"
     assert artifact.feature_dim == 147
     assert artifact.window_length == 24
     assert artifact.window_step == 3
@@ -71,17 +75,16 @@ def test_load_inference_artifact(tmp_path: Path) -> None:
     assert artifact.class_labels[0] == "open_palm_hold"
 
 
-def test_load_inference_artifact_rejects_wrong_type(tmp_path: Path) -> None:
-    """Artifacts with non-two-stream type must raise ValueError."""
+def test_load_inference_artifact_rejects_legacy_two_stream_type(tmp_path: Path) -> None:
+    """Legacy baseline runtime artifacts must raise ValueError."""
     artifact_path = tmp_path / "bad.pt"
-    # Craft a minimal payload with a single-stream lstm artifact_type.
     payload = {
-        "artifact_type": "lstm_inference",
+        "artifact_type": "two_stream_lstm_inference",
         "artifact_version": "v0",
         "model_state_dict": {},
         "model_config": {
-            "model_name": "lstm_v1",
-            "input_size": 126,
+            "model_name": "two_stream_lstm_v1",
+            "input_size": 147,
             "hidden_size": 64,
             "num_layers": 2,
             "dropout": 0.1,
@@ -90,7 +93,7 @@ def test_load_inference_artifact_rejects_wrong_type(tmp_path: Path) -> None:
         "class_labels": ["a", "b"],
         "feature_schema": {
             "feature_schema_version": "v1",
-            "feature_dim": 126,
+            "feature_dim": 147,
             "window_length": 24,
             "window_step": 3,
             "orientation_normalization": False,
