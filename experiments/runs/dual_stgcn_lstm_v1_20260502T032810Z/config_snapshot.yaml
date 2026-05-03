@@ -8,9 +8,9 @@ model:
   num_nodes: 67
   num_coords: 3
   stgcn_channels:
-  - 64
-  - 128
-  - 256
+    - 64
+    - 128
+    - 256
   num_stgcn_layers: 3
   lstm_hidden: 256
   lstm_layers: 2
@@ -40,5 +40,5 @@ scheduler:
 export:
   checkpoint_dir: models/checkpoints
   exported_dir: models/exported
-  feature_schema_version: ''
+  feature_schema_version: ""
   graph_schema_version: graph-schema-v1

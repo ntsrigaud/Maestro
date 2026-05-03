@@ -67,7 +67,7 @@ training:
   early_stopping_min_delta: 0.0001
   seed: 42
   num_workers: 0
-  class_weighting: false       # paper does not mention class weighting; removed to keep loss aligned with accuracy
+  class_weighting: false # paper does not mention class weighting; removed to keep loss aligned with accuracy
 
 splits:
   train_ratio: 0.7
@@ -92,4 +92,4 @@ augmentation:
   temporal_scale_range: [0.85, 1.15]
   spatial_jitter_sigma: 0.005
   apply_prob: 0.5
-  mirror_flip_prob: 0.5        # improves swipe_left/swipe_right parity
+  mirror_flip_prob: 0.5 # improves swipe_left/swipe_right parity
