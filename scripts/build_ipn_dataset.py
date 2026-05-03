@@ -309,12 +309,31 @@ def extract_all_landmarks(
     result_paths: dict[str, Path] = {}
 
     for stem in video_stems:
-        video_path = video_dir / f"{stem}.avi"
-        if not video_path.exists():
-            logger.warning("Video not found, skipping: %s", video_path)
+        cache_path = cache_dir / f"{stem}_holistic.npz"
+
+        # Fast path: use an existing cache file without requiring the video.
+        # This allows Phase 2 to proceed even when the original .avi files
+        # have been moved or deleted after the first extraction run.
+        if not no_cache and cache_path.exists():
+            result_paths[stem] = cache_path
             continue
 
-        cache_path = cache_dir / f"{stem}_holistic.npz"
+        # Legacy fallback: previous versions of this script saved caches as
+        # {stem}.npz (without the _holistic suffix).  Accept those files so
+        # that users who have already extracted landmarks do not need to
+        # re-run Phase 1.
+        legacy_cache_path = cache_dir / f"{stem}.npz"
+        if not no_cache and legacy_cache_path.exists():
+            logger.debug("Using legacy cache for %s (%s)", stem, legacy_cache_path.name)
+            result_paths[stem] = legacy_cache_path
+            continue
+
+        # Cache miss — queue the video for (re-)extraction.
+        video_path = video_dir / f"{stem}.avi"
+        if not video_path.exists():
+            logger.warning("Video not found and no cache available, skipping: %s", video_path)
+            continue
+
         if no_cache and cache_path.exists():
             cache_path.unlink()
 
@@ -328,8 +347,15 @@ def extract_all_landmarks(
             )
         )
 
-    if not tasks:
-        logger.warning("No videos to process.")
+    if result_paths:
+        logger.info(
+            "%d video(s) resolved from existing cache; %d video(s) queued for extraction.",
+            len(result_paths),
+            len(tasks),
+        )
+
+    if not tasks and not result_paths:
+        logger.warning("No videos to process and no existing caches found.")
         return {}
 
     logger.info("Processing %d videos with %d worker(s)…", len(tasks), num_workers)
@@ -459,9 +485,12 @@ def assemble_dataset(
 
     # Group by video and apply unknown subsampling at the whole-dataset level.
     all_mapped: list[tuple[str, AnnotationRow]] = []  # (video_stem, row)
+    vocabulary_set = set(vocabulary)
     for row in annotations:
         if row.ipn_label not in IPN_TO_VOCAB:
-            continue  # skip G01, G02, G08, G09
+            continue  # IPN code has no production mapping at all
+        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+            continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
         all_mapped.append((row.video, row))
 
     # Subsample unknown segments from the full list.
@@ -582,9 +611,12 @@ def assemble_flat_dataset(
     )
 
     all_mapped: list[tuple[str, AnnotationRow]] = []
+    vocabulary_set = set(vocabulary)
     for row in annotations:
         if row.ipn_label not in IPN_TO_VOCAB:
-            continue
+            continue  # IPN code has no production mapping at all
+        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+            continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
         all_mapped.append((row.video, row))
 
     subsampled_unknown = _subsample_unknown_segments(
@@ -929,7 +961,14 @@ def main() -> None:
         no_cache=args.no_cache,
     )
     if not cache_paths:
-        logger.error("No videos were processed successfully.  Aborting.")
+        logger.error(
+            "No landmark caches are available.  "
+            "Ensure that either (a) .avi video files exist in '%s' or "
+            "(b) cached NPZ files exist in '%s'.  "
+            "Re-run with --log-level DEBUG for per-video details.",
+            video_dir,
+            cache_dir,
+        )
         sys.exit(1)
 
     # -----------------------------------------------------------------------
