@@ -1,4 +1,4 @@
-# Feature Schema v5
+# Feature Schema
 
 **Version string**: `feature-schema-v5`  
 **Total dimensionality**: 147  
@@ -78,31 +78,30 @@ When MediaPipe fails to detect a hand (`LandmarkPacket.valid == False`), `Landma
 
 ---
 
-## Schema Version History
+## Schema Versioning
 
-| Version             | Dims | Change                                                                                    |
-| ------------------- | ---- | ----------------------------------------------------------------------------------------- |
-| `feature-schema-v1` | 126  | Positions (63) + velocities (63) only                                                     |
-| `feature-schema-v5` | 147  | Adds fingertip spread (+5), wrist trajectory (+3), joint angles (+10), wrist_vel_raw (+3) |
-
-The schema version is embedded in every NPZ dataset artifact and every exported `.pt` inference artifact. Runtime compatibility is enforced by `validate_runtime_compatibility()` in `checkpoint_loader.py`.
+The version string `feature-schema-v5` is embedded in every NPZ dataset artifact and every exported `.pt` inference artifact. Runtime compatibility is enforced by `validate_runtime_compatibility()` in `checkpoint_loader.py`.
 
 ---
 
-## Two-Stream Feature Partition (Tier 4-A Architecture)
+## Two-Stream Feature Partition (Enhanced Architecture)
 
-The `TwoStreamGestureLSTM` (`configs/model/two_stream_lstm.yaml`) partitions the 147-dim vector into two semantically coherent streams before any recurrent processing. The partition is a deterministic index gather — no additional preprocessing is required.
+The `EnhancedTwoStreamLSTM` (`configs/model/two_stream_attn.yaml`) partitions the 147-dim vector into two semantically coherent streams before recurrent processing. The partition is a deterministic index gather — no additional preprocessing is required.
 
 | Stream                    | Slice(s)                 | Dims | Semantic role                                                                                      |
 | ------------------------- | ------------------------ | ---- | -------------------------------------------------------------------------------------------------- |
 | **A — Pose / Shape**      | `[0:63]` + `[134:144]`   | 73   | Static hand configuration: wrist-relative landmark positions + MCP/PIP joint angles                |
 | **B — Motion / Dynamics** | `[63:134]` + `[144:147]` | 74   | Dynamic hand motion: fingertip spread, wrist trajectory, per-landmark velocity, raw wrist velocity |
 
-**Rationale.** In the single-stream baseline, the 6 directional dims (`wrist_traj[68:71]` and `wrist_vel_raw[144:147]`) compete for gradient weight with the 141 remaining dims inside every LSTM timestep. Bahdanau attention resolves temporal competition (which timesteps matter) but cannot resolve within-timestep feature competition (which feature dims matter). Stream B gives the critical motion signals a fully independent pathway, eliminating this competition and raising the effective capacity dedicated to swipe direction discrimination from ~4% to ~50% of total model capacity.
+**Rationale.** In the single-stream baseline, the 6 directional dims (`wrist_traj[68:71]` and `wrist_vel_raw[144:147]`) compete for gradient weight with the 141 remaining dims inside every LSTM timestep. Multi-head self-attention resolves temporal competition (which timesteps matter) but cannot resolve within-timestep feature competition (which feature dims matter). Stream B gives the critical motion signals a fully independent pathway, eliminating this competition and raising the effective capacity dedicated to swipe direction discrimination from ~4% to ~50% of total model capacity.
 
-**Implementation** (`src/maestro/infrastructure/model/two_stream_lstm.py`):
+**Implementation** (`src/maestro/infrastructure/model/two_stream_attn_lstm.py` — `EnhancedTwoStreamLSTM._split`):
 
 ```python
-pose   = torch.cat([x[..., :63],  x[..., 134:144]], dim=-1)  # (B, T, 73)
-motion = torch.cat([x[..., 63:134], x[..., 144:]], dim=-1)   # (B, T, 74)
+@staticmethod
+def _split(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Partition (B, T, 147) → pose (B, T, 73) and motion (B, T, 74)."""
+    pose   = torch.cat([x[..., :63],   x[..., 134:144]], dim=-1)  # (B, T, 73)
+    motion = torch.cat([x[..., 63:134], x[..., 144:]],   dim=-1)  # (B, T, 74)
+    return pose, motion
 ```

@@ -8,8 +8,8 @@ model:
   num_nodes: 67
   num_coords: 3
   stgcn_channels:
-  - 64
-  - 128
+    - 64
+    - 128
   num_stgcn_layers: 2
   lstm_hidden: 128
   lstm_layers: 2

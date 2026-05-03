@@ -202,7 +202,7 @@ def _load_model_from_source(
     hf_revision_override: str | None,
     device: torch.device,
 ) -> InferenceArtifact:
-    """Load the two-stream LSTM artifact from Hugging Face Hub.
+    """Load the enhanced two-stream attention artifact from Hugging Face Hub.
 
     When *hf_revision_override* is provided it overrides ``model_source.revision``
     (supports the ``--hf-revision`` CLI flag).

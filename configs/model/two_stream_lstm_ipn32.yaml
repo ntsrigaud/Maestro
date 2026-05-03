@@ -7,7 +7,7 @@
 # Dataset:  build with --window-length 32 --window-step 1
 #           python scripts/build_ipn_dataset.py \
 #               --window-length 32 --window-step 1 \
-#               --output-npz data/processed/ipn_dataset_v5_w32.npz
+#               --output-npz data/processed/ipn_dataset_v6_w32.npz
 #
 # Hyperparameters follow the Phase-B alignment with the IEEE paper:
 #   - LR 1e-4  (paper: 0.001 but Adam with 1e-4 matches published practices)
@@ -19,11 +19,11 @@
 
 model:
   model_name: two_stream_lstm_v1
-  input_size: 147       # total feature dims (feature-schema-v5); split internally
-  hidden_size: 64       # per-stream hidden size; fused layer receives 2×64 = 128
+  input_size: 147 # total feature dims (feature-schema-v5); split internally
+  hidden_size: 64 # per-stream hidden size; fused layer receives 2×64 = 128
   num_layers: 2
   dropout: 0.3
-  num_classes: 12       # all 11 IPN gesture classes + unknown
+  num_classes: 14 # full IPN baseline: D0X + B0A/B0B + G01..G11
 
 # ── Design notes ─────────────────────────────────────────────────────────────
 # Stream A (Pose, 73 dims):
@@ -76,5 +76,5 @@ augmentation:
   apply_prob: 0.5
   # Mirror flip applies label-aware horizontal inversion (left ↔ right swipe).
   # Enabled here — build the mirrored variant with build_ipn_dataset.py and
-  # use ipn_dataset_v5_w32_mirrored.npz for best results.
+  # use ipn_dataset_v6_w32_mirrored.npz for best results.
   mirror_flip_prob: 0.5
