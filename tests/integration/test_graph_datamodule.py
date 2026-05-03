@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
 from maestro.pipeline.graph_schema import (
@@ -21,6 +22,7 @@ from maestro.pipeline.graph_schema import (
 )
 
 
+@pytest.mark.training
 class TestGraphDataModuleSynthetic:
     def _make_npz(self, tmp_path: Path, num_samples: int = 20) -> Path:
         """Write a minimal graph NPZ matching dataset_builder.save_npz() format."""
