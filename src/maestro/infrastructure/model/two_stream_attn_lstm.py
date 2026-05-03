@@ -1,38 +1,45 @@
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import nn
 
 
 class EnhancedTwoStreamLSTM(nn.Module):
-    """Improved two-stream gesture classifier: BiLSTM + Multi-Head Self-Attention.
+    """Improved two-stream gesture classifier: BiLSTM + MHA + cross-stream attention.
 
-    Key architectural differences from :class:`TwoStreamGestureLSTM`:
+    Key architectural components:
 
     1. **Feature projection** — both streams (73 dims and 74 dims) are projected
        to a shared ``proj_dim`` before LSTM processing, making the two BiLSTMs
        fully symmetric and decoupling raw feature width from model capacity.
 
-    2. **Bidirectional LSTMs** — forward *and* backward temporal context are
-       captured simultaneously over the fixed-length input window.  Because
-       gesture classification operates over a fully-buffered window (not a causal
-       stream), bidirectionality is appropriate and consistently improves accuracy
-       on fixed-window skeleton datasets.
+    2. **Bidirectional LSTMs** — forward *and* backward temporal context over
+       the fixed-length window, with inter-layer dropout for regularisation.
 
-    3. **Multi-Head Self-Attention (Q/K/V)** — replaces the single-head Bahdanau
-       additive attention (``Linear(H, 1)``).  Each of the T output frames attends
-       to all other frames across ``num_heads`` independent subspaces, yielding a
-       richer temporal summary before mean-pooling.  A pre-norm residual structure
-       (LayerNorm → MHA → residual + LayerNorm) is used for training stability.
+    3. **Sinusoidal positional encoding** — added to the BiLSTM output before
+       self-attention, giving the attention heads explicit knowledge of each
+       frame's temporal position within the window.  This is critical for
+       gesture recognition where *when* a frame occurs carries semantic meaning.
 
-    4. **Cross-stream gating** — after temporal pooling, each context vector is
-       element-wise scaled by a sigmoid gate conditioned on the *other* stream's
-       context.  This allows the motion stream to suppress or amplify pose
-       representations when the two streams give conflicting signals (e.g. a fast
-       swipe with a static hand shape).
+    4. **Output dropout** — applied to the position-encoded BiLSTM output before
+       self-attention to regularise the representations entering the attention
+       mechanism.
 
-    5. **Deeper MLP head** — ``LayerNorm → Linear → GELU → Dropout → Linear``
-       replaces the single ``Linear(2H, C)`` layer.
+    5. **Multi-Head Self-Attention (Q/K/V)** — each of the T output frames
+       attends to all other frames across ``num_heads`` independent subspaces,
+       yielding a richer temporal summary before mean-pooling.  Pre-norm
+       residual structure (LayerNorm → MHA → residual + LN) for stability.
+
+    6. **Cross-stream cross-attention** — replaces the previous scalar sigmoid
+       gate.  After temporal mean-pooling, each stream's context vector queries
+       the *other stream's temporal sequence* via a full MHA cross-attention
+       block.  This lets pose features focus on the specific motion frames most
+       relevant to the gesture and vice-versa, rather than receiving only a
+       blended scalar from a single linear gate.
+
+    7. **Deeper MLP head** — ``LayerNorm → Linear → GELU → Dropout → Linear``.
 
     Feature partition (feature-schema-v5, 147 dims total):
         Stream A — Pose / Shape (73 dims)
@@ -45,15 +52,21 @@ class EnhancedTwoStreamLSTM(nn.Module):
             dims  71:134  velocity         (21 per-landmark velocity × 3)
             dims 144:147  wrist_vel_raw    (3 camera-normalised wrist velocity)
 
+    Parameter budget (proj_dim=128, hidden_size=128, num_layers=2, num_heads=8):
+        proj_a / proj_b         2 × ~10 K             ≈   20 K
+        BiLSTM-A                2-layer bidir (128)    ≈  656 K
+        BiLSTM-B                (identical)            ≈  656 K
+        MHA-A / MHA-B (self)    2 × (8 × 256² + …)    ≈  526 K
+        Cross-attn A→B / B→A   2 × (same dims)        ≈  526 K
+        LN × 8                  negligible             ≈    1 K
+        Head MLP                512 → 256 → C          ≈  134 K
+        Total                                          ≈ 2.52 M
+
     Parameter budget (proj_dim=64, hidden_size=64, num_layers=2, num_heads=4):
-        proj_a / proj_b         2 × ~5 K              ≈  10 K
-        BiLSTM-A                layer1 66 K + layer2 99 K  ≈ 165 K
-        BiLSTM-B                (identical after projection)  ≈ 165 K
-        LayerNorm × 4           negligible             ≈   1 K
-        MHA-A / MHA-B           2 × (4 × 128² + bias) ≈ 132 K
-        Cross-gates × 2         2 × 128²               ≈  33 K
-        Head MLP                256 → 128 → C          ≈  35 K
-        Total                                          ≈ 541 K
+        (smaller reference configuration)
+        proj + BiLSTMs + self-attn (original)          ≈  541 K
+        Cross-attn A→B / B→A   2 × (4 × 128² + …)    ≈  132 K
+        Total                                          ≈  673 K
     """
 
     def __init__(
@@ -66,23 +79,27 @@ class EnhancedTwoStreamLSTM(nn.Module):
         num_classes: int,
         num_heads: int = 4,
         proj_dim: int = 64,
+        max_seq_len: int = 128,
     ) -> None:
         """Initialise the enhanced two-stream LSTM.
 
         Args:
-            input_size: Total feature dimensionality (must be 147 for
-                feature-schema-v5); stored for artifact serialisation only.
+            input_size: Total feature dimensionality (147 for feature-schema-v5);
+                stored for artifact serialisation only.
             hidden_size: Hidden units *per direction per stream*.  BiLSTM output
-                width = ``2 × hidden_size``.  Recommended: 64.
+                width = ``2 × hidden_size``.  Recommended: 128.
             num_layers: LSTM depth.  Dropout is applied between layers when
                 ``num_layers > 1``.  Recommended: 2.
-            dropout: Dropout rate applied between LSTM layers, inside MHA, and
-                in the pre-head Dropout.
+            dropout: Dropout rate applied between LSTM layers, on BiLSTM output
+                (before attention), inside MHA, and in the head Dropout.
             num_classes: Output vocabulary size.
-            num_heads: Number of attention heads.  Must divide
-                ``2 × hidden_size`` evenly.  Default: 4.
+            num_heads: Number of MHA heads.  Must divide ``2 × hidden_size``
+                evenly.  Default: 4 (use 8 for hidden_size=128).
             proj_dim: Output dimension of the per-stream feature projection.
-                Recommended: same as ``hidden_size`` (64).
+                Should equal or exceed ``hidden_size``.  Recommended: 128.
+            max_seq_len: Upper bound on sequence length for pre-building the
+                sinusoidal positional encoding buffer.  Default: 128 (covers
+                all IPN window configurations).
         """
         super().__init__()
 
@@ -100,6 +117,12 @@ class EnhancedTwoStreamLSTM(nn.Module):
                 f"BiLSTM output width ({bilstm_out} = 2 × hidden_size={hidden_size}) "
                 f"must be divisible by num_heads={num_heads}."
             )
+
+        # ── Sinusoidal positional encoding (no learnable params) ──────────────
+        self.register_buffer(
+            "_pe",
+            self._sinusoidal_pe(max_seq_len, bilstm_out),  # (1, max_seq_len, bilstm_out)
+        )
 
         # ── Feature projection ────────────────────────────────────────────────
         self.proj_a = nn.Sequential(
@@ -124,6 +147,9 @@ class EnhancedTwoStreamLSTM(nn.Module):
         self.lstm_a = nn.LSTM(input_size=proj_dim, **_lstm_kw)
         self.lstm_b = nn.LSTM(input_size=proj_dim, **_lstm_kw)
 
+        # ── Output dropout (applied after PE, before attention) ───────────────
+        self.out_drop = nn.Dropout(p=dropout)
+
         # ── Pre-attention LayerNorm ───────────────────────────────────────────
         self.ln_a = nn.LayerNorm(bilstm_out)
         self.ln_b = nn.LayerNorm(bilstm_out)
@@ -143,11 +169,18 @@ class EnhancedTwoStreamLSTM(nn.Module):
         self.ln_post_a = nn.LayerNorm(bilstm_out)
         self.ln_post_b = nn.LayerNorm(bilstm_out)
 
-        # ── Cross-stream gating ───────────────────────────────────────────────
-        # gate_a: σ(Linear(ctx_b)) → element-wise scale for ctx_a
-        # gate_b: σ(Linear(ctx_a)) → element-wise scale for ctx_b
-        self.gate_a = nn.Linear(bilstm_out, bilstm_out)
-        self.gate_b = nn.Linear(bilstm_out, bilstm_out)
+        # ── Cross-stream cross-attention ──────────────────────────────────────
+        # cross_attn_a: ctx_a (1 query) attends to out_b (T keys/values)
+        # cross_attn_b: ctx_b (1 query) attends to out_a (T keys/values)
+        # This replaces the scalar sigmoid gate with a full attention mechanism
+        # so each stream can focus on the specific *frames* of the other stream
+        # most relevant to the current gesture.
+        self.cross_attn_a = nn.MultiheadAttention(**_mha_kw)
+        self.cross_attn_b = nn.MultiheadAttention(**_mha_kw)
+
+        # Post-cross-attention LayerNorm (residual on pooled context)
+        self.ln_cross_a = nn.LayerNorm(bilstm_out)
+        self.ln_cross_b = nn.LayerNorm(bilstm_out)
 
         # ── Classification head ───────────────────────────────────────────────
         fused_dim = bilstm_out * 2
@@ -160,6 +193,24 @@ class EnhancedTwoStreamLSTM(nn.Module):
         )
 
     # ── Internal helpers ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _sinusoidal_pe(max_len: int, dim: int) -> torch.Tensor:
+        """Build a ``(1, max_len, dim)`` sinusoidal positional encoding tensor.
+
+        Uses the standard Transformer formulation:
+            PE[pos, 2i]   = sin(pos / 10000^(2i / dim))
+            PE[pos, 2i+1] = cos(pos / 10000^(2i / dim))
+        """
+        position = torch.arange(max_len, dtype=torch.float32).unsqueeze(1)  # (max_len, 1)
+        half = dim // 2
+        div_term = torch.exp(
+            torch.arange(half, dtype=torch.float32) * (-math.log(10000.0) / dim)
+        )  # (dim//2,)
+        pe = torch.zeros(max_len, dim)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        return pe.unsqueeze(0)  # (1, max_len, dim)
 
     @staticmethod
     def _split(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -183,12 +234,18 @@ class EnhancedTwoStreamLSTM(nn.Module):
         pose, motion = self._split(x)
 
         # ── Feature projection ────────────────────────────────────────────────
-        pose = self.proj_a(pose)      # (B, T, proj_dim)
+        pose   = self.proj_a(pose)    # (B, T, proj_dim)
         motion = self.proj_b(motion)  # (B, T, proj_dim)
 
         # ── BiLSTM encoding ───────────────────────────────────────────────────
         out_a, _ = self.lstm_a(pose)    # (B, T, 2H)
         out_b, _ = self.lstm_b(motion)  # (B, T, 2H)
+
+        # ── Sinusoidal positional encoding + output dropout ───────────────────
+        T = out_a.size(1)
+        pe = self._pe[:, :T, :]          # (1, T, 2H)  — type: ignore[index]
+        out_a = self.out_drop(out_a + pe)
+        out_b = self.out_drop(out_b + pe)
 
         # ── Pre-attention LayerNorm ───────────────────────────────────────────
         out_a = self.ln_a(out_a)  # (B, T, 2H)
@@ -205,12 +262,16 @@ class EnhancedTwoStreamLSTM(nn.Module):
         ctx_a = out_a.mean(dim=1)  # (B, 2H)
         ctx_b = out_b.mean(dim=1)  # (B, 2H)
 
-        # ── Cross-stream gating ───────────────────────────────────────────────
-        # Compute both gate scales before applying (avoids sequential dependency).
-        gate_scale_a = torch.sigmoid(self.gate_a(ctx_b))  # motion → pose gate
-        gate_scale_b = torch.sigmoid(self.gate_b(ctx_a))  # pose → motion gate
-        ctx_a = ctx_a * gate_scale_a
-        ctx_b = ctx_b * gate_scale_b
+        # ── Cross-stream cross-attention ──────────────────────────────────────
+        # Each stream's mean-pooled context (single query) attends to all T
+        # frames of the *other* stream, allowing fine-grained temporal focus.
+        # Shape of query: (B, 1, 2H);  key/value: (B, T, 2H) → (B, 1, 2H) out
+        ca_a, _ = self.cross_attn_a(ctx_a.unsqueeze(1), out_b, out_b)  # (B, 1, 2H)
+        ca_b, _ = self.cross_attn_b(ctx_b.unsqueeze(1), out_a, out_a)  # (B, 1, 2H)
+
+        # Residual + LN on pooled context (Transformer-style sublayer)
+        ctx_a = self.ln_cross_a(ctx_a + ca_a.squeeze(1))  # (B, 2H)
+        ctx_b = self.ln_cross_b(ctx_b + ca_b.squeeze(1))  # (B, 2H)
 
         # ── Fusion + classification ───────────────────────────────────────────
         fused = torch.cat([ctx_a, ctx_b], dim=-1)  # (B, 4H)
