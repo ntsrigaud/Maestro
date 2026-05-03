@@ -12,7 +12,7 @@
 # Dataset: build with --window-length 32 --window-step 1
 #   python scripts/build_ipn_dataset.py \
 #       --window-length 32 --window-step 1 \
-#       --output-npz data/processed/ipn_dataset_v5_w32.npz
+#       --output-npz data/processed/ipn_dataset_v6_w32.npz
 #
 # ── Regression root-cause analysis (run 024402Z — 71.58% val F1) ─────────────
 #
@@ -54,7 +54,7 @@ model:
   hidden_size: 96 # per-direction per-stream; BiLSTM output = 2×96 = 192
   num_layers: 2
   dropout: 0.35 # was 0.45 — right-sized for smaller 1.2M-param model
-  num_classes: 12 # all 11 IPN Hand gesture classes (G01–G11) + unknown
+  num_classes: 14 # full IPN baseline: D0X + B0A/B0B + G01..G11
   # EnhancedTwoStreamLSTM-specific fields
   num_heads: 8 # MHA heads; 192/8 = 24 dims per head ✓
   proj_dim: 96 # feature projection dim (73/74 → 96 before LSTM)

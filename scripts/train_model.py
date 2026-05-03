@@ -32,7 +32,7 @@ def _resolve_config_path(config_arg: str) -> Path:
     if path.exists():
         return path
 
-    default_path = Path("configs/model/two_stream_lstm.yaml")
+    default_path = Path("configs/model/two_stream_attn.yaml")
 
     # /tmp is commonly used for one-off smoke configs and gets cleaned frequently.
     if path.is_absolute() and str(path).startswith("/tmp/") and default_path.exists():
@@ -44,7 +44,7 @@ def _resolve_config_path(config_arg: str) -> Path:
 
     raise FileNotFoundError(
         f"Config not found: {path}. "
-        "Use --config configs/model/two_stream_lstm.yaml or omit --config to use default."
+        "Use --config configs/model/two_stream_attn.yaml or omit --config to use default."
     )
 
 
@@ -82,7 +82,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--config",
-        default="configs/model/two_stream_lstm.yaml",
+        default="configs/model/two_stream_attn.yaml",
         help="Model/training YAML config path",
     )
     parser.add_argument(

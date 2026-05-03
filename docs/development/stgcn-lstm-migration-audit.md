@@ -31,28 +31,28 @@ The STGCN-LSTM migration addresses all three by treating hand/body keypoints as 
 
 **SGCN block** (method `sgcn(Input)`):
 
-| Step | Operation | Output shape |
-|---|---|---|
-| 1 | `Conv2D(64, kernel=(9,1), padding='same')` — temporal convolution | `(B, T, N, 64)` |
-| 2 | Skip concat with input: `[Input, k1]` | `(B, T, N, C+64)` |
-| 3a | 1-hop: `Conv2D(64, 1×1)` → `expand_dims(axis=3)` → `ConvLSTM2D(25, 1×1, return_sequences=True)` → slice `[:,:,:,0,:]` → softmax + `bias_mat_1` → einsum `ntvw,ntwc->ntvc` | `(B, T, N, 64)` |
-| 3b | 2-hop: same structure with `AD2`, `bias_mat_2` | `(B, T, N, 64)` |
-| 4 | Concat 1-hop + 2-hop | `(B, T, N, 128)` |
-| 5 | Multi-scale temporal: `Conv2D(16, 9×1)` → `Conv2D(16, 15×1)` → `Conv2D(16, 20×1)` + `Dropout(0.25)` each | `(B, T, N, 16)` each |
-| 6 | Concat all three temporal scales | `(B, T, N, 48)` |
+| Step | Operation                                                                                                                                                                 | Output shape         |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 1    | `Conv2D(64, kernel=(9,1), padding='same')` — temporal convolution                                                                                                         | `(B, T, N, 64)`      |
+| 2    | Skip concat with input: `[Input, k1]`                                                                                                                                     | `(B, T, N, C+64)`    |
+| 3a   | 1-hop: `Conv2D(64, 1×1)` → `expand_dims(axis=3)` → `ConvLSTM2D(25, 1×1, return_sequences=True)` → slice `[:,:,:,0,:]` → softmax + `bias_mat_1` → einsum `ntvw,ntwc->ntvc` | `(B, T, N, 64)`      |
+| 3b   | 2-hop: same structure with `AD2`, `bias_mat_2`                                                                                                                            | `(B, T, N, 64)`      |
+| 4    | Concat 1-hop + 2-hop                                                                                                                                                      | `(B, T, N, 128)`     |
+| 5    | Multi-scale temporal: `Conv2D(16, 9×1)` → `Conv2D(16, 15×1)` → `Conv2D(16, 20×1)` + `Dropout(0.25)` each                                                                  | `(B, T, N, 16)` each |
+| 6    | Concat all three temporal scales                                                                                                                                          | `(B, T, N, 48)`      |
 
 **SGCN stack:** `x → sgcn(x) → y; y = y + x → z = sgcn(y); z = z + y` — two residual SGCN blocks.
 
 **LSTM block** (method `Lstm(x)`):
 
-| Step | Operation | Output |
-|---|---|---|
-| 1 | `Reshape(T, N*C)` | `(B, T, N×48)` |
-| 2 | `LSTM(80, return_sequences=True)` + `Dropout(0.25)` | `(B, T, 80)` |
-| 3 | `LSTM(40, return_sequences=True)` + `Dropout(0.25)` | `(B, T, 40)` |
-| 4 | `LSTM(40, return_sequences=True)` + `Dropout(0.25)` | `(B, T, 40)` |
-| 5 | `LSTM(80, return_sequences=False)` + `Dropout(0.25)` | `(B, 80)` |
-| 6 | `Dense(1, activation='linear')` | `(B, 1)` |
+| Step | Operation                                            | Output         |
+| ---- | ---------------------------------------------------- | -------------- |
+| 1    | `Reshape(T, N*C)`                                    | `(B, T, N×48)` |
+| 2    | `LSTM(80, return_sequences=True)` + `Dropout(0.25)`  | `(B, T, 80)`   |
+| 3    | `LSTM(40, return_sequences=True)` + `Dropout(0.25)`  | `(B, T, 40)`   |
+| 4    | `LSTM(40, return_sequences=True)` + `Dropout(0.25)`  | `(B, T, 40)`   |
+| 5    | `LSTM(80, return_sequences=False)` + `Dropout(0.25)` | `(B, 80)`      |
+| 6    | `Dense(1, activation='linear')`                      | `(B, 1)`       |
 
 **Loss:** Huber loss (delta=0.1). This is a **regression** model for rehabilitation movement scoring.
 
@@ -60,17 +60,17 @@ The STGCN-LSTM migration addresses all three by treating hand/body keypoints as 
 
 ### 2.2 Critical Limitations of Reference
 
-| Limitation | Impact on Migration |
-|---|---|
-| **TensorFlow, not PyTorch** | No code is reusable; requires full port |
-| **Regression output `Dense(1, linear)`** | Must replace with `Linear(hidden, num_classes=8)` + CrossEntropy |
-| **25 nodes hardcoded** (`self.num_joints = 25`) | Must redesign for 67 nodes |
-| **ConvLSTM2D used for attention coefficients** | Unusual design; standard `einsum`-based graph conv is simpler and equivalent |
-| **4-layer LSTM** (80→40→40→80) | ~400K+ LSTM params; too heavy for CPU real-time at N=67×48 |
-| **No batch normalisation in SGCN** | Stabilisation risk during training; add `BatchNorm1d` per block |
-| **Static pre-computed adjacency** | Hardcoded graph structure; must define hand skeleton adjacency for 67 nodes |
-| **Multi-scale temporal kernels (9, 15, 20)** | Good design; preserve this in the port |
-| **No normalisation of input coordinates** | Raw x,y,z values from MediaPipe need wrist-relative normalisation before graph conv |
+| Limitation                                      | Impact on Migration                                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **TensorFlow, not PyTorch**                     | No code is reusable; requires full port                                             |
+| **Regression output `Dense(1, linear)`**        | Must replace with `Linear(hidden, num_classes=8)` + CrossEntropy                    |
+| **25 nodes hardcoded** (`self.num_joints = 25`) | Must redesign for 67 nodes                                                          |
+| **ConvLSTM2D used for attention coefficients**  | Unusual design; standard `einsum`-based graph conv is simpler and equivalent        |
+| **4-layer LSTM** (80→40→40→80)                  | ~400K+ LSTM params; too heavy for CPU real-time at N=67×48                          |
+| **No batch normalisation in SGCN**              | Stabilisation risk during training; add `BatchNorm1d` per block                     |
+| **Static pre-computed adjacency**               | Hardcoded graph structure; must define hand skeleton adjacency for 67 nodes         |
+| **Multi-scale temporal kernels (9, 15, 20)**    | Good design; preserve this in the port                                              |
+| **No normalisation of input coordinates**       | Raw x,y,z values from MediaPipe need wrist-relative normalisation before graph conv |
 
 ### 2.3 Conceptual Design Worth Preserving
 
@@ -85,47 +85,48 @@ The STGCN-LSTM migration addresses all three by treating hand/body keypoints as 
 
 ### 3.1 Input Representation
 
-| Dimension | Current System | Target System | Status |
-|---|---|---|---|
-| Keypoint source | MediaPipe Hands (21 kpts, 1 hand) | MediaPipe Holistic / Hands+Pose+Face (67 kpts) | **MUST change** |
-| Feature type | 147-dim engineered vector | Raw `(x, y, z)` per keypoint | **MUST change** |
-| Tensor shape entering model | `(B, T=24, F=147)` | `(B, T, N=67, C=3)` | **MUST change** |
+| Dimension                    | Current System                              | Target System                                          | Status            |
+| ---------------------------- | ------------------------------------------- | ------------------------------------------------------ | ----------------- |
+| Keypoint source              | MediaPipe Hands (21 kpts, 1 hand)           | MediaPipe Holistic / Hands+Pose+Face (67 kpts)         | **MUST change**   |
+| Feature type                 | 147-dim engineered vector                   | Raw `(x, y, z)` per keypoint                           | **MUST change**   |
+| Tensor shape entering model  | `(B, T=24, F=147)`                          | `(B, T, N=67, C=3)`                                    | **MUST change**   |
 | Wrist-relative normalisation | Applied inside `LandmarkFeatureTransformer` | Must reapply per-frame to raw coords before graph conv | **MUST redesign** |
-| Handedness | Single hand selected by `HandSelector` | Both hands + body as unified graph | **MUST change** |
+| Handedness                   | Single hand selected by `HandSelector`      | Both hands + body as unified graph                     | **MUST change**   |
 
 ### 3.2 Dataset Format
 
-| Property | Current NPZ | Required NPZ |
-|---|---|---|
-| `sequences` shape | `(N, 24, 147)` | `(N, T, 67, 3)` |
-| `feature_dim` metadata | `147` | `67` nodes × `3` coords |
-| `feature_schema_version` | `feature-schema-v5` | New identifier, e.g. `graph-schema-v1` |
-| Adjacency matrix | Not stored | **MUST store** in NPZ or companion file |
-| Missing keypoint encoding | Zero vector | Must define explicit missing-keypoint convention (zero fill with valid mask) |
+| Property                  | Current NPZ         | Required NPZ                                                                 |
+| ------------------------- | ------------------- | ---------------------------------------------------------------------------- |
+| `sequences` shape         | `(N, 24, 147)`      | `(N, T, 67, 3)`                                                              |
+| `feature_dim` metadata    | `147`               | `67` nodes × `3` coords                                                      |
+| `feature_schema_version`  | `feature-schema-v5` | New identifier, e.g. `graph-schema-v1`                                       |
+| Adjacency matrix          | Not stored          | **MUST store** in NPZ or companion file                                      |
+| Missing keypoint encoding | Zero vector         | Must define explicit missing-keypoint convention (zero fill with valid mask) |
 
 ### 3.3 Pipeline Component Gaps
 
-| Component | Current Role | Required Change | Priority |
-|---|---|---|---|
-| `LandmarkFeatureTransformer` | 21 kpts → 147-dim vector | **Retire or replace** with raw-coordinate extractor | MUST |
-| `SlidingWindowSequenceBuffer` | Buffers `FeatureFrame` (147-dim vectors) | Must buffer `(67, 3)` graph frames | MUST |
-| `FeatureFrame` entity | `vector: list[float]`, `valid: bool` | Needs `nodes: np.ndarray (N, C)` or keep flat and reshape | MUST |
-| `SequenceWindow` entity | `features: list[list[float]]` | Must change to `(T, N, C)` array | MUST |
-| `SequenceDatasetBuilder` | Uses `LandmarkFeatureTransformer` internally | Must remove transformer, accept raw holistic kpts | MUST |
-| `HandSelector` | Selects one hand from `MultiHandPacket` | **Retire** — graph includes both hands + body | MUST |
-| `MediaPipeHandsExtractor` | Hands only | **Retire or supplement** with Holistic extractor | MUST |
-| `GestureDataModule` | Validates `sequences.ndim == 3` | Must accept `ndim == 4` `(N, T, N_nodes, C)` | MUST |
-| `SequenceTensorDataset` | Validates `ndim == 3` | Must accept `ndim == 4` | MUST |
-| `AugmentedSequenceTensorDataset` | Augments `(T, F)` arrays | Must augment `(T, N, C)` arrays | MUST |
-| `GestureAugmenter` | Feature-index-aware (hard-coded dim indices) | **Retire** current; redesign for node-axis operations | MUST |
-| `train_lstm.py → _build_model()` | Hardcoded to `TwoStreamGestureLSTM` | Must support `STGCN_LSTM` | MUST |
-| `checkpoint_loader.py` | Validates `artifact_type.startswith("two_stream")` | Must accept new artifact type | MUST |
-| `export_checkpoint.py` | `artifact_type = "two_stream_lstm_inference"` | Must emit new type + adjacency metadata | MUST |
-| `InferenceArtifact` dataclass | Has `feature_dim`, `window_length`, etc. | Add `num_nodes`, `num_coords`, `adjacency_schema` | SHOULD |
+| Component                        | Current Role                                       | Required Change                                           | Priority |
+| -------------------------------- | -------------------------------------------------- | --------------------------------------------------------- | -------- |
+| `LandmarkFeatureTransformer`     | 21 kpts → 147-dim vector                           | **Retire or replace** with raw-coordinate extractor       | MUST     |
+| `SlidingWindowSequenceBuffer`    | Buffers `FeatureFrame` (147-dim vectors)           | Must buffer `(67, 3)` graph frames                        | MUST     |
+| `FeatureFrame` entity            | `vector: list[float]`, `valid: bool`               | Needs `nodes: np.ndarray (N, C)` or keep flat and reshape | MUST     |
+| `SequenceWindow` entity          | `features: list[list[float]]`                      | Must change to `(T, N, C)` array                          | MUST     |
+| `SequenceDatasetBuilder`         | Uses `LandmarkFeatureTransformer` internally       | Must remove transformer, accept raw holistic kpts         | MUST     |
+| `HandSelector`                   | Selects one hand from `MultiHandPacket`            | **Retire** — graph includes both hands + body             | MUST     |
+| `MediaPipeHandsExtractor`        | Hands only                                         | **Retire or supplement** with Holistic extractor          | MUST     |
+| `GestureDataModule`              | Validates `sequences.ndim == 3`                    | Must accept `ndim == 4` `(N, T, N_nodes, C)`              | MUST     |
+| `SequenceTensorDataset`          | Validates `ndim == 3`                              | Must accept `ndim == 4`                                   | MUST     |
+| `AugmentedSequenceTensorDataset` | Augments `(T, F)` arrays                           | Must augment `(T, N, C)` arrays                           | MUST     |
+| `GestureAugmenter`               | Feature-index-aware (hard-coded dim indices)       | **Retire** current; redesign for node-axis operations     | MUST     |
+| `train_lstm.py → _build_model()` | Hardcoded to `TwoStreamGestureLSTM`                | Must support `STGCN_LSTM`                                 | MUST     |
+| `checkpoint_loader.py`           | Validates `artifact_type.startswith("two_stream")` | Must accept new artifact type                             | MUST     |
+| `export_checkpoint.py`           | `artifact_type = "two_stream_lstm_inference"`      | Must emit new type + adjacency metadata                   | MUST     |
+| `InferenceArtifact` dataclass    | Has `feature_dim`, `window_length`, etc.           | Add `num_nodes`, `num_coords`, `adjacency_schema`         | SHOULD   |
 
 ### 3.4 Categorised Change Register
 
 **MUST change:**
+
 - `src/maestro/infrastructure/mediapipe/hands_extractor.py` → replace/supplement with holistic extractor
 - `src/maestro/pipeline/feature_engineering.py` → retire `LandmarkFeatureTransformer` from inference path
 - `src/maestro/pipeline/hand_selection.py` → retire `HandSelector`
@@ -142,6 +143,7 @@ The STGCN-LSTM migration addresses all three by treating hand/body keypoints as 
 - `notebooks/02_model_training.ipynb` → model config, loader, training cells
 
 **SHOULD change:**
+
 - `src/maestro/infrastructure/model/two_stream_lstm.py` → keep for compatibility, add new `stgcn_lstm.py` alongside
 - `src/maestro/domain/entities.py` → `InferenceArtifact` fields
 - `configs/model/two_stream_lstm.yaml` → add `configs/model/stgcn_lstm.yaml`
@@ -149,6 +151,7 @@ The STGCN-LSTM migration addresses all three by treating hand/body keypoints as 
 - `src/maestro/utils/feature_validation.py` → update schema compatibility checks
 
 **OPTIONAL:**
+
 - `src/maestro/app/bootstrap.py` → `HandSelector` removal (flows from MUST changes)
 - `src/maestro/app/runtime.py` → runtime loop simplification
 - `src/maestro/training/hf_publish.py` → update model card template for STGCN
@@ -165,7 +168,7 @@ The refactored notebook must be restructured into 8 sections:
 
 ---
 
-**Section 0 — Prerequisites & Environment** *(replaces current Cell 1–2)*
+**Section 0 — Prerequisites & Environment** _(replaces current Cell 1–2)_
 
 Purpose: Import libraries, define repo root, verify IPN dataset presence, verify MediaPipe Holistic is installed.
 
@@ -177,7 +180,7 @@ Add explicit check: confirm `mediapipe >= 0.10` is installed, print holistic mod
 
 ---
 
-**Section 1 — Vocabulary & Graph Schema Configuration** *(replaces current Section 1 "Configuration")*
+**Section 1 — Vocabulary & Graph Schema Configuration** _(replaces current Section 1 "Configuration")_
 
 Purpose: Load vocabulary YAML (unchanged). Define adjacency matrix. Print the 67-node index map.
 
@@ -187,12 +190,12 @@ This cell must define, in pure Python/NumPy, the adjacency list for the 67-node 
 
 Required node index map (67 nodes):
 
-| Index range | Source | Count |
-|---|---|---|
-| 0–20 | MediaPipe Hands (right hand, landmark indices 0–20) | 21 |
-| 21–41 | MediaPipe Hands (left hand, landmark indices 0–20) | 21 |
-| 42–52 | MediaPipe Pose (upper body: nose=0, left/right eye inner/outer/ear=1-6, left/right shoulder=11,12, left/right elbow=13,14, left/right wrist=15,16, left/right pinky/index/thumb tips=17-22) | 11 |
-| 53–66 | MediaPipe Face (14 face contour keypoints: selected subset — not full 468-landmark mesh) | 14 |
+| Index range | Source                                                                                                                                                                                      | Count |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 0–20        | MediaPipe Hands (right hand, landmark indices 0–20)                                                                                                                                         | 21    |
+| 21–41       | MediaPipe Hands (left hand, landmark indices 0–20)                                                                                                                                          | 21    |
+| 42–52       | MediaPipe Pose (upper body: nose=0, left/right eye inner/outer/ear=1-6, left/right shoulder=11,12, left/right elbow=13,14, left/right wrist=15,16, left/right pinky/index/thumb tips=17-22) | 11    |
+| 53–66       | MediaPipe Face (14 face contour keypoints: selected subset — not full 468-landmark mesh)                                                                                                    | 14    |
 
 > **Important:** The exact subset of pose and face keypoints must be pinned at this cell and never changed without incrementing the schema version. The cell must print the full index→name mapping as a validation output.
 
@@ -210,7 +213,7 @@ The adjacency array must be exported alongside the NPZ dataset as `adjacency.npy
 
 ---
 
-**Section 2 — IPN Annotation Ingestion** *(largely unchanged from `build_ipn_dataset.py` logic)*
+**Section 2 — IPN Annotation Ingestion** _(largely unchanged from `build_ipn_dataset.py` logic)_
 
 Purpose: Load `Annot_List.txt`, parse gesture segments, apply IPN→vocabulary label mapping.
 
@@ -220,7 +223,7 @@ Add: count of segments per gesture class at this stage (pre-extraction diagnosti
 
 ---
 
-**Section 3 — Holistic Landmark Extraction** *(replaces MediaPipe Hands extraction)*
+**Section 3 — Holistic Landmark Extraction** _(replaces MediaPipe Hands extraction)_
 
 Purpose: For each IPN video segment, extract 67 keypoints per frame using MediaPipe Holistic.
 
@@ -245,7 +248,7 @@ Purpose: For each IPN video segment, extract 67 keypoints per frame using MediaP
 
 ---
 
-**Section 4 — Graph Frame Construction & Normalisation** *(new section, does not exist in current notebook)*
+**Section 4 — Graph Frame Construction & Normalisation** _(new section, does not exist in current notebook)_
 
 Purpose: Convert raw `(T, 67, 3)` per-segment arrays into normalised graph tensors.
 
@@ -261,7 +264,7 @@ Add a visualisation cell: plot a single frame's graph (nodes + edges) using matp
 
 ---
 
-**Section 5 — Temporal Sequencing** *(replaces current sliding-window logic)*
+**Section 5 — Temporal Sequencing** _(replaces current sliding-window logic)_
 
 Purpose: Apply sliding window over the per-segment `(F, 67, 3)` arrays to produce `(T, 67, 3)` sequence samples.
 
@@ -277,7 +280,7 @@ Add: histogram of per-segment valid_ratio distribution before and after windowin
 
 ---
 
-**Section 6 — Dataset Export** *(replaces current save cell)*
+**Section 6 — Dataset Export** _(replaces current save cell)_
 
 Purpose: Save the graph dataset in the new NPZ schema.
 
@@ -303,9 +306,23 @@ adjacency:        float32 (67, 67)         — degree-normalised adjacency matri
   "num_coords": 3,
   "window_length": 24,
   "window_step": 3,
-  "node_index_map": {"right_hand": [0, 20], "left_hand": [21, 41], "pose": [42, 52], "face": [53, 66]},
+  "node_index_map": {
+    "right_hand": [0, 20],
+    "left_hand": [21, 41],
+    "pose": [42, 52],
+    "face": [53, 66]
+  },
   "normalisation": "wrist_anchor_scale",
-  "vocabulary": ["open_palm_hold", "swipe_right", "swipe_left", "swipe_up", "swipe_down", "zoom_in", "zoom_out", "unknown"],
+  "vocabulary": [
+    "open_palm_hold",
+    "swipe_right",
+    "swipe_left",
+    "swipe_up",
+    "swipe_down",
+    "zoom_in",
+    "zoom_out",
+    "unknown"
+  ],
   "min_valid_ratio": 0.8
 }
 ```
@@ -316,11 +333,12 @@ Do NOT save a flat `(N, T, 147)` NPZ. The old schema is fully retired.
 
 ---
 
-**Section 7 — Dataset Validation** *(new section)*
+**Section 7 — Dataset Validation** _(new section)_
 
 Purpose: Automated shape and sanity checks.
 
 Required checks:
+
 1. `sequences.shape == (N, T, 67, 3)` — assert exactly.
 2. `label_ids` covers all 8 classes — assert `set(label_ids) == set(range(8))`.
 3. Per-class sequence counts — flag any class with < 50 samples.
@@ -331,7 +349,7 @@ Required checks:
 
 ---
 
-**Section 8 — Dataset Analysis & Visualisation** *(adapted from current Sections 3–8)*
+**Section 8 — Dataset Analysis & Visualisation** _(adapted from current Sections 3–8)_
 
 The existing analysis cells (class distribution, recording coverage, valid_ratio distribution) are largely portable. Required adaptations:
 
@@ -360,10 +378,12 @@ Rename to `LabeledGraphFrame` to make the schema break explicit and prevent acci
 ### 5.3 `SequenceDatasetBuilder` — replace core logic
 
 **Remove entirely:**
+
 - `self._transformer = LandmarkFeatureTransformer(...)` — no feature engineering.
 - The `LandmarkPacket` construction and `.transform()` call in `add_frame()`.
 
 **Replace `add_frame()` with:**
+
 1. Accept `LabeledGraphFrame` (not `LabeledLandmarkFrame`).
 2. Normalise the `(67, 3)` keypoint array using the wrist-anchor-scale procedure (identical to Section 4 of the notebook).
 3. Push the normalised `(67, 3)` array directly into the buffer.
@@ -508,21 +528,27 @@ elif artifact_type.startswith("two_stream"):
 Cell-by-cell analysis against current notebook structure:
 
 ### Cell 1 (lines 28–52) — Imports & Environment
+
 **Change:** Add `from maestro.infrastructure.model.stgcn_lstm import STGCN_LSTM`. Remove `gesture_control` import alias (it uses the wrong package path). Verify `torch.__version__ >= 2.0`.
 
 ### Cell 2 (lines 61–103) — Configuration
+
 **Change:** Replace `MODEL_TYPE = "two_stream"` with `MODEL_TYPE = "stgcn"`. Replace `_CONFIG_MAP` to point to `configs/model/stgcn_lstm.yaml`. Replace dataset candidates: prefer `ipn_graph_v1.npz` (new schema). Add `N_NODES = 67; N_COORDS = 3` constants.
 
 ### Cell 3 (lines 109–138) — Load Training Configuration
+
 **Change:** After loading config, add: load `adjacency` from NPZ dataset via `np.load(DATASET_PATH)["adjacency"]`. Convert to `torch.FloatTensor`. Print adjacency shape for verification.
 
 ### Cell 4 (lines 144–160) — Load Dataset
+
 **Change:** Replace `SequenceTensorDataset` with `GraphSequenceTensorDataset`. Assert `sequences.shape[2] == 67` and `sequences.shape[3] == 3`. Print `(N, T, N_nodes, C)` shape.
 
 ### Cell 5 (lines 163–207) — Data Splits Visualisation
+
 **Change:** Replace `F = sequences.shape[2]` with `_, T, N_nodes, C = sequences.shape`. Feature correlation heatmap: replace with node-position mean visualisation. Class distribution bar chart: no change.
 
 ### Cell 6 (lines 213–246) — Build Model
+
 **Replace entirely:**
 
 ```python
@@ -541,24 +567,31 @@ model = STGCN_LSTM(
 Print parameter count. Target: < 500K parameters for CPU real-time viability.
 
 ### Cell 7 (lines 252–275) — Training Loop
+
 **No structural change required.** `train_lstm()` function receives graph datamodule; model receives `(B, T, 67, 3)` batches. Verify `grad_clip_norm` is active (unchanged).
 
 ### Cell 8 (lines 281–345) — Learning Curves
+
 **No change required.** Loss/accuracy vs epoch plots are model-agnostic.
 
 ### Cell 9 (lines 351–378) — Validation Evaluation
+
 **No change required.** `evaluate_model()` operates on logits.
 
 ### Cell 10 (lines 384–415) — Confusion Matrix
+
 **No change required.**
 
 ### Cell 11 (lines 421–473) — Per-Class Metrics
+
 **No change required.** Flag any class with recall < 70%.
 
 ### Cell 12 (lines 483–560) — Export
+
 **Change:** Pass adjacency into export payload. `artifact_type` becomes `"stgcn_lstm_inference"`. Filename: `<version>_stgcn_inference.pt`.
 
 ### Cell 13 (lines 566–606) — Hugging Face Publish
+
 **Change:** Repo target: `ntsrigaud/maestro-stgcn` (not the existing LSTM repo). Update model card template to describe STGCN-LSTM, graph schema version, 67 nodes, adjacency structure. `hf_publish.py` must be updated to pass adjacency in the model card metadata.
 
 ### New Required Section — Graph Dataset Inspection (insert before Cell 4)
@@ -571,14 +604,14 @@ Add a dedicated cell to visualise a random sample's graph tensor: plot skeleton 
 
 ### 8.1 New Files to Create
 
-| File | Purpose |
-|---|---|
+| File                                                         | Purpose                                                                          |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | `src/maestro/infrastructure/mediapipe/holistic_extractor.py` | `HolisticLandmarkExtractor` — wraps MediaPipe Holistic, returns `(67, 3)` arrays |
-| `src/maestro/infrastructure/model/stgcn_lstm.py` | `STGCN_LSTM` PyTorch module (new implementation) |
-| `configs/model/stgcn_lstm.yaml` | STGCN-LSTM architecture and training hyperparameters |
-| `src/maestro/domain/entities.py` → add `GraphFrame` | New domain entity for graph-structured frame data |
-| `src/maestro/pipeline/graph_buffering.py` | `GraphSequenceBuffer` — buffers `GraphFrame` objects |
-| `src/maestro/pipeline/graph_schema.py` | Single source of truth for node index map, adjacency construction, normalisation |
+| `src/maestro/infrastructure/model/stgcn_lstm.py`             | `STGCN_LSTM` PyTorch module (new implementation)                                 |
+| `configs/model/stgcn_lstm.yaml`                              | STGCN-LSTM architecture and training hyperparameters                             |
+| `src/maestro/domain/entities.py` → add `GraphFrame`          | New domain entity for graph-structured frame data                                |
+| `src/maestro/pipeline/graph_buffering.py`                    | `GraphSequenceBuffer` — buffers `GraphFrame` objects                             |
+| `src/maestro/pipeline/graph_schema.py`                       | Single source of truth for node index map, adjacency construction, normalisation |
 
 ### 8.2 `configs/model/stgcn_lstm.yaml` — Required Structure
 
@@ -587,7 +620,7 @@ model:
   model_name: stgcn_lstm_v1
   num_nodes: 67
   num_coords: 3
-  stgcn_channels: [64, 128]      # output channels per STGCN layer
+  stgcn_channels: [64, 128] # output channels per STGCN layer
   num_stgcn_layers: 2
   lstm_hidden: 128
   lstm_layers: 2
@@ -595,9 +628,9 @@ model:
   num_classes: 8
 
 training:
-  epochs: 60                     # longer convergence expected
-  batch_size: 32                 # smaller due to 4-D tensors
-  learning_rate: 0.0005          # lower initial LR for graph models
+  epochs: 60 # longer convergence expected
+  batch_size: 32 # smaller due to 4-D tensors
+  learning_rate: 0.0005 # lower initial LR for graph models
   weight_decay: 0.0001
   grad_clip_norm: 1.0
   early_stopping_patience: 10
@@ -626,7 +659,7 @@ export:
 augmentation:
   enabled: true
   temporal_scale_range: [0.8, 1.2]
-  spatial_jitter_sigma: 0.003    # lower: raw coords more sensitive than normalised features
+  spatial_jitter_sigma: 0.003 # lower: raw coords more sensitive than normalised features
   apply_prob: 0.5
   mirror_flip_prob: 0.5
 ```
@@ -635,14 +668,14 @@ augmentation:
 
 The following components must be **identical** between training and runtime inference:
 
-| Component | Training path | Inference path |
-|---|---|---|
-| Holistic keypoint extraction | `HolisticLandmarkExtractor` | Same class |
-| 67-node index mapping | Defined once in `graph_schema.py` | Imported by extractor |
-| Wrist-anchor normalisation | Applied in `SequenceDatasetBuilder.add_frame()` | Applied in `GraphSequenceBuffer` or runtime pipeline |
-| Adjacency matrix | Loaded from NPZ at training time | Loaded from `InferenceArtifact.adjacency` at runtime |
-| Window length (T=24) | `SlidingWindowSequenceBuffer` | `GraphSequenceBuffer` |
-| Window step | Configured in `stgcn_lstm.yaml` | `InferenceArtifact.window_step` |
+| Component                    | Training path                                   | Inference path                                       |
+| ---------------------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| Holistic keypoint extraction | `HolisticLandmarkExtractor`                     | Same class                                           |
+| 67-node index mapping        | Defined once in `graph_schema.py`               | Imported by extractor                                |
+| Wrist-anchor normalisation   | Applied in `SequenceDatasetBuilder.add_frame()` | Applied in `GraphSequenceBuffer` or runtime pipeline |
+| Adjacency matrix             | Loaded from NPZ at training time                | Loaded from `InferenceArtifact.adjacency` at runtime |
+| Window length (T=24)         | `SlidingWindowSequenceBuffer`                   | `GraphSequenceBuffer`                                |
+| Window step                  | Configured in `stgcn_lstm.yaml`                 | `InferenceArtifact.window_step`                      |
 
 **Recommended:** Create `src/maestro/pipeline/graph_schema.py` as a single source of truth for the node index map and adjacency construction. Import this module in both the training dataset builder and the runtime pipeline.
 
@@ -671,12 +704,12 @@ The `IFeatureTransformer` interface must be replaced with a `IGraphNormaliser` i
 
 ### 9.1 Expected Gains
 
-| Metric | Current (Two-Stream LSTM) | Expected (STGCN-LSTM) | Basis |
-|---|---|---|---|
-| Overall accuracy | ~79.8% | 85–90% | Graph models on skeletal data routinely exceed feature-engineered baselines by 6–12% on similar-scale datasets |
-| Macro-F1 | ~79.3% | 84–89% | Spatial relational modelling eliminates the main failure mode: gestures where hand shape matters as much as trajectory (e.g., zoom_in vs zoom_out) |
-| Worst-class recall | <70% | >75% | Two-hop graph conv captures finger configurations not representable in flat velocity vectors |
-| Translation invariance | Wrist-relative only | Structural (graph topology preserving) | Graph conv is inherently permutation-invariant and translation-equivariant |
+| Metric                 | Current (Two-Stream LSTM) | Expected (STGCN-LSTM)                  | Basis                                                                                                                                              |
+| ---------------------- | ------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overall accuracy       | ~79.8%                    | 85–90%                                 | Graph models on skeletal data routinely exceed feature-engineered baselines by 6–12% on similar-scale datasets                                     |
+| Macro-F1               | ~79.3%                    | 84–89%                                 | Spatial relational modelling eliminates the main failure mode: gestures where hand shape matters as much as trajectory (e.g., zoom_in vs zoom_out) |
+| Worst-class recall     | <70%                      | >75%                                   | Two-hop graph conv captures finger configurations not representable in flat velocity vectors                                                       |
+| Translation invariance | Wrist-relative only       | Structural (graph topology preserving) | Graph conv is inherently permutation-invariant and translation-equivariant                                                                         |
 
 ### 9.2 Risks
 
@@ -688,6 +721,7 @@ The primary real-time risk. The current two-stream LSTM has ~182K parameters and
 - Graph conv (matrix multiply against 67×67 adjacency): at `(B=1, T=24, N=67, C=64)`, a single GCN layer is `67×67 × 64 ≈ 288K` multiply-accumulates. For 2 layers: ~576K MACs. This is fast but the batched tensor operations add overhead.
 
 **Mitigation strategies:**
+
 1. **MediaPipe Holistic model complexity reduction:** Use `model_complexity=0` (lightweight model) for real-time inference. Use `model_complexity=1` only for dataset building offline.
 2. **Downscale input video** to 480p before Holistic extraction in the runtime pipeline (not during dataset building, where accuracy matters more).
 3. **Reduce STGCN layer count** to 1 if latency testing shows >40ms inference time on the target CPU.
@@ -702,6 +736,7 @@ The IPN dataset provides ~7,000–10,000 gesture sequences (exact count depends 
 Overfitting is a serious risk at this scale.
 
 **Mitigation strategies:**
+
 1. **DropEdge regularisation:** randomly zero out edges in the adjacency matrix during training (analogous to Dropout for graphs). Drop probability 0.1–0.2.
 2. **Aggressive data augmentation:** Spatial jitter, temporal scaling, mirror flip (left/right swap) — all defined in Section 6.3. Additionally: random node dropout (zero out random non-wrist nodes during training to simulate partial occlusion).
 3. **Keep STGCN channels small:** `[32, 64]` instead of `[64, 128]`. Prioritise training stability over parameter capacity.
@@ -715,6 +750,7 @@ The current parity guarantee comes from sharing `LandmarkFeatureTransformer` and
 The new parity depends on the normalisation procedure being implemented identically in `SequenceDatasetBuilder` and the runtime `GraphNormaliser`. Any divergence (e.g., different wrist-anchor formula, different keypoint ordering) silently degrades inference accuracy without raising an error.
 
 **Mitigation strategies:**
+
 1. Create `src/maestro/pipeline/graph_schema.py` as the single source of truth for all graph-related constants (node indices, normalisation formula, adjacency construction). Both paths must import from this module — never inline constants.
 2. Add a `src/maestro/utils/feature_validation.py` check that verifies `graph_schema_version` in the artifact matches the current runtime schema version. Fail loudly (not silently) on mismatch.
 3. Write an integration test that extracts a known video frame, normalises it via both paths, and asserts coordinate arrays are bitwise identical.
@@ -740,6 +776,7 @@ IPN annotations give frame-level gesture labels for the original video frames. T
 Execute in strict phase order. Do not begin Phase 2 before Phase 1 is verified with shape assertions.
 
 **Phase 1 — Data Infrastructure (2–3 weeks, highest risk)**
+
 1. Implement `graph_schema.py` — pin node index map, adjacency construction, normalisation function.
 2. Implement `HolisticLandmarkExtractor` in `infrastructure/mediapipe/`.
 3. Refactor `dataset_builder.py` — `LabeledGraphFrame`, `SequenceDatasetBuilder` overhaul.
@@ -748,11 +785,13 @@ Execute in strict phase order. Do not begin Phase 2 before Phase 1 is verified w
 6. Implement Section 7 validation cell. All checks must pass before proceeding.
 
 **Phase 2 — Model Implementation (1 week)**
+
 1. Implement `STGCN_LSTM` in `infrastructure/model/stgcn_lstm.py` using PyTorch, following the conceptual design from the reference but adapted for 67 nodes and classification.
 2. Unit test: forward pass with `(2, 24, 67, 3)` input → `(2, 8)` logits. Test gradient flow.
 3. Add `stgcn_lstm.yaml` config.
 
 **Phase 3 — Training Pipeline Integration (1 week)**
+
 1. Refactor `datamodule.py` — 4-D tensor support, `GraphSequenceTensorDataset`.
 2. Refactor `augmentation.py` — node-axis augmentation.
 3. Refactor `train_lstm.py` — model factory dispatch.
@@ -760,12 +799,14 @@ Execute in strict phase order. Do not begin Phase 2 before Phase 1 is verified w
 5. Run first training run. Expect > 10 epochs to convergence on graph data.
 
 **Phase 4 — Export & Inference Integration (1 week)**
+
 1. Refactor `export_checkpoint.py`, `checkpoint_loader.py`.
 2. Replace `HandSelector` + `LandmarkFeatureTransformer` in runtime pipeline with `GraphNormaliser` + `GraphSequenceBuffer`.
 3. Latency benchmark on target CPU. If > 50ms end-to-end, reduce model complexity.
 4. Publish to `ntsrigaud/maestro-stgcn` on Hugging Face.
 
 **Phase 5 — Validation & Regression (0.5 weeks)**
+
 1. Run full evaluation: confusion matrix, per-class recall. All classes must exceed 70% recall.
 2. Run `scripts/benchmark_system.py` — P95 latency < 50ms.
 3. Parity integration test (normalisation path equivalence).
@@ -781,12 +822,12 @@ Execute in strict phase order. Do not begin Phase 2 before Phase 1 is verified w
 
 ### 10.3 Success Criteria
 
-| Criterion | Gate |
-|---|---|
-| Dataset shape | `ipn_graph_v1.npz` sequences: `(N, 24, 67, 3)`, all 8 classes |
-| Training convergence | Val macro-F1 improves over 20 epochs without divergence |
-| Accuracy target | Test macro-F1 ≥ 84% |
-| Worst-class recall | All classes ≥ 72% recall |
-| CPU inference latency | P95 < 50ms end-to-end (Holistic + buffer + model + stabiliser) |
-| Parity test | Training and runtime normalisation produce bitwise-identical coordinates on shared test frame |
-| Artifact integrity | `checkpoint_loader.py` loads new artifact without errors; model runs in eval mode |
+| Criterion             | Gate                                                                                          |
+| --------------------- | --------------------------------------------------------------------------------------------- |
+| Dataset shape         | `ipn_graph_v1.npz` sequences: `(N, 24, 67, 3)`, all 8 classes                                 |
+| Training convergence  | Val macro-F1 improves over 20 epochs without divergence                                       |
+| Accuracy target       | Test macro-F1 ≥ 84%                                                                           |
+| Worst-class recall    | All classes ≥ 72% recall                                                                      |
+| CPU inference latency | P95 < 50ms end-to-end (Holistic + buffer + model + stabiliser)                                |
+| Parity test           | Training and runtime normalisation produce bitwise-identical coordinates on shared test frame |
+| Artifact integrity    | `checkpoint_loader.py` loads new artifact without errors; model runs in eval mode             |

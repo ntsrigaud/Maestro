@@ -127,7 +127,7 @@ class ModelSourceConfig(BaseModel):
     # Hugging Face Hub settings.
     repo_id: str = "ntsrigaud/gesture-control-lstm"
     revision: str = "main"
-    filename: str = "two_stream_lstm_v1_20260420T091839Z_inference.pt"
+    filename: str = "two_stream_attn_v1_20260503T065204Z_inference.pt"
     cache_dir: str | None = None
 
 
