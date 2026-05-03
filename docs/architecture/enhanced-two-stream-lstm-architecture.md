@@ -149,4 +149,4 @@ Runtime loading enforces these rules:
 - `docs/architecture/data-flow.md`
 - `docs/architecture/process-view.md`
 - `docs/architecture/system-overview.md`
-- `docs/ml-system/feature-schema-v5.md`
+- `docs/ml-system/feature-schema.md`
