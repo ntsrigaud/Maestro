@@ -1,7 +1,7 @@
 # Training Pipeline: Dataset Preparation → Model Training → Hugging Face Deployment
 
 This document describes the offline ML pipeline that produces the production
-`two_stream_lstm_v1` artefact — from raw IPN Hand video files through to the
+`two_stream_attn_v1` artefact — from raw IPN Hand video files through to the
 published model on Hugging Face Hub. This pipeline is entirely separate from the
 real-time inference path: **no webcam or live camera is involved at any stage.**
 
@@ -29,7 +29,7 @@ flowchart TD
         direction TB
         VIDEOS["IPN Hand Videos<br/>200 MP4 files · 640×480 · 30 FPS<br/>50 subjects · lab environment"]
         ANNOT["Annotation Files<br/>Annot_TrainList.txt · Annot_TestList.txt<br/>Columns: video, label, t_start, t_end<br/>14 IPN gesture labels total"]
-        VOCAB["Vocabulary Config<br/>configs/gestures/vocabulary_ipn.yaml<br/>8 production classes<br/>G03–G11 + D0X + B0A + B0B"]
+        VOCAB["Vocabulary Config<br/>configs/gestures/vocabulary_ipn.yaml<br/>14-class baseline (ipn_v3)<br/>B0A/B0B + D0X + G01..G11"]
     end
 
     class VIDEOS rawNode
@@ -61,7 +61,7 @@ flowchart TD
 
     subgraph PH3["Phase 3 — Label Mapping and Segment Filtering"]
         direction TB
-        LMAP["IPN → Vocabulary Mapping<br/>G03 → swipe_up    G04 → swipe_down<br/>G05 → swipe_left  G06 → swipe_right<br/>G07 → open_palm_hold<br/>G10 → zoom_in     G11 → zoom_out<br/>D0X + B0A + B0B → unknown<br/>G01 G02 G08 G09 → SKIPPED (no control semantic)"]
+        LMAP["IPN → Vocabulary Mapping<br/>B0A → point_one     B0B → point_two<br/>D0X → unknown<br/>G01 → click_one     G02 → click_two<br/>G03 → swipe_up      G04 → swipe_down<br/>G05 → swipe_left    G06 → swipe_right<br/>G07 → open_palm_hold<br/>G08 → double_click_one   G09 → double_click_two<br/>G10 → zoom_in       G11 → zoom_out"]
         SUBSAMP["Unknown Class Subsampling<br/>unknown sequences subsampled to prevent domination<br/>Inverse-frequency class weights computed for training loss"]
     end
 
@@ -96,8 +96,8 @@ flowchart TD
 
     subgraph PH5["Phase 5 — Mirror Augmentation and Dataset Serialisation"]
         direction TB
-        MIRR["Mirror Augmentation (optional)<br/>Label-aware horizontal flip<br/>swipe_left ↔ swipe_right are swapped<br/>Doubles training set size<br/>Produces: ipn_dataset_v5_mirrored.npz"]
-        NPZ["Output NPZ Dataset<br/>data/processed/ipn_dataset_v5_mirrored.npz<br/>────────────────────────────────────<br/>sequences   (N, 24, 147)  float32<br/>labels      (N,)          str<br/>label_ids   (N,)          int64<br/>recording_ids (N,)        str<br/>valid_ratio (N,)          float32<br/>metadata_json             JSON blob"]
+        MIRR["Mirror Augmentation (optional)<br/>Label-aware horizontal flip<br/>swipe_left ↔ swipe_right are swapped<br/>Doubles training set size"]
+        NPZ["Output NPZ Dataset<br/>data/processed/*.npz (configurable output path)<br/>────────────────────────────────────<br/>sequences   (N, 24, 147)  float32<br/>labels      (N,)          str<br/>label_ids   (N,)          int64<br/>recording_ids (N,)        str<br/>valid_ratio (N,)          float32<br/>metadata_json             JSON blob"]
     end
 
     class MIRR buildNode
@@ -126,9 +126,9 @@ flowchart TD
 
     subgraph PH7["Phase 7 — Training Configuration"]
         direction LR
-        CFG_MODEL["Model Hyperparameters<br/>two_stream_lstm.yaml<br/>────────────────────────────<br/>input_size    : 147<br/>hidden_size   : 64 (per stream)<br/>num_layers    : 2<br/>dropout       : 0.3<br/>num_classes   : 8"]
-        CFG_TRAIN["Training Hyperparameters<br/>────────────────────────────<br/>epochs        : 30 (max)<br/>batch_size    : 64<br/>learning_rate : 0.001<br/>weight_decay  : 0.0001<br/>grad_clip_norm: 1.0<br/>seed          : 42"]
-        CFG_STOP["Early Stopping<br/>────────────────────────────<br/>patience      : 7 epochs<br/>min_delta     : 0.0001<br/>Monitor       : val_loss"]
+        CFG_MODEL["Model Hyperparameters<br/>two_stream_attn.yaml (default)<br/>────────────────────────────<br/>input_size    : 147<br/>hidden_size   : 96 (per direction)<br/>num_layers    : 2<br/>num_heads     : 8<br/>proj_dim      : 96<br/>num_classes   : 8 (runtime profile)"]
+        CFG_TRAIN["Training Hyperparameters<br/>────────────────────────────<br/>epochs        : 100 (max)<br/>batch_size    : 64<br/>learning_rate : 0.00009<br/>weight_decay  : 0.0005<br/>grad_clip_norm: 1.0<br/>seed          : 42"]
+        CFG_STOP["Early Stopping<br/>────────────────────────────<br/>patience      : 25 epochs<br/>min_delta     : 0.0001<br/>Monitor       : val_loss"]
         CFG_SCHED["LR Scheduler<br/>ReduceLROnPlateau<br/>────────────────────────────<br/>factor        : 0.5<br/>patience      : 3 epochs<br/>min_lr        : 1e-6"]
         CFG_AUG["Augmentation (online)<br/>────────────────────────────<br/>temporal_scale: 0.8 – 1.2×<br/>spatial_jitter: σ = 0.005<br/>apply_prob    : 0.5<br/>mirror_flip   : 0.0  (done offline)"]
     end
@@ -145,10 +145,10 @@ flowchart TD
 
     subgraph PH8["Phase 8 — Training Loop"]
         direction TB
-        INIT["Model Initialisation<br/>TwoStreamGestureLSTM<br/>~182 K parameters · device: CPU / MPS / CUDA<br/>Optimizer: AdamW (lr=0.001, wd=0.0001)"]
-        EPOCH["Epoch Loop  (max 30 epochs)<br/>For each mini-batch (size 64):<br/>  → online augmentation applied to training batches<br/>  → forward pass through both LSTM streams<br/>  → CrossEntropyLoss with class weights<br/>  → gradient clip at norm = 1.0<br/>  → AdamW parameter update"]
+        INIT["Model Initialisation<br/>EnhancedTwoStreamLSTM<br/>BiLSTM + MHA + cross-stream gate · device: CPU / MPS / CUDA<br/>Optimizer: AdamW (default config-driven)"]
+        EPOCH["Epoch Loop  (max 100 epochs)<br/>For each mini-batch (size 64):<br/>  → online augmentation applied to training batches<br/>  → forward pass through both enhanced streams<br/>  → CrossEntropyLoss with class weights<br/>  → gradient clip at norm = 1.0<br/>  → AdamW parameter update"]
         VAL["Validation Pass<br/>After each epoch — no augmentation<br/>Metrics: val_loss · val_accuracy · val_macro_f1<br/>ReduceLROnPlateau checks val_loss<br/>Best-epoch checkpoint saved on val_loss improvement"]
-        ES["Early Stopping Check<br/>Stop if val_loss has not improved by<br/>min_delta = 0.0001 for 7 consecutive epochs<br/>Production run: stopped at epoch 11"]
+        ES["Early Stopping Check<br/>Stop if val_loss has not improved by<br/>min_delta = 0.0001 for configured patience window"]
     end
 
     class INIT trainNode
@@ -171,7 +171,7 @@ flowchart TD
 
     subgraph PH9["Phase 9 — Test Set Evaluation"]
         direction TB
-        CKPT["Best Checkpoint Restore<br/>Epoch with lowest val_loss reloaded<br/>Production: epoch 11<br/>Val accuracy: 78.99%   Val Macro-F1: 77.95%"]
+        CKPT["Best Checkpoint Restore<br/>Epoch with lowest val_loss reloaded<br/>Validation metrics are run-specific"]
         EVAL["Test Set Inference (no augmentation)<br/>Full forward pass on held-out 15% split<br/>Metrics computed:<br/>  accuracy · macro F1 · per-class precision/recall<br/>  calibration ECE · confusion matrix"]
         REPORT["Evaluation Report<br/>Per-class F1 · confusion matrix<br/>Swipe directional parity analysis<br/>Overfitting gap (train vs val accuracy)"]
     end
@@ -189,8 +189,8 @@ flowchart TD
 
     subgraph PH10["Phase 10 — Inference Artefact Export"]
         direction TB
-        EXPORT["export_inference_artifact()<br/>Strips training state (optimizer, scheduler)<br/>Bundles into a single .pt dict:<br/>  model_state_dict<br/>  hyperparameters  (input_size, hidden_size, …)<br/>  class_labels     (8 gesture names)<br/>  feature_schema_version  (feature-schema-v5)<br/>  model_name       (two_stream_lstm_v1)<br/>  artifact_type    (two_stream_lstm_inference)"]
-        PTFILE["Inference Artefact<br/>models/exported/<br/>two_stream_lstm_v1_20260420T091839Z_inference.pt<br/>Loadable with load_inference_artifact()<br/>No training dependencies required"]
+        EXPORT["export_inference_artifact()<br/>Strips training state (optimizer, scheduler)<br/>Bundles into a single .pt dict:<br/>  model_state_dict<br/>  hyperparameters  (input_size, hidden_size, …)<br/>  class_labels     (task vocabulary)<br/>  feature_schema_version  (feature-schema-v5)<br/>  model_name       (two_stream_attn_v1 default)<br/>  artifact_type    (two_stream_attn_inference default)"]
+        PTFILE["Inference Artefact<br/>models/exported/<br/>two_stream_attn_v1_*_inference.pt<br/>Loadable with load_inference_artifact()<br/>No training dependencies required"]
         REG["Model Registry Update (optional)<br/>configs/model_source.yaml<br/>Points to new artefact name<br/>Used by runtime to locate the checkpoint"]
     end
 
@@ -207,7 +207,7 @@ flowchart TD
     subgraph PH11["Phase 11 — Hugging Face Hub Publishing"]
         direction TB
         HF_UP["publish_to_huggingface()<br/>Uploads .pt inference artefact<br/>Generates model card with:<br/>  architecture description<br/>  test accuracy · macro F1 · per-class metrics<br/>  feature schema version<br/>  dataset provenance (IPN Hand)<br/>  class label list"]
-        HF_REPO["Hugging Face Hub<br/>ntsrigaud/maestro-lstm<br/>────────────────────────────<br/>Artefact: …091839Z_inference.pt<br/>Access: public<br/>Cached locally on first load by runtime"]
+        HF_REPO["Hugging Face Hub<br/>ntsrigaud/maestro-lstm<br/>────────────────────────────<br/>Artefact: two_stream_attn_v1_*_inference.pt<br/>Access: public<br/>Cached locally on first load by runtime"]
         HF_CFG["model_source.yaml updated<br/>Runtime HFModelSource reads this<br/>to locate + download the published artefact<br/>Falls back to local cache if offline"]
     end
 
@@ -222,19 +222,19 @@ flowchart TD
 
 ## Phase Summary
 
-| Phase                                   | Script / Notebook                                                                     | Key Output                                         |
-| --------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 1 — Raw data                            | External (IPN Hand download)                                                          | 200 MP4 videos + annotation TXT files              |
-| 2 — Landmark extraction                 | `scripts/build_ipn_dataset.py` Phase 1                                                | `cache/<stem>.npz` per video (parallelised)        |
-| 3 — Label mapping                       | `scripts/build_ipn_dataset.py` Phase 2                                                | 8-class vocabulary mapping; 4 labels skipped       |
-| 4 — Feature engineering + windowing     | `build_ipn_dataset.py` → `LandmarkFeatureTransformer` + `SlidingWindowSequenceBuffer` | Sequence windows (N, 24, 147) with majority labels |
-| 5 — Mirror augmentation + serialisation | `build_ipn_dataset.py`                                                                | `data/processed/ipn_dataset_v5_mirrored.npz`       |
-| 6 — Data splits                         | `notebooks/02_model_training.ipynb` → `GestureDataModule`                             | Stratified 70/15/15 train/val/test split           |
-| 7 — Configuration                       | `configs/model/two_stream_lstm.yaml`                                                  | All hyperparameters                                |
-| 8 — Training loop                       | `notebooks/02_model_training.ipynb` → `train_lstm()`                                  | Per-epoch checkpoints; best saved by `val_loss`    |
-| 9 — Evaluation                          | `notebooks/02_model_training.ipynb`                                                   | Test metrics, confusion matrix, per-class report   |
-| 10 — Export                             | `training/export_checkpoint.py`                                                       | `…091839Z_inference.pt` (no training state)        |
-| 11 — Publish                            | `training/hf_publish.py`                                                              | `ntsrigaud/maestro-lstm` on Hugging Face Hub       |
+| Phase                                   | Script / Notebook                                                                     | Key Output                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 1 — Raw data                            | External (IPN Hand download)                                                          | 200 MP4 videos + annotation TXT files                   |
+| 2 — Landmark extraction                 | `scripts/build_ipn_dataset.py` Phase 1                                                | `cache/<stem>.npz` per video (parallelised)             |
+| 3 — Label mapping                       | `scripts/build_ipn_dataset.py` Phase 2                                                | 14-class baseline vocabulary mapping                    |
+| 4 — Feature engineering + windowing     | `build_ipn_dataset.py` → `LandmarkFeatureTransformer` + `SlidingWindowSequenceBuffer` | Sequence windows (N, 24, 147) with majority labels      |
+| 5 — Mirror augmentation + serialisation | `build_ipn_dataset.py`                                                                | `data/processed/*.npz` (output path configurable)       |
+| 6 — Data splits                         | `notebooks/02_model_training.ipynb` → `GestureDataModule`                             | Stratified 70/15/15 train/val/test split                |
+| 7 — Configuration                       | `configs/model/two_stream_attn.yaml`                                                  | Default EnhancedTwoStreamLSTM hyperparameters           |
+| 8 — Training loop                       | `notebooks/02_model_training.ipynb` → `train_lstm()`                                  | Per-epoch checkpoints; best saved by `val_loss`         |
+| 9 — Evaluation                          | `notebooks/02_model_training.ipynb`                                                   | Test metrics, confusion matrix, per-class report        |
+| 10 — Export                             | `training/export_checkpoint.py`                                                       | `two_stream_attn_v1_*_inference.pt` (no training state) |
+| 11 — Publish                            | `training/hf_publish.py`                                                              | `ntsrigaud/maestro-lstm` on Hugging Face Hub            |
 
 ---
 
