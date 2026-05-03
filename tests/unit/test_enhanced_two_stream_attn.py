@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import pytest
 import torch
+import torch.nn as nn
 
 from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
@@ -95,20 +95,20 @@ def test_num_heads_divisibility_guard() -> None:
 
 
 def test_parameter_count_small_config() -> None:
-    """Small config (h=64): ~640 K params after adding cross-attention modules."""
+    """Small config (h=64, proj=64): ~540 K params without cross-attention."""
     model = _make_model(hidden_size=64, proj_dim=64, num_heads=4)
     n_params = sum(p.numel() for p in model.parameters())
-    assert 500_000 < n_params < 900_000, f"Unexpected param count: {n_params:,}"
+    assert 400_000 < n_params < 700_000, f"Unexpected param count: {n_params:,}"
 
 
 def test_parameter_count_large_config() -> None:
-    """Large config (h=128): ~2.5 M params (recommended for IPN 12-class)."""
+    """Recommended config (h=96, proj=96): ~1.2 M params."""
     model = EnhancedTwoStreamLSTM(
-        input_size=147, hidden_size=128, num_layers=2,
-        dropout=0.45, num_classes=12, num_heads=8, proj_dim=128,
+        input_size=147, hidden_size=96, num_layers=2,
+        dropout=0.35, num_classes=12, num_heads=8, proj_dim=96,
     )
     n_params = sum(p.numel() for p in model.parameters())
-    assert 2_000_000 < n_params < 3_500_000, f"Unexpected param count: {n_params:,}"
+    assert 900_000 < n_params < 1_500_000, f"Unexpected param count: {n_params:,}"
 
 
 def test_bidirectional_lstm_output_width() -> None:
@@ -126,31 +126,24 @@ def test_mha_embed_dim_matches_bilstm_output() -> None:
     model = _make_model(hidden_size=64, num_heads=4)
     assert model.mha_a.embed_dim == 128  # 2 × hidden_size
     assert model.mha_b.embed_dim == 128
-    # Cross-attention modules should have the same embed_dim
-    assert model.cross_attn_a.embed_dim == 128
-    assert model.cross_attn_b.embed_dim == 128
 
 
-def test_positional_encoding_buffer_shape() -> None:
-    """PE buffer must be (1, max_seq_len, 2*hidden_size) and non-trainable."""
+def test_pool_ln_modules_exist() -> None:
+    """pool_ln_a/b must be LayerNorm modules for post-pool normalisation."""
     model = _make_model(hidden_size=64)
-    # _pe is a buffer (not a parameter)
-    assert hasattr(model, "_pe"), "Expected '_pe' buffer on model"
-    pe = model._pe
-    assert pe.dim() == 3, f"PE should be 3-D, got {pe.dim()}"
-    assert pe.size(0) == 1, "PE batch dim should be 1"
-    assert pe.size(2) == 128, "PE embed dim should be 2*hidden_size=128"
-    # Verify it is NOT in model.parameters()
-    param_names = {n for n, _ in model.named_parameters()}
-    assert "_pe" not in param_names, "PE should be a buffer, not a parameter"
+    assert isinstance(model.pool_ln_a, nn.LayerNorm)
+    assert isinstance(model.pool_ln_b, nn.LayerNorm)
 
 
-def test_cross_attention_modules_exist() -> None:
-    """cross_attn_a and cross_attn_b must be MHA modules on the model."""
+def test_gate_modules_exist() -> None:
+    """gate_a/b must be 2-layer MLP (nn.Sequential) for cross-stream gating."""
     model = _make_model(hidden_size=64, num_heads=4)
-    import torch.nn as nn
-    assert isinstance(model.cross_attn_a, nn.MultiheadAttention)
-    assert isinstance(model.cross_attn_b, nn.MultiheadAttention)
+    assert isinstance(model.gate_a, nn.Sequential), (
+        f"Expected nn.Sequential for gate_a, got {type(model.gate_a)}"
+    )
+    assert isinstance(model.gate_b, nn.Sequential), (
+        f"Expected nn.Sequential for gate_b, got {type(model.gate_b)}"
+    )
     assert isinstance(model.ln_cross_a, nn.LayerNorm)
     assert isinstance(model.ln_cross_b, nn.LayerNorm)
 
