@@ -42,7 +42,7 @@ model:
   hidden_size: 64 # per-direction per-stream; BiLSTM output = 2×64 = 128
   num_layers: 2
   dropout: 0.3
-  num_classes: 8 # must match dataset vocabulary (set by build_ipn_dataset.py)
+  num_classes: 12 # all 11 IPN Hand gesture classes (G01–G11) + unknown
   # EnhancedTwoStreamLSTM-specific fields
   num_heads: 4 # MHA heads; must divide 2×hidden_size = 128 evenly
   proj_dim: 64 # feature projection output dim (73/74 → 64 before LSTM)
