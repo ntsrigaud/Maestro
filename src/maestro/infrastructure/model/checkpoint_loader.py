@@ -19,8 +19,8 @@ def _build_model_from_artifact(
 ) -> torch.nn.Module:
     """Instantiate the correct model class from *artifact_type* / *model_config*.
 
-    Dispatches on ``artifact_type`` (preferred) then falls back to ``model_name``:
-    * ``two_stream_lstm_inference`` → :class:`TwoStreamGestureLSTM`
+    Runtime supports only the production EnhancedTwoStreamLSTM artifact:
+    * ``two_stream_attn_inference``
     """
     model_name = str(model_config.get("model_name", ""))
 
@@ -37,20 +37,9 @@ def _build_model_from_artifact(
             proj_dim=int(model_config.get("proj_dim", 64)),
         ).to(device)
 
-    if artifact_type.startswith("two_stream") or model_name.startswith("two_stream"):
-        from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
-
-        return TwoStreamGestureLSTM(
-            input_size=int(model_config["input_size"]),
-            hidden_size=int(model_config["hidden_size"]),
-            num_layers=int(model_config["num_layers"]),
-            dropout=float(model_config["dropout"]),
-            num_classes=int(model_config["num_classes"]),
-        ).to(device)
-
     raise ValueError(
         f"Unsupported artifact type {artifact_type!r} (model_name={model_name!r}). "
-        "Supported types: 'two_stream_attn_inference', 'two_stream_lstm_inference'."
+        "Supported type: 'two_stream_attn_inference'."
     )
 
 
