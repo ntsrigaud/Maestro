@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -438,7 +439,42 @@ def train_lstm(
     checkpoint_output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = checkpoint_output_dir / f"{model_version}.pt"
 
+    n_train = len(datamodule.train_indices)
+    n_val   = len(datamodule.val_indices)
+    n_params = sum(p.numel() for p in model.parameters())
+    _header_cols = (
+        f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  "
+        f"{'ValLoss':>8}  {'ValAcc':>7}  {'ValF1':>6}  "
+        f"{'LR':>8}  {'Time':>6}  {'ES':>5}  Note"
+    )
+    _sep = "-" * len(_header_cols)
+    print(f"\nTraining  {model_version}")
+    print(
+        f"  Model     : {type(model).__name__}  ({n_params:,} params)"
+    )
+    print(
+        f"  Dataset   : train={n_train:,}  val={n_val:,}"
+    )
+    print(
+        f"  Optimiser : AdamW  lr={config.training.learning_rate:.2e}  "
+        f"wd={config.training.weight_decay:.2e}"
+    )
+    print(
+        f"  Schedule  : ReduceLROnPlateau  "
+        f"factor={config.scheduler.factor}  patience={config.scheduler.patience}"
+        if config.scheduler.enabled else "  Schedule  : none"
+    )
+    print(
+        f"  Stopping  : patience={config.training.early_stopping_patience}  "
+        f"min_delta={config.training.early_stopping_min_delta:.0e}  "
+        f"metric=val_macro_f1"
+    )
+    print(_sep)
+    print(_header_cols)
+    print(_sep, flush=True)
+
     for epoch in range(1, config.training.epochs + 1):
+        _t_epoch = time.perf_counter()
         train_loss, train_acc = _train_one_epoch(
             model=model,
             dataloader=train_loader,
@@ -460,6 +496,7 @@ def train_lstm(
             scheduler.step(val_report.macro_f1)
 
         current_lr = float(optimizer.param_groups[0]["lr"])
+        _epoch_secs = time.perf_counter() - _t_epoch
         history.append(
             {
                 "epoch": float(epoch),
@@ -469,6 +506,7 @@ def train_lstm(
                 "val_accuracy": val_report.accuracy,
                 "val_macro_f1": val_report.macro_f1,
                 "learning_rate": current_lr,
+                "epoch_secs": _epoch_secs,
             }
         )
 
@@ -491,11 +529,38 @@ def train_lstm(
                 },
                 checkpoint_path,
             )
+            _note = "* best"
         else:
             epochs_without_improve += 1
+            _note = f"  ES {epochs_without_improve}/{config.training.early_stopping_patience}"
+
+        print(
+            f"{epoch:>6}/{config.training.epochs:<4}  "
+            f"{train_loss:>9.4f}  {train_acc:>8.1%}  "
+            f"{val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  "
+            f"{val_report.macro_f1:>6.1%}  "
+            f"{current_lr:>8.2e}  {_epoch_secs:>5.1f}s  "
+            f"{_note}",
+            flush=True,
+        )
 
         if epochs_without_improve >= config.training.early_stopping_patience:
+            print(
+                f"\nEarly stopping at epoch {epoch}  "
+                f"(no improvement in val_macro_f1 for "
+                f"{config.training.early_stopping_patience} epochs)",
+                flush=True,
+            )
             break
+
+    else:
+        print(f"\nCompleted all {config.training.epochs} epochs.", flush=True)
+
+    print(
+        f"\nBest epoch  : {best_epoch}  "
+        f"val_macro_f1={best_val_f1:.4f}  val_loss={best_val_loss:.4f}",
+        flush=True,
+    )
 
     checkpoint_payload = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint_payload["model_state_dict"])
