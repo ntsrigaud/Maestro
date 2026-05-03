@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 import torch
-from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 from maestro.training.augmentation import AugmentationConfig, GestureAugmenter
@@ -322,6 +321,8 @@ class GestureDataModule:
         partition ends up with fewer than 2 unique recordings, the val/test sub-
         split falls back to random ``train_test_split``.
         """
+        from sklearn.model_selection import GroupShuffleSplit, train_test_split
+
         n = len(label_ids)
         all_idx = np.arange(n)
         temp_ratio = self._split.val_ratio + self._split.test_ratio
@@ -355,6 +356,8 @@ class GestureDataModule:
         return np.asarray(train_idx), np.asarray(val_idx), np.asarray(test_idx)
 
     def _split_indices(self, label_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        from sklearn.model_selection import train_test_split
+
         n = label_ids.shape[0]
         all_idx = np.arange(n)
 
@@ -712,6 +715,8 @@ class GraphGestureDataModule:
         label_ids: np.ndarray,
         recording_ids: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        from sklearn.model_selection import GroupShuffleSplit, train_test_split
+
         n = len(label_ids)
         all_idx = np.arange(n)
         temp_ratio = self._split.val_ratio + self._split.test_ratio
@@ -733,6 +738,8 @@ class GraphGestureDataModule:
         return np.asarray(train_idx), np.asarray(val_idx), np.asarray(test_idx)
 
     def _split_indices(self, label_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        from sklearn.model_selection import train_test_split
+
         n = label_ids.shape[0]
         all_idx = np.arange(n)
         temp_ratio = self._split.val_ratio + self._split.test_ratio

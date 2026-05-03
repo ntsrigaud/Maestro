@@ -4,12 +4,6 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 import torch
-from sklearn.metrics import (
-    accuracy_score,
-    confusion_matrix,
-    f1_score,
-    precision_recall_fscore_support,
-)
 from torch.utils.data import DataLoader
 
 
@@ -65,6 +59,13 @@ def evaluate_model(
     device: torch.device,
     criterion: torch.nn.Module,
 ) -> EvaluationReport:
+    from sklearn.metrics import (
+        accuracy_score,
+        confusion_matrix,
+        f1_score,
+        precision_recall_fscore_support,
+    )
+
     model.eval()
     total_loss = 0.0
     total_examples = 0
