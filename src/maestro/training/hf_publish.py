@@ -383,9 +383,13 @@ Input (B, T=24, 147)
     │   (identical structure) → ctx_b (B, {bilstm_out})
     │
     ├─ MLP cross-stream gate
-    │   gate_a = Sigmoid(Linear({gate_hidden}→{bilstm_out})(Tanh(Linear({bilstm_out}→{gate_hidden})(ctx_b))))
+    │   gate_a = Sigmoid(
+    │     Linear({gate_hidden}→{bilstm_out})(
+    │       Tanh(Linear({bilstm_out}→{gate_hidden})(ctx_b))))
     │   ctx_a  = LN(ctx_a × gate_a + ctx_a)
-    │   gate_b = Sigmoid(Linear({gate_hidden}→{bilstm_out})(Tanh(Linear({bilstm_out}→{gate_hidden})(ctx_a))))
+    │   gate_b = Sigmoid(
+    │     Linear({gate_hidden}→{bilstm_out})(
+    │       Tanh(Linear({bilstm_out}→{gate_hidden})(ctx_a))))
     │   ctx_b  = LN(ctx_b × gate_b + ctx_b)
     │
     └─ cat(ctx_a, ctx_b) → ({fused_dim},)
