@@ -91,6 +91,7 @@ def _is_nan(lm: object) -> bool:
         or math.isnan(getattr(lm, "z", 0.0))
     )
 
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -102,20 +103,20 @@ logger = logging.getLogger(__name__)
 # negative examples under the ``unknown`` class.
 
 IPN_TO_VOCAB: dict[str, str] = {
-    "D0X": "unknown",          # non-gesture background
-    "B0A": "unknown",          # pointing with one finger → negative example
-    "B0B": "unknown",          # pointing with two fingers → negative example
-    "G03": "swipe_up",         # throw up
-    "G04": "swipe_down",       # throw down
-    "G05": "swipe_left",       # throw left
-    "G06": "swipe_right",      # throw right
-    "G07": "open_palm_hold",   # open twice
-    "G10": "zoom_in",          # zoom in
-    "G11": "zoom_out",         # zoom out
-    "G01": "click_one",        # click with one finger
-    "G02": "click_two",        # click with two fingers
-    "G08": "double_click_one", # double click with one finger
-    "G09": "double_click_two", # double click with two fingers
+    "D0X": "unknown",  # non-gesture background
+    "B0A": "unknown",  # pointing with one finger → negative example
+    "B0B": "unknown",  # pointing with two fingers → negative example
+    "G03": "swipe_up",  # throw up
+    "G04": "swipe_down",  # throw down
+    "G05": "swipe_left",  # throw left
+    "G06": "swipe_right",  # throw right
+    "G07": "open_palm_hold",  # open twice
+    "G10": "zoom_in",  # zoom in
+    "G11": "zoom_out",  # zoom out
+    "G01": "click_one",  # click with one finger
+    "G02": "click_two",  # click with two fingers
+    "G08": "double_click_one",  # double click with one finger
+    "G09": "double_click_two",  # double click with two fingers
 }
 
 # ---------------------------------------------------------------------------
@@ -570,7 +571,9 @@ def assemble_dataset(
 # ---------------------------------------------------------------------------
 
 
-def _compute_class_stats(builder: GraphSequenceDatasetBuilder | SequenceDatasetBuilder) -> dict[str, Any]:
+def _compute_class_stats(
+    builder: GraphSequenceDatasetBuilder | SequenceDatasetBuilder,
+) -> dict[str, Any]:
     from collections import Counter
 
     label_counts = Counter(s.label for s in builder.samples)
@@ -655,9 +658,7 @@ def assemble_flat_dataset(
 
             t_end_effective = seg.t_end
             if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
-                t_end_effective = min(
-                    seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1
-                )
+                t_end_effective = min(seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1)
 
             seg_windows_before = len(builder.samples)
             for frame_id in range(seg.t_start, t_end_effective + 1):
