@@ -1,0 +1,81 @@
+# ── EnhancedTwoStreamLSTM — 8-class production configuration ─────────────────
+#
+# This config trains the EnhancedTwoStreamLSTM (two_stream_attn_v1) on the
+# production 8-gesture vocabulary at a 24-frame sliding window (≈800 ms at 30 FPS):
+#
+#   open_palm_hold, swipe_right, swipe_left, swipe_up,
+#   swipe_down, zoom_in, zoom_out, unknown
+#
+# Architecture:
+#   - Bidirectional LSTMs (forward + backward context)
+#   - Multi-Head Self-Attention (Q/K/V, 8 heads) on each stream
+#   - Mean + Max temporal pooling (captures sustained + transient gesture events)
+#   - 2-layer MLP cross-stream gate (compact cross-modal recalibration)
+#   - Feature projection layers (73/74 → proj_dim before LSTM)
+#   - Deeper GELU MLP head with LayerNorm
+#   - AdamW optimiser with class_weighting=true
+#
+# Dataset: build with --window-length 24 --window-step 3
+#   python scripts/build_ipn_dataset.py \
+#       --window-length 24 --window-step 3 \
+#       --output-npz data/processed/ipn_dataset_v5_mirrored.npz
+#
+# ── Parameter budget (hidden_size=96, proj_dim=96, num_heads=8, 8 classes) ───
+#   proj_a / proj_b             2 × ~7 K               ≈   14 K
+#   BiLSTM-A  (2L bidir 96)     layer1 148K+layer2 222K ≈  370 K
+#   BiLSTM-B                    (identical)             ≈  370 K
+#   Self-MHA-A / Self-MHA-B     2 × (8 × 192² + …)     ≈  296 K
+#   pool_ln_a / pool_ln_b       2 × LN(192)             ≈    1 K
+#   gate_a / gate_b             2 × MLP(192→96→192)     ≈   74 K
+#   ln_cross × 2                negligible              ≈    1 K
+#   Head MLP                    384 → 192 → 8           ≈   75 K
+#   Total                                               ≈ 1.20 M
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_v1
+  input_size: 147 # total feature dims (feature-schema-v5); split internally
+  hidden_size: 96 # per-direction per-stream; BiLSTM output = 2×96 = 192
+  num_layers: 2
+  dropout: 0.35
+  num_classes: 8 # 7 active gestures + unknown
+  # EnhancedTwoStreamLSTM-specific fields
+  num_heads: 8 # MHA heads; 192/8 = 24 dims per head ✓
+  proj_dim: 96 # feature projection dim (73/74 → 96 before LSTM)
+
+training:
+  epochs: 100
+  batch_size: 64
+  learning_rate: 0.00009 # 9e-5 — best performing lr from IPN ablation
+  weight_decay: 0.0005
+  grad_clip_norm: 1.0
+  early_stopping_patience: 25
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.05
+  seed: 42
+  num_workers: 0
+  class_weighting: true # inverse-frequency weighting
+
+splits:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 8
+  min_lr: 0.000001
+
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+
+augmentation:
+  enabled: true
+  temporal_scale_range: [0.8, 1.2]
+  spatial_jitter_sigma: 0.005
+  apply_prob: 0.5
+  mirror_flip_prob: 0.5 # label-aware horizontal flip (swipe_left ↔ swipe_right)
