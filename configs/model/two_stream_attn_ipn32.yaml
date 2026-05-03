@@ -61,8 +61,8 @@ model:
 training:
   epochs: 100
   batch_size: 128 # larger batch → more stable gradient estimates
-  learning_rate: 0.0003 # slightly higher LR benefits BiLSTM + attention
-  weight_decay: 0.0005 # stronger weight decay to combat the 16% overfit gap
+  learning_rate: 0.00009 # slightly higher LR benefits BiLSTM + attention
+  weight_decay: 0.0009 # stronger weight decay to combat the 16% overfit gap
   grad_clip_norm: 1.0
   early_stopping_patience: 20
   early_stopping_min_delta: 0.0001
