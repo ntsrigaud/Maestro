@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 import torch
 
-from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -20,24 +20,28 @@ from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 
 
 def _write_artifact(path: Path) -> None:
-    model = TwoStreamGestureLSTM(
+    model = EnhancedTwoStreamLSTM(
         input_size=147,
         hidden_size=64,
         num_layers=2,
         dropout=0.1,
         num_classes=8,
+        num_heads=4,
+        proj_dim=64,
     )
     payload = {
-        "artifact_type": "two_stream_lstm_inference",
-        "artifact_version": "two_stream_test_v1",
+        "artifact_type": "two_stream_attn_inference",
+        "artifact_version": "two_stream_attn_test_v1",
         "model_state_dict": model.state_dict(),
         "model_config": {
-            "model_name": "two_stream_lstm_v1",
+            "model_name": "two_stream_attn_v1",
             "input_size": 147,
             "hidden_size": 64,
             "num_layers": 2,
             "dropout": 0.1,
             "num_classes": 8,
+            "num_heads": 4,
+            "proj_dim": 64,
         },
         "class_labels": [
             "open_palm_hold",
@@ -68,7 +72,7 @@ def _write_artifact(path: Path) -> None:
 def test_load_artifact_from_hub_calls_hf_hub_download(tmp_path: Path) -> None:
     """load_artifact_from_hub should delegate to hf_hub_download and return
     a correctly populated InferenceArtifact."""
-    artifact_path = tmp_path / "lstm_v1_test_inference.pt"
+    artifact_path = tmp_path / "two_stream_attn_v1_test_inference.pt"
     _write_artifact(artifact_path)
 
     with patch("maestro.infrastructure.model.hf_loader.hf_hub_download") as mock_dl:
@@ -80,20 +84,20 @@ def test_load_artifact_from_hub_calls_hf_hub_download(tmp_path: Path) -> None:
 
         artifact = load_artifact_from_hub(
             repo_id="ntsrigaud/gesture-control-lstm",
-            filename="lstm_v1_test_inference.pt",
+            filename="two_stream_attn_v1_test_inference.pt",
             revision="main",
             device=torch.device("cpu"),
         )
 
     mock_dl.assert_called_once_with(
         repo_id="ntsrigaud/gesture-control-lstm",
-        filename="lstm_v1_test_inference.pt",
+        filename="two_stream_attn_v1_test_inference.pt",
         revision="main",
         cache_dir=None,
     )
     assert artifact.feature_schema_version == "feature-schema-v5"
     assert artifact.feature_dim == 147
-    assert artifact.model_version == "two_stream_test_v1"
+    assert artifact.model_version == "two_stream_attn_test_v1"
     assert len(artifact.class_labels) == 8
 
 
