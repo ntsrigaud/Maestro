@@ -24,9 +24,7 @@ def _build_model_from_artifact(
     """
     model_name = str(model_config.get("model_name", ""))
 
-    if artifact_type == "two_stream_attn_inference" or model_name.startswith(
-        "two_stream_attn"
-    ):
+    if artifact_type == "two_stream_attn_inference" or model_name.startswith("two_stream_attn"):
         from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
         return EnhancedTwoStreamLSTM(

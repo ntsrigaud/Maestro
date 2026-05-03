@@ -399,9 +399,7 @@ def train_lstm(
             class_weights, label_smoothing=config.training.label_smoothing
         )
     else:
-        criterion = _build_criterion(
-            None, label_smoothing=config.training.label_smoothing
-        )
+        criterion = _build_criterion(None, label_smoothing=config.training.label_smoothing)
 
     optimizer = AdamW(
         model.parameters(),
@@ -440,7 +438,7 @@ def train_lstm(
     checkpoint_path = checkpoint_output_dir / f"{model_version}.pt"
 
     n_train = len(datamodule.train_indices)
-    n_val   = len(datamodule.val_indices)
+    n_val = len(datamodule.val_indices)
     n_params = sum(p.numel() for p in model.parameters())
     _header_cols = (
         f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  "
@@ -449,12 +447,8 @@ def train_lstm(
     )
     _sep = "-" * len(_header_cols)
     print(f"\nTraining  {model_version}")
-    print(
-        f"  Model     : {type(model).__name__}  ({n_params:,} params)"
-    )
-    print(
-        f"  Dataset   : train={n_train:,}  val={n_val:,}"
-    )
+    print(f"  Model     : {type(model).__name__}  ({n_params:,} params)")
+    print(f"  Dataset   : train={n_train:,}  val={n_val:,}")
     print(
         f"  Optimiser : AdamW  lr={config.training.learning_rate:.2e}  "
         f"wd={config.training.weight_decay:.2e}"
@@ -462,7 +456,8 @@ def train_lstm(
     print(
         f"  Schedule  : ReduceLROnPlateau  "
         f"factor={config.scheduler.factor}  patience={config.scheduler.patience}"
-        if config.scheduler.enabled else "  Schedule  : none"
+        if config.scheduler.enabled
+        else "  Schedule  : none"
     )
     print(
         f"  Stopping  : patience={config.training.early_stopping_patience}  "
