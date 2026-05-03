@@ -141,7 +141,7 @@ The system reads from and writes to the local file system:
 | `experiments/runs/`         | Write      | Training run logs and metrics                                            |
 | `~/.cache/huggingface/hub/` | Read/Write | Hugging Face Hub download cache (first-use download of production model) |
 
-Trained inference artifacts are **not tracked in VCS**. The production model (`lstm_v1_20260418T023120Z_inference.pt`) is hosted on the Hugging Face Hub (`ntsrigaud/maestro-lstm`) and downloaded on first use by `hf_hub_download()`. The backend is controlled by `configs/model_source.yaml`.
+Trained inference artifacts are **not tracked in VCS**. The runtime default model source points to an EnhancedTwoStreamLSTM artifact (`two_stream_attn_v1_20260503T065204Z_inference.pt`) on Hugging Face Hub (`ntsrigaud/maestro-lstm`), downloaded on first use by `hf_hub_download()`. The backend is controlled by `configs/model_source.yaml`.
 
 ## 7. Deployment Procedure
 
@@ -180,10 +180,10 @@ python scripts/run_realtime.py --config configs --model-artifact path/to/artifac
 ### 7.3 Training Execution
 
 ```bash
-# Train LSTM model
+# Train model (default: EnhancedTwoStreamLSTM)
 python scripts/train_model.py \
     --dataset data/processed/gesture_dataset_v2.npz \
-    --config configs/model/lstm_default.yaml \
+    --config configs/model/two_stream_attn.yaml \
     --config-dir configs
 ```
 
