@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-Maestro is a real-time gesture recognition system that enables hands-free presentation control. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with a two-stream LSTM neural network, and dispatches operating-system-level keyboard commands for slide navigation, scrolling, zoom, and presentation start/stop.
+Maestro is a real-time gesture recognition system that enables hands-free presentation control. The system captures webcam video, extracts hand landmarks using MediaPipe Hands, classifies temporal gesture sequences with the `EnhancedTwoStreamLSTM` neural network, and dispatches operating-system-level keyboard commands for slide navigation, scrolling, zoom, and presentation start/stop.
 
 The architecture follows a modular, protocol-driven design with strict separation between domain logic, infrastructure adapters, and pipeline orchestration. All runtime parameters are externalized to YAML configuration files. The system is CPU-first and operates at interactive frame rates on consumer hardware.
 
@@ -12,7 +12,9 @@ Provide reliable, low-latency gesture-based desktop control using a small, highl
 
 ## 3. Gesture Vocabulary
 
-The system recognizes eight gesture classes derived from the IPN Hand dataset:
+Runtime command control uses an 8-class production vocabulary. The dataset preparation pipeline also maintains a full 14-class IPN baseline vocabulary for training/evaluation comparisons.
+
+The production runtime vocabulary is:
 
 | Gesture          | Type            | Mapped Command          |
 | ---------------- | --------------- | ----------------------- |
@@ -64,15 +66,22 @@ The real-time inference pipeline processes each camera frame through eleven sequ
 ```mermaid
 graph LR
     A[Camera Frame] --> B[Gaze Estimation]
-    B --> C[Landmark Extraction]
+    B --> Bg{Gaze Permitted?}
+    Bg -->|No| R[Overlay + State Update]
+    Bg -->|Yes| C[Landmark Extraction]
     C --> Cs[Hand Selection]
     Cs --> D[Feature Engineering]
     D --> E[Temporal Buffering]
-    E --> F[LSTM Inference]
+    E --> Er{Window Ready?}
+    Er -->|No| R
+    Er -->|Yes| F[Enhanced Two-Stream Inference]
     F --> G[Prediction Stabilization]
     G --> H[Activation Controller]
-    H --> I[Command Dispatch]
+    H --> Hc{Command Emitted?}
+    Hc -->|No| R
+    Hc -->|Yes| I[Command Dispatch]
     I --> J[Keyboard Execution]
+    J --> R
 ```
 
 1. **Frame Capture**: OpenCV reads a BGR frame from the webcam at 30 FPS (1280×720).
@@ -81,7 +90,7 @@ graph LR
 4. **Hand Selection**: `HandSelector` applies the user's `hand_preference` configuration to pick one hand from the `MultiHandPacket`, producing a `LandmarkPacket`. Encodes the selfie-view inversion (`"right"` → MP `"Left"`, `"left"` → MP `"Right"`); marks the packet `valid=False` if the preferred hand is absent or below confidence thresholds.
 5. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity, joint angles, fingertip spread, and wrist trajectory features to produce a 147-dimensional feature vector (feature-schema-v5).
 6. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
-7. **Two-Stream LSTM Inference**: The buffered sequence (24×147) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory), each processed by an independent 2-layer LSTM with Bahdanau attention. The fused context (128 dims) is projected to an 8-class probability distribution by `TwoStreamGestureLSTM`.
+7. **Enhanced Two-Stream Inference**: The buffered sequence (24×147) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory). `EnhancedTwoStreamLSTM` applies per-stream projection, bidirectional LSTM encoding, multi-head self-attention, cross-stream gating, and an MLP head to produce the final class probabilities.
 8. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
 9. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in ARMED state; gaze loss transitions to IDLE; gaze restoration calls `rearm()` to return to ARMED. Edge-triggered dispatch is enforced throughout.
 10. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
@@ -116,26 +125,28 @@ Nine `Protocol` interfaces define service contracts. Implementations can be swap
 
 ## 7. Technology Stack
 
-| Component               | Technology        | Version                                                                |
-| ----------------------- | ----------------- | ---------------------------------------------------------------------- |
-| Language                | Python            | 3.11                                                                   |
-| Hand Pose Estimation    | MediaPipe Hands   | 0.10.14 (pinned)                                                       |
-| Sequence Classification | PyTorch LSTM      | ≥2.7.0                                                                 |
-| Frame Capture           | OpenCV (headless) | ≥4.10.0                                                                |
-| OS Keyboard Control     | pyautogui         | ≥0.9.54                                                                |
-| Config Validation       | Pydantic          | ≥2.6.0                                                                 |
-| Array Operations        | NumPy             | ≥1.26.0                                                                |
-| Graphical Interface     | PySide6 (Qt6)     | ≥6.5.0 (`[dev]` optional extra; not required for CLI inference)        |
-| Model Hosting           | Hugging Face Hub  | ≥0.22.0 (optional `[huggingface]` extra; required for default backend) |
-| ML Metrics (training)   | scikit-learn      | ≥1.5.0 (optional `[training]` extra)                                   |
+| Component               | Technology                      | Version                                                                |
+| ----------------------- | ------------------------------- | ---------------------------------------------------------------------- |
+| Language                | Python                          | 3.11                                                                   |
+| Hand Pose Estimation    | MediaPipe Hands                 | 0.10.14 (pinned)                                                       |
+| Sequence Classification | PyTorch (EnhancedTwoStreamLSTM) | ≥2.7.0                                                                 |
+| Frame Capture           | OpenCV (headless)               | ≥4.10.0                                                                |
+| OS Keyboard Control     | pyautogui                       | ≥0.9.54                                                                |
+| Config Validation       | Pydantic                        | ≥2.6.0                                                                 |
+| Array Operations        | NumPy                           | ≥1.26.0                                                                |
+| Graphical Interface     | PySide6 (Qt6)                   | ≥6.5.0 (`[dev]` optional extra; not required for CLI inference)        |
+| Model Hosting           | Hugging Face Hub                | ≥0.22.0 (optional `[huggingface]` extra; required for default backend) |
+| ML Metrics (training)   | scikit-learn                    | ≥1.5.0 (optional `[training]` extra)                                   |
 
 ## 8. Training Infrastructure
 
 The offline training pipeline converts labeled video data into a trained LSTM checkpoint:
 
-1. **Data Collection**: The IPN Hand dataset (200 videos, 8 classes) is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks from IPN video files and produces NPZ sequence datasets.
-2. **Model Training**: `scripts/train_model.py` trains a `TwoStreamGestureLSTM` — a two-stream, 2-layer LSTM with independent Bahdanau attention per stream, class-weighted cross-entropy loss, Adam optimizer, learning rate scheduling, and early stopping.
-3. **Model Export**: Trained checkpoints are exported as inference artifacts containing the state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/maestro-lstm`). At runtime the artifact is downloaded on first use and served from the local Hugging Face cache.
+1. **Data Collection**: The IPN Hand dataset is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks and emits NPZ sequence datasets using the full 14-class baseline mapping (with production subsets available for runtime-focused training).
+2. **Model Training**: `scripts/train_model.py` defaults to `configs/model/two_stream_attn.yaml`, training `EnhancedTwoStreamLSTM` with class weighting, AdamW, learning-rate scheduling, and early stopping. Legacy model configs are retained for experimental reference only.
+3. **Model Export**: Trained checkpoints are exported as inference artifacts containing state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/maestro-lstm`). Runtime loading is pinned to the enhanced artifact type (`two_stream_attn_inference`).
+
+For detailed model internals, see `enhanced-two-stream-lstm-architecture.md`.
 
 ---
 
