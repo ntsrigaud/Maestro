@@ -76,7 +76,8 @@ def test_split_covers_all_dims() -> None:
     pose, motion = EnhancedTwoStreamLSTM._split(x)
     reconstructed = torch.cat([pose, motion], dim=-1).squeeze()
     assert reconstructed.shape == (147,)
-    # Values: positions[0:63] + angles[134:144] | spread[63:68] + traj[68:71] + vel[71:134] + wv[144:147]
+    # Values: positions[0:63] + angles[134:144]
+    # | spread[63:68] + traj[68:71] + vel[71:134] + wv[144:147]
     expected = torch.cat(
         [
             x[0, 0, :63],
