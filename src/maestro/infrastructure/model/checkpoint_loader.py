@@ -24,6 +24,19 @@ def _build_model_from_artifact(
     """
     model_name = str(model_config.get("model_name", ""))
 
+    if artifact_type == "two_stream_attn_inference" or model_name.startswith("two_stream_attn"):
+        from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
+
+        return EnhancedTwoStreamLSTM(
+            input_size=int(model_config["input_size"]),
+            hidden_size=int(model_config["hidden_size"]),
+            num_layers=int(model_config["num_layers"]),
+            dropout=float(model_config["dropout"]),
+            num_classes=int(model_config["num_classes"]),
+            num_heads=int(model_config.get("num_heads", 4)),
+            proj_dim=int(model_config.get("proj_dim", 64)),
+        ).to(device)
+
     if artifact_type.startswith("two_stream") or model_name.startswith("two_stream"):
         from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 
@@ -37,7 +50,7 @@ def _build_model_from_artifact(
 
     raise ValueError(
         f"Unsupported artifact type {artifact_type!r} (model_name={model_name!r}). "
-        "Supported types: 'two_stream_lstm_inference'."
+        "Supported types: 'two_stream_attn_inference', 'two_stream_lstm_inference'."
     )
 
 

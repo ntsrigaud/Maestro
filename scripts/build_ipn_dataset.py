@@ -73,6 +73,8 @@ from maestro.domain.entities import LabeledGraphFrame  # noqa: E402
 from maestro.pipeline import graph_schema  # noqa: E402
 from maestro.training.dataset_builder import (  # noqa: E402
     GraphSequenceDatasetBuilder,
+    LabeledLandmarkFrame,
+    SequenceDatasetBuilder,
 )
 
 # Default model cache path (mirrors the constant formerly in holistic_extractor).
@@ -88,6 +90,7 @@ def _is_nan(lm: object) -> bool:
         or math.isnan(getattr(lm, "y", 0.0))
         or math.isnan(getattr(lm, "z", 0.0))
     )
+
 
 logger = logging.getLogger(__name__)
 
@@ -107,13 +110,13 @@ IPN_TO_VOCAB: dict[str, str] = {
     "G04": "swipe_down",  # throw down
     "G05": "swipe_left",  # throw left
     "G06": "swipe_right",  # throw right
-    "G07": "open_palm_hold",  # open twice (closest to open-palm hold)
+    "G07": "open_palm_hold",  # open twice
     "G10": "zoom_in",  # zoom in
     "G11": "zoom_out",  # zoom out
-    # G01 click one finger  — skipped (no directional / hold semantic)
-    # G02 click two fingers — skipped
-    # G08 double click one  — skipped
-    # G09 double click two  — skipped
+    "G01": "click_one",  # click with one finger
+    "G02": "click_two",  # click with two fingers
+    "G08": "double_click_one",  # double click with one finger
+    "G09": "double_click_two",  # double click with two fingers
 }
 
 # ---------------------------------------------------------------------------
@@ -307,12 +310,31 @@ def extract_all_landmarks(
     result_paths: dict[str, Path] = {}
 
     for stem in video_stems:
-        video_path = video_dir / f"{stem}.avi"
-        if not video_path.exists():
-            logger.warning("Video not found, skipping: %s", video_path)
+        cache_path = cache_dir / f"{stem}_holistic.npz"
+
+        # Fast path: use an existing cache file without requiring the video.
+        # This allows Phase 2 to proceed even when the original .avi files
+        # have been moved or deleted after the first extraction run.
+        if not no_cache and cache_path.exists():
+            result_paths[stem] = cache_path
             continue
 
-        cache_path = cache_dir / f"{stem}_holistic.npz"
+        # Legacy fallback: previous versions of this script saved caches as
+        # {stem}.npz (without the _holistic suffix).  Accept those files so
+        # that users who have already extracted landmarks do not need to
+        # re-run Phase 1.
+        legacy_cache_path = cache_dir / f"{stem}.npz"
+        if not no_cache and legacy_cache_path.exists():
+            logger.debug("Using legacy cache for %s (%s)", stem, legacy_cache_path.name)
+            result_paths[stem] = legacy_cache_path
+            continue
+
+        # Cache miss — queue the video for (re-)extraction.
+        video_path = video_dir / f"{stem}.avi"
+        if not video_path.exists():
+            logger.warning("Video not found and no cache available, skipping: %s", video_path)
+            continue
+
         if no_cache and cache_path.exists():
             cache_path.unlink()
 
@@ -326,8 +348,15 @@ def extract_all_landmarks(
             )
         )
 
-    if not tasks:
-        logger.warning("No videos to process.")
+    if result_paths:
+        logger.info(
+            "%d video(s) resolved from existing cache; %d video(s) queued for extraction.",
+            len(result_paths),
+            len(tasks),
+        )
+
+    if not tasks and not result_paths:
+        logger.warning("No videos to process and no existing caches found.")
         return {}
 
     logger.info("Processing %d videos with %d worker(s)…", len(tasks), num_workers)
@@ -457,9 +486,12 @@ def assemble_dataset(
 
     # Group by video and apply unknown subsampling at the whole-dataset level.
     all_mapped: list[tuple[str, AnnotationRow]] = []  # (video_stem, row)
+    vocabulary_set = set(vocabulary)
     for row in annotations:
         if row.ipn_label not in IPN_TO_VOCAB:
-            continue  # skip G01, G02, G08, G09
+            continue  # IPN code has no production mapping at all
+        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+            continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
         all_mapped.append((row.video, row))
 
     # Subsample unknown segments from the full list.
@@ -539,7 +571,9 @@ def assemble_dataset(
 # ---------------------------------------------------------------------------
 
 
-def _compute_class_stats(builder: GraphSequenceDatasetBuilder) -> dict[str, Any]:
+def _compute_class_stats(
+    builder: GraphSequenceDatasetBuilder | SequenceDatasetBuilder,
+) -> dict[str, Any]:
     from collections import Counter
 
     label_counts = Counter(s.label for s in builder.samples)
@@ -548,6 +582,112 @@ def _compute_class_stats(builder: GraphSequenceDatasetBuilder) -> dict[str, Any]
         "class_distribution": dict(label_counts),
         "num_classes": len(label_counts),
     }
+
+
+def assemble_flat_dataset(
+    annotations: list[AnnotationRow],
+    cache_paths: dict[str, Path],
+    vocabulary: list[str],
+    *,
+    window_length: int,
+    window_step: int,
+    min_valid_ratio: float,
+    label_strategy: str,
+    max_unknown_segments_per_source: int,
+    max_unknown_frames_per_segment: int,
+    seed: int,
+) -> SequenceDatasetBuilder:
+    """Feed annotated right-hand landmarks into a ``SequenceDatasetBuilder``.
+
+    Extracts right-hand keypoints (nodes 0-20) from the holistic cache and
+    produces a flat feature-schema-v5 dataset compatible with
+    ``GestureDataModule`` and ``TwoStreamGestureLSTM``.
+    """
+    rng = random.Random(seed)
+
+    builder = SequenceDatasetBuilder(
+        vocabulary=vocabulary,
+        window_length=window_length,
+        window_step=window_step,
+        min_valid_ratio=min_valid_ratio,
+        label_strategy=label_strategy,
+    )
+
+    all_mapped: list[tuple[str, AnnotationRow]] = []
+    vocabulary_set = set(vocabulary)
+    for row in annotations:
+        if row.ipn_label not in IPN_TO_VOCAB:
+            continue  # IPN code has no production mapping at all
+        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+            continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
+        all_mapped.append((row.video, row))
+
+    subsampled_unknown = _subsample_unknown_segments(
+        [r for _, r in all_mapped if IPN_TO_VOCAB[r.ipn_label] == "unknown"],
+        max_unknown_segments_per_source,
+        rng,
+    )
+    unknown_set = {id(r) for r in subsampled_unknown}
+
+    final_by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
+    for video, row in all_mapped:
+        if IPN_TO_VOCAB[row.ipn_label] == "unknown":
+            if id(row) not in unknown_set:
+                continue
+        final_by_video[video].append(row)
+
+    for segs in final_by_video.values():
+        segs.sort(key=lambda r: r.t_start)
+
+    total_windows = 0
+    missing_cache = 0
+
+    for video_stem, segments in sorted(final_by_video.items()):
+        cache_path = cache_paths.get(video_stem)
+        if cache_path is None or not cache_path.exists():
+            logger.warning("No cache for video '%s', skipping.", video_stem)
+            missing_cache += 1
+            continue
+
+        vl = _load_cache(cache_path)
+        fid_to_idx = {int(fid): i for i, fid in enumerate(vl.frame_ids)}
+
+        for seg_idx, seg in enumerate(segments):
+            vocab_label = IPN_TO_VOCAB[seg.ipn_label]
+            recording_id = f"{video_stem}:seg{seg_idx:04d}"
+
+            t_end_effective = seg.t_end
+            if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
+                t_end_effective = min(seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1)
+
+            seg_windows_before = len(builder.samples)
+            for frame_id in range(seg.t_start, t_end_effective + 1):
+                idx = fid_to_idx.get(frame_id)
+                if idx is None:
+                    continue
+
+                timestamp_ms = int((frame_id - 1) * 1000.0 / vl.fps)
+                # Extract right-hand keypoints (nodes 0-20 in graph layout).
+                rh_kps = vl.keypoints[idx, :21]  # (21, 3) raw coordinates
+                rh_valid = bool(vl.valid_mask[idx, :21].any())
+
+                lf = LabeledLandmarkFrame(
+                    recording_id=recording_id,
+                    timestamp_ms=timestamp_ms,
+                    label=vocab_label,
+                    landmarks=rh_kps.tolist(),
+                    valid=rh_valid,
+                    handedness="Right",
+                )
+                builder.add_frame(lf)
+
+            total_windows += len(builder.samples) - seg_windows_before
+
+    if missing_cache > 0:
+        logger.warning("%d video(s) had no cache and were skipped.", missing_cache)
+
+    logger.info("Flat assembly complete: %d sliding-window samples generated.", total_windows)
+    return builder
 
 
 def _load_vocabulary(vocab_config_path: Path) -> list[str]:
@@ -725,9 +865,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Random seed for unknown-segment subsampling (default: 42).",
     )
     p.add_argument(
+        "--format",
+        default="graph",
+        choices=["graph", "flat"],
+        help=(
+            "Output format: 'graph' (default) produces graph-schema-v1 NPZ with "
+            "sequences shape (N,T,67,3); 'flat' produces feature-schema-v5 NPZ with "
+            "sequences shape (N,T,147) compatible with TwoStreamGestureLSTM and "
+            "GestureDataModule."
+        ),
+    )
+    p.add_argument(
         "--graph-schema-version",
         default=graph_schema.GRAPH_SCHEMA_VERSION,
-        help="Graph schema version tag embedded in the NPZ metadata.",
+        help="Graph schema version tag embedded in the NPZ metadata (graph format only).",
     )
     p.add_argument(
         "--metadata-json",
@@ -811,13 +962,20 @@ def main() -> None:
         no_cache=args.no_cache,
     )
     if not cache_paths:
-        logger.error("No videos were processed successfully.  Aborting.")
+        logger.error(
+            "No landmark caches are available.  "
+            "Ensure that either (a) .avi video files exist in '%s' or "
+            "(b) cached NPZ files exist in '%s'.  "
+            "Re-run with --log-level DEBUG for per-video details.",
+            video_dir,
+            cache_dir,
+        )
         sys.exit(1)
 
     # -----------------------------------------------------------------------
     # Phase 2 — assemble sliding-window dataset.
     # -----------------------------------------------------------------------
-    builder = assemble_dataset(
+    assemble_kwargs = dict(
         annotations=annotations,
         cache_paths=cache_paths,
         vocabulary=vocabulary,
@@ -829,6 +987,15 @@ def main() -> None:
         max_unknown_frames_per_segment=args.max_unknown_frames_per_segment,
         seed=args.seed,
     )
+
+    if args.format == "flat":
+        logger.info("Building flat feature-schema-v5 dataset (right-hand, 147 dims)…")
+        builder: SequenceDatasetBuilder | GraphSequenceDatasetBuilder = assemble_flat_dataset(
+            **assemble_kwargs
+        )
+    else:
+        logger.info("Building graph-schema-v1 dataset (holistic, 67 nodes × 3 coords)…")
+        builder = assemble_dataset(**assemble_kwargs)
 
     if not builder.samples:
         logger.error(
@@ -859,10 +1026,12 @@ def main() -> None:
     # Save NPZ and metadata.
     # -----------------------------------------------------------------------
     output_npz.parent.mkdir(parents=True, exist_ok=True)
-    builder.save_npz(
-        output_npz,
-        graph_schema_version=args.graph_schema_version,
-    )
+    if args.format == "flat":
+        assert isinstance(builder, SequenceDatasetBuilder)
+        builder.save_npz(output_npz, feature_schema_version="feature-schema-v5")
+    else:
+        assert isinstance(builder, GraphSequenceDatasetBuilder)
+        builder.save_npz(output_npz, graph_schema_version=args.graph_schema_version)
     logger.info("Dataset saved → %s  (%d samples)", output_npz, len(builder.samples))
 
     stats = _compute_class_stats(builder)
@@ -871,16 +1040,17 @@ def main() -> None:
     metadata_path = Path(
         args.metadata_json if args.metadata_json else str(output_npz) + ".metadata.json"
     )
-    _save_metadata(
-        metadata_path=metadata_path,
-        annotations_used=len(annotations),
-        cache_paths=cache_paths,
-        vocabulary=vocabulary,
-        window_length=args.window_length,
-        window_step=args.window_step,
-        stats=stats,
-        graph_schema_version=args.graph_schema_version,
-    )
+    if args.format == "graph":
+        _save_metadata(
+            metadata_path=metadata_path,
+            annotations_used=len(annotations),
+            cache_paths=cache_paths,
+            vocabulary=vocabulary,
+            window_length=args.window_length,
+            window_step=args.window_step,
+            stats=stats,
+            graph_schema_version=args.graph_schema_version,
+        )
 
 
 if __name__ == "__main__":

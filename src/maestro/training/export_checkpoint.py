@@ -38,9 +38,12 @@ def export_inference_artifact(
 
     is_dual_stgcn = config.model.model_name.startswith("dual_stgcn")
     is_graph_model = is_dual_stgcn
+    is_two_stream_attn = config.model.model_name.startswith("two_stream_attn")
 
     if is_dual_stgcn:
         artifact_type = "dual_stgcn_lstm_inference"
+    elif is_two_stream_attn:
+        artifact_type = "two_stream_attn_inference"
     else:
         artifact_type = "two_stream_lstm_inference"
 
@@ -58,14 +61,26 @@ def export_inference_artifact(
             "num_classes": config.model.num_classes,
         }
     else:
-        model_config_dict = {
-            "model_name": config.model.model_name,
-            "input_size": config.model.input_size,
-            "hidden_size": config.model.hidden_size,
-            "num_layers": config.model.num_layers,
-            "dropout": config.model.dropout,
-            "num_classes": config.model.num_classes,
-        }
+        if is_two_stream_attn:
+            model_config_dict = {
+                "model_name": config.model.model_name,
+                "input_size": config.model.input_size,
+                "hidden_size": config.model.hidden_size,
+                "num_layers": config.model.num_layers,
+                "dropout": config.model.dropout,
+                "num_classes": config.model.num_classes,
+                "num_heads": config.model.num_heads,
+                "proj_dim": config.model.proj_dim,
+            }
+        else:
+            model_config_dict = {
+                "model_name": config.model.model_name,
+                "input_size": config.model.input_size,
+                "hidden_size": config.model.hidden_size,
+                "num_layers": config.model.num_layers,
+                "dropout": config.model.dropout,
+                "num_classes": config.model.num_classes,
+            }
 
     payload: dict[str, Any] = {
         "artifact_type": artifact_type,
