@@ -194,7 +194,7 @@ class EnhancedTwoStreamLSTM(nn.Module):
     @staticmethod
     def _split(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Partition (B, T, 147) → pose (B, T, 73) and motion (B, T, 74)."""
-        pose = torch.cat([x[..., :63], x[..., 134:144]], dim=-1)    # (B, T, 73)
+        pose = torch.cat([x[..., :63], x[..., 134:144]], dim=-1)  # (B, T, 73)
         motion = torch.cat([x[..., 63:134], x[..., 144:]], dim=-1)  # (B, T, 74)
         return pose, motion
 
@@ -213,11 +213,11 @@ class EnhancedTwoStreamLSTM(nn.Module):
         pose, motion = self._split(x)
 
         # ── Feature projection ────────────────────────────────────────────────
-        pose   = self.proj_a(pose)    # (B, T, proj_dim)
+        pose = self.proj_a(pose)  # (B, T, proj_dim)
         motion = self.proj_b(motion)  # (B, T, proj_dim)
 
         # ── BiLSTM encoding ───────────────────────────────────────────────────
-        out_a, _ = self.lstm_a(pose)    # (B, T, 2H)
+        out_a, _ = self.lstm_a(pose)  # (B, T, 2H)
         out_b, _ = self.lstm_b(motion)  # (B, T, 2H)
 
         # ── Pre-attention LayerNorm ───────────────────────────────────────────
@@ -226,10 +226,10 @@ class EnhancedTwoStreamLSTM(nn.Module):
 
         # ── Multi-Head Self-Attention (residual + post-LN) ────────────────────
         sa_a, _ = self.mha_a(out_a, out_a, out_a)  # (B, T, 2H)
-        out_a = self.ln_post_a(out_a + sa_a)         # residual + LN
+        out_a = self.ln_post_a(out_a + sa_a)  # residual + LN
 
         sa_b, _ = self.mha_b(out_b, out_b, out_b)  # (B, T, 2H)
-        out_b = self.ln_post_b(out_b + sa_b)         # residual + LN
+        out_b = self.ln_post_b(out_b + sa_b)  # residual + LN
 
         # ── Temporal pooling: mean + max ──────────────────────────────────────
         # Element-wise sum of temporal mean and temporal max:
@@ -242,12 +242,12 @@ class EnhancedTwoStreamLSTM(nn.Module):
         # gate_a reads ctx_b and computes element-wise gates for ctx_a.
         # Gated residual + LN preserves the original representation while
         # selectively emphasising features relevant to the other stream.
-        gate_a = self.gate_a(ctx_b)               # (B, 2H) in [0, 1]
+        gate_a = self.gate_a(ctx_b)  # (B, 2H) in [0, 1]
         ctx_a = self.ln_cross_a(ctx_a * gate_a + ctx_a)  # gated residual + LN
 
-        gate_b = self.gate_b(ctx_a)               # (B, 2H) in [0, 1]
+        gate_b = self.gate_b(ctx_a)  # (B, 2H) in [0, 1]
         ctx_b = self.ln_cross_b(ctx_b * gate_b + ctx_b)  # gated residual + LN
 
         # ── Fusion + classification ───────────────────────────────────────────
         fused = torch.cat([ctx_a, ctx_b], dim=-1)  # (B, 4H)
-        return self.head(fused)                      # (B, C)
+        return self.head(fused)  # (B, C)

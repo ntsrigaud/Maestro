@@ -134,9 +134,9 @@ class GestureAugmenter:
         # Vectorised linear interpolation across all F features simultaneously.
         # This replaces the original O(F) Python loop (np.interp × F calls) with
         # two gather operations and a single broadcast lerp — ~12× faster.
-        idx_low  = np.floor(src_indices).astype(np.intp)           # (T,)
-        idx_high = np.minimum(idx_low + 1, T - 1)                  # (T,) clamped
-        frac     = (src_indices - idx_low).astype(seq.dtype)[:, np.newaxis]  # (T,1)
+        idx_low = np.floor(src_indices).astype(np.intp)  # (T,)
+        idx_high = np.minimum(idx_low + 1, T - 1)  # (T,) clamped
+        frac = (src_indices - idx_low).astype(seq.dtype)[:, np.newaxis]  # (T,1)
         return seq[idx_low] * (1.0 - frac) + seq[idx_high] * frac  # (T, F)
 
     def _spatial_jitter(self, seq: np.ndarray) -> np.ndarray:

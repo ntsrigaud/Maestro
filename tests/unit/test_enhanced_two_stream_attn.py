@@ -8,8 +8,8 @@ import torch.nn as nn
 
 from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
-
 # ── Fixtures ─────────────────────────────────────────────────────────────────
+
 
 def _make_model(
     hidden_size: int = 64,
@@ -30,12 +30,16 @@ def _make_model(
 
 # ── Shape tests ───────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("batch,seq,classes", [
-    (1, 32, 8),
-    (4, 32, 8),
-    (1, 24, 8),   # works with other window lengths too
-    (2, 32, 12),  # different num_classes
-])
+
+@pytest.mark.parametrize(
+    "batch,seq,classes",
+    [
+        (1, 32, 8),
+        (4, 32, 8),
+        (1, 24, 8),  # works with other window lengths too
+        (2, 32, 12),  # different num_classes
+    ],
+)
 def test_forward_output_shape(batch: int, seq: int, classes: int) -> None:
     model = _make_model(num_classes=classes)
     x = torch.zeros(batch, seq, 147)
@@ -58,6 +62,7 @@ def test_output_is_logits_not_probabilities() -> None:
 
 # ── Feature partition ─────────────────────────────────────────────────────────
 
+
 def test_split_dimensions() -> None:
     x = torch.randn(3, 32, 147)
     pose, motion = EnhancedTwoStreamLSTM._split(x)
@@ -72,25 +77,30 @@ def test_split_covers_all_dims() -> None:
     reconstructed = torch.cat([pose, motion], dim=-1).squeeze()
     assert reconstructed.shape == (147,)
     # Values: positions[0:63] + angles[134:144] | spread[63:68] + traj[68:71] + vel[71:134] + wv[144:147]
-    expected = torch.cat([
-        x[0, 0, :63], x[0, 0, 134:144],    # 73 pose dims
-        x[0, 0, 63:134], x[0, 0, 144:],     # 74 motion dims
-    ])
+    expected = torch.cat(
+        [
+            x[0, 0, :63],
+            x[0, 0, 134:144],  # 73 pose dims
+            x[0, 0, 63:134],
+            x[0, 0, 144:],  # 74 motion dims
+        ]
+    )
     assert torch.allclose(reconstructed, expected)
 
 
 # ── Architecture validation ───────────────────────────────────────────────────
+
 
 def test_num_heads_divisibility_guard() -> None:
     """num_heads must evenly divide 2*hidden_size."""
     with pytest.raises(ValueError, match="must be divisible by num_heads"):
         EnhancedTwoStreamLSTM(
             input_size=147,
-            hidden_size=64,   # 2×64 = 128
+            hidden_size=64,  # 2×64 = 128
             num_layers=2,
             dropout=0.1,
             num_classes=8,
-            num_heads=3,      # 128 % 3 != 0 → should raise
+            num_heads=3,  # 128 % 3 != 0 → should raise
         )
 
 
@@ -104,8 +114,13 @@ def test_parameter_count_small_config() -> None:
 def test_parameter_count_large_config() -> None:
     """Recommended config (h=96, proj=96): ~1.2 M params."""
     model = EnhancedTwoStreamLSTM(
-        input_size=147, hidden_size=96, num_layers=2,
-        dropout=0.35, num_classes=12, num_heads=8, proj_dim=96,
+        input_size=147,
+        hidden_size=96,
+        num_layers=2,
+        dropout=0.35,
+        num_classes=12,
+        num_heads=8,
+        proj_dim=96,
     )
     n_params = sum(p.numel() for p in model.parameters())
     assert 900_000 < n_params < 1_500_000, f"Unexpected param count: {n_params:,}"
@@ -155,13 +170,15 @@ def test_gradient_flow_with_random_input() -> None:
     logits = model(x)
     logits.sum().backward()
     dead = [
-        name for name, p in model.named_parameters()
+        name
+        for name, p in model.named_parameters()
         if p.requires_grad and (p.grad is None or p.grad.abs().sum() == 0)
     ]
     assert not dead, f"Dead gradients with random input: {dead}"
 
 
 # ── Gradient flow ─────────────────────────────────────────────────────────────
+
 
 def test_all_parameters_receive_gradients() -> None:
     """With random (non-degenerate) input all parameters must be reachable."""
@@ -171,13 +188,15 @@ def test_all_parameters_receive_gradients() -> None:
     loss = logits.sum()
     loss.backward()
     dead = [
-        name for name, p in model.named_parameters()
+        name
+        for name, p in model.named_parameters()
         if p.requires_grad and (p.grad is None or p.grad.abs().sum() == 0)
     ]
     assert not dead, f"Parameters with zero/None gradient: {dead}"
 
 
 # ── Checkpoint round-trip ─────────────────────────────────────────────────────
+
 
 def test_state_dict_round_trip(tmp_path: Path) -> None:
     model = _make_model()
@@ -201,6 +220,7 @@ def test_state_dict_round_trip(tmp_path: Path) -> None:
 
 # ── Checkpoint loader integration ─────────────────────────────────────────────
 
+
 def test_checkpoint_loader_two_stream_attn(tmp_path: Path) -> None:
     from maestro.infrastructure.model.checkpoint_loader import load_inference_artifact
 
@@ -222,8 +242,14 @@ def test_checkpoint_loader_two_stream_attn(tmp_path: Path) -> None:
             "proj_dim": 64,
         },
         "class_labels": [
-            "open_palm_hold", "swipe_right", "swipe_left", "swipe_up",
-            "swipe_down", "zoom_in", "zoom_out", "unknown",
+            "open_palm_hold",
+            "swipe_right",
+            "swipe_left",
+            "swipe_up",
+            "swipe_down",
+            "zoom_in",
+            "zoom_out",
+            "unknown",
         ],
         "feature_schema": {
             "feature_schema_version": "feature-schema-v5",
@@ -254,8 +280,10 @@ def test_checkpoint_loader_two_stream_attn(tmp_path: Path) -> None:
 
 # ── _build_model dispatch ─────────────────────────────────────────────────────
 
+
 def test_build_model_dispatches_two_stream_attn() -> None:
     import torch
+
     from maestro.training.train_lstm import ModelConfig, _build_model
 
     cfg = ModelConfig(
