@@ -11,8 +11,7 @@ The script implements a two-phase architecture:
   Phase 2 — Dataset Assembly
     The annotation file is used to identify gesture segments.  IPN labels are
     mapped to the production vocabulary defined in ``vocabulary_ipn.yaml``.
-    Segments whose IPN label has no mapping (G01, G02, G08, G09) are skipped.
-    The ``unknown`` class (D0X, B0A, B0B) is subsampled to prevent it from
+        The ``unknown`` class (D0X) is subsampled to prevent it from
     dominating the dataset.  Frames for each segment are fed sequentially to
     ``SequenceDatasetBuilder``, which applies the existing feature transformer
     and sliding-window logic before saving the final NPZ.
@@ -97,15 +96,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # IPN label → production vocabulary mapping
 # ---------------------------------------------------------------------------
-# Gestures with no clear presentation-control semantic (click / double-click
-# styles: G01, G02, G08, G09) are deliberately omitted — their frames will be
-# skipped during assembly.  Pointing poses (B0A, B0B) are retained as
-# negative examples under the ``unknown`` class.
+# Full IPN baseline mapping (14 classes):
+#   D0X, B0A, B0B, G01..G11
 
 IPN_TO_VOCAB: dict[str, str] = {
     "D0X": "unknown",  # non-gesture background
-    "B0A": "unknown",  # pointing with one finger → negative example
-    "B0B": "unknown",  # pointing with two fingers → negative example
+    "B0A": "point_one",  # pointing with one finger
+    "B0B": "point_two",  # pointing with two fingers
     "G03": "swipe_up",  # throw up
     "G04": "swipe_down",  # throw down
     "G05": "swipe_left",  # throw left
@@ -784,7 +781,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         metavar="N",
         help=(
             "Maximum number of unknown-class segments drawn from each IPN "
-            "source label (D0X, B0A, B0B) to limit class imbalance.  "
+            "source label (currently D0X) to limit class imbalance.  "
             "Default: 150."
         ),
     )

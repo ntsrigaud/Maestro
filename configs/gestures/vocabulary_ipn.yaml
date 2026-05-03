@@ -1,10 +1,15 @@
-version: ipn_v2
+version: ipn_v3
 
 # Vocabulary derived from the IPN Hand dataset gesture classes.
-# All 11 active gesture categories from the IPN Hand dataset are included
-# so this experiment reflects the full dataset.
+# Full 14-class baseline set is included:
+#   - D0X non-gesture background
+#   - B0A/B0B pointing poses
+#   - G01..G11 gesture labels
 #
 # IPN source mapping (all gesture classes):
+#   unknown          ← D0X (Non-gesture background)
+#   point_one        ← B0A (Pointing with one finger)
+#   point_two        ← B0B (Pointing with two fingers)
 #   open_palm_hold   ← G07 (Open twice)
 #   swipe_right      ← G06 (Throw right)
 #   swipe_left       ← G05 (Throw left)
@@ -16,9 +21,11 @@ version: ipn_v2
 #   click_two        ← G02 (Click with two fingers)
 #   double_click_one ← G08 (Double click with one finger)
 #   double_click_two ← G09 (Double click with two fingers)
-#   unknown          ← D0X (Non-gesture background) + B0A + B0B (pointing poses)
 
 gestures:
+  - unknown
+  - point_one
+  - point_two
   - open_palm_hold
   - swipe_right
   - swipe_left
@@ -30,4 +37,3 @@ gestures:
   - click_two
   - double_click_one
   - double_click_two
-  - unknown
