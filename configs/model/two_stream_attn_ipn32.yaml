@@ -1,0 +1,110 @@
+# ── EnhancedTwoStreamLSTM — IPN 32-frame comparison configuration ─────────────
+#
+# This config trains the improved two_stream_attn architecture v3:
+#   - Bidirectional LSTMs (forward + backward context)
+#   - Multi-Head Self-Attention (Q/K/V, 8 heads) on each stream
+#   - Mean + Max temporal pooling (captures sustained + transient gesture events)
+#   - 2-layer MLP cross-stream gate (replaces degenerate MHA cross-attention)
+#   - Feature projection layers (73/74 → proj_dim before LSTM)
+#   - Deeper GELU MLP head with LayerNorm
+#   - AdamW optimiser with class_weighting=true
+#
+# Dataset: build with --window-length 32 --window-step 1
+#   python scripts/build_ipn_dataset.py \
+#       --window-length 32 --window-step 1 \
+#       --output-npz data/processed/ipn_dataset_v5_w32.npz
+#
+# ── Regression root-cause analysis (run 024402Z — 71.58% val F1) ─────────────
+#
+#   Six root causes identified and addressed (detailed in notebook 05, §5.5):
+#
+#   1. PE + BiLSTM temporal redundancy: LSTMs already encode temporal order
+#      via cell state — sinusoidal PE added conflicting temporal signals.
+#      Fix: removed PE buffer and _sinusoidal_pe entirely.
+#
+#   2. Out-dropout destroyed PE signal: 45% dropout on PE-encoded LSTM output
+#      before attention made PE ineffective (and harmful).
+#      Fix: removed out_drop (LSTM inter-layer dropout unchanged).
+#
+#   3. Degenerate cross-attention query: cross_attn used a mean-pooled ctx
+#      (B, 1, 2H) as query → equivalent to a ~526 K-param weighted mean.
+#      Fix: replaced with a 2-layer MLP gate (~37 K params per gate).
+#
+#   4. Model 4.7× too large: 2.52 M params on ~50 K training windows →
+#      train_acc 99.78% at best epoch (26% train/val accuracy gap).
+#      Fix: hidden_size 128→96 → ~1.2 M params total.
+#
+#   5. Mean-only pooling diluted transient gestures (click_one: P=49%, R=39%).
+#      Fix: mean + max pooling captures both sustained shape and peak activity.
+#
+#   6. Overly aggressive LR schedule: 4 halving steps in 56 epochs with
+#      ReduceLROnPlateau patience=10 barely improved convergence.
+#      Fix: patience reduced to 8 for more responsive but less reactive LR.
+#
+# ── IPN research baseline targets (GTX 1080ti) ───────────────────────────────
+#   ResNeXt-101  RGB-Flow  86.32%   50.8 ms
+#   ResNeXt-101  RGB       83.59%   27.7 ms
+#   C3D          RGB       77.75%   76.2 ms
+#   TwoStream    Skeleton  ≥ 76%    < 5 ms    ← this config target
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_v1
+  input_size: 147 # total feature dims (feature-schema-v5)
+  hidden_size: 96 # per-direction per-stream; BiLSTM output = 2×96 = 192
+  num_layers: 2
+  dropout: 0.35 # was 0.45 — right-sized for smaller 1.2M-param model
+  num_classes: 12 # all 11 IPN Hand gesture classes (G01–G11) + unknown
+  # EnhancedTwoStreamLSTM-specific fields
+  num_heads: 8 # MHA heads; 192/8 = 24 dims per head ✓
+  proj_dim: 96 # feature projection dim (73/74 → 96 before LSTM)
+
+# ── Design notes ─────────────────────────────────────────────────────────────
+# Approximate parameter budget (hidden_size=96, proj_dim=96, num_heads=8):
+#   proj_a / proj_b             2 × ~7 K               ≈   14 K
+#   BiLSTM-A  (2L bidir 96)     layer1 148K+layer2 222K ≈  370 K
+#   BiLSTM-B                    (identical)             ≈  370 K
+#   Self-MHA-A / Self-MHA-B     2 × (8 × 192² + …)     ≈  296 K
+#   pool_ln_a / pool_ln_b       2 × LN(192)             ≈    1 K
+#   gate_a / gate_b             2 × MLP(192→96→192)     ≈   74 K
+#   ln_cross × 2                negligible              ≈    1 K
+#   Head MLP                    384 → 192 → 12          ≈   76 K
+#   Total                                               ≈ 1.20 M
+# ─────────────────────────────────────────────────────────────────────────────
+
+training:
+  epochs: 100
+  batch_size: 128
+  learning_rate: 0.00009 # 9e-5 — best performing lr from prior ablation
+  weight_decay: 0.0005 # was 0.001 — lighter for smaller model
+  grad_clip_norm: 1.0
+  early_stopping_patience: 25
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.05 # was 0.1 — reduced; class_weighting already handles imbalance
+  seed: 42
+  num_workers: 0
+  class_weighting: true # inverse-frequency weighting for open_palm_hold vs click classes
+
+splits:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 8 # was 10 — more responsive LR reduction
+  min_lr: 0.000001
+
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+
+augmentation:
+  enabled: true
+  temporal_scale_range: [0.75, 1.25]
+  spatial_jitter_sigma: 0.008
+  apply_prob: 0.6
+  mirror_flip_prob: 0.5

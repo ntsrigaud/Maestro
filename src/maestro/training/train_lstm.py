@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,7 +10,7 @@ from typing import Any
 import torch
 import yaml
 from torch import nn
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from maestro.training.augmentation import AugmentationConfig
@@ -36,6 +37,9 @@ class ModelConfig:
     # Dual-branch STGCN phonological branch fields (only used for "dual_stgcn_*").
     phono_proj_dim: int = 128
     phono_conv_channels: int = 256
+    # EnhancedTwoStreamLSTM-specific fields (only used for "two_stream_attn_*").
+    num_heads: int = 4
+    proj_dim: int = 64
 
 
 @dataclass(slots=True)
@@ -50,6 +54,7 @@ class TrainingConfig:
     seed: int
     num_workers: int
     class_weighting: bool
+    label_smoothing: float = 0.0
 
 
 @dataclass(slots=True)
@@ -130,6 +135,8 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             lstm_layers=int(model_data.get("lstm_layers", 2)),
             phono_proj_dim=int(model_data.get("phono_proj_dim", 128)),
             phono_conv_channels=int(model_data.get("phono_conv_channels", 256)),
+            num_heads=int(model_data.get("num_heads", 4)),
+            proj_dim=int(model_data.get("proj_dim", 64)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
@@ -142,6 +149,7 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             seed=int(train_data.get("seed", 42)),
             num_workers=int(train_data.get("num_workers", 0)),
             class_weighting=bool(train_data.get("class_weighting", True)),
+            label_smoothing=float(train_data.get("label_smoothing", 0.0)),
         ),
         split=DataSplitConfig(
             train_ratio=float(split_data.get("train_ratio", 0.7)),
@@ -192,8 +200,12 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
     """Instantiate the appropriate model from *config*.
 
     Dispatches based on ``config.model_name``:
-    * ``dual_stgcn_*``  → :class:`DualBranchSTGCN_LSTM`
-    * ``two_stream_*``  → :class:`TwoStreamGestureLSTM`
+    * ``dual_stgcn_*``      → :class:`DualBranchSTGCN_LSTM`
+    * ``two_stream_attn_*`` → :class:`EnhancedTwoStreamLSTM`
+    * ``two_stream_*``      → :class:`TwoStreamGestureLSTM`
+
+    Note: ``two_stream_attn_*`` is checked *before* ``two_stream_*`` because it
+    is a more specific prefix.
     """
     if config.model_name.startswith("dual_stgcn"):
         from maestro.infrastructure.model.dual_branch_stgcn_lstm import DualBranchSTGCN_LSTM
@@ -209,6 +221,19 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
             num_classes=config.num_classes,
         ).to(device)
 
+    if config.model_name.startswith("two_stream_attn"):
+        from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
+
+        return EnhancedTwoStreamLSTM(
+            input_size=config.input_size,
+            hidden_size=config.hidden_size,
+            num_layers=config.num_layers,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+            num_heads=config.num_heads,
+            proj_dim=config.proj_dim,
+        ).to(device)
+
     if config.model_name.startswith("two_stream"):
         from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
 
@@ -222,7 +247,7 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
 
     raise ValueError(
         f"Unsupported model_name {config.model_name!r}. "
-        "Supported prefixes: 'dual_stgcn_', 'two_stream_'."
+        "Supported prefixes: 'dual_stgcn_', 'two_stream_attn_', 'two_stream_'."
     )
 
 
@@ -370,11 +395,13 @@ def train_lstm(
 
     if config.training.class_weighting:
         class_weights = _build_class_weights(datamodule, device)
-        criterion: nn.Module = _build_criterion(class_weights)
+        criterion: nn.Module = _build_criterion(
+            class_weights, label_smoothing=config.training.label_smoothing
+        )
     else:
-        criterion = _build_criterion(None)
+        criterion = _build_criterion(None, label_smoothing=config.training.label_smoothing)
 
-    optimizer = Adam(
+    optimizer = AdamW(
         model.parameters(),
         lr=config.training.learning_rate,
         weight_decay=config.training.weight_decay,
@@ -410,7 +437,39 @@ def train_lstm(
     checkpoint_output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = checkpoint_output_dir / f"{model_version}.pt"
 
+    n_train = len(datamodule.train_indices)
+    n_val = len(datamodule.val_indices)
+    n_params = sum(p.numel() for p in model.parameters())
+    _header_cols = (
+        f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  "
+        f"{'ValLoss':>8}  {'ValAcc':>7}  {'ValF1':>6}  "
+        f"{'LR':>8}  {'Time':>6}  {'ES':>5}  Note"
+    )
+    _sep = "-" * len(_header_cols)
+    print(f"\nTraining  {model_version}")
+    print(f"  Model     : {type(model).__name__}  ({n_params:,} params)")
+    print(f"  Dataset   : train={n_train:,}  val={n_val:,}")
+    print(
+        f"  Optimiser : AdamW  lr={config.training.learning_rate:.2e}  "
+        f"wd={config.training.weight_decay:.2e}"
+    )
+    print(
+        f"  Schedule  : ReduceLROnPlateau  "
+        f"factor={config.scheduler.factor}  patience={config.scheduler.patience}"
+        if config.scheduler.enabled
+        else "  Schedule  : none"
+    )
+    print(
+        f"  Stopping  : patience={config.training.early_stopping_patience}  "
+        f"min_delta={config.training.early_stopping_min_delta:.0e}  "
+        f"metric=val_macro_f1"
+    )
+    print(_sep)
+    print(_header_cols)
+    print(_sep, flush=True)
+
     for epoch in range(1, config.training.epochs + 1):
+        _t_epoch = time.perf_counter()
         train_loss, train_acc = _train_one_epoch(
             model=model,
             dataloader=train_loader,
@@ -432,6 +491,7 @@ def train_lstm(
             scheduler.step(val_report.macro_f1)
 
         current_lr = float(optimizer.param_groups[0]["lr"])
+        _epoch_secs = time.perf_counter() - _t_epoch
         history.append(
             {
                 "epoch": float(epoch),
@@ -441,6 +501,7 @@ def train_lstm(
                 "val_accuracy": val_report.accuracy,
                 "val_macro_f1": val_report.macro_f1,
                 "learning_rate": current_lr,
+                "epoch_secs": _epoch_secs,
             }
         )
 
@@ -463,11 +524,38 @@ def train_lstm(
                 },
                 checkpoint_path,
             )
+            _note = "* best"
         else:
             epochs_without_improve += 1
+            _note = f"  ES {epochs_without_improve}/{config.training.early_stopping_patience}"
+
+        print(
+            f"{epoch:>6}/{config.training.epochs:<4}  "
+            f"{train_loss:>9.4f}  {train_acc:>8.1%}  "
+            f"{val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  "
+            f"{val_report.macro_f1:>6.1%}  "
+            f"{current_lr:>8.2e}  {_epoch_secs:>5.1f}s  "
+            f"{_note}",
+            flush=True,
+        )
 
         if epochs_without_improve >= config.training.early_stopping_patience:
+            print(
+                f"\nEarly stopping at epoch {epoch}  "
+                f"(no improvement in val_macro_f1 for "
+                f"{config.training.early_stopping_patience} epochs)",
+                flush=True,
+            )
             break
+
+    else:
+        print(f"\nCompleted all {config.training.epochs} epochs.", flush=True)
+
+    print(
+        f"\nBest epoch  : {best_epoch}  "
+        f"val_macro_f1={best_val_f1:.4f}  val_loss={best_val_loss:.4f}",
+        flush=True,
+    )
 
     checkpoint_payload = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint_payload["model_state_dict"])
