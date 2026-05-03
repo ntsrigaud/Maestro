@@ -16,13 +16,13 @@ The proposed model integrates STGCN and LSTM modules to process sequences of han
 
 ### 2.1. Data Input and Preprocessing
 
--   **Input Source**: Live 3D hand keypoints are extracted using the **MediaPipe Hands** pipeline.
--   **Keypoint Extraction**: MediaPipe provides **21 keypoints** per hand. For sign language recognition tasks that often involve facial expressions and body posture, a more holistic set of **75 keypoints** (including hands, face, and pose) is typically used.
--   **Feature Selection for Hand Gestures**: For our specific use case of hand gesture recognition, we will adapt this by using a subset of **67 keypoints** that focus primarily on the hands and arms, discarding irrelevant facial or body keypoints. The input tensor will have the shape `(B, T, N, C)`, where:
-    -   `B`: Batch size
-    -   `T`: Number of frames in the sequence (e.g., 24 frames)
-    -   `N`: Number of keypoints (67)
-    -   `C`: Number of coordinates per keypoint (e.g., 3 for x, y, z)
+- **Input Source**: Live 3D hand keypoints are extracted using the **MediaPipe Hands** pipeline.
+- **Keypoint Extraction**: MediaPipe provides **21 keypoints** per hand. For sign language recognition tasks that often involve facial expressions and body posture, a more holistic set of **75 keypoints** (including hands, face, and pose) is typically used.
+- **Feature Selection for Hand Gestures**: For our specific use case of hand gesture recognition, we will adapt this by using a subset of **67 keypoints** that focus primarily on the hands and arms, discarding irrelevant facial or body keypoints. The input tensor will have the shape `(B, T, N, C)`, where:
+  - `B`: Batch size
+  - `T`: Number of frames in the sequence (e.g., 24 frames)
+  - `N`: Number of keypoints (67)
+  - `C`: Number of coordinates per keypoint (e.g., 3 for x, y, z)
 
 ### 2.2. Architecture Diagram
 
@@ -107,9 +107,9 @@ The output of the final STGCN layer is a feature sequence that encodes rich spat
 
 The proposed STGCN-LSTM architecture is highly adaptable. While originally designed for full-body action recognition or sign language (using 75+ keypoints), it can be effectively tailored for hand-centric gesture recognition using the **IPN Hands dataset**.
 
--   **Dataset**: The model will be trained on the IPN Hands dataset, which contains a vocabulary of gestures relevant to our application.
--   **Input Features**: We will utilize the 21 keypoints per hand (42 for two hands if necessary) provided by MediaPipe, which are also the basis for the IPN dataset. The graph structure (adjacency matrix) will be defined based on this 21-keypoint hand skeleton.
--   **Transfer Learning**: If a pre-trained STGCN model on a larger sign-language dataset is available, we can leverage transfer learning. We would fine-tune the model on the IPN Hands dataset, which is expected to accelerate convergence and improve performance, especially given a smaller dataset.
+- **Dataset**: The model will be trained on the IPN Hands dataset, which contains a vocabulary of gestures relevant to our application.
+- **Input Features**: We will utilize the 21 keypoints per hand (42 for two hands if necessary) provided by MediaPipe, which are also the basis for the IPN dataset. The graph structure (adjacency matrix) will be defined based on this 21-keypoint hand skeleton.
+- **Transfer Learning**: If a pre-trained STGCN model on a larger sign-language dataset is available, we can leverage transfer learning. We would fine-tune the model on the IPN Hands dataset, which is expected to accelerate convergence and improve performance, especially given a smaller dataset.
 
 By focusing the model on hand-specific keypoints and training it on the IPN dataset, we can create a highly accurate and robust classifier for our target gesture vocabulary.
 
@@ -119,9 +119,9 @@ By focusing the model on hand-specific keypoints and training it on the IPN data
 
 By migrating to the STGCN-LSTM architecture, we anticipate the following benefits:
 
--   **Improved Accuracy**: Superior modeling of the underlying hand structure and dynamics will lead to better discrimination between subtle gestures.
--   **Enhanced Robustness**: The graph-based approach is inherently more robust to variations in viewpoint, scale, and translation.
--   **Better Generalization**: The model is expected to generalize better to unseen variations of gestures.
+- **Improved Accuracy**: Superior modeling of the underlying hand structure and dynamics will lead to better discrimination between subtle gestures.
+- **Enhanced Robustness**: The graph-based approach is inherently more robust to variations in viewpoint, scale, and translation.
+- **Better Generalization**: The model is expected to generalize better to unseen variations of gestures.
 
 This migration represents a strategic shift towards a state-of-the-art architecture that is better suited for the complexities of dynamic hand gesture recognition.
 
