@@ -94,11 +94,21 @@ def test_num_heads_divisibility_guard() -> None:
         )
 
 
-def test_parameter_count_in_expected_range() -> None:
-    """Confirm model is in the lightweight ~540 K range, not accidentally huge."""
+def test_parameter_count_small_config() -> None:
+    """Small config (h=64): ~640 K params after adding cross-attention modules."""
     model = _make_model(hidden_size=64, proj_dim=64, num_heads=4)
     n_params = sum(p.numel() for p in model.parameters())
-    assert 400_000 < n_params < 700_000, f"Unexpected param count: {n_params:,}"
+    assert 500_000 < n_params < 900_000, f"Unexpected param count: {n_params:,}"
+
+
+def test_parameter_count_large_config() -> None:
+    """Large config (h=128): ~2.5 M params (recommended for IPN 12-class)."""
+    model = EnhancedTwoStreamLSTM(
+        input_size=147, hidden_size=128, num_layers=2,
+        dropout=0.45, num_classes=12, num_heads=8, proj_dim=128,
+    )
+    n_params = sum(p.numel() for p in model.parameters())
+    assert 2_000_000 < n_params < 3_500_000, f"Unexpected param count: {n_params:,}"
 
 
 def test_bidirectional_lstm_output_width() -> None:
@@ -116,13 +126,54 @@ def test_mha_embed_dim_matches_bilstm_output() -> None:
     model = _make_model(hidden_size=64, num_heads=4)
     assert model.mha_a.embed_dim == 128  # 2 × hidden_size
     assert model.mha_b.embed_dim == 128
+    # Cross-attention modules should have the same embed_dim
+    assert model.cross_attn_a.embed_dim == 128
+    assert model.cross_attn_b.embed_dim == 128
+
+
+def test_positional_encoding_buffer_shape() -> None:
+    """PE buffer must be (1, max_seq_len, 2*hidden_size) and non-trainable."""
+    model = _make_model(hidden_size=64)
+    # _pe is a buffer (not a parameter)
+    assert hasattr(model, "_pe"), "Expected '_pe' buffer on model"
+    pe = model._pe
+    assert pe.dim() == 3, f"PE should be 3-D, got {pe.dim()}"
+    assert pe.size(0) == 1, "PE batch dim should be 1"
+    assert pe.size(2) == 128, "PE embed dim should be 2*hidden_size=128"
+    # Verify it is NOT in model.parameters()
+    param_names = {n for n, _ in model.named_parameters()}
+    assert "_pe" not in param_names, "PE should be a buffer, not a parameter"
+
+
+def test_cross_attention_modules_exist() -> None:
+    """cross_attn_a and cross_attn_b must be MHA modules on the model."""
+    model = _make_model(hidden_size=64, num_heads=4)
+    import torch.nn as nn
+    assert isinstance(model.cross_attn_a, nn.MultiheadAttention)
+    assert isinstance(model.cross_attn_b, nn.MultiheadAttention)
+    assert isinstance(model.ln_cross_a, nn.LayerNorm)
+    assert isinstance(model.ln_cross_b, nn.LayerNorm)
+
+
+def test_gradient_flow_with_random_input() -> None:
+    """All parameters must receive non-zero gradients when input is non-zero."""
+    model = _make_model()
+    x = torch.randn(2, 32, 147)  # random, not zeros
+    logits = model(x)
+    logits.sum().backward()
+    dead = [
+        name for name, p in model.named_parameters()
+        if p.requires_grad and (p.grad is None or p.grad.abs().sum() == 0)
+    ]
+    assert not dead, f"Dead gradients with random input: {dead}"
 
 
 # ── Gradient flow ─────────────────────────────────────────────────────────────
 
 def test_all_parameters_receive_gradients() -> None:
+    """With random (non-degenerate) input all parameters must be reachable."""
     model = _make_model()
-    x = torch.randn(2, 32, 147)
+    x = torch.randn(2, 32, 147)  # use random, not zeros
     logits = model(x)
     loss = logits.sum()
     loss.backward()
