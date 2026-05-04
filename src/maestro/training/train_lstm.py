@@ -55,6 +55,7 @@ class TrainingConfig:
     num_workers: int
     class_weighting: bool
     label_smoothing: float = 0.0
+    max_samples_per_class: int | None = None
 
 
 @dataclass(slots=True)
@@ -150,6 +151,11 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             num_workers=int(train_data.get("num_workers", 0)),
             class_weighting=bool(train_data.get("class_weighting", True)),
             label_smoothing=float(train_data.get("label_smoothing", 0.0)),
+            max_samples_per_class=(
+                int(train_data["max_samples_per_class"])
+                if train_data.get("max_samples_per_class") is not None
+                else None
+            ),
         ),
         split=DataSplitConfig(
             train_ratio=float(split_data.get("train_ratio", 0.7)),
@@ -297,6 +303,7 @@ def create_datamodule(
         num_workers=config.training.num_workers,
         pin_memory=False,
         augmentation=config.augmentation,
+        max_samples_per_class=config.training.max_samples_per_class,
     )
     flat_dm.setup()
     return flat_dm
@@ -320,7 +327,14 @@ def _build_criterion(
 def _build_class_weights(
     datamodule: GestureDataModule | GraphGestureDataModule, device: torch.device
 ) -> torch.Tensor:
-    distribution = datamodule.label_distribution()
+    # Use training-split-only counts so that any per-class downsampling is
+    # reflected in the weights.  Without this, the weights would be computed
+    # from the full dataset distribution, which still shows the 145x imbalance
+    # even after downsampling has been applied to the training split.
+    if isinstance(datamodule, GestureDataModule):
+        distribution = datamodule.training_label_distribution()
+    else:
+        distribution = datamodule.label_distribution()
     labels = datamodule.class_labels
     counts = torch.tensor([distribution[label] for label in labels], dtype=torch.float32)
     weights = torch.sum(counts) / (counts * len(labels))
