@@ -83,7 +83,12 @@ training:
   label_smoothing: 0.05 # was 0.1 — reduced; class_weighting already handles imbalance
   seed: 42
   num_workers: 0
-  class_weighting: true # inverse-frequency weighting for open_palm_hold vs click classes
+  class_weighting: true # inverse-frequency weighting — computed on training split only
+  # Per-class cap applied to the TRAINING split after stratified group splitting.
+  # point_one/point_two had 145x more samples than minority classes (82% of all data).
+  # Cap at 8 000 → max/min ratio among gesture classes falls to ≤ 2.6x.
+  # Val/test splits are never touched.
+  max_samples_per_class: 8000
 
 splits:
   train_ratio: 0.7
