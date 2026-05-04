@@ -14,24 +14,44 @@ from maestro.training.dataset_builder import SequenceDatasetBuilder
 
 
 class SequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
-    """Torch dataset wrapper for sequence tensors and label ids."""
+    """Torch dataset wrapper for sequence tensors and label ids.
 
-    def __init__(self, sequences: np.ndarray, label_ids: np.ndarray) -> None:
+    When *indices* is provided the dataset holds a shared reference to the full
+    *sequences* array and slices one window per ``__getitem__`` call, avoiding
+    the per-split upfront copy that can cost several GiB of RAM.
+    """
+
+    def __init__(
+        self,
+        sequences: np.ndarray,
+        label_ids: np.ndarray,
+        indices: np.ndarray | None = None,
+    ) -> None:
         if sequences.ndim != 3:
             raise ValueError("sequences must have shape (N, T, F)")
         if label_ids.ndim != 1:
             raise ValueError("label_ids must have shape (N,)")
-        if len(sequences) != len(label_ids):
+        if indices is not None:
+            if len(label_ids) != len(indices):
+                raise ValueError(
+                    "label_ids and indices must have the same length when indices is provided"
+                )
+        elif len(sequences) != len(label_ids):
             raise ValueError("sequences and label_ids must have the same length")
 
-        self._sequences = torch.from_numpy(sequences.astype(np.float32))
-        self._label_ids = torch.from_numpy(label_ids.astype(np.int64))
+        # Store as numpy — per-item slices are cheap (T, F) views into the full array.
+        self._sequences = sequences.astype(np.float32, copy=False)
+        self._indices = indices
+        self._label_ids = torch.from_numpy(label_ids.astype(np.int64, copy=False))
 
     def __len__(self) -> int:
         return int(self._label_ids.shape[0])
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        return self._sequences[index], self._label_ids[index]
+        seq = self._sequences[
+            int(self._indices[index]) if self._indices is not None else index
+        ]
+        return torch.from_numpy(np.asarray(seq, dtype=np.float32)), self._label_ids[index]
 
 
 class AugmentedSequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
@@ -46,24 +66,35 @@ class AugmentedSequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tensor]])
         sequences: np.ndarray,
         label_ids: np.ndarray,
         augmenter: GestureAugmenter,
+        indices: np.ndarray | None = None,
     ) -> None:
         if sequences.ndim != 3:
             raise ValueError("sequences must have shape (N, T, F)")
         if label_ids.ndim != 1:
             raise ValueError("label_ids must have shape (N,)")
-        if len(sequences) != len(label_ids):
+        if indices is not None:
+            if len(label_ids) != len(indices):
+                raise ValueError(
+                    "label_ids and indices must have the same length when indices is provided"
+                )
+        elif len(sequences) != len(label_ids):
             raise ValueError("sequences and label_ids must have the same length")
 
-        # Keep as numpy so the augmenter can work without tensor round-trips.
-        self._sequences_np = sequences.astype(np.float32)
-        self._label_ids = torch.from_numpy(label_ids.astype(np.int64))
+        # Keep as numpy; when indices is provided sequences is the full array —
+        # no per-split copy is made.  Augmentation creates a new array per item.
+        self._sequences_np = sequences.astype(np.float32, copy=False)
+        self._indices = indices
+        self._label_ids = torch.from_numpy(label_ids.astype(np.int64, copy=False))
         self._augmenter = augmenter
 
     def __len__(self) -> int:
         return int(self._label_ids.shape[0])
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        seq_aug = self._augmenter.augment(self._sequences_np[index])
+        seq = self._sequences_np[
+            int(self._indices[index]) if self._indices is not None else index
+        ]
+        seq_aug = self._augmenter.augment(seq)
         return torch.from_numpy(seq_aug), self._label_ids[index]
 
 
@@ -111,6 +142,7 @@ class GestureDataModule:
         pin_memory: bool = False,
         use_group_split: bool = True,
         augmentation: AugmentationConfig | None = None,
+        max_samples_per_class: int | None = None,
     ) -> None:
         self._dataset_path = Path(dataset_path)
         self._batch_size = batch_size
@@ -120,6 +152,7 @@ class GestureDataModule:
         self._pin_memory = pin_memory
         self._use_group_split = use_group_split
         self._augmentation = augmentation
+        self._max_samples_per_class = max_samples_per_class
 
         self._bundle: DatasetBundle | None = None
         self._train_dataset: SequenceTensorDataset | AugmentedSequenceTensorDataset | None = None
@@ -229,27 +262,79 @@ class GestureDataModule:
             train_idx, val_idx, test_idx = self._split_indices(label_ids)
 
         self._train_idx = np.asarray(train_idx)
+        if self._max_samples_per_class is not None:
+            self._train_idx = self._downsample_train_indices(
+                self._train_idx, label_ids
+            )
         self._val_idx = np.asarray(val_idx)
         self._test_idx = np.asarray(test_idx)
 
         # Build datasets; apply augmentation to training split only.
+        # Pass the full sequences array + split indices so no per-split
+        # fancy-index copy is made.  Peak RAM stays at one sequences allocation
+        # (~6 GB); each __getitem__ slices one (T, F) window on demand.
         if self._augmentation is not None:
             augmenter = GestureAugmenter(self._augmentation)
             self._train_dataset = AugmentedSequenceTensorDataset(
-                sequences[self._train_idx],
+                sequences,
                 label_ids[self._train_idx],
                 augmenter,
+                indices=self._train_idx,
             )
         else:
             self._train_dataset = SequenceTensorDataset(
-                sequences[self._train_idx], label_ids[self._train_idx]
+                sequences, label_ids[self._train_idx], indices=self._train_idx
             )
         self._val_dataset = SequenceTensorDataset(
-            sequences[self._val_idx], label_ids[self._val_idx]
+            sequences, label_ids[self._val_idx], indices=self._val_idx
         )
         self._test_dataset = SequenceTensorDataset(
-            sequences[self._test_idx], label_ids[self._test_idx]
+            sequences, label_ids[self._test_idx], indices=self._test_idx
         )
+
+    def setup_indices_only(
+        self,
+        label_ids: np.ndarray,
+        recording_ids: np.ndarray,
+    ) -> None:
+        """Compute train/val/test split indices from pre-loaded arrays.
+
+        Identical splitting logic to :meth:`setup` (same seed, stratification,
+        and group-split flag), but avoids loading the dataset from disk and never
+        creates ``SequenceTensorDataset`` instances.  This is the correct method
+        to call from analysis notebooks that have already loaded the sequences
+        array into memory — calling :meth:`setup` would reload and materialise
+        the full sequences array a second time, exhausting available RAM.
+
+        After calling this method :attr:`train_indices`, :attr:`val_indices`, and
+        :attr:`test_indices` are fully operational.  Calls to the dataloader
+        methods will raise ``RuntimeError`` (datasets are not created), which is
+        the expected behaviour for index-only initialisation.
+
+        Parameters
+        ----------
+        label_ids:
+            Integer label array, shape ``(N,)``.
+        recording_ids:
+            String / object array of recording identifiers, shape ``(N,)``.
+        """
+        self._split.validate()
+
+        unique_recs = np.unique(recording_ids)
+        if self._use_group_split and len(unique_recs) >= 3:
+            train_idx, val_idx, test_idx = self._group_split_indices(
+                label_ids, recording_ids
+            )
+        else:
+            train_idx, val_idx, test_idx = self._split_indices(label_ids)
+
+        self._train_idx = np.asarray(train_idx)
+        if self._max_samples_per_class is not None:
+            self._train_idx = self._downsample_train_indices(
+                self._train_idx, label_ids
+            )
+        self._val_idx = np.asarray(val_idx)
+        self._test_idx = np.asarray(test_idx)
 
     def train_dataloader(self) -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
         if self._train_dataset is None:
@@ -287,12 +372,53 @@ class GestureDataModule:
             pin_memory=self._pin_memory,
         )
 
+    def _downsample_train_indices(
+        self,
+        train_idx: np.ndarray,
+        label_ids: np.ndarray,
+    ) -> np.ndarray:
+        """Cap each class in *train_idx* to ``self._max_samples_per_class`` samples.
+
+        The subsampling uses a seeded RNG derived from ``self._seed`` for full
+        reproducibility.  Val and test splits are never touched.
+        """
+        assert self._max_samples_per_class is not None
+        rng = np.random.default_rng(self._seed)
+        keep: list[np.ndarray] = []
+        train_labels = label_ids[train_idx]
+        for cls_id in np.unique(train_labels):
+            cls_sub_idx = train_idx[train_labels == cls_id]
+            if len(cls_sub_idx) > self._max_samples_per_class:
+                cls_sub_idx = rng.choice(
+                    cls_sub_idx, size=self._max_samples_per_class, replace=False
+                )
+            keep.append(cls_sub_idx)
+        return np.sort(np.concatenate(keep))
+
     def label_distribution(self) -> dict[str, int]:
         if self._bundle is None:
             raise RuntimeError("DataModule not initialized. Call setup() first.")
 
         labels = self.class_labels
         counts = np.bincount(self._bundle.label_ids, minlength=len(labels))
+        return {labels[i]: int(counts[i]) for i in range(len(labels))}
+
+    def training_label_distribution(self) -> dict[str, int]:
+        """Return label counts for the TRAINING split only.
+
+        Unlike :meth:`label_distribution` (which counts every sample in the
+        full dataset), this method counts only the indices in the training
+        split, reflecting any per-class downsampling applied by
+        ``max_samples_per_class``.  This is the correct distribution to use
+        when computing inverse-frequency class weights for the loss function.
+        """
+        if self._bundle is None or self._train_idx is None:
+            raise RuntimeError(
+                "training_label_distribution() requires setup() to be called first."
+            )
+        labels = self.class_labels
+        train_label_ids = self._bundle.label_ids[self._train_idx]
+        counts = np.bincount(train_label_ids, minlength=len(labels))
         return {labels[i]: int(counts[i]) for i in range(len(labels))}
 
     def split_info(self) -> dict[str, set[str]]:
@@ -424,8 +550,8 @@ class GraphSequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
             raise ValueError("label_ids must have shape (M,)")
         if len(sequences) != len(label_ids):
             raise ValueError("sequences and label_ids must have the same length")
-        self._sequences = torch.from_numpy(sequences.astype(np.float32))
-        self._label_ids = torch.from_numpy(label_ids.astype(np.int64))
+        self._sequences = torch.from_numpy(sequences.astype(np.float32, copy=False))
+        self._label_ids = torch.from_numpy(label_ids.astype(np.int64, copy=False))
 
     def __len__(self) -> int:
         return int(self._label_ids.shape[0])
@@ -449,8 +575,8 @@ class AugmentedGraphSequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tens
             raise ValueError("label_ids must have shape (M,)")
         if len(sequences) != len(label_ids):
             raise ValueError("sequences and label_ids must have the same length")
-        self._sequences_np = sequences.astype(np.float32)
-        self._label_ids = torch.from_numpy(label_ids.astype(np.int64))
+        self._sequences_np = sequences.astype(np.float32, copy=False)
+        self._label_ids = torch.from_numpy(label_ids.astype(np.int64, copy=False))
         self._augmenter = augmenter
 
     def __len__(self) -> int:
