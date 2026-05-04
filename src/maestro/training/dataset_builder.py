@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from collections import Counter, deque
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -163,53 +164,65 @@ class SequenceDatasetBuilder:
         if not self._samples:
             raise RuntimeError("No sequence samples have been generated")
 
-        sequences = np.asarray(
-            [sample.sequence for sample in self._samples],
-            dtype=np.float32,
-        )
-        labels = np.asarray([sample.label for sample in self._samples], dtype=object)
-        label_ids = np.asarray([sample.label_id for sample in self._samples], dtype=np.int64)
-        recording_ids = np.asarray(
-            [sample.recording_id for sample in self._samples],
-            dtype=object,
-        )
-        sample_ids = np.asarray([sample.sample_id for sample in self._samples], dtype=object)
-        start_ts = np.asarray(
-            [sample.start_timestamp_ms for sample in self._samples],
-            dtype=np.int64,
-        )
-        end_ts = np.asarray(
-            [sample.end_timestamp_ms for sample in self._samples],
-            dtype=np.int64,
-        )
-        valid_ratio = np.asarray(
-            [sample.valid_ratio for sample in self._samples],
-            dtype=np.float32,
-        )
+        n_samples = len(self._samples)
+        first = self._samples[0]
+        window_length = len(first.sequence)
+        feature_dim = len(first.sequence[0]) if window_length > 0 else 0
 
-        metadata = {
-            "feature_schema_version": feature_schema_version,
-            "feature_dim": int(sequences.shape[2]),
-            "window_length": int(sequences.shape[1]),
-            "window_step": self._window_step,
-            "min_valid_ratio": self._min_valid_ratio,
-            "label_strategy": self._label_strategy,
-            "enable_orientation_normalization": self._enable_orientation_normalization,
-            "vocabulary": self._vocabulary,
-        }
+        labels = np.empty(n_samples, dtype=object)
+        label_ids = np.empty(n_samples, dtype=np.int64)
+        recording_ids = np.empty(n_samples, dtype=object)
+        sample_ids = np.empty(n_samples, dtype=object)
+        start_ts = np.empty(n_samples, dtype=np.int64)
+        end_ts = np.empty(n_samples, dtype=np.int64)
+        valid_ratio = np.empty(n_samples, dtype=np.float32)
 
-        np.savez_compressed(
-            path,
-            sequences=sequences,
-            labels=labels,
-            label_ids=label_ids,
-            recording_ids=recording_ids,
-            sample_ids=sample_ids,
-            start_timestamp_ms=start_ts,
-            end_timestamp_ms=end_ts,
-            valid_ratio=valid_ratio,
-            metadata_json=np.asarray(json.dumps(metadata), dtype=object),
-        )
+        # Use a disk-backed buffer to avoid a second full in-memory copy of
+        # sequences during save for large datasets.
+        with tempfile.TemporaryDirectory(prefix="maestro_npz_") as tmpdir:
+            memmap_path = Path(tmpdir) / "sequences.float32.dat"
+            sequences = np.memmap(
+                memmap_path,
+                dtype=np.float32,
+                mode="w+",
+                shape=(n_samples, window_length, feature_dim),
+            )
+
+            for i, sample in enumerate(self._samples):
+                sequences[i] = np.asarray(sample.sequence, dtype=np.float32)
+                labels[i] = sample.label
+                label_ids[i] = sample.label_id
+                recording_ids[i] = sample.recording_id
+                sample_ids[i] = sample.sample_id
+                start_ts[i] = sample.start_timestamp_ms
+                end_ts[i] = sample.end_timestamp_ms
+                valid_ratio[i] = sample.valid_ratio
+
+            sequences.flush()
+
+            metadata = {
+                "feature_schema_version": feature_schema_version,
+                "feature_dim": int(feature_dim),
+                "window_length": int(window_length),
+                "window_step": self._window_step,
+                "min_valid_ratio": self._min_valid_ratio,
+                "label_strategy": self._label_strategy,
+                "enable_orientation_normalization": self._enable_orientation_normalization,
+                "vocabulary": self._vocabulary,
+            }
+
+            np.savez_compressed(
+                path,
+                sequences=sequences,
+                labels=labels,
+                label_ids=label_ids,
+                recording_ids=recording_ids,
+                sample_ids=sample_ids,
+                start_timestamp_ms=start_ts,
+                end_timestamp_ms=end_ts,
+                valid_ratio=valid_ratio,
+                metadata_json=np.asarray(json.dumps(metadata), dtype=object),
+            )
         return path
 
     @staticmethod
