@@ -277,13 +277,56 @@ def _extract_video_worker(args: tuple[str, str, str, float, float]) -> tuple[str
 
 
 def _load_cache(cache_path: Path) -> VideoLandmarks:
+    """Load a holistic or legacy right-hand-only cache NPZ.
+
+    Holistic format (``*_holistic.npz`` written by this script):
+        ``keypoints``  (N, 67, 3) float32 — all holistic nodes
+        ``valid_mask`` (N, 67)    bool    — per-node validity
+
+    Legacy format (``{stem}.npz`` written by earlier pipeline versions):
+        ``landmarks``  (N, 21, 3) float32 — right-hand landmarks only
+        ``valid``      (N,)       bool    — per-frame detection validity
+
+    Legacy caches are promoted to the holistic layout by placing the 21
+    right-hand landmarks at nodes 0-20 (the right-hand slot in the graph
+    schema), leaving nodes 21-66 as zeros.  This is sufficient because the
+    flat pipeline only reads ``keypoints[:, :21, :]``.
+    """
     with np.load(cache_path, allow_pickle=True) as data:
+        fps = float(data["fps"])
+        frame_ids = data["frame_ids"]
+
+        if "keypoints" in data.files:
+            # Current holistic format — load directly.
+            return VideoLandmarks(
+                video_stem=cache_path.stem,
+                fps=fps,
+                frame_ids=frame_ids,
+                keypoints=data["keypoints"],    # (N, 67, 3)
+                valid_mask=data["valid_mask"],  # (N, 67)
+            )
+
+        # Legacy format: landmarks (N, 21, 3) + valid (N,)
+        rh_landmarks = data["landmarks"]  # (N, 21, 3) right-hand only
+        rh_valid = data["valid"]          # (N,) bool
+        N = len(frame_ids)
+
+        # Promote to full holistic layout (67 nodes, 3 coords) so the rest
+        # of the pipeline can use the same code path regardless of format.
+        keypoints = np.zeros(
+            (N, graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32
+        )
+        keypoints[:, :21, :] = rh_landmarks
+
+        valid_mask = np.zeros((N, graph_schema.NUM_NODES), dtype=bool)
+        valid_mask[:, :21] = rh_valid[:, np.newaxis]
+
         return VideoLandmarks(
             video_stem=cache_path.stem,
-            fps=float(data["fps"]),
-            frame_ids=data["frame_ids"],
-            keypoints=data["keypoints"],  # (N, 67, 3)
-            valid_mask=data["valid_mask"],  # (N, 67)
+            fps=fps,
+            frame_ids=frame_ids,
+            keypoints=keypoints,
+            valid_mask=valid_mask,
         )
 
 
@@ -427,27 +470,34 @@ def _subsample_unknown_segments(
     max_per_source: int,
     rng: random.Random,
 ) -> list[AnnotationRow]:
-    """Randomly subsample unknown-mapped segments per IPN source label."""
-    by_source: dict[str, list[AnnotationRow]] = defaultdict(list)
+    """Randomly subsample unknown-mapped segments per source video.
+
+    Groups D0X segments by video stem so that each recording contributes at
+    most ``max_per_source`` unknown segments.  Grouping by IPN label alone
+    (e.g. a single 'D0X' bucket for all 200 videos) would keep only
+    ``max_per_source`` segments globally, collapsing coverage to a handful
+    of videos.
+    """
+    by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
     other: list[AnnotationRow] = []
     for seg in segments:
         if IPN_TO_VOCAB.get(seg.ipn_label) == "unknown":
-            by_source[seg.ipn_label].append(seg)
+            by_video[seg.video].append(seg)
         else:
             other.append(seg)
 
     subsampled: list[AnnotationRow] = list(other)
-    for source_label, source_segs in by_source.items():
-        if len(source_segs) > max_per_source:
-            chosen = rng.sample(source_segs, max_per_source)
-            logger.info(
-                "Subsampled unknown source '%s': %d → %d segments.",
-                source_label,
-                len(source_segs),
+    for video_stem, video_segs in by_video.items():
+        if len(video_segs) > max_per_source:
+            chosen = rng.sample(video_segs, max_per_source)
+            logger.debug(
+                "Subsampled unknown for video '%s': %d → %d segments.",
+                video_stem,
+                len(video_segs),
                 max_per_source,
             )
         else:
-            chosen = source_segs
+            chosen = video_segs
         subsampled.extend(chosen)
     return subsampled
 
