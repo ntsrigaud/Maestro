@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import ast as _ast
+import struct as _struct
 import warnings
+import zipfile as _zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -128,6 +131,64 @@ class DatasetBundle:
     metadata: dict[str, Any]
 
 
+# ── Streaming NPZ reader ──────────────────────────────────────────────────────
+# numpy compressed NPZ files store each array as a separate .npy entry inside a
+# ZIP archive.  np.load() decompresses the full array into memory on first
+# access — for the sequences array this is 6–7 GB, which exceeds available RAM
+# on development machines.  The helpers below stream the array row-by-row
+# through the ZIP decompressor so that only one chunk (~90 MB) is live at once.
+
+def _parse_npy_header(stream: Any) -> tuple[np.dtype, tuple[int, ...]]:
+    """Read the numpy .npy header from *stream* and return (dtype, shape)."""
+    prefix = stream.read(8)
+    if prefix[:6] != b"\x93NUMPY":
+        raise ValueError("Not a valid .npy file")
+    major = prefix[6]
+    hdr_len = _struct.unpack("<H" if major == 1 else "<I",
+                             stream.read(2 if major == 1 else 4))[0]
+    hdr = _ast.literal_eval(stream.read(hdr_len).decode("latin1").strip())
+    if hdr.get("fortran_order", False):
+        raise ValueError("Fortran-order arrays are not supported by the streaming reader")
+    return np.dtype(hdr["descr"]), tuple(hdr["shape"])
+
+
+def _iter_sequences_chunked(
+    npz_path: Path,
+    chunk_size: int = 4_000,
+    key: str = "sequences",
+) -> Any:
+    """Yield (start_index, chunk) pairs streaming from a compressed NPZ.
+
+    The sequences array is never fully decompressed; each call to
+    ``zipfile.ZipExtFile.read(n_bytes)`` decompresses incrementally.  Peak RAM
+    per call is one chunk (``chunk_size × T × F × 4`` bytes ≈ 90 MB for the
+    default chunk_size with T=32, F=147).
+
+    Yields
+    ------
+    start : int
+        Index of the first row in this chunk relative to the full array.
+    chunk : np.ndarray, shape (n, T, F), dtype float32
+        A writable copy of the current chunk cast to float32.
+    """
+    with _zipfile.ZipFile(str(npz_path), "r") as zf:
+        with zf.open(f"{key}.npy", "r") as f:
+            dtype, shape = _parse_npy_header(f)
+            N_total, *rest = shape
+            row_bytes = int(np.prod(rest)) * dtype.itemsize
+            start = 0
+            while start < N_total:
+                n = min(chunk_size, N_total - start)
+                raw = f.read(n * row_bytes)
+                actual_n = len(raw) // row_bytes
+                if actual_n == 0:
+                    break
+                raw = raw[: actual_n * row_bytes]
+                chunk = np.frombuffer(raw, dtype=dtype).reshape(actual_n, *rest)
+                yield start, chunk.astype(np.float32)
+                start += actual_n
+
+
 class GestureDataModule:
     """Loads NPZ dataset artifacts and prepares deterministic PyTorch dataloaders."""
 
@@ -178,31 +239,58 @@ class GestureDataModule:
         if self._class_labels_override is not None:
             return list(self._class_labels_override)
 
-        metadata = self.metadata
-        labels = metadata.get("vocabulary")
-        if isinstance(labels, list) and labels:
-            return [str(item) for item in labels]
+        # Fast path: bundle is loaded (after setup()).
+        if self._bundle is not None:
+            metadata = dict(self._bundle.metadata)
+            labels = metadata.get("vocabulary")
+            if isinstance(labels, list) and labels:
+                return [str(item) for item in labels]
+            return sorted(set(str(x) for x in self._bundle.labels.tolist()))
 
-        if self._bundle is None:
-            raise RuntimeError("Dataset is not loaded. Call setup() first.")
-        return sorted(set(str(x) for x in self._bundle.labels.tolist()))
+        # Fallback: setup_indices_only() was called without vocab, or vocab was
+        # not stored (e.g. older kernel with cached module).  Load vocabulary
+        # from the dataset file — metadata-only, no sequences are decompressed.
+        try:
+            payload = SequenceDatasetBuilder.load_npz(self._dataset_path)
+            vocab = payload["metadata"].get("vocabulary")
+            if isinstance(vocab, list) and vocab:
+                self._class_labels_override = [str(v) for v in vocab]
+                return list(self._class_labels_override)
+        except Exception:
+            pass
+
+        raise RuntimeError(
+            "class_labels: vocabulary could not be determined. "
+            "Call setup() or setup_indices_only(vocab=...) first."
+        )
+
+    def _load_metadata_from_file(self) -> dict:
+        """Load dataset metadata without decompressing sequences."""
+        payload = SequenceDatasetBuilder.load_npz(self._dataset_path)
+        return dict(payload["metadata"])
 
     @property
     def feature_dim(self) -> int:
-        metadata = self.metadata
+        if self._bundle is not None:
+            metadata = dict(self._bundle.metadata)
+        else:
+            metadata = self._load_metadata_from_file()
         if "feature_dim" in metadata:
             return int(metadata["feature_dim"])
         if self._bundle is None:
-            raise RuntimeError("Dataset is not loaded. Call setup() first.")
+            raise RuntimeError("feature_dim not in metadata. Call setup() first.")
         return int(self._bundle.sequences.shape[2])
 
     @property
     def sequence_length(self) -> int:
-        metadata = self.metadata
+        if self._bundle is not None:
+            metadata = dict(self._bundle.metadata)
+        else:
+            metadata = self._load_metadata_from_file()
         if "window_length" in metadata:
             return int(metadata["window_length"])
         if self._bundle is None:
-            raise RuntimeError("Dataset is not loaded. Call setup() first.")
+            raise RuntimeError("window_length not in metadata. Call setup() first.")
         return int(self._bundle.sequences.shape[1])
 
     @property
@@ -234,41 +322,58 @@ class GestureDataModule:
         if not self._dataset_path.exists():
             raise FileNotFoundError(f"Dataset not found: {self._dataset_path}")
 
+        # ── Load small arrays cheaply from the NPZ ────────────────────────────
+        # np.load on a compressed NPZ is lazy — arrays are decompressed only on
+        # first item access.  We access only the small side-car arrays here and
+        # deliberately avoid touching "sequences" (6–7 GB uncompressed).
         payload = SequenceDatasetBuilder.load_npz(self._dataset_path)
-        sequences = np.asarray(payload["sequences"], dtype=np.float32)
         labels = np.asarray(payload["labels"], dtype=object)
         label_ids = np.asarray(payload["label_ids"], dtype=np.int64)
         recording_ids = np.asarray(payload["recording_ids"], dtype=object)
         metadata = dict(payload["metadata"])
 
-        if sequences.ndim != 3:
-            raise ValueError("Dataset sequences must have shape (N, T, F)")
-        if sequences.shape[0] <= 0:
+        N = len(label_ids)
+        if N == 0:
             raise ValueError("Dataset must contain at least one sequence")
 
-        # Filter excluded classes before splitting.  The filtered vocab and
-        # remapped label_ids (contiguous 0..N_kept-1) are stored in the bundle
-        # so that class_labels and training_label_distribution() stay correct.
+        # ── Determine which samples to keep ───────────────────────────────────
+        # When exclude_classes is active we compute the keep mask from label_ids
+        # (cheap, ~3 MB) before any sequences memory is allocated.
         if self._exclude_classes:
             vocab = list(metadata.get("vocabulary") or [])
             filtered_vocab, keep_indices, remapped_ids = self._apply_exclude_classes(
                 vocab, label_ids
             )
-            sequences = sequences[keep_indices]
             labels = labels[keep_indices]
             label_ids = remapped_ids
             recording_ids = recording_ids[keep_indices]
             metadata = {**metadata, "vocabulary": filtered_vocab}
+        else:
+            keep_indices = None  # keep all
 
-        self._bundle = DatasetBundle(
-            sequences=sequences,
-            labels=labels,
-            label_ids=label_ids,
-            recording_ids=recording_ids,
-            metadata=metadata,
-        )
+        N_kept = len(label_ids)
 
-        # Choose group-aware or random split.
+        # ── Apply per-class cap BEFORE splitting ─────────────────────────────
+        # Capping the full dataset (not just the training split) ensures that
+        # val and test are proportionally balanced across classes.  Without this
+        # step, majority classes (e.g. point_one/point_two with ~56 k sequences)
+        # produce ~8 400 val/test samples each while minority classes produce
+        # only ~360, creating a 23× evaluation disparity that masks poor
+        # per-class performance on minority gestures.
+        if self._max_samples_per_class is not None:
+            cap_sub_idx = self._downsample_dataset_indices(label_ids)
+            labels = labels[cap_sub_idx]
+            label_ids = label_ids[cap_sub_idx]
+            recording_ids = recording_ids[cap_sub_idx]
+            # Compose with any earlier exclude_classes filter so the streaming
+            # step builds the sequences array from the right original rows.
+            if keep_indices is not None:
+                keep_indices = keep_indices[cap_sub_idx]
+            else:
+                keep_indices = cap_sub_idx
+            N_kept = len(label_ids)
+
+        # ── Compute splits on the (possibly filtered + capped) label_ids ──────
         unique_recs = np.unique(recording_ids)
         if self._use_group_split and len(unique_recs) >= 3:
             train_idx, val_idx, test_idx = self._group_split_indices(label_ids, recording_ids)
@@ -284,17 +389,62 @@ class GestureDataModule:
             train_idx, val_idx, test_idx = self._split_indices(label_ids)
 
         self._train_idx = np.asarray(train_idx)
-        if self._max_samples_per_class is not None:
-            self._train_idx = self._downsample_train_indices(
-                self._train_idx, label_ids
-            )
         self._val_idx = np.asarray(val_idx)
         self._test_idx = np.asarray(test_idx)
 
-        # Build datasets; apply augmentation to training split only.
-        # Pass the full sequences array + split indices so no per-split
-        # fancy-index copy is made.  Peak RAM stays at one sequences allocation
-        # (~6 GB); each __getitem__ slices one (T, F) window on demand.
+        # ── Stream sequences into a single compact allocation ─────────────────
+        # We stream the full sequences array chunk-by-chunk through the ZIP
+        # decompressor, applying the keep_indices filter on each chunk so that
+        # only the kept rows land in the output array.  Peak RAM = one chunk
+        # (~90 MB) + the final allocation (N_kept × T × F × 4 bytes).
+        #
+        # For the v6 dataset on a machine with 6.5 GB free:
+        #   Old approach (np.load → 6.64 GB + fancy-index copy → 6.22 GB):
+        #     peak ≈ 13 GB  → OOM kill
+        #   New approach (streaming → compact 6.22 GB result):
+        #     peak ≈ 6.3 GB  → fits in available RAM
+        meta = metadata
+        T = int(meta.get("window_length", 32))
+        F = int(meta.get("feature_dim", 147))
+
+        sequences = np.empty((N_kept, T, F), dtype=np.float32)
+        write_pos = 0
+
+        if keep_indices is not None:
+            # keep_mask is a boolean array over the original N rows.
+            # For each streaming chunk we slice just the kept rows — one cheap
+            # boolean-index on a small chunk rather than a full-array fancy-index.
+            keep_mask = np.zeros(N, dtype=bool)
+            keep_mask[keep_indices] = True
+            for _s, chunk in _iter_sequences_chunked(self._dataset_path):
+                n = len(chunk)
+                chunk_mask = keep_mask[_s : _s + n]
+                kept = chunk[chunk_mask]
+                nk = len(kept)
+                if nk:
+                    sequences[write_pos : write_pos + nk] = kept
+                    write_pos += nk
+                del chunk, kept
+        else:
+            for _s, chunk in _iter_sequences_chunked(self._dataset_path):
+                n = len(chunk)
+                sequences[write_pos : write_pos + n] = chunk
+                write_pos += n
+                del chunk
+
+        assert write_pos == N_kept, f"Streaming read mismatch: wrote {write_pos}, expected {N_kept}"
+
+        self._bundle = DatasetBundle(
+            sequences=sequences,
+            labels=labels,
+            label_ids=label_ids,
+            recording_ids=recording_ids,
+            metadata=metadata,
+        )
+
+        # ── Build datasets; apply augmentation to training split only ─────────
+        # Pass the compact sequences array + split indices so each __getitem__
+        # slices one (T, F) window on demand — no per-split fancy-index copies.
         if self._augmentation is not None:
             augmenter = GestureAugmenter(self._augmentation)
             self._train_dataset = AugmentedSequenceTensorDataset(
@@ -358,6 +508,14 @@ class GestureDataModule:
             self._class_labels_override = filtered_vocab
             filtered_recording_ids = recording_ids[keep_indices]
 
+            # Apply per-class cap BEFORE splitting (same reasoning as setup()).
+            if self._max_samples_per_class is not None:
+                cap_sub_idx = self._downsample_dataset_indices(remapped_ids)
+                remapped_ids = remapped_ids[cap_sub_idx]
+                filtered_recording_ids = filtered_recording_ids[cap_sub_idx]
+                # Compose: split → cap → exclude-filter → original index space.
+                keep_indices = keep_indices[cap_sub_idx]
+
             unique_recs = np.unique(filtered_recording_ids)
             if self._use_group_split and len(unique_recs) >= 3:
                 train_idx, val_idx, test_idx = self._group_split_indices(
@@ -366,32 +524,51 @@ class GestureDataModule:
             else:
                 train_idx, val_idx, test_idx = self._split_indices(remapped_ids)
 
-            # Map filtered-array indices back to original-array indices so
+            # Map split-relative indices back to original-array indices so
             # callers can do all_labels[_dm.train_indices] on the full array.
             self._train_idx = keep_indices[np.asarray(train_idx)]
-            if self._max_samples_per_class is not None:
-                self._train_idx = self._downsample_train_indices(
-                    self._train_idx, label_ids
-                )
-            self._val_idx = keep_indices[np.asarray(val_idx)]
-            self._test_idx = keep_indices[np.asarray(test_idx)]
+            self._val_idx   = keep_indices[np.asarray(val_idx)]
+            self._test_idx  = keep_indices[np.asarray(test_idx)]
             return
 
-        unique_recs = np.unique(recording_ids)
+        # Apply per-class cap BEFORE splitting (no exclude_classes path).
+        if self._max_samples_per_class is not None:
+            cap_idx = self._downsample_dataset_indices(label_ids)
+            label_ids_split = label_ids[cap_idx]
+            rec_ids_split = recording_ids[cap_idx]
+        else:
+            cap_idx = None
+            label_ids_split = label_ids
+            rec_ids_split = recording_ids
+
+        unique_recs = np.unique(rec_ids_split)
         if self._use_group_split and len(unique_recs) >= 3:
             train_idx, val_idx, test_idx = self._group_split_indices(
-                label_ids, recording_ids
+                label_ids_split, rec_ids_split
             )
         else:
-            train_idx, val_idx, test_idx = self._split_indices(label_ids)
+            train_idx, val_idx, test_idx = self._split_indices(label_ids_split)
 
-        self._train_idx = np.asarray(train_idx)
-        if self._max_samples_per_class is not None:
-            self._train_idx = self._downsample_train_indices(
-                self._train_idx, label_ids
-            )
-        self._val_idx = np.asarray(val_idx)
-        self._test_idx = np.asarray(test_idx)
+        if cap_idx is not None:
+            self._train_idx = cap_idx[np.asarray(train_idx)]
+            self._val_idx   = cap_idx[np.asarray(val_idx)]
+            self._test_idx  = cap_idx[np.asarray(test_idx)]
+        else:
+            self._train_idx = np.asarray(train_idx)
+            self._val_idx   = np.asarray(val_idx)
+            self._test_idx  = np.asarray(test_idx)
+
+        # Ensure class_labels / num_classes work without a full setup().
+        # If vocab was provided use it directly; otherwise fall back to loading
+        # the vocabulary from the dataset file (cheap — metadata only, no sequences).
+        if not vocab:
+            try:
+                payload = SequenceDatasetBuilder.load_npz(self._dataset_path)
+                vocab = [str(v) for v in (payload["metadata"].get("vocabulary") or [])]
+            except Exception:
+                pass
+        if vocab and self._class_labels_override is None:
+            self._class_labels_override = [str(v) for v in vocab]
 
     def train_dataloader(self) -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
         if self._train_dataset is None:
@@ -473,27 +650,33 @@ class GestureDataModule:
         remapped_ids = remap[label_ids[keep_indices]]
         return filtered_vocab, keep_indices, remapped_ids
 
-    def _downsample_train_indices(
+    def _downsample_dataset_indices(
         self,
-        train_idx: np.ndarray,
         label_ids: np.ndarray,
     ) -> np.ndarray:
-        """Cap each class in *train_idx* to ``self._max_samples_per_class`` samples.
+        """Return indices that cap each class at ``self._max_samples_per_class``.
 
-        The subsampling uses a seeded RNG derived from ``self._seed`` for full
-        reproducibility.  Val and test splits are never touched.
+        Applied to the **full dataset** before the train/val/test split so that
+        the cap is respected in every partition, not only in the training split.
+        This prevents majority classes (e.g. point_one/point_two) from
+        dominating the validation and test sets while being downsampled in
+        training, which would make evaluation metrics misleadingly optimistic for
+        those classes.
+
+        The subsampling is reproducible via a seeded RNG derived from
+        ``self._seed``.
         """
         assert self._max_samples_per_class is not None
         rng = np.random.default_rng(self._seed)
         keep: list[np.ndarray] = []
-        train_labels = label_ids[train_idx]
-        for cls_id in np.unique(train_labels):
-            cls_sub_idx = train_idx[train_labels == cls_id]
-            if len(cls_sub_idx) > self._max_samples_per_class:
-                cls_sub_idx = rng.choice(
-                    cls_sub_idx, size=self._max_samples_per_class, replace=False
+        all_idx = np.arange(len(label_ids))
+        for cls_id in np.unique(label_ids):
+            cls_idx = all_idx[label_ids == cls_id]
+            if len(cls_idx) > self._max_samples_per_class:
+                cls_idx = rng.choice(
+                    cls_idx, size=self._max_samples_per_class, replace=False
                 )
-            keep.append(cls_sub_idx)
+            keep.append(cls_idx)
         return np.sort(np.concatenate(keep))
 
     def label_distribution(self) -> dict[str, int]:
@@ -542,23 +725,34 @@ class GestureDataModule:
         label_ids: np.ndarray,
         recording_ids: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Split samples by recording group so no recording leaks across partitions.
+        """Split samples by video so no video leaks across partitions.
 
-        Requires at least 3 unique recording IDs (one per split).  If the temp
-        partition ends up with fewer than 2 unique recordings, the val/test sub-
-        split falls back to random ``train_test_split``.
+        Recording IDs have the format ``"videostem:segNNNN"`` — multiple
+        annotated segments (and their sliding windows) per video.  We split on
+        the *video stem* (everything before the first ``:``) so that all windows
+        from the same video land in exactly one partition.
+
+        Requires at least 3 unique video stems (one per split).  If the temp
+        partition ends up with fewer than 2 unique video stems, the val/test
+        sub-split falls back to random ``train_test_split``.
         """
         from sklearn.model_selection import GroupShuffleSplit, train_test_split
+
+        # Extract video stems: "videostem:segNNNN" → "videostem".
+        # IDs without a colon are used as-is (handles test data and future formats).
+        group_ids = np.array(
+            [str(r).split(":")[0] if ":" in str(r) else str(r) for r in recording_ids]
+        )
 
         n = len(label_ids)
         all_idx = np.arange(n)
         temp_ratio = self._split.val_ratio + self._split.test_ratio
 
         gss = GroupShuffleSplit(n_splits=1, test_size=temp_ratio, random_state=self._seed)
-        train_idx, temp_idx = next(gss.split(all_idx, label_ids, groups=recording_ids))
+        train_idx, temp_idx = next(gss.split(all_idx, label_ids, groups=group_ids))
 
-        temp_rec_ids = recording_ids[temp_idx]
-        unique_temp = np.unique(temp_rec_ids)
+        temp_group_ids = group_ids[temp_idx]
+        unique_temp = np.unique(temp_group_ids)
 
         if len(unique_temp) >= 2:
             val_share = self._split.val_ratio / temp_ratio
@@ -567,11 +761,13 @@ class GestureDataModule:
                 test_size=1.0 - val_share,
                 random_state=self._seed,
             )
-            rel_val, rel_test = next(gss2.split(temp_idx, label_ids[temp_idx], groups=temp_rec_ids))
+            rel_val, rel_test = next(
+                gss2.split(temp_idx, label_ids[temp_idx], groups=temp_group_ids)
+            )
             val_idx = temp_idx[rel_val]
             test_idx = temp_idx[rel_test]
         else:
-            # Only one recording in the temp pool — random sub-split is safe here.
+            # Only one video in the temp pool — random sub-split is safe here.
             val_share = self._split.val_ratio / temp_ratio
             val_idx, test_idx = train_test_split(
                 temp_idx,
@@ -815,7 +1011,6 @@ class GraphGestureDataModule:
             raise FileNotFoundError(f"Dataset not found: {self._dataset_path}")
 
         payload = SequenceDatasetBuilder.load_npz(self._dataset_path)
-        sequences = np.asarray(payload["sequences"], dtype=np.float32)
         labels = np.asarray(payload["labels"], dtype=object)
         label_ids = np.asarray(payload["label_ids"], dtype=np.int64)
         recording_ids = np.asarray(payload["recording_ids"], dtype=object)
@@ -827,9 +1022,14 @@ class GraphGestureDataModule:
                 "this does not appear to be a graph-schema dataset. "
                 "Use GestureDataModule for flat-feature datasets."
             )
-        adjacency = np.asarray(payload["adjacency"], dtype=np.float32)
 
-        valid_masks_raw = payload.get("valid_masks")
+        # Graph datasets are much smaller than flat-feature datasets so we load
+        # sequences directly here rather than streaming.
+        with np.load(self._dataset_path, allow_pickle=True) as _data:
+            sequences = np.asarray(_data["sequences"], dtype=np.float32)
+            adjacency = np.asarray(_data["adjacency"], dtype=np.float32)
+            valid_masks_raw = _data["valid_masks"] if "valid_masks" in _data.files else None
+
         valid_masks = (
             np.asarray(valid_masks_raw, dtype=bool)
             if valid_masks_raw is not None

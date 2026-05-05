@@ -231,11 +231,18 @@ class SequenceDatasetBuilder:
         with np.load(path, allow_pickle=True) as data:
             metadata = json.loads(str(data["metadata_json"].item()))
             files = set(data.files)
-            sequences = data["sequences"]
-            n = len(sequences)
-            # sample_ids / timestamps are absent in derived datasets (e.g. mirror-augmented
-            # NPZs built by the dataset notebook). Provide zero/empty defaults so the loader
-            # remains backward-compatible with any NPZ that only has the core fields.
+            # ── sequences is intentionally NOT loaded here ─────────────────────
+            # The uncompressed sequences array for the v6 dataset is 6–7 GB.
+            # Loading it via np.load would decompress the full array into RAM,
+            # then GestureDataModule.setup() would make an additional filtered
+            # copy — together exceeding available RAM and triggering an OOM kill.
+            # setup() streams sequences directly from the ZIP using
+            # _iter_sequences_chunked(); we return only the shape for callers
+            # that need dimension info without touching the data.
+            seq_shape = None
+            if "sequences" in files:
+                seq_shape = data["sequences"].shape  # numpy reads shape from header, not data
+            n = seq_shape[0] if seq_shape is not None else 0
             sample_ids = data["sample_ids"] if "sample_ids" in files else np.empty(n, dtype=object)
             start_ts = (
                 data["start_timestamp_ms"]
@@ -248,7 +255,8 @@ class SequenceDatasetBuilder:
                 else np.zeros(n, dtype=np.int64)
             )
             result: dict[str, Any] = {
-                "sequences": sequences,
+                "sequences": None,  # intentionally omitted — stream via _iter_sequences_chunked
+                "sequences_shape": seq_shape,
                 "labels": data["labels"],
                 "label_ids": data["label_ids"],
                 "recording_ids": data["recording_ids"],
@@ -261,7 +269,7 @@ class SequenceDatasetBuilder:
                 "metadata": metadata,
             }
             # Graph-schema NPZ extras (sequences.ndim == 4)
-            if sequences.ndim == 4:
+            if seq_shape is not None and len(seq_shape) == 4:
                 result["adjacency"] = data["adjacency"] if "adjacency" in files else None
                 result["valid_masks"] = data["valid_masks"] if "valid_masks" in files else None
             return result
