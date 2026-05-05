@@ -57,6 +57,19 @@ training:
   class_weighting: false # normalization handled exclusively by max_samples_per_class cap
   # Per-class cap applied to the FULL DATASET before train/val/test splitting.
   # This ensures all three splits are proportionally balanced — not just training.
+  #
+  # Cap value = 2 400, set to the natural floor of the dataset.
+  # The mirrored IPN dataset has these raw sequence counts (before capping):
+  #   point_one / point_two : ~56 k / ~54 k  (sliding windows over many annotations)
+  #   unknown               :  ~4.4 k         (capped to 10 segs/video at build time)
+  #   swipe_right / up / down:  2 406 / 2 487 / 2 503  ← natural floor after mirroring
+  # With cap=2 600, the three swipe classes fall below the cap (2 406 < 2 600),
+  # so point_one/point_two contribute 194 extra samples each — a ~8% imbalance.
+  # cap=2 400 is the smallest value at which every class meets or exceeds the cap,
+  # giving all classes exactly 2 400 total sequences:
+  #   train ~1 680, val ~360, test ~360 per class at 70/15/15.
+  #   Max/min ratio across training ≤ 1.06× (due to video-level GroupShuffleSplit).
+  max_samples_per_class: 2400
 
 splits:
   train_ratio: 0.7
