@@ -36,7 +36,7 @@ model:
   model_name: two_stream_attn_v1
   input_size: 147 # total feature dims (feature-schema-v5); split internally
   hidden_size: 96 # per-direction per-stream; BiLSTM output = 2×96 = 192
-  num_layers: 2
+  num_layers: 4
   dropout: 0.35
   num_classes: 10 # 9 active gestures + unknown
   # EnhancedTwoStreamLSTM-specific fields
