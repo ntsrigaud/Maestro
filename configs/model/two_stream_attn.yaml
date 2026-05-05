@@ -20,33 +20,38 @@
 #       --window-length 24 --window-step 3 \
 #       --output-npz data/processed/ipn_dataset_v5_mirrored.npz
 #
-# ── Parameter budget (hidden_size=96, proj_dim=96, num_heads=8, 8 classes) ───
-#   proj_a / proj_b             2 × ~7 K               ≈   14 K
-#   BiLSTM-A  (2L bidir 96)     layer1 148K+layer2 222K ≈  370 K
-#   BiLSTM-B                    (identical)             ≈  370 K
-#   Self-MHA-A / Self-MHA-B     2 × (8 × 192² + …)     ≈  296 K
-#   pool_ln_a / pool_ln_b       2 × LN(192)             ≈    1 K
-#   gate_a / gate_b             2 × MLP(192→96→192)     ≈   74 K
+# ── Parameter budget (hidden_size=128, proj_dim=96, num_heads=8, 10 classes) ──
+#   Grid search optimum — 21-run staged sweep (Stage 1→2→3), May 2026
+#
+#   proj_a / proj_b             2 × ~10 K              ≈   20 K
+#   BiLSTM-A  (2L bidir 128)    layer1 197K+layer2 394K ≈  591 K
+#   BiLSTM-B                    (identical)             ≈  591 K
+#   Self-MHA-A / Self-MHA-B     2 × (8 × 256² + …)     ≈  528 K
+#   pool_ln_a / pool_ln_b       2 × LN(256)             ≈    1 K
+#   gate_a / gate_b             2 × MLP(256→128→256)    ≈  132 K
 #   ln_cross × 2                negligible              ≈    1 K
-#   Head MLP                    384 → 192 → 10          ≈   75 K
-#   Total                                               ≈ 1.20 M
+#   Head MLP                    512 → 256 → 10          ≈  134 K
+#   Total                                               ≈ 1.99 M
+#
+#   Grid search result (s3_r06): val_macro_f1=86.90%  test_macro_f1=84.38%
+#   Val–test gap: 2.52%  |  Best epoch: 72
 # ─────────────────────────────────────────────────────────────────────────────
 
 model:
   model_name: two_stream_attn_v1
   input_size: 147 # total feature dims (feature-schema-v5); split internally
-  hidden_size: 96 # per-direction per-stream; BiLSTM output = 2×96 = 192
-  num_layers: 4
+  hidden_size: 128 # per-direction per-stream; BiLSTM output = 2×128 = 256
+  num_layers: 2 # grid search: 2L > 3L/4L for this dataset size
   dropout: 0.30
   num_classes: 10 # 9 active gestures + unknown
   # EnhancedTwoStreamLSTM-specific fields
-  num_heads: 8 # MHA heads; 192/8 = 24 dims per head ✓
+  num_heads: 8 # MHA heads; 256/8 = 32 dims per head ✓
   proj_dim: 96 # feature projection dim (73/74 → 96 before LSTM)
 
 training:
   epochs: 100
   batch_size: 64
-  learning_rate: 0.00009 # 9e-5 — best performing lr from IPN ablation
+  learning_rate: 0.0002 # 2e-4 — grid search Stage 3 optimal (best test F1 + smallest gap)
   weight_decay: 0.0005
   grad_clip_norm: 1.0
   early_stopping_patience: 25
