@@ -37,7 +37,7 @@ model:
   input_size: 147 # total feature dims (feature-schema-v5); split internally
   hidden_size: 96 # per-direction per-stream; BiLSTM output = 2×96 = 192
   num_layers: 4
-  dropout: 0.35
+  dropout: 0.30
   num_classes: 10 # 9 active gestures + unknown
   # EnhancedTwoStreamLSTM-specific fields
   num_heads: 8 # MHA heads; 192/8 = 24 dims per head ✓
