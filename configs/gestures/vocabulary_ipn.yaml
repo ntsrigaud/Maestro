@@ -33,7 +33,3 @@ gestures:
   - swipe_down
   - zoom_in
   - zoom_out
-  - click_one
-  - click_two
-  - double_click_one
-  - double_click_two
