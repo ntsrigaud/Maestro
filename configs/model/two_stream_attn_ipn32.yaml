@@ -83,11 +83,14 @@ training:
   label_smoothing: 0.05 # was 0.1 — reduced; class_weighting already handles imbalance
   seed: 42
   num_workers: 0
-  class_weighting: true # inverse-frequency weighting — computed on training split only
-  # Per-class cap applied to the TRAINING split after stratified group splitting.
-  # point_one/point_two had 145x more samples than minority classes (82% of all data).
-  # Cap at 8 000 → max/min ratio among gesture classes falls to ≤ 2.6x.
-  # Val/test splits are never touched.
+  class_weighting: false # normalization handled exclusively by max_samples_per_class cap
+  # Per-class cap applied to the FULL DATASET before train/val/test splitting.
+  # This ensures all three splits are proportionally balanced — not just training.
+  # Without this fix, majority classes (point_one/point_two ~145× more samples)
+  # dominate val/test sets while being downsampled in training only, making
+  # evaluation metrics misleadingly optimistic for majority classes.
+  # After cap: every class has ≤ 8 000 total sequences →
+  #   train ~5 600, val ~1 200, test ~1 200 per class at 70/15/15.
   max_samples_per_class: 8000
   # Click gestures removed from the IPN vocabulary (underperforming, not in production vocab).
   # Samples with these labels are excluded from training, validation, and test splits.
