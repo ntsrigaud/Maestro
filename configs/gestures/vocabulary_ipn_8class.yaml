@@ -1,12 +1,13 @@
-version: ipn_8class_v1
+version: ipn_10class_v1
 
-# 8-class production vocabulary for EnhancedTwoStreamLSTM (two_stream_attn).
-# Contains only the 7 active presentation-control gestures + unknown.
-# This is a subset of vocabulary_ipn.yaml (14 classes). Non-selected classes
-# (pointing/click variants) are dropped during assembly because they are not
-# present in this vocabulary file.
+# 10-class production vocabulary for EnhancedTwoStreamLSTM (two_stream_attn).
+# Contains 9 active presentation-control gestures + unknown.
+# This is a subset of vocabulary_ipn.yaml (14 classes). Click and double-click
+# variants (click_one, click_two, double_click_one, double_click_two) are excluded.
 #
 # IPN source mapping:
+#   point_one        ← G01 (Pointing with index finger)
+#   point_two        ← G02 (Pointing with two fingers)
 #   open_palm_hold   ← G07 (Open twice)
 #   swipe_right      ← G06 (Throw right)
 #   swipe_left       ← G05 (Throw left)
@@ -21,9 +22,12 @@ version: ipn_8class_v1
 #       --format flat \
 #       --vocab-config configs/gestures/vocabulary_ipn_8class.yaml \
 #       --window-length 24 --window-step 3 \
-#       --output-npz data/processed/ipn_dataset_v5_8class_mirrored.npz
+#       --output-npz data/processed/ipn_dataset_v5_10class_mirrored.npz
 
 gestures:
+  - unknown
+  - point_one
+  - point_two
   - open_palm_hold
   - swipe_right
   - swipe_left
@@ -31,4 +35,3 @@ gestures:
   - swipe_down
   - zoom_in
   - zoom_out
-  - unknown
