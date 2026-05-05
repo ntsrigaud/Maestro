@@ -143,6 +143,7 @@ class GestureDataModule:
         use_group_split: bool = True,
         augmentation: AugmentationConfig | None = None,
         max_samples_per_class: int | None = None,
+        exclude_classes: list[str] | None = None,
     ) -> None:
         self._dataset_path = Path(dataset_path)
         self._batch_size = batch_size
@@ -153,8 +154,10 @@ class GestureDataModule:
         self._use_group_split = use_group_split
         self._augmentation = augmentation
         self._max_samples_per_class = max_samples_per_class
+        self._exclude_classes: list[str] | None = exclude_classes
 
         self._bundle: DatasetBundle | None = None
+        self._class_labels_override: list[str] | None = None
         self._train_dataset: SequenceTensorDataset | AugmentedSequenceTensorDataset | None = None
         self._val_dataset: SequenceTensorDataset | None = None
         self._test_dataset: SequenceTensorDataset | None = None
@@ -170,6 +173,11 @@ class GestureDataModule:
 
     @property
     def class_labels(self) -> list[str]:
+        # When exclude_classes was applied without a full setup() (e.g. after
+        # setup_indices_only()), the filtered vocabulary is stored here.
+        if self._class_labels_override is not None:
+            return list(self._class_labels_override)
+
         metadata = self.metadata
         labels = metadata.get("vocabulary")
         if isinstance(labels, list) and labels:
@@ -238,6 +246,20 @@ class GestureDataModule:
         if sequences.shape[0] <= 0:
             raise ValueError("Dataset must contain at least one sequence")
 
+        # Filter excluded classes before splitting.  The filtered vocab and
+        # remapped label_ids (contiguous 0..N_kept-1) are stored in the bundle
+        # so that class_labels and training_label_distribution() stay correct.
+        if self._exclude_classes:
+            vocab = list(metadata.get("vocabulary") or [])
+            filtered_vocab, keep_indices, remapped_ids = self._apply_exclude_classes(
+                vocab, label_ids
+            )
+            sequences = sequences[keep_indices]
+            labels = labels[keep_indices]
+            label_ids = remapped_ids
+            recording_ids = recording_ids[keep_indices]
+            metadata = {**metadata, "vocabulary": filtered_vocab}
+
         self._bundle = DatasetBundle(
             sequences=sequences,
             labels=labels,
@@ -296,6 +318,7 @@ class GestureDataModule:
         self,
         label_ids: np.ndarray,
         recording_ids: np.ndarray,
+        vocab: list[str] | None = None,
     ) -> None:
         """Compute train/val/test split indices from pre-loaded arrays.
 
@@ -317,8 +340,42 @@ class GestureDataModule:
             Integer label array, shape ``(N,)``.
         recording_ids:
             String / object array of recording identifiers, shape ``(N,)``.
+        vocab:
+            Full vocabulary list (in label-id order) as stored in the dataset
+            metadata.  Required when *exclude_classes* was passed to the
+            constructor — the method uses it to identify which label IDs to
+            remove before splitting.  Ignored when *exclude_classes* is None.
         """
         self._split.validate()
+
+        # When exclude_classes is active, filter the input arrays and map split
+        # results back to original indices so that callers can still index into
+        # the full (N,) arrays with the returned indices.
+        if self._exclude_classes and vocab:
+            filtered_vocab, keep_indices, remapped_ids = self._apply_exclude_classes(
+                vocab, label_ids
+            )
+            self._class_labels_override = filtered_vocab
+            filtered_recording_ids = recording_ids[keep_indices]
+
+            unique_recs = np.unique(filtered_recording_ids)
+            if self._use_group_split and len(unique_recs) >= 3:
+                train_idx, val_idx, test_idx = self._group_split_indices(
+                    remapped_ids, filtered_recording_ids
+                )
+            else:
+                train_idx, val_idx, test_idx = self._split_indices(remapped_ids)
+
+            # Map filtered-array indices back to original-array indices so
+            # callers can do all_labels[_dm.train_indices] on the full array.
+            self._train_idx = keep_indices[np.asarray(train_idx)]
+            if self._max_samples_per_class is not None:
+                self._train_idx = self._downsample_train_indices(
+                    self._train_idx, label_ids
+                )
+            self._val_idx = keep_indices[np.asarray(val_idx)]
+            self._test_idx = keep_indices[np.asarray(test_idx)]
+            return
 
         unique_recs = np.unique(recording_ids)
         if self._use_group_split and len(unique_recs) >= 3:
@@ -371,6 +428,50 @@ class GestureDataModule:
             num_workers=self._num_workers,
             pin_memory=self._pin_memory,
         )
+
+    def _apply_exclude_classes(
+        self,
+        vocab: list[str],
+        label_ids: np.ndarray,
+    ) -> tuple[list[str], np.ndarray, np.ndarray]:
+        """Remove excluded classes from *label_ids* and remap IDs to be contiguous.
+
+        Parameters
+        ----------
+        vocab:
+            Full class vocabulary in label-id order (index = class ID).
+        label_ids:
+            Original integer label array, shape ``(N,)``.
+
+        Returns
+        -------
+        filtered_vocab:
+            Vocabulary with excluded classes removed (preserves original order).
+        keep_indices:
+            Indices into the original (N,) arrays for samples that are kept.
+        remapped_ids:
+            New contiguous label IDs (0..M-1) for the kept samples, where M is
+            ``len(filtered_vocab)``.
+        """
+        assert self._exclude_classes is not None
+        exclude_set = set(self._exclude_classes)
+
+        # IDs that belong to excluded classes.
+        exclude_ids = {i for i, cls in enumerate(vocab) if cls in exclude_set}
+
+        # Vocabulary after removal (order preserved).
+        filtered_vocab = [cls for cls in vocab if cls not in exclude_set]
+
+        # Build old-id → new-id remap (-1 for excluded classes).
+        remap = np.full(len(vocab), -1, dtype=np.int64)
+        for new_id, cls in enumerate(filtered_vocab):
+            old_id = vocab.index(cls)
+            remap[old_id] = new_id
+
+        keep_mask = ~np.isin(label_ids, list(exclude_ids))
+        keep_indices = np.where(keep_mask)[0]
+        remapped_ids = remap[label_ids[keep_indices]]
+        return filtered_vocab, keep_indices, remapped_ids
 
     def _downsample_train_indices(
         self,

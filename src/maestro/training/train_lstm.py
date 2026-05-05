@@ -56,6 +56,7 @@ class TrainingConfig:
     class_weighting: bool
     label_smoothing: float = 0.0
     max_samples_per_class: int | None = None
+    exclude_classes: list[str] | None = None
 
 
 @dataclass(slots=True)
@@ -154,6 +155,11 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             max_samples_per_class=(
                 int(train_data["max_samples_per_class"])
                 if train_data.get("max_samples_per_class") is not None
+                else None
+            ),
+            exclude_classes=(
+                [str(c) for c in train_data["exclude_classes"]]
+                if train_data.get("exclude_classes")
                 else None
             ),
         ),
@@ -304,6 +310,7 @@ def create_datamodule(
         pin_memory=False,
         augmentation=config.augmentation,
         max_samples_per_class=config.training.max_samples_per_class,
+        exclude_classes=config.training.exclude_classes,
     )
     flat_dm.setup()
     return flat_dm
