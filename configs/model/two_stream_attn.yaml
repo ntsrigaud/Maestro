@@ -54,7 +54,9 @@ training:
   label_smoothing: 0.05
   seed: 42
   num_workers: 0
-  class_weighting: true # inverse-frequency weighting
+  class_weighting: false # normalization handled exclusively by max_samples_per_class cap
+  # Per-class cap applied to the FULL DATASET before train/val/test splitting.
+  # This ensures all three splits are proportionally balanced — not just training.
 
 splits:
   train_ratio: 0.7
