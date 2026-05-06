@@ -12,13 +12,23 @@ from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamL
 from maestro.utils.schema_validation import RuntimeConfig
 
 
-def _write_artifact(path: Path) -> None:
+def _write_artifact(path: Path, *, window_length: int = 32, num_classes: int = 10) -> None:
+    _labels_10 = [
+        "unknown", "point_one", "point_two",
+        "open_palm_hold", "swipe_right", "swipe_left",
+        "swipe_up", "swipe_down", "zoom_in", "zoom_out",
+    ]
+    _labels_8 = [
+        "open_palm_hold", "swipe_right", "swipe_left",
+        "swipe_up", "swipe_down", "zoom_in", "zoom_out", "unknown",
+    ]
+    class_labels = _labels_10 if num_classes == 10 else _labels_8
     model = EnhancedTwoStreamLSTM(
         input_size=147,
         hidden_size=64,
         num_layers=2,
         dropout=0.1,
-        num_classes=8,
+        num_classes=num_classes,
         num_heads=4,
         proj_dim=64,
     )
@@ -32,24 +42,15 @@ def _write_artifact(path: Path) -> None:
             "hidden_size": 64,
             "num_layers": 2,
             "dropout": 0.1,
-            "num_classes": 8,
+            "num_classes": num_classes,
             "num_heads": 4,
             "proj_dim": 64,
         },
-        "class_labels": [
-            "open_palm_hold",
-            "swipe_right",
-            "swipe_left",
-            "swipe_up",
-            "swipe_down",
-            "zoom_in",
-            "zoom_out",
-            "unknown",
-        ],
+        "class_labels": class_labels,
         "feature_schema": {
             "feature_schema_version": "feature-schema-v5",
             "feature_dim": 147,
-            "window_length": 24,
+            "window_length": window_length,
             "window_step": 3,
             "orientation_normalization": True,
         },
@@ -68,11 +69,11 @@ def test_load_inference_artifact(tmp_path: Path) -> None:
 
     assert artifact.model_version == "two_stream_attn_test_v1"
     assert artifact.feature_dim == 147
-    assert artifact.window_length == 24
+    assert artifact.window_length == 32
     assert artifact.window_step == 3
     assert artifact.orientation_normalization is True
-    assert len(artifact.class_labels) == 8
-    assert artifact.class_labels[0] == "open_palm_hold"
+    assert len(artifact.class_labels) == 10
+    assert artifact.class_labels[0] == "unknown"
 
 
 def test_load_inference_artifact_rejects_legacy_two_stream_type(tmp_path: Path) -> None:
@@ -94,7 +95,7 @@ def test_load_inference_artifact_rejects_legacy_two_stream_type(tmp_path: Path) 
         "feature_schema": {
             "feature_schema_version": "v1",
             "feature_dim": 147,
-            "window_length": 24,
+            "window_length": 32,
             "window_step": 3,
             "orientation_normalization": False,
         },
@@ -117,7 +118,7 @@ def test_validate_runtime_compatibility_passes(tmp_path: Path) -> None:
                 "target_fps": 30,
             },
             "inference": {
-                "window_length": 24,
+                "window_length": 32,
                 "window_step": 3,
                 "min_valid_ratio": 0.8,
                 "idle_timeout_ms": 3000,
@@ -139,3 +140,40 @@ def test_validate_runtime_compatibility_passes(tmp_path: Path) -> None:
         device=torch.device("cpu"),
     )
     validate_runtime_compatibility(runtime_config=runtime, artifact=artifact)
+
+
+def test_validate_runtime_compatibility_rejects_window_mismatch(tmp_path: Path) -> None:
+    """A legacy 24-frame artifact must fail validation against a 32-frame runtime."""
+    import pytest
+
+    runtime = RuntimeConfig.model_validate(
+        {
+            "app": {
+                "app_name": "x",
+                "camera_index": 0,
+                "frame_width": 1280,
+                "frame_height": 720,
+                "target_fps": 30,
+            },
+            "inference": {
+                "window_length": 32,
+                "window_step": 3,
+                "min_valid_ratio": 0.8,
+                "idle_timeout_ms": 3000,
+                "command_cooldown_ms": 500,
+            },
+            "feature_pipeline": {
+                "wrist_relative_normalization": True,
+                "scale_normalization": True,
+                "orientation_normalization": True,
+                "velocity_features": True,
+            },
+        }
+    )
+
+    artifact_path = tmp_path / "legacy.pt"
+    _write_artifact(artifact_path, window_length=24, num_classes=10)
+    artifact = load_inference_artifact(artifact_path=artifact_path, device=torch.device("cpu"))
+
+    with pytest.raises(ValueError, match="window_length"):
+        validate_runtime_compatibility(runtime_config=runtime, artifact=artifact)

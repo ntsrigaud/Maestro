@@ -14,8 +14,11 @@ from maestro.training.augmentation import (
 # ---------------------------------------------------------------------------
 
 
-def _make_seq(T: int = 24, F: int = 147, value: float | None = None) -> np.ndarray:
-    """Return a (T, F) float32 array.  Fills with *value* or an arange."""
+def _make_seq(T: int = 32, F: int = 147, value: float | None = None) -> np.ndarray:
+    """Return a (T, F) float32 array.  Fills with *value* or an arange.
+
+    T matches the production window_length (32 frames at 30 FPS ≈ 1067 ms).
+    """
     if value is not None:
         return np.full((T, F), value, dtype=np.float32)
     return np.arange(T * F, dtype=np.float32).reshape(T, F)
@@ -89,7 +92,7 @@ def test_spatial_jitter_only_modifies_position_dims() -> None:
         seed=0,
     )
     aug = GestureAugmenter(config)
-    seq = np.zeros((24, 147), dtype=np.float32)
+    seq = np.zeros((32, 147), dtype=np.float32)
     result = aug.augment(seq)
 
     # Position dims should now differ from zero (noise was added).
@@ -112,7 +115,7 @@ def test_spatial_jitter_sigma_scales_noise() -> None:
         apply_prob=1.0,
         seed=1,
     )
-    seq = np.zeros((24, 147), dtype=np.float32)
+    seq = np.zeros((32, 147), dtype=np.float32)
     noise_small = np.abs(GestureAugmenter(small).augment(seq)[:, :_POSITION_DIMS]).mean()
     noise_large = np.abs(GestureAugmenter(large).augment(seq)[:, :_POSITION_DIMS]).mean()
     assert noise_large > noise_small
@@ -133,7 +136,7 @@ def test_temporal_scale_first_frame_unchanged_for_any_factor() -> None:
             seed=0,
         )
         aug = GestureAugmenter(config)
-        seq = np.arange(24, dtype=np.float32).reshape(24, 1).repeat(147, axis=1)
+        seq = np.arange(32, dtype=np.float32).reshape(32, 1).repeat(147, axis=1)
         result = aug._temporal_scale(seq)
         assert np.isclose(result[0, 0], 0.0), f"Failed at factor_range={factor_range}"
 
@@ -148,7 +151,7 @@ def test_temporal_scale_slow_interpolates_mid_frame() -> None:
     )
     aug = GestureAugmenter(config)
     # Values: seq[t, *] == t (easy to reason about interpolation)
-    seq = np.arange(24, dtype=np.float32).reshape(24, 1).repeat(147, axis=1)
+    seq = np.arange(32, dtype=np.float32).reshape(32, 1).repeat(147, axis=1)
     result = aug._temporal_scale(seq)
     assert np.isclose(result[1, 0], 0.5), f"Got {result[1, 0]}"
 
@@ -188,7 +191,7 @@ def test_temporal_scale_identity_is_noop() -> None:
 
 def test_augmenter_is_deterministic_with_fixed_seed() -> None:
     """Two augmenters with the same seed must produce identical results."""
-    seq = np.random.default_rng(0).random((24, 147)).astype(np.float32)
+    seq = np.random.default_rng(0).random((32, 147)).astype(np.float32)
     config = AugmentationConfig(apply_prob=0.8, seed=123)
     r1 = GestureAugmenter(config).augment(seq)
     r2 = GestureAugmenter(config).augment(seq)

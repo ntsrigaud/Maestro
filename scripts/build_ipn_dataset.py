@@ -860,8 +860,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--window-length",
         type=int,
-        default=24,
-        help="Sliding window length in frames (default: 24).",
+        default=32,
+        help="Sliding window length in frames (default: 32).",
     )
     p.add_argument(
         "--window-step",

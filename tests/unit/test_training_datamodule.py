@@ -14,7 +14,7 @@ pytestmark = pytest.mark.training
 
 def _create_dataset(path: Path) -> None:
     rng = np.random.default_rng(42)
-    n, t, f = 120, 24, 147
+    n, t, f = 120, 32, 147
 
     sequences = rng.normal(size=(n, t, f)).astype(np.float32)
     labels = np.array(["a"] * 60 + ["b"] * 60, dtype=object)
@@ -57,7 +57,7 @@ def test_datamodule_setup_and_shapes(tmp_path: Path) -> None:
     dm.setup()
 
     assert dm.feature_dim == 147
-    assert dm.sequence_length == 24
+    assert dm.sequence_length == 32
     assert dm.num_classes == 2
 
     train_batch_x, train_batch_y = next(iter(dm.train_dataloader()))
@@ -110,7 +110,7 @@ def _create_multi_recording_dataset(
 ) -> None:
     """NPZ with *recordings_per_class* unique recording IDs per class."""
     rng = np.random.default_rng(7)
-    T, F = 24, 147
+    T, F = 32, 147
 
     sequences_list, labels_list, label_ids_list, rec_ids_list = [], [], [], []
     for cls in range(n_classes):
