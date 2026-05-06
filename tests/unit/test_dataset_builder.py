@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import numpy as np
 import pytest
 
 from maestro.training.dataset_builder import (
@@ -80,4 +77,3 @@ def test_unknown_label_raises_validation_error() -> None:
 
     with pytest.raises(ValueError, match="Unknown label"):
         builder.add_frame(_frame(0, label="not_in_vocab"))
-

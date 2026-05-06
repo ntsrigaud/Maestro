@@ -11,8 +11,7 @@ from maestro.domain.entities import LabeledGraphFrame
 from maestro.pipeline import graph_schema
 from maestro.training.dataset_builder import (
     GraphSequenceDatasetBuilder,
-    GraphSequenceSample,
-    SequenceDatasetBuilder,  # ensure old builder is still importable
+    GraphSequenceSample,  # ensure old builder is still importable
 )
 
 # ---------------------------------------------------------------------------
@@ -111,4 +110,3 @@ class TestGraphSequenceDatasetBuilderBasics:
 
         # All samples should belong to rec_02.
         assert all(s.recording_id == "rec_02" for s in builder.samples)
-
