@@ -190,6 +190,9 @@ class Runtime:
                 if benchmark is not None:
                     benchmark.record_end_to_end(loop_e2e_ms)
 
+                window_ready = self._container.sequence_buffer.ready()
+                landmarks_info = landmark_packet.landmarks  # type: ignore[union-attr]
+
                 state = RuntimeState(
                     mode=mode,
                     last_label=latest_label,
@@ -197,8 +200,8 @@ class Runtime:
                     gaze_permitted=gaze_permitted,
                     active_mode=self._active_mode,
                     info={
-                        "landmarks": landmark_packet.landmarks,
-                        "window_ready": self._container.sequence_buffer.ready(),
+                        "landmarks": landmarks_info,
+                        "window_ready": window_ready,
                         "valid_ratio": valid_ratio,
                         "latency_infer_ms": inference_ms,
                         "latency_e2e_ms": loop_e2e_ms,

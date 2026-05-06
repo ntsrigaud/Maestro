@@ -45,7 +45,7 @@ graph TD
     Transform --> Buffer["6. Buffer Push<br/>SlidingWindowSequenceBuffer.push()"]
     Buffer --> Ready{Buffer Ready?}
     Ready -->|No| Render
-    Ready -->|Yes| Infer["7. Two-Stream LSTM Inference<br/>TwoStreamGestureLSTM.predict()"]
+    Ready -->|Yes| Infer["7. Enhanced Two-Stream Inference<br/>EnhancedTwoStreamLSTM.predict()"]
     Infer --> Stabilize["8. Stabilize<br/>PredictionStabilizer.update()"]
     Stabilize --> Activate["9. Activation Routing<br/>GestureActivationController.route()"]
     Activate --> HasCmd{Command?}
@@ -71,13 +71,13 @@ At 30 FPS target, each loop iteration has a ~33 ms budget. The pipeline stages c
 | Hand Selection      | < 0.1 ms        | In-memory preference filtering over 0–2 hand entries |
 | Feature Transform   | < 1 ms          | NumPy array operations                               |
 | Buffer Push         | < 0.1 ms        | Deque append                                         |
-| LSTM Inference      | 20–30 ms        | PyTorch CPU forward pass (when buffer ready)         |
+| Enhanced Inference  | 20–30 ms        | PyTorch CPU forward pass (when buffer ready)         |
 | Stabilization       | < 0.1 ms        | EMA + deque lookup                                   |
 | Activation Routing  | < 0.1 ms        | State machine transition                             |
 | Command Dispatch    | < 1 ms          | pyautogui call (when command emitted)                |
 | Overlay Render      | 1–2 ms          | OpenCV text/rectangle drawing                        |
 
-**Total end-to-end (gaze active)**: ~40–60 ms per frame (without LSTM inference), ~60–80 ms when inference triggers. Gaze estimation adds ~1–2 ms amortized per frame because BlazeFace is sampled at 10 Hz (every 3rd frame) and the result is cached. When gaze is absent, the per-frame cost drops to ~3–5 ms (capture + gaze check + render).
+**Total end-to-end (gaze active)**: ~40–60 ms per frame (without model inference), ~60–80 ms when inference triggers. Gaze estimation adds ~1–2 ms amortized per frame because BlazeFace is sampled at 10 Hz (every 3rd frame) and the result is cached. When gaze is absent, the per-frame cost drops to ~3–5 ms (capture + gaze check + render).
 
 ## 4. Gaze-Aware Activation Design
 
@@ -149,11 +149,11 @@ stateDiagram-v2
 
 ## 5. Prediction Stabilization Pipeline
 
-The prediction stabilizer applies three sequential filtering stages to reduce noise in raw LSTM output:
+The prediction stabilizer applies three sequential filtering stages to reduce noise in raw model output:
 
 ```mermaid
 graph LR
-    Raw["Raw Prediction<br/>(8-class probabilities)"] --> EMA["Stage 1: EMA Smoothing<br/>α = 0.4"]
+    Raw["Raw Prediction<br/>(class probabilities)"] --> EMA["Stage 1: EMA Smoothing<br/>α = 0.4"]
     EMA --> Threshold["Stage 2: Per-Class<br/>Confidence Threshold"]
     Threshold --> Vote["Stage 3: Temporal<br/>Majority Voting"]
     Vote --> Output["StabilizedPrediction<br/>(label, accepted, reason)"]
@@ -200,7 +200,7 @@ graph TD
     Window --> NPZ["NPZ Dataset<br/>(N × 24 × 147)"]
     NPZ --> Split["Recording-level Group Split<br/>(70/15/15)"]
     Split --> Augment["On-the-Fly Augmentation<br/>(temporal scale, spatial jitter)"]
-    Augment --> Train["LSTM Training Loop<br/>(Adam, class-weighted CE)"]
+    Augment --> Train["EnhancedTwoStreamLSTM Training Loop<br/>(AdamW, class-weighted CE)"]
     Train --> Eval["Evaluation<br/>(precision, recall, F1)"]
     Eval --> Export["Export Artifact<br/>(.pt + metadata)"]
     Export --> HFHub["Publish to HF Hub<br/>(ntsrigaud/maestro-lstm)"]

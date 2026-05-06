@@ -95,7 +95,7 @@ across all 200 videos. D0X has 1 431 instances; B0A and B0B each have
 | Mean   | 140    | 4.7 s             |
 | Median | 112    | 3.7 s             |
 
-The LSTM window is 24 frames (0.8 s), so most gesture segments comfortably
+The LSTM window is 32 frames (≈1.07 s), so most gesture segments comfortably
 contain multiple non-overlapping windows.
 
 ---
@@ -182,7 +182,7 @@ IPN Videos (AVI, 30 FPS)
 │  • SequenceDatasetBuilder:                       │
 │    – LandmarkFeatureTransformer (wrist-relative, │
 │      scale-normalised positions + velocities)    │
-│    – SlidingWindowSequenceBuffer (24 frames,     │
+│    – SlidingWindowSequenceBuffer (32 frames,     │
 │      step 3, min_valid_ratio 0.8)                │
 │  • recording_id = {video}:seg{i:04d}             │
 │    (builder resets feature state at each segment)│

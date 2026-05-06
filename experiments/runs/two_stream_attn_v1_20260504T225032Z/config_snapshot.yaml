@@ -1,0 +1,48 @@
+model:
+  model_name: two_stream_attn_v1
+  input_size: 147
+  hidden_size: 96
+  num_layers: 4
+  dropout: 0.35
+  num_classes: 10
+  num_nodes: 67
+  num_coords: 3
+  stgcn_channels:
+  - 64
+  - 128
+  num_stgcn_layers: 2
+  lstm_hidden: 128
+  lstm_layers: 2
+  phono_proj_dim: 128
+  phono_conv_channels: 256
+  num_heads: 8
+  proj_dim: 96
+training:
+  epochs: 100
+  batch_size: 64
+  learning_rate: 9.0e-05
+  weight_decay: 0.0005
+  grad_clip_norm: 1.0
+  early_stopping_patience: 25
+  early_stopping_min_delta: 0.0001
+  seed: 42
+  num_workers: 0
+  class_weighting: true
+  label_smoothing: 0.05
+  max_samples_per_class: 3000
+  exclude_classes: null
+split:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 8
+  min_lr: 1.0e-06
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+  graph_schema_version: graph-schema-v1
