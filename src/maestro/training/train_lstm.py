@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,11 +10,11 @@ from typing import Any
 import torch
 import yaml
 from torch import nn
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from maestro.training.augmentation import AugmentationConfig
-from maestro.training.datamodule import DataSplitConfig, GestureDataModule
+from maestro.training.datamodule import DataSplitConfig, GestureDataModule, GraphGestureDataModule
 from maestro.training.evaluate import EvaluationReport, evaluate_model
 from maestro.utils.reproducibility import seed_everything
 
@@ -26,6 +27,19 @@ class ModelConfig:
     num_layers: int
     dropout: float
     num_classes: int
+    # STGCN-specific fields (only used when model_name starts with "stgcn").
+    num_nodes: int = 67
+    num_coords: int = 3
+    stgcn_channels: tuple[int, ...] = (64, 128)
+    num_stgcn_layers: int = 2
+    lstm_hidden: int = 128
+    lstm_layers: int = 2
+    # Dual-branch STGCN phonological branch fields (only used for "dual_stgcn_*").
+    phono_proj_dim: int = 128
+    phono_conv_channels: int = 256
+    # EnhancedTwoStreamLSTM-specific fields (only used for "two_stream_attn_*").
+    num_heads: int = 4
+    proj_dim: int = 64
 
 
 @dataclass(slots=True)
@@ -40,6 +54,9 @@ class TrainingConfig:
     seed: int
     num_workers: int
     class_weighting: bool
+    label_smoothing: float = 0.0
+    max_samples_per_class: int | None = None
+    exclude_classes: list[str] | None = None
 
 
 @dataclass(slots=True)
@@ -55,6 +72,7 @@ class ExportConfig:
     checkpoint_dir: str
     exported_dir: str
     feature_schema_version: str
+    graph_schema_version: str = "graph-schema-v1"
 
 
 @dataclass(slots=True)
@@ -109,7 +127,18 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             hidden_size=int(model_data.get("hidden_size", 128)),
             num_layers=int(model_data.get("num_layers", 2)),
             dropout=float(model_data.get("dropout", 0.3)),
-            num_classes=int(model_data.get("num_classes", 8)),
+            num_classes=int(model_data.get("num_classes", 10)),
+            # STGCN fields — ignored for two_stream models.
+            num_nodes=int(model_data.get("num_nodes", 67)),
+            num_coords=int(model_data.get("num_coords", 3)),
+            stgcn_channels=tuple(int(c) for c in model_data.get("stgcn_channels", [64, 128])),
+            num_stgcn_layers=int(model_data.get("num_stgcn_layers", 2)),
+            lstm_hidden=int(model_data.get("lstm_hidden", 128)),
+            lstm_layers=int(model_data.get("lstm_layers", 2)),
+            phono_proj_dim=int(model_data.get("phono_proj_dim", 128)),
+            phono_conv_channels=int(model_data.get("phono_conv_channels", 256)),
+            num_heads=int(model_data.get("num_heads", 4)),
+            proj_dim=int(model_data.get("proj_dim", 64)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
@@ -122,6 +151,17 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             seed=int(train_data.get("seed", 42)),
             num_workers=int(train_data.get("num_workers", 0)),
             class_weighting=bool(train_data.get("class_weighting", True)),
+            label_smoothing=float(train_data.get("label_smoothing", 0.0)),
+            max_samples_per_class=(
+                int(train_data["max_samples_per_class"])
+                if train_data.get("max_samples_per_class") is not None
+                else None
+            ),
+            exclude_classes=(
+                [str(c) for c in train_data["exclude_classes"]]
+                if train_data.get("exclude_classes")
+                else None
+            ),
         ),
         split=DataSplitConfig(
             train_ratio=float(split_data.get("train_ratio", 0.7)),
@@ -140,6 +180,12 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             exported_dir=str(export_data.get("exported_dir", "models/exported")),
             feature_schema_version=str(
                 export_data.get("feature_schema_version", "feature-schema-v1")
+            ),
+            graph_schema_version=str(
+                export_data.get(
+                    "graph_schema_version",
+                    train_data.get("graph_schema_version", "graph-schema-v1"),
+                )
             ),
         ),
         augmentation=_parse_augmentation_config(payload.get("augmentation")),
@@ -163,37 +209,99 @@ def _parse_augmentation_config(
 
 
 def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
-    """Instantiate :class:`TwoStreamGestureLSTM` from *config*.
+    """Instantiate the appropriate model from *config*.
 
-    Raises:
-        ValueError: If *config.model_name* does not identify a two-stream model.
+    Dispatches based on ``config.model_name``:
+    * ``dual_stgcn_*``      → :class:`DualBranchSTGCN_LSTM`
+    * ``two_stream_attn_*`` → :class:`EnhancedTwoStreamLSTM`
+    * ``two_stream_*``      → :class:`TwoStreamGestureLSTM`
+
+    Note: ``two_stream_attn_*`` is checked *before* ``two_stream_*`` because it
+    is a more specific prefix.
     """
-    if not config.model_name.startswith("two_stream"):
-        raise ValueError(
-            f"Unsupported model_name {config.model_name!r}. "
-            "Only two_stream_* models are supported. "
-            "Use configs/model/two_stream_lstm.yaml."
-        )
+    if config.model_name.startswith("dual_stgcn"):
+        from maestro.infrastructure.model.dual_branch_stgcn_lstm import DualBranchSTGCN_LSTM
 
-    from maestro.infrastructure.model.two_stream_lstm import (
-        TwoStreamGestureLSTM,
+        return DualBranchSTGCN_LSTM(
+            num_nodes=config.num_nodes,
+            num_coords=config.num_coords,
+            phono_conv_channels=config.phono_conv_channels,
+            phono_lstm_hidden=config.lstm_hidden,
+            phono_lstm_layers=config.lstm_layers,
+            stgcn_channels=config.stgcn_channels,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+        ).to(device)
+
+    if config.model_name.startswith("two_stream_attn"):
+        from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
+
+        return EnhancedTwoStreamLSTM(
+            input_size=config.input_size,
+            hidden_size=config.hidden_size,
+            num_layers=config.num_layers,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+            num_heads=config.num_heads,
+            proj_dim=config.proj_dim,
+        ).to(device)
+
+    if config.model_name.startswith("two_stream"):
+        from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+
+        return TwoStreamGestureLSTM(
+            input_size=config.input_size,
+            hidden_size=config.hidden_size,
+            num_layers=config.num_layers,
+            dropout=config.dropout,
+            num_classes=config.num_classes,
+        ).to(device)
+
+    raise ValueError(
+        f"Unsupported model_name {config.model_name!r}. "
+        "Supported prefixes: 'dual_stgcn_', 'two_stream_attn_', 'two_stream_'."
     )
-
-    return TwoStreamGestureLSTM(
-        input_size=config.input_size,
-        hidden_size=config.hidden_size,
-        num_layers=config.num_layers,
-        dropout=config.dropout,
-        num_classes=config.num_classes,
-    ).to(device)
 
 
 def create_datamodule(
     *,
     dataset_path: str | Path,
     config: TrainingPipelineConfig,
-) -> GestureDataModule:
-    datamodule = GestureDataModule(
+) -> GestureDataModule | GraphGestureDataModule:
+    """Create and set up the appropriate data module for *config.model.model_name*.
+
+    * ``dual_stgcn_*`` models → :class:`GraphGestureDataModule`
+    * ``two_stream_*``         → :class:`GestureDataModule`
+    """
+    is_graph_model = config.model.model_name.startswith("dual_stgcn")
+    if is_graph_model:
+        from maestro.training.augmentation import (  # noqa: F401
+            GraphAugmentationConfig,
+            GraphGestureAugmenter,
+        )
+
+        graph_aug: Any = None
+        if config.augmentation is not None:
+            graph_aug = GraphAugmentationConfig(
+                temporal_scale_range=config.augmentation.temporal_scale_range,
+                spatial_jitter_sigma=config.augmentation.spatial_jitter_sigma,
+                apply_prob=config.augmentation.apply_prob,
+                mirror_flip_prob=config.augmentation.mirror_flip_prob,
+            )
+
+        dm: GraphGestureDataModule = GraphGestureDataModule(
+            dataset_path=dataset_path,
+            batch_size=config.training.batch_size,
+            split=config.split,
+            seed=config.training.seed,
+            num_workers=config.training.num_workers,
+            pin_memory=False,
+            graph_augmentation=graph_aug,
+        )
+        dm.setup()
+        return dm
+
+    flat_dm: GestureDataModule = GestureDataModule(
         dataset_path=dataset_path,
         batch_size=config.training.batch_size,
         split=config.split,
@@ -201,9 +309,11 @@ def create_datamodule(
         num_workers=config.training.num_workers,
         pin_memory=False,
         augmentation=config.augmentation,
+        max_samples_per_class=config.training.max_samples_per_class,
+        exclude_classes=config.training.exclude_classes,
     )
-    datamodule.setup()
-    return datamodule
+    flat_dm.setup()
+    return flat_dm
 
 
 def _build_criterion(
@@ -221,8 +331,17 @@ def _build_criterion(
     return nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
 
-def _build_class_weights(datamodule: GestureDataModule, device: torch.device) -> torch.Tensor:
-    distribution = datamodule.label_distribution()
+def _build_class_weights(
+    datamodule: GestureDataModule | GraphGestureDataModule, device: torch.device
+) -> torch.Tensor:
+    # Use training-split-only counts so that any per-class downsampling is
+    # reflected in the weights.  Without this, the weights would be computed
+    # from the full dataset distribution, which still shows the 145x imbalance
+    # even after downsampling has been applied to the training split.
+    if isinstance(datamodule, GestureDataModule):
+        distribution = datamodule.training_label_distribution()
+    else:
+        distribution = datamodule.label_distribution()
     labels = datamodule.class_labels
     counts = torch.tensor([distribution[label] for label in labels], dtype=torch.float32)
     weights = torch.sum(counts) / (counts * len(labels))
@@ -279,11 +398,13 @@ def train_lstm(
     seed_everything(config.training.seed)
     datamodule = create_datamodule(dataset_path=dataset_path, config=config)
 
-    if datamodule.feature_dim != config.model.input_size:
-        raise ValueError(
-            "Model input_size does not match dataset feature_dim: "
-            f"input_size={config.model.input_size}, feature_dim={datamodule.feature_dim}"
-        )
+    # For flat-feature models, verify input_size matches the dataset.
+    if not config.model.model_name.startswith("stgcn") and hasattr(datamodule, "feature_dim"):
+        if datamodule.feature_dim != config.model.input_size:  # type: ignore[union-attr]
+            raise ValueError(
+                "Model input_size does not match dataset feature_dim: "
+                f"input_size={config.model.input_size}, feature_dim={datamodule.feature_dim}"  # type: ignore[union-attr]
+            )
 
     if datamodule.num_classes != config.model.num_classes:
         raise ValueError(
@@ -295,11 +416,13 @@ def train_lstm(
 
     if config.training.class_weighting:
         class_weights = _build_class_weights(datamodule, device)
-        criterion: nn.Module = _build_criterion(class_weights, label_smoothing=0.1)
+        criterion: nn.Module = _build_criterion(
+            class_weights, label_smoothing=config.training.label_smoothing
+        )
     else:
-        criterion = _build_criterion(None, label_smoothing=0.1)
+        criterion = _build_criterion(None, label_smoothing=config.training.label_smoothing)
 
-    optimizer = Adam(
+    optimizer = AdamW(
         model.parameters(),
         lr=config.training.learning_rate,
         weight_decay=config.training.weight_decay,
@@ -309,7 +432,7 @@ def train_lstm(
     if config.scheduler.enabled:
         scheduler = ReduceLROnPlateau(
             optimizer,
-            mode="min",
+            mode="max",  # maximise val_macro_f1
             factor=config.scheduler.factor,
             patience=config.scheduler.patience,
             min_lr=config.scheduler.min_lr,
@@ -325,7 +448,8 @@ def train_lstm(
     run_dir = Path(run_root_dir) / model_version
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    best_val_loss = float("inf")
+    best_val_f1 = -float("inf")
+    best_val_loss = float("inf")  # tracked for reporting only
     best_epoch = 0
     epochs_without_improve = 0
     history: list[dict[str, float]] = []
@@ -334,7 +458,39 @@ def train_lstm(
     checkpoint_output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = checkpoint_output_dir / f"{model_version}.pt"
 
+    n_train = len(datamodule.train_indices)
+    n_val = len(datamodule.val_indices)
+    n_params = sum(p.numel() for p in model.parameters())
+    _header_cols = (
+        f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  "
+        f"{'ValLoss':>8}  {'ValAcc':>7}  {'ValF1':>6}  "
+        f"{'LR':>8}  {'Time':>6}  {'ES':>5}  Note"
+    )
+    _sep = "-" * len(_header_cols)
+    print(f"\nTraining  {model_version}")
+    print(f"  Model     : {type(model).__name__}  ({n_params:,} params)")
+    print(f"  Dataset   : train={n_train:,}  val={n_val:,}")
+    print(
+        f"  Optimiser : AdamW  lr={config.training.learning_rate:.2e}  "
+        f"wd={config.training.weight_decay:.2e}"
+    )
+    print(
+        f"  Schedule  : ReduceLROnPlateau  "
+        f"factor={config.scheduler.factor}  patience={config.scheduler.patience}"
+        if config.scheduler.enabled
+        else "  Schedule  : none"
+    )
+    print(
+        f"  Stopping  : patience={config.training.early_stopping_patience}  "
+        f"min_delta={config.training.early_stopping_min_delta:.0e}  "
+        f"metric=val_macro_f1"
+    )
+    print(_sep)
+    print(_header_cols)
+    print(_sep, flush=True)
+
     for epoch in range(1, config.training.epochs + 1):
+        _t_epoch = time.perf_counter()
         train_loss, train_acc = _train_one_epoch(
             model=model,
             dataloader=train_loader,
@@ -353,9 +509,10 @@ def train_lstm(
         )
 
         if scheduler is not None:
-            scheduler.step(val_report.loss)
+            scheduler.step(val_report.macro_f1)
 
         current_lr = float(optimizer.param_groups[0]["lr"])
+        _epoch_secs = time.perf_counter() - _t_epoch
         history.append(
             {
                 "epoch": float(epoch),
@@ -365,12 +522,14 @@ def train_lstm(
                 "val_accuracy": val_report.accuracy,
                 "val_macro_f1": val_report.macro_f1,
                 "learning_rate": current_lr,
+                "epoch_secs": _epoch_secs,
             }
         )
 
-        improved = (best_val_loss - val_report.loss) > config.training.early_stopping_min_delta
+        improved = (val_report.macro_f1 - best_val_f1) > config.training.early_stopping_min_delta
         if improved:
-            best_val_loss = val_report.loss
+            best_val_f1 = val_report.macro_f1
+            best_val_loss = val_report.loss  # track for reporting
             best_epoch = epoch
             epochs_without_improve = 0
             torch.save(
@@ -381,15 +540,43 @@ def train_lstm(
                     "dataset_metadata": datamodule.metadata,
                     "feature_schema_version": config.export.feature_schema_version,
                     "best_epoch": best_epoch,
+                    "best_val_f1": best_val_f1,
                     "best_val_loss": best_val_loss,
                 },
                 checkpoint_path,
             )
+            _note = "* best"
         else:
             epochs_without_improve += 1
+            _note = f"  ES {epochs_without_improve}/{config.training.early_stopping_patience}"
+
+        print(
+            f"{epoch:>6}/{config.training.epochs:<4}  "
+            f"{train_loss:>9.4f}  {train_acc:>8.1%}  "
+            f"{val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  "
+            f"{val_report.macro_f1:>6.1%}  "
+            f"{current_lr:>8.2e}  {_epoch_secs:>5.1f}s  "
+            f"{_note}",
+            flush=True,
+        )
 
         if epochs_without_improve >= config.training.early_stopping_patience:
+            print(
+                f"\nEarly stopping at epoch {epoch}  "
+                f"(no improvement in val_macro_f1 for "
+                f"{config.training.early_stopping_patience} epochs)",
+                flush=True,
+            )
             break
+
+    else:
+        print(f"\nCompleted all {config.training.epochs} epochs.", flush=True)
+
+    print(
+        f"\nBest epoch  : {best_epoch}  "
+        f"val_macro_f1={best_val_f1:.4f}  val_loss={best_val_loss:.4f}",
+        flush=True,
+    )
 
     checkpoint_payload = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint_payload["model_state_dict"])
@@ -412,6 +599,7 @@ def train_lstm(
     training_summary = {
         "model_version": model_version,
         "best_epoch": best_epoch,
+        "best_val_f1": best_val_f1,
         "best_val_loss": best_val_loss,
         "history": history,
         "val_report": val_report.to_dict(),

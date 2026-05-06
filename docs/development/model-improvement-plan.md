@@ -68,7 +68,7 @@ The system achieves 79 % accuracy on held-out IPN Hand test recordings, but swip
 
 ### T2-B — Switch Dataset Builder to `last` Label Strategy
 
-**Problem.** `label_strategy: majority` assigns a gesture label to any 24-frame window where the gesture occupies slightly more than 50 % of frames. For a 300 ms swipe inside an 800 ms window, this means the model is trained to classify windows where the majority of frames are neutral rest-state poses as a swipe. Inference windows share the same structure, but the ambiguous framing hurts precision.
+**Problem.** `label_strategy: majority` assigns a gesture label to any 32-frame window where the gesture occupies slightly more than 50 % of frames. For a 300 ms swipe inside a ≈1067 ms window, this means the model is trained to classify windows where the majority of frames are neutral rest-state poses as a swipe. Inference windows share the same structure, but the ambiguous framing hurts precision.
 
 **Plan.**
 

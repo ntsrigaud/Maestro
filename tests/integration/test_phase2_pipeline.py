@@ -8,22 +8,27 @@ import numpy as np
 from maestro.app.bootstrap import build_container
 from maestro.domain.entities import FramePacket, HandLandmarks, MultiHandPacket
 from maestro.infrastructure.model.checkpoint_loader import InferenceArtifact
-from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
+from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
 
 def _mock_artifact() -> InferenceArtifact:
     """Create a dummy InferenceArtifact matching the current feature-schema-v5 config."""
-    model = TwoStreamGestureLSTM(
+    model = EnhancedTwoStreamLSTM(
         input_size=147,
         hidden_size=64,
         num_layers=2,
         dropout=0.1,
-        num_classes=8,
+        num_classes=10,
+        num_heads=4,
+        proj_dim=64,
     )
     return InferenceArtifact(
         model=model,
         model_version="test_v5",
         class_labels=[
+            "unknown",
+            "point_one",
+            "point_two",
             "swipe_up",
             "swipe_down",
             "swipe_left",
@@ -31,11 +36,10 @@ def _mock_artifact() -> InferenceArtifact:
             "open_palm_hold",
             "zoom_in",
             "zoom_out",
-            "unknown",
         ],
         feature_schema_version="feature-schema-v5",
         feature_dim=147,
-        window_length=24,
+        window_length=32,
         window_step=3,
         orientation_normalization=False,
         artifact_path=Path("/dev/null"),

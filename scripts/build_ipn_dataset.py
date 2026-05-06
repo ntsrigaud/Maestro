@@ -11,8 +11,7 @@ The script implements a two-phase architecture:
   Phase 2 — Dataset Assembly
     The annotation file is used to identify gesture segments.  IPN labels are
     mapped to the production vocabulary defined in ``vocabulary_ipn.yaml``.
-    Segments whose IPN label has no mapping (G01, G02, G08, G09) are skipped.
-    The ``unknown`` class (D0X, B0A, B0B) is subsampled to prevent it from
+        The ``unknown`` class (D0X) is subsampled to prevent it from
     dominating the dataset.  Frames for each segment are fed sequentially to
     ``SequenceDatasetBuilder``, which applies the existing feature transformer
     and sliding-window logic before saving the final NPZ.
@@ -69,41 +68,52 @@ import yaml
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from maestro.domain.entities import FramePacket  # noqa: E402
-from maestro.infrastructure.mediapipe.hands_extractor import (  # noqa: E402
-    MediaPipeHandsExtractor,
-)
-from maestro.pipeline.hand_selection import HandSelector  # noqa: E402
+from maestro.domain.entities import LabeledGraphFrame  # noqa: E402
+from maestro.pipeline import graph_schema  # noqa: E402
 from maestro.training.dataset_builder import (  # noqa: E402
+    GraphSequenceDatasetBuilder,
     LabeledLandmarkFrame,
     SequenceDatasetBuilder,
 )
+
+# Default model cache path (mirrors the constant formerly in holistic_extractor).
+_DEFAULT_MODEL_CACHE = Path.home() / ".cache" / "maestro" / "holistic_landmarker.task"
+
+
+def _is_nan(lm: object) -> bool:
+    """Return True if any coordinate of *lm* is NaN."""
+    import math
+
+    return (
+        math.isnan(getattr(lm, "x", 0.0))
+        or math.isnan(getattr(lm, "y", 0.0))
+        or math.isnan(getattr(lm, "z", 0.0))
+    )
+
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # IPN label → production vocabulary mapping
 # ---------------------------------------------------------------------------
-# Gestures with no clear presentation-control semantic (click / double-click
-# styles: G01, G02, G08, G09) are deliberately omitted — their frames will be
-# skipped during assembly.  Pointing poses (B0A, B0B) are retained as
-# negative examples under the ``unknown`` class.
+# Full IPN baseline mapping (14 classes):
+#   D0X, B0A, B0B, G01..G11
 
 IPN_TO_VOCAB: dict[str, str] = {
     "D0X": "unknown",  # non-gesture background
-    "B0A": "unknown",  # pointing with one finger → negative example
-    "B0B": "unknown",  # pointing with two fingers → negative example
+    "B0A": "point_one",  # pointing with one finger
+    "B0B": "point_two",  # pointing with two fingers
     "G03": "swipe_up",  # throw up
     "G04": "swipe_down",  # throw down
     "G05": "swipe_left",  # throw left
     "G06": "swipe_right",  # throw right
-    "G07": "open_palm_hold",  # open twice (closest to open-palm hold)
+    "G07": "open_palm_hold",  # open twice
     "G10": "zoom_in",  # zoom in
     "G11": "zoom_out",  # zoom out
-    # G01 click one finger  — skipped (no directional / hold semantic)
-    # G02 click two fingers — skipped
-    # G08 double click one  — skipped
-    # G09 double click two  — skipped
+    "G01": "click_one",  # click with one finger
+    "G02": "click_two",  # click with two fingers
+    "G08": "double_click_one",  # double click with one finger
+    "G09": "double_click_two",  # double click with two fingers
 }
 
 # ---------------------------------------------------------------------------
@@ -123,16 +133,13 @@ class AnnotationRow:
 
 @dataclass
 class VideoLandmarks:
-    """Per-frame MediaPipe results for a single video."""
+    """Per-frame holistic landmark results for a single video (graph-schema-v1)."""
 
     video_stem: str
     fps: float
-    frame_ids: np.ndarray  # shape (N,) int32, 1-indexed
-    valid: np.ndarray  # shape (N,) bool
-    landmarks: np.ndarray  # shape (N, 21, 3) float32
-    detect_conf: np.ndarray  # shape (N,) float32
-    track_conf: np.ndarray  # shape (N,) float32
-    handedness: list[str | None]  # length N
+    frame_ids: np.ndarray  # shape (N,)     int32, 1-indexed
+    keypoints: np.ndarray  # shape (N, 67, 3) float32 — raw (pre-normalisation)
+    valid_mask: np.ndarray  # shape (N, 67)  bool — per-node detection validity
 
 
 # ---------------------------------------------------------------------------
@@ -140,23 +147,76 @@ class VideoLandmarks:
 # ---------------------------------------------------------------------------
 
 
-def _extract_video_worker(args: tuple[str, str, float, float]) -> tuple[str, str]:
-    """Worker function: extract MediaPipe landmarks for a single video.
+def _parse_holistic_legacy(
+    result: Any,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Parse a legacy mp.solutions.holistic result into (67, 3) keypoints + mask.
+
+    The legacy solutions API returns ``NormalizedLandmarkList`` objects that
+    expose landmarks via a ``.landmark`` attribute, unlike the task-based API
+    which returns plain lists.  No normalisation is applied — raw coordinates
+    are stored in the per-video cache; ``graph_schema.normalise_graph_frame()``
+    is applied at assembly time.
+    """
+    keypoints = np.zeros((graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32)
+    valid_mask = np.zeros(graph_schema.NUM_NODES, dtype=bool)
+
+    rh = result.right_hand_landmarks
+    if rh:
+        for i, lm in enumerate(rh.landmark[:21]):
+            if not _is_nan(lm):
+                keypoints[i] = [lm.x, lm.y, lm.z]
+                valid_mask[i] = True
+
+    lh_offset = graph_schema.NODE_INDEX_MAP["left_hand"][0]
+    lh = result.left_hand_landmarks
+    if lh:
+        for i, lm in enumerate(lh.landmark[:21]):
+            idx = i + lh_offset
+            if not _is_nan(lm):
+                keypoints[idx] = [lm.x, lm.y, lm.z]
+                valid_mask[idx] = True
+
+    pose = result.pose_landmarks
+    if pose:
+        for gi, mp_i in enumerate(graph_schema.POSE_LANDMARK_INDICES):
+            idx = graph_schema.NODE_INDEX_MAP["pose"][0] + gi
+            if mp_i < len(pose.landmark):
+                lm = pose.landmark[mp_i]
+                if not _is_nan(lm):
+                    keypoints[idx] = [lm.x, lm.y, lm.z]
+                    valid_mask[idx] = True
+
+    face = result.face_landmarks
+    if face:
+        for gi, mp_i in enumerate(graph_schema.FACE_LANDMARK_INDICES):
+            idx = graph_schema.NODE_INDEX_MAP["face"][0] + gi
+            if mp_i < len(face.landmark):
+                lm = face.landmark[mp_i]
+                if not _is_nan(lm):
+                    keypoints[idx] = [lm.x, lm.y, lm.z]
+                    valid_mask[idx] = True
+
+    return keypoints, valid_mask
+
+
+def _extract_video_worker(args: tuple[str, str, str, float, float]) -> tuple[str, str]:
+    """Worker function: extract holistic landmarks for a single video.
 
     Parameters
     ----------
     args:
-        Tuple of (video_path, cache_path, min_detection_confidence,
-        min_tracking_confidence).
+        Tuple of (video_path, cache_path, model_path,
+        min_detection_confidence, min_tracking_confidence).
 
     Returns
     -------
     (video_stem, cache_path)
-        The stem of the processed video and the path where results were saved.
-        On failure the stem is returned with a cache_path of empty string so
-        the caller can handle it.
+        On failure the stem is returned with an empty cache_path string.
     """
-    video_path_str, cache_path_str, min_det_conf, min_track_conf = args
+    import mediapipe as mp
+
+    video_path_str, cache_path_str, model_path_str, min_det_conf, min_track_conf = args
     video_path = Path(video_path_str)
     cache_path = Path(cache_path_str)
     stem = video_path.stem
@@ -171,76 +231,100 @@ def _extract_video_worker(args: tuple[str, str, float, float]) -> tuple[str, str
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 
-    extractor = MediaPipeHandsExtractor(
+    # Use the legacy mp.solutions.holistic.Holistic API for offline extraction.
+    # The task-based HolisticLandmarker (mp.tasks.vision) triggers a fatal
+    # SIGABRT on CPU-only headless Linux due to an assertion in the inference
+    # feedback manager when EGL/GPU is unavailable.  The legacy solutions API
+    # does not use that mechanism and is stable for offline dataset building.
+    frame_ids: list[int] = []
+    keypoints_list: list[np.ndarray] = []
+    valid_mask_list: list[np.ndarray] = []
+
+    with mp.solutions.holistic.Holistic(
         static_image_mode=False,
+        model_complexity=1,
         min_detection_confidence=min_det_conf,
         min_tracking_confidence=min_track_conf,
-    )
-    hand_selector = HandSelector(
-        hand_preference="both",
-        min_handedness_conf=min_det_conf,
-        min_track_conf=min_track_conf,
-    )
+        enable_segmentation=False,
+    ) as holistic:
+        frame_id = 1  # 1-indexed to match IPN annotations
+        while True:
+            ret, bgr = cap.read()
+            if not ret:
+                break
 
-    frame_ids: list[int] = []
-    valid_flags: list[bool] = []
-    landmarks_list: list[np.ndarray] = []
-    detect_confs: list[float] = []
-    track_confs: list[float] = []
-    handedness_list: list[str | None] = []
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+            result = holistic.process(rgb)
 
-    frame_id = 1  # 1-indexed to match IPN annotations
-    while True:
-        ret, bgr = cap.read()
-        if not ret:
-            break
-
-        timestamp_ms = int((frame_id - 1) * 1000.0 / fps)
-        packet = FramePacket(frame=bgr, timestamp_ms=timestamp_ms, frame_id=frame_id)
-        lp = hand_selector.select(extractor.extract(packet))
-
-        frame_ids.append(frame_id)
-        valid_flags.append(lp.valid)
-        detect_confs.append(float(lp.detect_conf))
-        track_confs.append(float(lp.track_conf))
-        handedness_list.append(lp.handedness)
-
-        if lp.valid and len(lp.landmarks) == 21:
-            landmarks_list.append(np.asarray(lp.landmarks, dtype=np.float32))
-        else:
-            landmarks_list.append(np.zeros((21, 3), dtype=np.float32))
-
-        frame_id += 1
+            kp, vm = _parse_holistic_legacy(result)
+            frame_ids.append(frame_id)
+            keypoints_list.append(kp)
+            valid_mask_list.append(vm)
+            frame_id += 1
 
     cap.release()
-    extractor.close()
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         cache_path,
         fps=np.float32(fps),
         frame_ids=np.asarray(frame_ids, dtype=np.int32),
-        valid=np.asarray(valid_flags, dtype=bool),
-        landmarks=np.asarray(landmarks_list, dtype=np.float32),
-        detect_conf=np.asarray(detect_confs, dtype=np.float32),
-        track_conf=np.asarray(track_confs, dtype=np.float32),
-        handedness=np.asarray(handedness_list, dtype=object),
+        keypoints=np.asarray(keypoints_list, dtype=np.float32),
+        valid_mask=np.asarray(valid_mask_list, dtype=bool),
     )
     logger.info("Cached %d frames → %s", len(frame_ids), cache_path.name)
     return stem, cache_path_str
 
 
 def _load_cache(cache_path: Path) -> VideoLandmarks:
+    """Load a holistic or legacy right-hand-only cache NPZ.
+
+    Holistic format (``*_holistic.npz`` written by this script):
+        ``keypoints``  (N, 67, 3) float32 — all holistic nodes
+        ``valid_mask`` (N, 67)    bool    — per-node validity
+
+    Legacy format (``{stem}.npz`` written by earlier pipeline versions):
+        ``landmarks``  (N, 21, 3) float32 — right-hand landmarks only
+        ``valid``      (N,)       bool    — per-frame detection validity
+
+    Legacy caches are promoted to the holistic layout by placing the 21
+    right-hand landmarks at nodes 0-20 (the right-hand slot in the graph
+    schema), leaving nodes 21-66 as zeros.  This is sufficient because the
+    flat pipeline only reads ``keypoints[:, :21, :]``.
+    """
     with np.load(cache_path, allow_pickle=True) as data:
+        fps = float(data["fps"])
+        frame_ids = data["frame_ids"]
+
+        if "keypoints" in data.files:
+            # Current holistic format — load directly.
+            return VideoLandmarks(
+                video_stem=cache_path.stem,
+                fps=fps,
+                frame_ids=frame_ids,
+                keypoints=data["keypoints"],  # (N, 67, 3)
+                valid_mask=data["valid_mask"],  # (N, 67)
+            )
+
+        # Legacy format: landmarks (N, 21, 3) + valid (N,)
+        rh_landmarks = data["landmarks"]  # (N, 21, 3) right-hand only
+        rh_valid = data["valid"]  # (N,) bool
+        N = len(frame_ids)
+
+        # Promote to full holistic layout (67 nodes, 3 coords) so the rest
+        # of the pipeline can use the same code path regardless of format.
+        keypoints = np.zeros((N, graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32)
+        keypoints[:, :21, :] = rh_landmarks
+
+        valid_mask = np.zeros((N, graph_schema.NUM_NODES), dtype=bool)
+        valid_mask[:, :21] = rh_valid[:, np.newaxis]
+
         return VideoLandmarks(
             video_stem=cache_path.stem,
-            fps=float(data["fps"]),
-            frame_ids=data["frame_ids"],
-            valid=data["valid"],
-            landmarks=data["landmarks"],
-            detect_conf=data["detect_conf"],
-            track_conf=data["track_conf"],
-            handedness=list(data["handedness"]),
+            fps=fps,
+            frame_ids=frame_ids,
+            keypoints=keypoints,
+            valid_mask=valid_mask,
         )
 
 
@@ -250,25 +334,45 @@ def extract_all_landmarks(
     cache_dir: Path,
     *,
     num_workers: int,
+    model_path: str,
     min_detection_confidence: float,
     min_tracking_confidence: float,
     no_cache: bool,
 ) -> dict[str, Path]:
-    """Extract or load cached landmarks for every requested video.
+    """Extract or load cached holistic landmarks for every requested video.
 
     Returns a dict mapping video stem → cache NPZ path.
     """
     cache_dir.mkdir(parents=True, exist_ok=True)
-    tasks: list[tuple[str, str, float, float]] = []
+    tasks: list[tuple[str, str, str, float, float]] = []
     result_paths: dict[str, Path] = {}
 
     for stem in video_stems:
-        video_path = video_dir / f"{stem}.avi"
-        if not video_path.exists():
-            logger.warning("Video not found, skipping: %s", video_path)
+        cache_path = cache_dir / f"{stem}_holistic.npz"
+
+        # Fast path: use an existing cache file without requiring the video.
+        # This allows Phase 2 to proceed even when the original .avi files
+        # have been moved or deleted after the first extraction run.
+        if not no_cache and cache_path.exists():
+            result_paths[stem] = cache_path
             continue
 
-        cache_path = cache_dir / f"{stem}.npz"
+        # Legacy fallback: previous versions of this script saved caches as
+        # {stem}.npz (without the _holistic suffix).  Accept those files so
+        # that users who have already extracted landmarks do not need to
+        # re-run Phase 1.
+        legacy_cache_path = cache_dir / f"{stem}.npz"
+        if not no_cache and legacy_cache_path.exists():
+            logger.debug("Using legacy cache for %s (%s)", stem, legacy_cache_path.name)
+            result_paths[stem] = legacy_cache_path
+            continue
+
+        # Cache miss — queue the video for (re-)extraction.
+        video_path = video_dir / f"{stem}.avi"
+        if not video_path.exists():
+            logger.warning("Video not found and no cache available, skipping: %s", video_path)
+            continue
+
         if no_cache and cache_path.exists():
             cache_path.unlink()
 
@@ -276,13 +380,21 @@ def extract_all_landmarks(
             (
                 str(video_path),
                 str(cache_path),
+                model_path,
                 min_detection_confidence,
                 min_tracking_confidence,
             )
         )
 
-    if not tasks:
-        logger.warning("No videos to process.")
+    if result_paths:
+        logger.info(
+            "%d video(s) resolved from existing cache; %d video(s) queued for extraction.",
+            len(result_paths),
+            len(tasks),
+        )
+
+    if not tasks and not result_paths:
+        logger.warning("No videos to process and no existing caches found.")
         return {}
 
     logger.info("Processing %d videos with %d worker(s)…", len(tasks), num_workers)
@@ -356,27 +468,34 @@ def _subsample_unknown_segments(
     max_per_source: int,
     rng: random.Random,
 ) -> list[AnnotationRow]:
-    """Randomly subsample unknown-mapped segments per IPN source label."""
-    by_source: dict[str, list[AnnotationRow]] = defaultdict(list)
+    """Randomly subsample unknown-mapped segments per source video.
+
+    Groups D0X segments by video stem so that each recording contributes at
+    most ``max_per_source`` unknown segments.  Grouping by IPN label alone
+    (e.g. a single 'D0X' bucket for all 200 videos) would keep only
+    ``max_per_source`` segments globally, collapsing coverage to a handful
+    of videos.
+    """
+    by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
     other: list[AnnotationRow] = []
     for seg in segments:
         if IPN_TO_VOCAB.get(seg.ipn_label) == "unknown":
-            by_source[seg.ipn_label].append(seg)
+            by_video[seg.video].append(seg)
         else:
             other.append(seg)
 
     subsampled: list[AnnotationRow] = list(other)
-    for source_label, source_segs in by_source.items():
-        if len(source_segs) > max_per_source:
-            chosen = rng.sample(source_segs, max_per_source)
-            logger.info(
-                "Subsampled unknown source '%s': %d → %d segments.",
-                source_label,
-                len(source_segs),
+    for video_stem, video_segs in by_video.items():
+        if len(video_segs) > max_per_source:
+            chosen = rng.sample(video_segs, max_per_source)
+            logger.debug(
+                "Subsampled unknown for video '%s': %d → %d segments.",
+                video_stem,
+                len(video_segs),
                 max_per_source,
             )
         else:
-            chosen = source_segs
+            chosen = video_segs
         subsampled.extend(chosen)
     return subsampled
 
@@ -392,32 +511,32 @@ def assemble_dataset(
     label_strategy: str,
     max_unknown_segments_per_source: int,
     max_unknown_frames_per_segment: int,
-    enable_orientation_normalization: bool,
     seed: int,
-) -> SequenceDatasetBuilder:
-    """Feed annotated landmark segments into a ``SequenceDatasetBuilder``.
+) -> GraphSequenceDatasetBuilder:
+    """Feed annotated holistic frames into a ``GraphSequenceDatasetBuilder``.
 
     Each annotated gesture segment is assigned a unique ``recording_id`` of
-    the form ``{video}:{seg_index}`` so the builder resets its feature
-    transformer state at every segment boundary, ensuring velocity features
-    are never computed across gesture boundaries.
+    the form ``{video}:{seg_index}`` so the builder resets its buffer state
+    at every segment boundary.
     """
     rng = random.Random(seed)
 
-    builder = SequenceDatasetBuilder(
+    builder = GraphSequenceDatasetBuilder(
         vocabulary=vocabulary,
         window_length=window_length,
         window_step=window_step,
         min_valid_ratio=min_valid_ratio,
         label_strategy=label_strategy,
-        enable_orientation_normalization=enable_orientation_normalization,
     )
 
     # Group by video and apply unknown subsampling at the whole-dataset level.
     all_mapped: list[tuple[str, AnnotationRow]] = []  # (video_stem, row)
+    vocabulary_set = set(vocabulary)
     for row in annotations:
         if row.ipn_label not in IPN_TO_VOCAB:
-            continue  # skip G01, G02, G08, G09
+            continue  # IPN code has no production mapping at all
+        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+            continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
         all_mapped.append((row.video, row))
 
     # Subsample unknown segments from the full list.
@@ -472,18 +591,13 @@ def assemble_dataset(
                     continue  # frame not in cache (truncated video)
 
                 timestamp_ms = int((frame_id - 1) * 1000.0 / vl.fps)
-                is_valid = bool(vl.valid[idx])
-                lm = vl.landmarks[idx].tolist()  # List[List[float]] shape (21, 3)
 
-                lf = LabeledLandmarkFrame(
+                lf = LabeledGraphFrame(
+                    keypoints=vl.keypoints[idx],  # (67, 3) raw
+                    valid_mask=vl.valid_mask[idx],  # (67,) bool
+                    label=vocab_label,
                     recording_id=recording_id,
                     timestamp_ms=timestamp_ms,
-                    label=vocab_label,
-                    landmarks=lm,
-                    valid=is_valid,
-                    handedness=vl.handedness[idx],
-                    detect_conf=float(vl.detect_conf[idx]),
-                    track_conf=float(vl.track_conf[idx]),
                 )
                 builder.add_frame(lf)
 
@@ -502,7 +616,9 @@ def assemble_dataset(
 # ---------------------------------------------------------------------------
 
 
-def _compute_class_stats(builder: SequenceDatasetBuilder) -> dict[str, Any]:
+def _compute_class_stats(
+    builder: GraphSequenceDatasetBuilder | SequenceDatasetBuilder,
+) -> dict[str, Any]:
     from collections import Counter
 
     label_counts = Counter(s.label for s in builder.samples)
@@ -511,6 +627,112 @@ def _compute_class_stats(builder: SequenceDatasetBuilder) -> dict[str, Any]:
         "class_distribution": dict(label_counts),
         "num_classes": len(label_counts),
     }
+
+
+def assemble_flat_dataset(
+    annotations: list[AnnotationRow],
+    cache_paths: dict[str, Path],
+    vocabulary: list[str],
+    *,
+    window_length: int,
+    window_step: int,
+    min_valid_ratio: float,
+    label_strategy: str,
+    max_unknown_segments_per_source: int,
+    max_unknown_frames_per_segment: int,
+    seed: int,
+) -> SequenceDatasetBuilder:
+    """Feed annotated right-hand landmarks into a ``SequenceDatasetBuilder``.
+
+    Extracts right-hand keypoints (nodes 0-20) from the holistic cache and
+    produces a flat feature-schema-v5 dataset compatible with
+    ``GestureDataModule`` and ``TwoStreamGestureLSTM``.
+    """
+    rng = random.Random(seed)
+
+    builder = SequenceDatasetBuilder(
+        vocabulary=vocabulary,
+        window_length=window_length,
+        window_step=window_step,
+        min_valid_ratio=min_valid_ratio,
+        label_strategy=label_strategy,
+    )
+
+    all_mapped: list[tuple[str, AnnotationRow]] = []
+    vocabulary_set = set(vocabulary)
+    for row in annotations:
+        if row.ipn_label not in IPN_TO_VOCAB:
+            continue  # IPN code has no production mapping at all
+        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+            continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
+        all_mapped.append((row.video, row))
+
+    subsampled_unknown = _subsample_unknown_segments(
+        [r for _, r in all_mapped if IPN_TO_VOCAB[r.ipn_label] == "unknown"],
+        max_unknown_segments_per_source,
+        rng,
+    )
+    unknown_set = {id(r) for r in subsampled_unknown}
+
+    final_by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
+    for video, row in all_mapped:
+        if IPN_TO_VOCAB[row.ipn_label] == "unknown":
+            if id(row) not in unknown_set:
+                continue
+        final_by_video[video].append(row)
+
+    for segs in final_by_video.values():
+        segs.sort(key=lambda r: r.t_start)
+
+    total_windows = 0
+    missing_cache = 0
+
+    for video_stem, segments in sorted(final_by_video.items()):
+        cache_path = cache_paths.get(video_stem)
+        if cache_path is None or not cache_path.exists():
+            logger.warning("No cache for video '%s', skipping.", video_stem)
+            missing_cache += 1
+            continue
+
+        vl = _load_cache(cache_path)
+        fid_to_idx = {int(fid): i for i, fid in enumerate(vl.frame_ids)}
+
+        for seg_idx, seg in enumerate(segments):
+            vocab_label = IPN_TO_VOCAB[seg.ipn_label]
+            recording_id = f"{video_stem}:seg{seg_idx:04d}"
+
+            t_end_effective = seg.t_end
+            if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
+                t_end_effective = min(seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1)
+
+            seg_windows_before = len(builder.samples)
+            for frame_id in range(seg.t_start, t_end_effective + 1):
+                idx = fid_to_idx.get(frame_id)
+                if idx is None:
+                    continue
+
+                timestamp_ms = int((frame_id - 1) * 1000.0 / vl.fps)
+                # Extract right-hand keypoints (nodes 0-20 in graph layout).
+                rh_kps = vl.keypoints[idx, :21]  # (21, 3) raw coordinates
+                rh_valid = bool(vl.valid_mask[idx, :21].any())
+
+                lf = LabeledLandmarkFrame(
+                    recording_id=recording_id,
+                    timestamp_ms=timestamp_ms,
+                    label=vocab_label,
+                    landmarks=rh_kps.tolist(),
+                    valid=rh_valid,
+                    handedness="Right",
+                )
+                builder.add_frame(lf)
+
+            total_windows += len(builder.samples) - seg_windows_before
+
+    if missing_cache > 0:
+        logger.warning("%d video(s) had no cache and were skipped.", missing_cache)
+
+    logger.info("Flat assembly complete: %d sliding-window samples generated.", total_windows)
+    return builder
 
 
 def _load_vocabulary(vocab_config_path: Path) -> list[str]:
@@ -532,14 +754,16 @@ def _save_metadata(
     window_length: int,
     window_step: int,
     stats: dict[str, Any],
-    feature_schema_version: str = "feature-schema-v1",
+    graph_schema_version: str = graph_schema.GRAPH_SCHEMA_VERSION,
 ) -> None:
     metadata = {
         "ipn_label_mapping": IPN_TO_VOCAB,
         "vocabulary": vocabulary,
         "window_length": window_length,
         "window_step": window_step,
-        "feature_schema_version": feature_schema_version,
+        "graph_schema_version": graph_schema_version,
+        "num_nodes": graph_schema.NUM_NODES,
+        "num_coords": graph_schema.NUM_COORDS,
         "annotation_rows_used": annotations_used,
         "videos_processed": len(cache_paths),
         "dataset_stats": stats,
@@ -605,7 +829,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         metavar="N",
         help=(
             "Maximum number of unknown-class segments drawn from each IPN "
-            "source label (D0X, B0A, B0B) to limit class imbalance.  "
+            "source label (currently D0X) to limit class imbalance.  "
             "Default: 150."
         ),
     )
@@ -634,8 +858,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--window-length",
         type=int,
-        default=24,
-        help="Sliding window length in frames (default: 24).",
+        default=32,
+        help="Sliding window length in frames (default: 32).",
     )
     p.add_argument(
         "--window-step",
@@ -660,6 +884,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--model-path",
+        default=None,
+        help=(
+            "Path to the holistic_landmarker.task model bundle.  "
+            "If omitted the model is downloaded to ~/.cache/maestro/ on first use."
+        ),
+    )
+    p.add_argument(
         "--min-detection-confidence",
         type=float,
         default=0.7,
@@ -672,24 +904,26 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="MediaPipe minimum tracking confidence (default: 0.5).",
     )
     p.add_argument(
-        "--enable-orientation-normalization",
-        action="store_true",
-        help="Enable orientation normalization in the feature transformer.",
-    )
-    p.add_argument(
         "--seed",
         type=int,
         default=42,
         help="Random seed for unknown-segment subsampling (default: 42).",
     )
     p.add_argument(
-        "--feature-schema-version",
-        default="feature-schema-v1",
+        "--format",
+        default="graph",
+        choices=["graph", "flat"],
         help=(
-            "Feature schema version tag embedded in the NPZ metadata "
-            "(default: feature-schema-v1).  Use feature-schema-v2 after "
-            "enabling spread/wrist-trajectory features."
+            "Output format: 'graph' (default) produces graph-schema-v1 NPZ with "
+            "sequences shape (N,T,67,3); 'flat' produces feature-schema-v5 NPZ with "
+            "sequences shape (N,T,147) compatible with TwoStreamGestureLSTM and "
+            "GestureDataModule."
         ),
+    )
+    p.add_argument(
+        "--graph-schema-version",
+        default=graph_schema.GRAPH_SCHEMA_VERSION,
+        help="Graph schema version tag embedded in the NPZ metadata (graph format only).",
     )
     p.add_argument(
         "--metadata-json",
@@ -755,23 +989,38 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Phase 1 — extract / load per-video landmark caches.
     # -----------------------------------------------------------------------
+    # Resolve holistic model path (download if needed).
+    # The legacy mp.solutions.holistic.Holistic API used by _extract_video_worker
+    # bundles its own model weights inside the mediapipe package and does not
+    # require the separate HolisticLandmarker .task file.  We keep the
+    # model_path argument for API compatibility but no longer download anything.
+    model_path = Path(args.model_path) if args.model_path else _DEFAULT_MODEL_CACHE
+
     cache_paths = extract_all_landmarks(
         video_dir=video_dir,
         video_stems=needed_videos,
         cache_dir=cache_dir,
         num_workers=num_workers,
+        model_path=str(model_path),  # kept for arg-tuple compatibility, unused by worker
         min_detection_confidence=args.min_detection_confidence,
         min_tracking_confidence=args.min_tracking_confidence,
         no_cache=args.no_cache,
     )
     if not cache_paths:
-        logger.error("No videos were processed successfully.  Aborting.")
+        logger.error(
+            "No landmark caches are available.  "
+            "Ensure that either (a) .avi video files exist in '%s' or "
+            "(b) cached NPZ files exist in '%s'.  "
+            "Re-run with --log-level DEBUG for per-video details.",
+            video_dir,
+            cache_dir,
+        )
         sys.exit(1)
 
     # -----------------------------------------------------------------------
     # Phase 2 — assemble sliding-window dataset.
     # -----------------------------------------------------------------------
-    builder = assemble_dataset(
+    assemble_kwargs = dict(
         annotations=annotations,
         cache_paths=cache_paths,
         vocabulary=vocabulary,
@@ -781,9 +1030,17 @@ def main() -> None:
         label_strategy=args.label_strategy,
         max_unknown_segments_per_source=args.max_unknown_segments_per_source,
         max_unknown_frames_per_segment=args.max_unknown_frames_per_segment,
-        enable_orientation_normalization=args.enable_orientation_normalization,
         seed=args.seed,
     )
+
+    if args.format == "flat":
+        logger.info("Building flat feature-schema-v5 dataset (right-hand, 147 dims)…")
+        builder: SequenceDatasetBuilder | GraphSequenceDatasetBuilder = assemble_flat_dataset(
+            **assemble_kwargs
+        )
+    else:
+        logger.info("Building graph-schema-v1 dataset (holistic, 67 nodes × 3 coords)…")
+        builder = assemble_dataset(**assemble_kwargs)
 
     if not builder.samples:
         logger.error(
@@ -814,10 +1071,12 @@ def main() -> None:
     # Save NPZ and metadata.
     # -----------------------------------------------------------------------
     output_npz.parent.mkdir(parents=True, exist_ok=True)
-    builder.save_npz(
-        output_npz,
-        feature_schema_version=args.feature_schema_version,
-    )
+    if args.format == "flat":
+        assert isinstance(builder, SequenceDatasetBuilder)
+        builder.save_npz(output_npz, feature_schema_version="feature-schema-v5")
+    else:
+        assert isinstance(builder, GraphSequenceDatasetBuilder)
+        builder.save_npz(output_npz, graph_schema_version=args.graph_schema_version)
     logger.info("Dataset saved → %s  (%d samples)", output_npz, len(builder.samples))
 
     stats = _compute_class_stats(builder)
@@ -826,16 +1085,17 @@ def main() -> None:
     metadata_path = Path(
         args.metadata_json if args.metadata_json else str(output_npz) + ".metadata.json"
     )
-    _save_metadata(
-        metadata_path=metadata_path,
-        annotations_used=len(annotations),
-        cache_paths=cache_paths,
-        vocabulary=vocabulary,
-        window_length=args.window_length,
-        window_step=args.window_step,
-        stats=stats,
-        feature_schema_version=args.feature_schema_version,
-    )
+    if args.format == "graph":
+        _save_metadata(
+            metadata_path=metadata_path,
+            annotations_used=len(annotations),
+            cache_paths=cache_paths,
+            vocabulary=vocabulary,
+            window_length=args.window_length,
+            window_step=args.window_step,
+            stats=stats,
+            graph_schema_version=args.graph_schema_version,
+        )
 
 
 if __name__ == "__main__":

@@ -9,23 +9,28 @@ This document describes the complete data flow through the real-time inference p
 ```mermaid
 graph TD
     A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| B["Gaze Estimation<br/>(BlazeFace + Head Pose)"]
-    B -->|gaze_permitted=false| Z["Skip to next frame"]
-    B -->|gaze_permitted=true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
+    B --> Gz{"gaze_permitted?"}
+    Gz -->|false| O["Overlay Render + RuntimeState Emit"]
+    Gz -->|true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
     C -->|MultiHandPacket| Cs["Hand Selection<br/>(HandSelector)"]
     Cs -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
     D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 24x147)"]
-    E -->|SequenceWindow| F["Two-Stream LSTM<br/>(Hidden=64/stream, Fused=128, 8-Class)"]
+    E --> Wr{"window_ready?"}
+    Wr -->|false| O
+    Wr -->|true| F["Enhanced Two-Stream<br/>(BiLSTM + MHA + Cross-Stream Gate)"]
     F -->|Prediction| G["Prediction Stabilizer<br/>(EMA + Threshold + Voting)"]
     G -->|StabilizedPrediction| H["Activation Controller<br/>(IDLE / ARMED / COOLDOWN)"]
-    H -->|ExecutableCommand| I["Command Dispatcher<br/>(Allowlist + Rate Limit)"]
+    H --> Cm{"command emitted?"}
+    Cm -->|no| O
+    Cm -->|yes| I["Command Dispatcher<br/>(Allowlist + Rate Limit)"]
     I -->|DispatchResult| J["Keyboard Adapter<br/>(pyautogui)"]
     J -->|OS Key Event| K["Target Application"]
-
-    E -.->|Buffer incomplete| Z
+    K --> O
+    O --> N["Next Frame Iteration"]
 
     style A fill:#e1f5fe
     style K fill:#e8f5e9
-    style Z fill:#fff3e0
+    style O fill:#fff3e0
 ```
 
 ## 3. Stage-by-Stage Description
@@ -168,17 +173,17 @@ If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is em
 | `end_timestamp_ms`   | `float`                           | Timestamp of the newest frame in the window |
 | `valid_ratio`        | `float`                           | Fraction of frames with `valid=True`        |
 
-The buffer is a fixed-length deque (default length 24). Feature frames are pushed on every iteration. A window is emitted when three conditions are met:
+The buffer is a fixed-length deque (default length 32). Feature frames are pushed on every iteration. A window is emitted when three conditions are met:
 
-1. The deque is full (24 frames accumulated).
+1. The deque is full (32 frames accumulated).
 2. At least `window_step` frames (default 3) have been pushed since the last emission.
 3. The valid-frame ratio meets or exceeds `min_valid_ratio` (default 0.8).
 
-At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 24-frame window spans approximately 800 ms of hand motion, capturing sufficient temporal context for dynamic gesture recognition.
+At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 32-frame window spans approximately 1067 ms of hand motion, capturing sufficient temporal context for dynamic gesture recognition.
 
-### Stage 7: Two-Stream LSTM Inference
+### Stage 7: Enhanced Two-Stream Inference
 
-**Component**: `TwoStreamGestureLSTM`  
+**Component**: `EnhancedTwoStreamLSTM`  
 **Input**: `SequenceWindow`  
 **Output**: `Prediction`
 
@@ -188,39 +193,18 @@ At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The
 | `top_class`   | `str`              | Class label with highest probability |
 | `confidence`  | `float`            | Probability of the top class         |
 
-The `TwoStreamGestureLSTM` (`two_stream_lstm_v1`) is the sole supported model architecture — a Tier 4-A two-stream design:
+The runtime uses `two_stream_attn_v1` as the authoritative architecture:
 
-**Two-stream LSTM** (`two_stream_lstm_v1`):
+- Feature partition remains deterministic: pose stream (73 dims) + motion stream (74 dims).
+- Each stream is projected, encoded with BiLSTM, then refined by multi-head self-attention.
+- Mean+max pooled stream contexts are recalibrated through cross-stream MLP gates.
+- A LayerNorm/GELU MLP head produces final class logits.
 
-```
-Input tensor: (1, 24, 147)
-    ↓ feature partition (no learned parameters)
-┌─────────────────────────────────┐  ┌──────────────────────────────────────────┐
-│ Stream A — Pose / Shape         │  │ Stream B — Motion / Dynamics             │
-│  positions[0:63]       63 dims  │  │  fingertip_spread[63:68]     5 dims      │
-│  joint_angles[134:144] 10 dims  │  │  wrist_trajectory[68:71]     3 dims      │
-│  ───────────────────── ───────  │  │  velocity[71:134]            63 dims     │
-│  Total                 73 dims  │  │  wrist_vel_raw[144:147]       3 dims     │
-│                                 │  │  ────────────────────────────────────    │
-│  LSTM(73→64, 2 layers)          │  │  Total                       74 dims     │
-│  Bahdanau attention pool        │  │                                          │
-│  Context: (1, 64)               │  │  LSTM(74→64, 2 layers)                   │
-│                                 │  │  Bahdanau attention pool                 │
-│                                 │  │  Context: (1, 64)                        │
-└─────────────────────────────────┘  └──────────────────────────────────────────┘
-    ↓                                     ↓
-    └──────── concat ─────────────────────┘
-             Fused: (1, 128)
-                ↓
-          Dropout(0.3)
-                ↓
-         Linear(128, 8) → Softmax: 8-class probability distribution
-~182 K parameters
-```
+See also: `enhanced-two-stream-lstm-architecture.md` for the full component-level model design.
 
 The two-stream architecture addresses the directional signal dilution identified in the model improvement plan (Tier 4-A): the 6 critical directional dims (`wrist_traj` + `wrist_vel_raw`) previously competed for gradient weight with 141 pose and velocity dims in a single LSTM. Stream B gives motion features a fully independent representational pathway, eliminating within-timestep feature competition that Bahdanau attention alone cannot resolve (attention operates over time, not over feature dimensions).
 
-The model runs in `torch.no_grad()` evaluation mode. `checkpoint_loader.py` validates that `artifact_type` equals `two_stream_lstm_inference` before reconstructing the model; any other artifact type raises `ValueError` to prevent silent failure.
+The model runs in `torch.no_grad()` evaluation mode. `checkpoint_loader.py` validates that `artifact_type` equals `two_stream_attn_inference` before reconstructing the model; any other artifact type raises `ValueError` to prevent silent failure.
 
 ### Stage 8: Prediction Stabilization
 
