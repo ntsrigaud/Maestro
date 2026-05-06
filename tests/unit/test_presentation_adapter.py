@@ -148,7 +148,7 @@ class TestPresentationAdapterNoOp:
         assert adapter.target_app == "presentation"
 
     def test_all_eight_commands_handled(self):
-        """Smoke test: none of the eight canonical commands raise."""
+        """Smoke test: none of the ten canonical commands raise."""
         commands = [
             "next_slide",
             "previous_slide",
@@ -157,6 +157,8 @@ class TestPresentationAdapterNoOp:
             "zoom_in_view",
             "zoom_out_view",
             "start_stop_presentation",
+            "activate_laser_pointer",
+            "deactivate_laser_pointer",
             "no_action",
         ]
         kb = _mock_keyboard()
@@ -164,3 +166,28 @@ class TestPresentationAdapterNoOp:
         for cmd in commands:
             result = adapter.execute(cmd)
             assert isinstance(result, DispatchResult)
+
+
+# ---------------------------------------------------------------------------
+# Tests: laser pointer commands
+# ---------------------------------------------------------------------------
+
+
+class TestPresentationAdapterLaserPointer:
+    def test_activate_laser_pointer_presses_ctrl_l(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("activate_laser_pointer")
+        kb.press_hotkey.assert_called_once_with("ctrl", "l")
+        assert result.success is True
+        assert result.command_id == "activate_laser_pointer"
+        assert result.target_app == "presentation"
+
+    def test_deactivate_laser_pointer_presses_ctrl_a(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("deactivate_laser_pointer")
+        kb.press_hotkey.assert_called_once_with("ctrl", "a")
+        assert result.success is True
+        assert result.command_id == "deactivate_laser_pointer"
+        assert result.target_app == "presentation"
