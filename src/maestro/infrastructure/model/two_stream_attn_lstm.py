@@ -48,7 +48,7 @@ class EnhancedTwoStreamLSTM(nn.Module):
             dims  71:134  velocity         (21 per-landmark velocity × 3)
             dims 144:147  wrist_vel_raw    (3 camera-normalised wrist velocity)
 
-    Parameter budget (proj_dim=96, hidden_size=96, num_layers=2, num_heads=8, 12 classes):
+    Parameter budget (proj_dim=96, hidden_size=96, num_layers=2, num_heads=8, 10 classes):
         proj_a / proj_b           2 × ~7 K              ≈   14 K
         BiLSTM-A                  2-layer bidir (96)     ≈  370 K
         BiLSTM-B                  (identical)            ≈  370 K
@@ -59,7 +59,7 @@ class EnhancedTwoStreamLSTM(nn.Module):
         Head MLP                  384 → 192 → C          ≈   76 K
         Total                                            ≈ 1.20 M
 
-    Parameter budget (proj_dim=64, hidden_size=64, num_layers=2, num_heads=4, 8 classes):
+    Parameter budget (proj_dim=64, hidden_size=64, num_layers=2, num_heads=4, 10 classes):
         (small reference configuration)
         proj + BiLSTMs + self-attn + gates + head       ≈  542 K
     """
