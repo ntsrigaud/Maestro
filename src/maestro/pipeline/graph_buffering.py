@@ -23,7 +23,8 @@ class GraphSequenceBuffer:
     is ``True`` (i.e. at least one hand node block is non-zero).
 
     Args:
-        window_length: Number of frames per window (default 24).
+        window_length: Number of frames per window (default 24, STGCN pipeline;
+            flat-feature pipeline uses 32).
         window_step: Emit a new window every N pushes (default 3).
         min_valid_ratio: Minimum fraction of valid frames required to emit
             (default 0.8). Frames with no detected hand are invalid.

@@ -15,7 +15,7 @@ def _make_model(
     hidden_size: int = 64,
     num_heads: int = 4,
     proj_dim: int = 64,
-    num_classes: int = 8,
+    num_classes: int = 10,
 ) -> EnhancedTwoStreamLSTM:
     return EnhancedTwoStreamLSTM(
         input_size=147,
@@ -100,7 +100,7 @@ def test_num_heads_divisibility_guard() -> None:
             hidden_size=64,  # 2×64 = 128
             num_layers=2,
             dropout=0.1,
-            num_classes=8,
+            num_classes=10,
             num_heads=3,  # 128 % 3 != 0 → should raise
         )
 
@@ -238,11 +238,14 @@ def test_checkpoint_loader_two_stream_attn(tmp_path: Path) -> None:
             "hidden_size": 64,
             "num_layers": 2,
             "dropout": 0.1,
-            "num_classes": 8,
+            "num_classes": 10,
             "num_heads": 4,
             "proj_dim": 64,
         },
         "class_labels": [
+            "unknown",
+            "point_one",
+            "point_two",
             "open_palm_hold",
             "swipe_right",
             "swipe_left",
@@ -250,7 +253,6 @@ def test_checkpoint_loader_two_stream_attn(tmp_path: Path) -> None:
             "swipe_down",
             "zoom_in",
             "zoom_out",
-            "unknown",
         ],
         "feature_schema": {
             "feature_schema_version": "feature-schema-v5",
@@ -270,13 +272,13 @@ def test_checkpoint_loader_two_stream_attn(tmp_path: Path) -> None:
     assert artifact.feature_schema_version == "feature-schema-v5"
     assert artifact.window_length == 32
     assert artifact.window_step == 1
-    assert len(artifact.class_labels) == 8
+    assert len(artifact.class_labels) == 10
 
     # Verify inference works after loading
     x = torch.zeros(1, 32, 147)
     with torch.no_grad():
         out = artifact.model(x)
-    assert out.shape == (1, 8)
+    assert out.shape == (1, 10)
 
 
 # ── _build_model dispatch ─────────────────────────────────────────────────────
@@ -293,7 +295,7 @@ def test_build_model_dispatches_two_stream_attn() -> None:
         hidden_size=64,
         num_layers=2,
         dropout=0.1,
-        num_classes=8,
+        num_classes=10,
         num_heads=4,
         proj_dim=64,
     )
@@ -302,4 +304,4 @@ def test_build_model_dispatches_two_stream_attn() -> None:
     x = torch.zeros(1, 32, 147)
     with torch.no_grad():
         out = model(x)
-    assert out.shape == (1, 8)
+    assert out.shape == (1, 10)
