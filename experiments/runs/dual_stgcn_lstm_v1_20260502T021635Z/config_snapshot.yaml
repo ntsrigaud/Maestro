@@ -1,0 +1,44 @@
+model:
+  model_name: dual_stgcn_lstm_v1
+  input_size: 201
+  hidden_size: 256
+  num_layers: 2
+  dropout: 0.3
+  num_classes: 8
+  num_nodes: 67
+  num_coords: 3
+  stgcn_channels:
+    - 64
+    - 128
+    - 256
+  num_stgcn_layers: 3
+  lstm_hidden: 256
+  lstm_layers: 2
+  phono_proj_dim: 128
+  phono_conv_channels: 256
+training:
+  epochs: 40
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  grad_clip_norm: 1.0
+  early_stopping_patience: 7
+  early_stopping_min_delta: 0.0001
+  seed: 42
+  num_workers: 0
+  class_weighting: true
+split:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 3
+  min_lr: 1.0e-06
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: ""
+  graph_schema_version: graph-schema-v1

@@ -16,10 +16,11 @@ Semantic-HGR-System/
 │   │   ├── app.yaml                  # Desktop camera/FPS overrides
 │   │   └── inference.yaml            # Desktop timing (shorter timeouts, faster cooldown)
 │   ├── gestures/
-│   │   ├── vocabulary_ipn.yaml       # Gesture class vocabulary (8 classes)
+│   │   ├── vocabulary_ipn.yaml       # Full IPN baseline vocabulary (14 classes)
 │   │   └── command_map_presentation.yaml  # Gesture-to-command mapping (presentation vocabulary)
 │   ├── model/
-│   │   ├── two_stream_lstm.yaml      # Two-stream LSTM architecture and training hyperparameters
+│   │   ├── two_stream_attn.yaml      # EnhancedTwoStreamLSTM (authoritative default)
+│   │   ├── two_stream_lstm.yaml      # Legacy two-stream LSTM (experimental reference)
 │   │   └── feature_pipeline.yaml     # Feature normalization toggles
 │   └── thresholds/
 │       └── production_ipn.yaml       # Per-class confidence thresholds and vote windows
@@ -130,15 +131,15 @@ Semantic-HGR-System/
 
 **Purpose**: Offline dataset construction, model training, evaluation, and export.
 
-| Module                 | Key Classes                                              | Responsibility                                                                                                                   |
-| ---------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `dataset_builder.py`   | `SequenceDatasetBuilder`, `LabeledLandmarkFrame`         | Converts JSONL landmark recordings to NPZ sequence datasets                                                                      |
-| `datamodule.py`        | `GestureDataModule`, `SequenceTensorDataset`             | PyTorch dataset wrappers with recording-level group splits and optional augmentation                                             |
-| `augmentation.py`      | `GestureAugmenter`, `AugmentationConfig`                 | Temporal scaling and spatial jitter for training regularization                                                                  |
-| `train_lstm.py`        | `train_lstm()`, `TrainingPipelineConfig`                 | Training loop with early stopping and LR scheduling; instantiates `TwoStreamGestureLSTM` (imported from `infrastructure/model/`) |
-| `evaluate.py`          | `evaluate_model()`, `EvaluationReport`                   | Per-class precision, recall, F1; confusion matrix                                                                                |
-| `export_checkpoint.py` | `export_inference_artifact()`, `update_model_registry()` | Checkpoint serialization and local registry update                                                                               |
-| `hf_publish.py`        | `publish_to_huggingface()`, `build_model_card()`         | Publish trained artifacts to Hugging Face Hub with auto-generated model card                                                     |
+| Module                 | Key Classes                                              | Responsibility                                                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dataset_builder.py`   | `SequenceDatasetBuilder`, `LabeledLandmarkFrame`         | Converts JSONL landmark recordings to NPZ sequence datasets                                                                                                                      |
+| `datamodule.py`        | `GestureDataModule`, `SequenceTensorDataset`             | PyTorch dataset wrappers with recording-level group splits and optional augmentation                                                                                             |
+| `augmentation.py`      | `GestureAugmenter`, `AugmentationConfig`                 | Temporal scaling and spatial jitter for training regularization                                                                                                                  |
+| `train_lstm.py`        | `train_lstm()`, `TrainingPipelineConfig`                 | Training loop with early stopping and LR scheduling; instantiates model architecture from config (`EnhancedTwoStreamLSTM` default, legacy variants retained for experimentation) |
+| `evaluate.py`          | `evaluate_model()`, `EvaluationReport`                   | Per-class precision, recall, F1; confusion matrix                                                                                                                                |
+| `export_checkpoint.py` | `export_inference_artifact()`, `update_model_registry()` | Checkpoint serialization and local registry update                                                                                                                               |
+| `hf_publish.py`        | `publish_to_huggingface()`, `build_model_card()`         | Publish trained artifacts to Hugging Face Hub with auto-generated model card                                                                                                     |
 
 **Dependency rule**: Imports pipeline components (`LandmarkFeatureTransformer`, `SlidingWindowSequenceBuffer`) for training–inference parity. Imports PyTorch and scikit-learn. Not imported by the runtime inference path.
 
@@ -210,6 +211,7 @@ graph TD
     Training["training/"] --> Pipeline
     Training --> Domain
     Training --> Utils
+    Training --> Infra
 
     Infra --> Domain
     Infra --> Interfaces
@@ -227,16 +229,16 @@ graph TD
 
 Configuration files are organized by concern:
 
-| Category         | Files                                    | Schema                                                                           |
-| ---------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
-| **Application**  | `app.yaml`                               | `AppConfig` — camera index, resolution, FPS                                      |
-| **Inference**    | `inference.yaml`                         | `InferenceConfig` — window length/step, activation timing, cooldown              |
-| **Model source** | `model_source.yaml`                      | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename |
-| **Model**        | `model/two_stream_lstm.yaml`             | Training hyperparameters, two-stream LSTM architecture, augmentation settings    |
-| **Features**     | `model/feature_pipeline.yaml`            | `FeaturePipelineConfig` — normalization and velocity toggles                     |
-| **Vocabulary**   | `gestures/vocabulary_ipn.yaml`           | Gesture class list (8 classes)                                                   |
-| **Commands**     | `gestures/command_map_presentation.yaml` | Gesture-to-command mapping (presentation vocabulary)                             |
-| **Thresholds**   | `thresholds/production_ipn.yaml`         | Per-class confidence thresholds and temporal vote window sizes                   |
+| Category         | Files                                    | Schema                                                                                                                |
+| ---------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Application**  | `app.yaml`                               | `AppConfig` — camera index, resolution, FPS                                                                           |
+| **Inference**    | `inference.yaml`                         | `InferenceConfig` — window length/step, activation timing, cooldown                                                   |
+| **Model source** | `model_source.yaml`                      | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename                                      |
+| **Model**        | `model/two_stream_attn.yaml`             | Authoritative training defaults for `EnhancedTwoStreamLSTM`; legacy model configs remain for experimental comparisons |
+| **Features**     | `model/feature_pipeline.yaml`            | `FeaturePipelineConfig` — normalization and velocity toggles                                                          |
+| **Vocabulary**   | `gestures/vocabulary_ipn.yaml`           | Full IPN baseline gesture class list (14 classes)                                                                     |
+| **Commands**     | `gestures/command_map_presentation.yaml` | Gesture-to-command mapping (presentation vocabulary)                                                                  |
+| **Thresholds**   | `thresholds/production_ipn.yaml`         | Per-class confidence thresholds and temporal vote window sizes                                                        |
 
 All configuration is validated at startup via Pydantic schemas. Invalid configurations cause immediate failure with descriptive error messages.
 

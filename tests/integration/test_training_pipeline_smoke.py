@@ -14,7 +14,7 @@ pytestmark = pytest.mark.training
 
 def _create_dataset(path: Path) -> None:
     rng = np.random.default_rng(123)
-    n, t, f = 128, 24, 147
+    n, t, f = 128, 32, 147
 
     sequences = rng.normal(size=(n, t, f)).astype(np.float32)
     labels = np.array(["open_palm_hold"] * 64 + ["swipe_right"] * 64, dtype=object)

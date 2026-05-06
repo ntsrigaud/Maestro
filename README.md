@@ -4,7 +4,7 @@ Production-grade webcam-based gesture recognition system for hands-free presenta
 
 ## System Overview
 
-The system recognizes 8 hand gestures from a live webcam feed and maps them to application commands (slide navigation, view zoom, presentation start/stop). It runs in real time on consumer laptops without a GPU.
+The system recognizes 10 hand gestures from a live webcam feed and maps them to application commands (slide navigation, view zoom, presentation start/stop). It runs in real time on consumer laptops without a GPU.
 
 **Core pipeline:**
 
@@ -27,7 +27,7 @@ A **PySide6 graphical interface** provides runtime control, live telemetry monit
 
 For developers who prefer script-based invocation, `scripts/run_ui.py` and `scripts/run_realtime.py` remain available as thin wrappers.
 
-**Gesture vocabulary** (IPN Hand dataset, 8 classes):
+**Gesture vocabulary** (IPN Hand dataset, 10 classes):
 
 | Gesture          | Command                   | IPN Source      |
 | ---------------- | ------------------------- | --------------- |
@@ -38,6 +38,8 @@ For developers who prefer script-based invocation, `scripts/run_ui.py` and `scri
 | `swipe_down`     | Next slide                | G04             |
 | `zoom_in`        | Zoom in view              | G10             |
 | `zoom_out`       | Zoom out view             | G11             |
+| `point_one`      | (reserved)                | B0A             |
+| `point_two`      | (reserved)                | B0B             |
 | `unknown`        | No action (noise class)   | D0X + B0A + B0B |
 
 ## Installation

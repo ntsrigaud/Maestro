@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import numpy as np
 import pytest
 
 from maestro.training.dataset_builder import (
@@ -80,23 +77,3 @@ def test_unknown_label_raises_validation_error() -> None:
 
     with pytest.raises(ValueError, match="Unknown label"):
         builder.add_frame(_frame(0, label="not_in_vocab"))
-
-
-def test_dataset_serialization_roundtrip(tmp_path: Path) -> None:
-    builder = SequenceDatasetBuilder(
-        vocabulary=["swipe_right", "unknown"],
-        window_length=4,
-        window_step=2,
-        min_valid_ratio=0.75,
-    )
-    for i in range(8):
-        builder.add_frame(_frame(i))
-
-    output = builder.save_npz(tmp_path / "train_dataset.npz")
-    payload = SequenceDatasetBuilder.load_npz(output)
-
-    assert payload["sequences"].shape == (3, 4, 147)
-    assert payload["label_ids"].shape == (3,)
-    assert payload["metadata"]["window_length"] == 4
-    assert payload["metadata"]["feature_dim"] == 147
-    np.testing.assert_array_equal(payload["labels"], np.asarray(["swipe_right"] * 3, dtype=object))

@@ -81,24 +81,6 @@ def build_container(
         frame_height=config.app.frame_height,
         target_fps=config.app.target_fps,
     )
-    landmark_extractor = MediaPipeHandsExtractor(
-        static_image_mode=False,
-        min_detection_confidence=0.7,
-        min_tracking_confidence=0.5,
-    )
-    hand_selector = HandSelector(
-        hand_preference=config.app.hand_preference,
-        min_handedness_conf=0.7,
-        min_track_conf=0.5,
-    )
-    feature_transformer = LandmarkFeatureTransformer(
-        enable_orientation_normalization=config.feature_pipeline.orientation_normalization,
-    )
-    sequence_buffer = SlidingWindowSequenceBuffer(
-        window_length=config.inference.window_length,
-        window_step=config.inference.window_step,
-        min_valid_ratio=config.inference.min_valid_ratio,
-    )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if model_artifact_path:
@@ -111,6 +93,25 @@ def build_container(
         )
 
     validate_runtime_compatibility(runtime_config=config, artifact=artifact)
+
+    landmark_extractor: IHandLandmarkExtractor = MediaPipeHandsExtractor(
+        static_image_mode=False,
+        min_detection_confidence=0.7,
+        min_tracking_confidence=0.5,
+    )
+    hand_selector = HandSelector(
+        hand_preference=config.app.hand_preference,
+        min_handedness_conf=0.7,
+        min_track_conf=0.5,
+    )
+    feature_transformer: IFeatureTransformer = LandmarkFeatureTransformer(
+        enable_orientation_normalization=config.feature_pipeline.orientation_normalization,
+    )
+    sequence_buffer: ISequenceBuffer = SlidingWindowSequenceBuffer(
+        window_length=config.inference.window_length,
+        window_step=config.inference.window_step,
+        min_valid_ratio=config.inference.min_valid_ratio,
+    )
 
     stabilizer = PredictionStabilizer(
         default_threshold=float(thresholds.get("acceptance_default", 0.85)),
@@ -201,7 +202,7 @@ def _load_model_from_source(
     hf_revision_override: str | None,
     device: torch.device,
 ) -> InferenceArtifact:
-    """Load the two-stream LSTM artifact from Hugging Face Hub.
+    """Load the enhanced two-stream attention artifact from Hugging Face Hub.
 
     When *hf_revision_override* is provided it overrides ``model_source.revision``
     (supports the ``--hf-revision`` CLI flag).
