@@ -360,7 +360,7 @@ standard webcam using MediaPipe for landmark extraction.
 
 - **Architecture**: {architecture}
 - **Parameters**: {num_params:,}
-- **Input**: `(batch, 24, {feature_dim})` — 24-frame sliding window at 30 FPS ≈ 800 ms
+- **Input**: `(batch, 32, {feature_dim})` — 32-frame sliding window at 30 FPS ≈ 1067 ms
 - **Output**: Softmax logits over {num_classes} gesture classes
 - **Inference latency**: < 1 ms per call (CPU, single sample)
 - **Feature schema**: `{feature_schema_version}`
@@ -371,7 +371,7 @@ standard webcam using MediaPipe for landmark extraction.
 processes them through a BiLSTM + self-attention + MLP-gate pipeline:
 
 ```
-Input (B, T=24, 147)
+Input (B, T=32, 147)
     │
     ├─ Stream A — Pose/Shape (73 dims)
     │   Linear+LN+GELU → {proj_dim}
@@ -433,9 +433,9 @@ artifact = load_inference_artifact(
 artifact.model.eval()
 
 # Build a {feature_dim}-dim feature vector using LandmarkFeatureTransformer
-# and fill a 24-frame SlidingWindowSequenceBuffer, then:
+# and fill a 32-frame SlidingWindowSequenceBuffer, then:
 with torch.no_grad():
-    # tensor shape: (batch=1, T=24, F={feature_dim})
+    # tensor shape: (batch=1, T=32, F={feature_dim})
     window_tensor = torch.tensor(window_np, dtype=torch.float32).unsqueeze(0)
     logits = artifact.model(window_tensor)
     pred_class = artifact.class_labels[logits.argmax(dim=1).item()]
@@ -559,7 +559,7 @@ standard webcam using MediaPipe for landmark extraction.
 
 - **Architecture**: {architecture}
 - **Parameters**: {num_params:,}
-- **Input**: `(batch, 24, {feature_dim})` — 24-frame sliding window at 30 FPS ≈ 800 ms
+- **Input**: `(batch, 32, {feature_dim})` — 32-frame sliding window at 30 FPS ≈ 1067 ms
 - **Output**: Softmax logits over {num_classes} gesture classes
 - **Inference latency**: ~0.5 ms per call (CPU, single sample)
 - **Feature schema**: `{feature_schema_version}`
@@ -595,9 +595,9 @@ artifact = load_inference_artifact(
 artifact.model.eval()
 
 # Build a {feature_dim}-dim feature vector using LandmarkFeatureTransformer
-# and fill a 24-frame SlidingWindowSequenceBuffer, then:
+# and fill a 32-frame SlidingWindowSequenceBuffer, then:
 with torch.no_grad():
-    # tensor shape: (batch=1, T=24, F={feature_dim})
+    # tensor shape: (batch=1, T=32, F={feature_dim})
     window_tensor = torch.tensor(window_np, dtype=torch.float32).unsqueeze(0)
     logits = artifact.model(window_tensor)
     pred_class = artifact.class_labels[logits.argmax(dim=1).item()]
@@ -608,7 +608,7 @@ with torch.no_grad():
 - **Source**: IPN Hand database — multi-subject, multi-session gesture recordings
 - **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
 - **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
-- **Sequences**: ~22,973 sliding windows × 24 frames × {feature_dim} features
+- **Sequences**: ~22,973 sliding windows × 32 frames × {feature_dim} features
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
   label-aware offline horizontal mirror (swipe_left ↔ swipe_right)
 
@@ -964,7 +964,7 @@ def publish_to_huggingface(
                 "feature_schema_version": config.export.feature_schema_version,
                 "feature_dim": config.model.input_size,
                 "orientation_normalization": False,
-                "window_length": result.dataset_metadata.get("window_length", 24),
+                "window_length": result.dataset_metadata.get("window_length", 32),
                 "window_step": result.dataset_metadata.get("window_step", 3),
             }
         }

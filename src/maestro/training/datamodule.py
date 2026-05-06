@@ -51,9 +51,7 @@ class SequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         return int(self._label_ids.shape[0])
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        seq = self._sequences[
-            int(self._indices[index]) if self._indices is not None else index
-        ]
+        seq = self._sequences[int(self._indices[index]) if self._indices is not None else index]
         return torch.from_numpy(np.asarray(seq, dtype=np.float32)), self._label_ids[index]
 
 
@@ -94,9 +92,7 @@ class AugmentedSequenceTensorDataset(Dataset[tuple[torch.Tensor, torch.Tensor]])
         return int(self._label_ids.shape[0])
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        seq = self._sequences_np[
-            int(self._indices[index]) if self._indices is not None else index
-        ]
+        seq = self._sequences_np[int(self._indices[index]) if self._indices is not None else index]
         seq_aug = self._augmenter.augment(seq)
         return torch.from_numpy(seq_aug), self._label_ids[index]
 
@@ -138,14 +134,14 @@ class DatasetBundle:
 # on development machines.  The helpers below stream the array row-by-row
 # through the ZIP decompressor so that only one chunk (~90 MB) is live at once.
 
+
 def _parse_npy_header(stream: Any) -> tuple[np.dtype, tuple[int, ...]]:
     """Read the numpy .npy header from *stream* and return (dtype, shape)."""
     prefix = stream.read(8)
     if prefix[:6] != b"\x93NUMPY":
         raise ValueError("Not a valid .npy file")
     major = prefix[6]
-    hdr_len = _struct.unpack("<H" if major == 1 else "<I",
-                             stream.read(2 if major == 1 else 4))[0]
+    hdr_len = _struct.unpack("<H" if major == 1 else "<I", stream.read(2 if major == 1 else 4))[0]
     hdr = _ast.literal_eval(stream.read(hdr_len).decode("latin1").strip())
     if hdr.get("fortran_order", False):
         raise ValueError("Fortran-order arrays are not supported by the streaming reader")
@@ -527,8 +523,8 @@ class GestureDataModule:
             # Map split-relative indices back to original-array indices so
             # callers can do all_labels[_dm.train_indices] on the full array.
             self._train_idx = keep_indices[np.asarray(train_idx)]
-            self._val_idx   = keep_indices[np.asarray(val_idx)]
-            self._test_idx  = keep_indices[np.asarray(test_idx)]
+            self._val_idx = keep_indices[np.asarray(val_idx)]
+            self._test_idx = keep_indices[np.asarray(test_idx)]
             return
 
         # Apply per-class cap BEFORE splitting (no exclude_classes path).
@@ -543,20 +539,18 @@ class GestureDataModule:
 
         unique_recs = np.unique(rec_ids_split)
         if self._use_group_split and len(unique_recs) >= 3:
-            train_idx, val_idx, test_idx = self._group_split_indices(
-                label_ids_split, rec_ids_split
-            )
+            train_idx, val_idx, test_idx = self._group_split_indices(label_ids_split, rec_ids_split)
         else:
             train_idx, val_idx, test_idx = self._split_indices(label_ids_split)
 
         if cap_idx is not None:
             self._train_idx = cap_idx[np.asarray(train_idx)]
-            self._val_idx   = cap_idx[np.asarray(val_idx)]
-            self._test_idx  = cap_idx[np.asarray(test_idx)]
+            self._val_idx = cap_idx[np.asarray(val_idx)]
+            self._test_idx = cap_idx[np.asarray(test_idx)]
         else:
             self._train_idx = np.asarray(train_idx)
-            self._val_idx   = np.asarray(val_idx)
-            self._test_idx  = np.asarray(test_idx)
+            self._val_idx = np.asarray(val_idx)
+            self._test_idx = np.asarray(test_idx)
 
         # Ensure class_labels / num_classes work without a full setup().
         # If vocab was provided use it directly; otherwise fall back to loading
@@ -673,9 +667,7 @@ class GestureDataModule:
         for cls_id in np.unique(label_ids):
             cls_idx = all_idx[label_ids == cls_id]
             if len(cls_idx) > self._max_samples_per_class:
-                cls_idx = rng.choice(
-                    cls_idx, size=self._max_samples_per_class, replace=False
-                )
+                cls_idx = rng.choice(cls_idx, size=self._max_samples_per_class, replace=False)
             keep.append(cls_idx)
         return np.sort(np.concatenate(keep))
 
@@ -697,9 +689,7 @@ class GestureDataModule:
         when computing inverse-frequency class weights for the loss function.
         """
         if self._bundle is None or self._train_idx is None:
-            raise RuntimeError(
-                "training_label_distribution() requires setup() to be called first."
-            )
+            raise RuntimeError("training_label_distribution() requires setup() to be called first.")
         labels = self.class_labels
         train_label_ids = self._bundle.label_ids[self._train_idx]
         counts = np.bincount(train_label_ids, minlength=len(labels))

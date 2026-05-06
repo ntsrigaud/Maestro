@@ -302,20 +302,18 @@ def _load_cache(cache_path: Path) -> VideoLandmarks:
                 video_stem=cache_path.stem,
                 fps=fps,
                 frame_ids=frame_ids,
-                keypoints=data["keypoints"],    # (N, 67, 3)
+                keypoints=data["keypoints"],  # (N, 67, 3)
                 valid_mask=data["valid_mask"],  # (N, 67)
             )
 
         # Legacy format: landmarks (N, 21, 3) + valid (N,)
         rh_landmarks = data["landmarks"]  # (N, 21, 3) right-hand only
-        rh_valid = data["valid"]          # (N,) bool
+        rh_valid = data["valid"]  # (N,) bool
         N = len(frame_ids)
 
         # Promote to full holistic layout (67 nodes, 3 coords) so the rest
         # of the pipeline can use the same code path regardless of format.
-        keypoints = np.zeros(
-            (N, graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32
-        )
+        keypoints = np.zeros((N, graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32)
         keypoints[:, :21, :] = rh_landmarks
 
         valid_mask = np.zeros((N, graph_schema.NUM_NODES), dtype=bool)
@@ -860,8 +858,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--window-length",
         type=int,
-        default=24,
-        help="Sliding window length in frames (default: 24).",
+        default=32,
+        help="Sliding window length in frames (default: 32).",
     )
     p.add_argument(
         "--window-step",

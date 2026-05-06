@@ -20,7 +20,7 @@ version: ipn_10class_v1
 # Use with:
 #   python scripts/build_ipn_dataset.py \
 #       --format flat \
-#       --vocab-config configs/gestures/vocabulary_ipn_8class.yaml \
+#       --vocab-config configs/gestures/vocabulary_ipn_10class.yaml \
 #       --window-length 24 --window-step 3 \
 #       --output-npz data/processed/ipn_dataset_v5_10class_mirrored.npz
 

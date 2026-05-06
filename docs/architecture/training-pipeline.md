@@ -78,7 +78,7 @@ flowchart TD
     subgraph PH4["Phase 4 — Feature Engineering and Sliding Window Assembly"]
         direction TB
         FT["LandmarkFeatureTransformer<br/>per frame · feature-schema-v5<br/>────────────────────────────────────<br/>1. Wrist centering    l_i = l_i - l_0<br/>2. Scale norm         l_i = l_i / dist(l_0, l_9)<br/>3. Orientation norm   DISABLED<br/>4. Velocity           v_i = Δpos / Δt<br/>Output: 147-dim vector per frame"]
-        WIN["SlidingWindowSequenceBuffer<br/>window_size = 24 frames<br/>step = 1  (dense during dataset build)<br/>min_valid_ratio = 0.8<br/>Output: (24, 147) numpy array per window"]
+        WIN["SlidingWindowSequenceBuffer<br/>window_size = 32 frames<br/>step = 1  (dense during dataset build)<br/>min_valid_ratio = 0.8<br/>Output: (32, 147) numpy array per window"]
         LABEL["Window Labelling<br/>Strategy: majority label in window<br/>Windows with &lt; 80% valid frames → discarded"]
     end
 
@@ -97,7 +97,7 @@ flowchart TD
     subgraph PH5["Phase 5 — Mirror Augmentation and Dataset Serialisation"]
         direction TB
         MIRR["Mirror Augmentation (optional)<br/>Label-aware horizontal flip<br/>swipe_left ↔ swipe_right are swapped<br/>Doubles training set size"]
-        NPZ["Output NPZ Dataset<br/>data/processed/*.npz (configurable output path)<br/>────────────────────────────────────<br/>sequences   (N, 24, 147)  float32<br/>labels      (N,)          str<br/>label_ids   (N,)          int64<br/>recording_ids (N,)        str<br/>valid_ratio (N,)          float32<br/>metadata_json             JSON blob"]
+        NPZ["Output NPZ Dataset<br/>data/processed/*.npz (configurable output path)<br/>────────────────────────────────────<br/>sequences   (N, 32, 147)  float32<br/>labels      (N,)          str<br/>label_ids   (N,)          int64<br/>recording_ids (N,)        str<br/>valid_ratio (N,)          float32<br/>metadata_json             JSON blob"]
     end
 
     class MIRR buildNode
@@ -227,7 +227,7 @@ flowchart TD
 | 1 — Raw data                            | External (IPN Hand download)                                                          | 200 MP4 videos + annotation TXT files                   |
 | 2 — Landmark extraction                 | `scripts/build_ipn_dataset.py` Phase 1                                                | `cache/<stem>.npz` per video (parallelised)             |
 | 3 — Label mapping                       | `scripts/build_ipn_dataset.py` Phase 2                                                | 14-class baseline vocabulary mapping                    |
-| 4 — Feature engineering + windowing     | `build_ipn_dataset.py` → `LandmarkFeatureTransformer` + `SlidingWindowSequenceBuffer` | Sequence windows (N, 24, 147) with majority labels      |
+| 4 — Feature engineering + windowing     | `build_ipn_dataset.py` → `LandmarkFeatureTransformer` + `SlidingWindowSequenceBuffer` | Sequence windows (N, 32, 147) with majority labels      |
 | 5 — Mirror augmentation + serialisation | `build_ipn_dataset.py`                                                                | `data/processed/*.npz` (output path configurable)       |
 | 6 — Data splits                         | `notebooks/02_model_training.ipynb` → `GestureDataModule`                             | Stratified 70/15/15 train/val/test split                |
 | 7 — Configuration                       | `configs/model/two_stream_attn.yaml`                                                  | Default EnhancedTwoStreamLSTM hyperparameters           |
