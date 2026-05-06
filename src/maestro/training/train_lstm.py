@@ -127,7 +127,7 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             hidden_size=int(model_data.get("hidden_size", 128)),
             num_layers=int(model_data.get("num_layers", 2)),
             dropout=float(model_data.get("dropout", 0.3)),
-            num_classes=int(model_data.get("num_classes", 8)),
+            num_classes=int(model_data.get("num_classes", 10)),
             # STGCN fields — ignored for two_stream models.
             num_nodes=int(model_data.get("num_nodes", 67)),
             num_coords=int(model_data.get("num_coords", 3)),

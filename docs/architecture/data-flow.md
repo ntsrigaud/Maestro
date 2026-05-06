@@ -173,13 +173,13 @@ If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is em
 | `end_timestamp_ms`   | `float`                           | Timestamp of the newest frame in the window |
 | `valid_ratio`        | `float`                           | Fraction of frames with `valid=True`        |
 
-The buffer is a fixed-length deque (default length 24). Feature frames are pushed on every iteration. A window is emitted when three conditions are met:
+The buffer is a fixed-length deque (default length 32). Feature frames are pushed on every iteration. A window is emitted when three conditions are met:
 
-1. The deque is full (24 frames accumulated).
+1. The deque is full (32 frames accumulated).
 2. At least `window_step` frames (default 3) have been pushed since the last emission.
 3. The valid-frame ratio meets or exceeds `min_valid_ratio` (default 0.8).
 
-At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 24-frame window spans approximately 800 ms of hand motion, capturing sufficient temporal context for dynamic gesture recognition.
+At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 32-frame window spans approximately 1067 ms of hand motion, capturing sufficient temporal context for dynamic gesture recognition.
 
 ### Stage 7: Enhanced Two-Stream Inference
 

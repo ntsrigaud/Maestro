@@ -2,7 +2,7 @@
 
 **Version string**: `feature-schema-v5`  
 **Total dimensionality**: 147  
-**Sequence format**: `(24, 147)` — 24-frame sliding window at 30 FPS ≈ 800 ms
+**Sequence format**: `(32, 147)` — 32-frame sliding window at 30 FPS ≈ 1067 ms
 
 ---
 
