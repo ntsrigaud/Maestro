@@ -14,13 +14,26 @@ from maestro.utils.schema_validation import RuntimeConfig
 
 def _write_artifact(path: Path, *, window_length: int = 32, num_classes: int = 10) -> None:
     _labels_10 = [
-        "unknown", "point_one", "point_two",
-        "open_palm_hold", "swipe_right", "swipe_left",
-        "swipe_up", "swipe_down", "zoom_in", "zoom_out",
+        "unknown",
+        "point_one",
+        "point_two",
+        "open_palm_hold",
+        "swipe_right",
+        "swipe_left",
+        "swipe_up",
+        "swipe_down",
+        "zoom_in",
+        "zoom_out",
     ]
     _labels_8 = [
-        "open_palm_hold", "swipe_right", "swipe_left",
-        "swipe_up", "swipe_down", "zoom_in", "zoom_out", "unknown",
+        "open_palm_hold",
+        "swipe_right",
+        "swipe_left",
+        "swipe_up",
+        "swipe_down",
+        "zoom_in",
+        "zoom_out",
+        "unknown",
     ]
     class_labels = _labels_10 if num_classes == 10 else _labels_8
     model = EnhancedTwoStreamLSTM(
