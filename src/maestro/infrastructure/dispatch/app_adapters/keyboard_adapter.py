@@ -51,6 +51,7 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "backspace",
         # Letter keys used in presentation/meeting shortcuts
         "a",
+        "e",  # E → erase all annotations (PowerPoint slideshow)
         "f",
         "k",
         "l",  # Ctrl+L (Windows) / Cmd+L (macOS) → laser pointer (PowerPoint slideshow)

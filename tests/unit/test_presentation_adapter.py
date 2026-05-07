@@ -124,6 +124,20 @@ class TestPresentationAdapterZoom:
 
 
 # ---------------------------------------------------------------------------
+# Tests: erase annotations
+# ---------------------------------------------------------------------------
+
+
+class TestPresentationAdapterEraseAnnotations:
+    def test_erase_annotations_presses_e(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("erase_annotations")
+        kb.press_hotkey.assert_called_once_with("e")
+        assert result.success is True
+
+
+# ---------------------------------------------------------------------------
 # Tests: start/stop presentation
 # ---------------------------------------------------------------------------
 
@@ -207,6 +221,7 @@ class TestPresentationAdapterNoOp:
             "zoom_in_view",
             "zoom_out_view",
             "zoom_out_totally",
+            "erase_annotations",
             "mouse_pointer",
             "no_action",
             # Legacy / extended commands (kept for backward compat)

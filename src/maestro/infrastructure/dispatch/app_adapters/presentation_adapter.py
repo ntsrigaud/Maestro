@@ -117,6 +117,10 @@ class PresentationAdapter:
             case "zoom_out_totally":
                 # Zoom out to the minimum by scrolling at maximum magnitude.
                 self._keyboard.zoom(-5, modifier=self._zoom_modifier)
+            case "erase_annotations":
+                # Erase all pen / laser annotations on the current slide.
+                # PowerPoint slideshow shortcut: E key (Windows and macOS).
+                self._keyboard.press_hotkey("e")
             case "mouse_pointer":
                 # Revert cursor to the default arrow pointer (Ctrl+A in
                 # PowerPoint slideshow; no-op on apps without a laser mode).
