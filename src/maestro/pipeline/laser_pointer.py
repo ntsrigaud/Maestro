@@ -1,20 +1,36 @@
 """Laser pointer tracker for continuous pointing gestures.
 
-Drives PowerPoint's built-in laser pointer (Ctrl+L) by mapping the index
-fingertip landmark to screen coordinates every frame.  The tracker is stateful
-and operates independently of the edge-trigger ``GestureActivationController``:
+Drives PowerPoint's built-in laser pointer by mapping the index fingertip
+landmark to screen coordinates every frame.  The tracker is stateful and
+operates independently of the edge-trigger ``GestureActivationController``:
 it monitors every frame rather than waiting for a cooldown window to expire.
+
+Platform-specific activation
+-----------------------------
+Microsoft PowerPoint uses different keyboard shortcuts per platform to toggle
+the laser pointer on and off during a running slideshow:
+
+- **macOS**: ``⌘+L`` (Command+L) activates; ``⌘+A`` (Command+A) reverts the
+  cursor to the arrow pointer.
+- **Windows / Linux**: ``Ctrl+L`` activates; ``Ctrl+A`` reverts.
+
+The correct key tuple is selected automatically from ``sys.platform`` via the
+module-level ``_LASER_ON_KEYS`` / ``_LASER_OFF_KEYS`` dicts.  Tests can
+override the selection by passing ``laser_on_keys`` / ``laser_off_keys`` to
+the constructor.
 
 Lifecycle
 ---------
 - **Entry** (first frame where a pointing gesture is accepted):
-  ``Ctrl+L`` is sent to activate the laser pointer in the running slideshow.
+  The laser-on hotkey (``⌘+L`` or ``Ctrl+L``) is pressed once to switch
+  PowerPoint into laser-pointer mode.
 - **Sustained** (subsequent frames with the same pointing gesture):
   The OS mouse cursor is moved to the screen position of the index fingertip
-  (landmark 8 in the MediaPipe 21-point hand model).  PowerPoint's laser dot
+  (landmark 8 in the MediaPipe 21-point hand model).  PowerPoint’s laser dot
   follows the cursor in real-time.
 - **Exit** (gesture returns to ``unknown`` or gaze is lost):
-  ``Ctrl+A`` is sent to revert the pointer to the default arrow cursor.
+  The laser-off hotkey (``⌘+A`` or ``Ctrl+A``) is pressed once to revert the
+  cursor to the default arrow pointer.
 
 Screen coordinate mapping
 -------------------------
@@ -30,6 +46,7 @@ appears at the visually correct position on the presentation display.
 from __future__ import annotations
 
 import logging
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -45,6 +62,25 @@ _INDEX_FINGERTIP: int = 8
 # Default set of gesture labels treated as "pointing".
 _DEFAULT_POINTING_LABELS: frozenset[str] = frozenset({"point_one", "point_two"})
 
+# Hotkeys to start / stop the laser pointer per platform.
+# macOS PowerPoint (slideshow mode): ⌘+L activates, ⌘+A reverts to arrow.
+# Windows / Linux PowerPoint (slideshow mode): Ctrl+L activates, Ctrl+A reverts.
+_LASER_ON_KEYS: dict[str, tuple[str, ...]] = {
+    "darwin": ("command", "l"),
+    "win32": ("ctrl", "l"),
+    "linux": ("ctrl", "l"),
+}
+_LASER_OFF_KEYS: dict[str, tuple[str, ...]] = {
+    "darwin": ("command", "a"),
+    "win32": ("ctrl", "a"),
+    "linux": ("ctrl", "a"),
+}
+
+
+def _platform_key() -> str:
+    """Return a normalised platform key for the _LASER_* dicts."""
+    return sys.platform if sys.platform in ("darwin", "win32") else "linux"
+
 
 class LaserPointerTracker:
     """Continuous laser pointer controller driven by pointing gestures.
@@ -53,7 +89,7 @@ class LaserPointerTracker:
     ----------
     keyboard:
         :class:`~maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.KeyboardAdapter`
-        used to send keystrokes (``Ctrl+L`` / ``Ctrl+A``) and move the mouse.
+        used to send keystrokes and move the mouse.
     pointing_labels:
         Set of gesture label strings that should activate the laser pointer.
         Defaults to ``{"point_one", "point_two"}``.
@@ -61,6 +97,13 @@ class LaserPointerTracker:
         When ``True``, the normalised x landmark coordinate is horizontally
         flipped before being mapped to screen pixels.  Set this to match the
         ``mirror_display`` setting in ``app.yaml``.
+    laser_on_keys:
+        Hotkey tuple sent to activate the laser (e.g. ``("command", "l")`` on
+        macOS or ``("ctrl", "l")`` on Windows).  Defaults to the correct value
+        for the current platform.  Override in tests for cross-platform coverage.
+    laser_off_keys:
+        Hotkey tuple sent to deactivate the laser (e.g. ``("command", "a")`` on
+        macOS or ``("ctrl", "a")`` on Windows).  Defaults to the current platform.
     """
 
     def __init__(
@@ -69,11 +112,16 @@ class LaserPointerTracker:
         keyboard: KeyboardAdapter,
         pointing_labels: frozenset[str] = _DEFAULT_POINTING_LABELS,
         mirror_x: bool = True,
+        laser_on_keys: tuple[str, ...] | None = None,
+        laser_off_keys: tuple[str, ...] | None = None,
     ) -> None:
         self._keyboard = keyboard
         self._pointing_labels = pointing_labels
         self._mirror_x = mirror_x
         self._active: bool = False
+        _p = _platform_key()
+        self._laser_on_keys: tuple[str, ...] = laser_on_keys if laser_on_keys is not None else _LASER_ON_KEYS[_p]
+        self._laser_off_keys: tuple[str, ...] = laser_off_keys if laser_off_keys is not None else _LASER_OFF_KEYS[_p]
 
     # ------------------------------------------------------------------
     # Public interface
@@ -130,7 +178,7 @@ class LaserPointerTracker:
 
     def _activate(self, label: str) -> None:
         try:
-            self._keyboard.press_hotkey("ctrl", "l")
+            self._keyboard.press_hotkey(*self._laser_on_keys)
             self._active = True
             LOGGER.info("LaserPointerTracker: activated (gesture=%r)", label)
         except Exception:
@@ -140,7 +188,7 @@ class LaserPointerTracker:
 
     def _deactivate(self, label: str) -> None:
         try:
-            self._keyboard.press_hotkey("ctrl", "a")
+            self._keyboard.press_hotkey(*self._laser_off_keys)
             self._active = False
             LOGGER.info("LaserPointerTracker: deactivated (gesture=%r)", label)
         except Exception:
