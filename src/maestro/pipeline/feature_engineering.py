@@ -8,6 +8,8 @@ import math
 from collections import deque
 from typing import cast
 
+import numpy as np
+
 from maestro.domain.entities import FeatureFrame, LandmarkPacket
 
 # MediaPipe Hand landmark indices for the 5 fingertips.
@@ -131,13 +133,16 @@ class LandmarkFeatureTransformer:
         # near-zero because all landmarks translate together; this block provides
         # the missing directional signal.
         joint_angles = self._joint_angles(normalized)
-        vector = (
+        vector = np.asarray(
+            (
             self._flatten(normalized)
             + spread
             + wrist_traj
             + self._flatten(velocity)
             + joint_angles
             + wrist_vel_raw
+            ),
+            dtype=np.float32,
         )
 
         self._prev_normalized = normalized
@@ -248,8 +253,8 @@ class LandmarkFeatureTransformer:
         return flat
 
     @staticmethod
-    def _zero_vector() -> list[float]:
-        return [0.0] * 147
+    def _zero_vector() -> np.ndarray:
+        return np.zeros(147, dtype=np.float32)
 
     @staticmethod
     def _joint_angles(normalized: list[list[float]]) -> list[float]:
