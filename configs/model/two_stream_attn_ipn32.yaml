@@ -54,7 +54,7 @@ model:
   hidden_size: 96 # per-direction per-stream; BiLSTM output = 2×96 = 192
   num_layers: 4
   dropout: 0.35 # was 0.45 — right-sized for smaller 1.2M-param model
-  num_classes: 10 # IPN vocabulary minus click gestures: D0X + B0A/B0B + G03..G07 + G10..G11
+  num_classes: 13 # 13 IPN gesture classes (B0A/B0B + G01..G11), excluding D0X background
   # EnhancedTwoStreamLSTM-specific fields
   num_heads: 8 # MHA heads; 192/8 = 24 dims per head ✓
   proj_dim: 96 # feature projection dim (73/74 → 96 before LSTM)
@@ -92,14 +92,11 @@ training:
   # After cap: every class has ≤ 8 000 total sequences →
   #   train ~5 600, val ~1 200, test ~1 200 per class at 70/15/15.
   max_samples_per_class: 8000
-  # Click gestures removed from the IPN vocabulary (underperforming, not in production vocab).
-  # Samples with these labels are excluded from training, validation, and test splits.
-  # The dataset (v6) was built with 14 classes; this list filters them at load time.
+  # The "unknown" (D0X) non-gesture background class is excluded to match the IPN baseline
+  # evaluation protocol: all 13 gesture classes (B0A/B0B + G01..G11) are retained.
+  # The dataset (v6) was built with all 14 classes; this list filters them at load time.
   exclude_classes:
-    - click_one
-    - click_two
-    - double_click_one
-    - double_click_two
+    - unknown
 
 splits:
   train_ratio: 0.7
