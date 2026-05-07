@@ -164,6 +164,28 @@ class KeyboardAdapter:
         pyautogui.moveTo(x, y, duration=0.0)
         LOGGER.debug("Mouse moved to (%d, %d)", x, y)
 
+    def mouse_drag_to(self, x: int, y: int) -> None:
+        """Drag the mouse cursor to (*x*, *y*) while the primary button is held.
+
+        On macOS, pyautogui uses ``kCGEventLeftMouseDragged`` for this call,
+        which is the correct event type required by drawing applications such
+        as PowerPoint.  A plain ``moveTo`` call (``kCGEventMouseMoved``) is
+        silently ignored by PowerPoint's pen mode even when the button is
+        already pressed.
+
+        On Windows/Linux, a drag event is equivalent to a move while the button
+        is held, so this delegates to the same underlying Quartz/Win32 drag
+        path via ``pyautogui.dragTo(mouseDownUp=False)``.
+
+        Must only be called after :meth:`mouse_down` and before
+        :meth:`mouse_up`.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — mouse_drag_to skipped.")
+            return
+        pyautogui.dragTo(x, y, duration=0.0, button="left", mouseDownUp=False, _pause=False)
+        LOGGER.debug("Mouse dragged to (%d, %d)", x, y)
+
     def mouse_down(self, x: int, y: int) -> None:
         """Move the OS cursor to (*x*, *y*) and press the primary mouse button.
 
