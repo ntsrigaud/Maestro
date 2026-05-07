@@ -60,7 +60,7 @@ LOGGER = logging.getLogger(__name__)
 _INDEX_FINGERTIP: int = 8
 
 # Default set of gesture labels treated as "pointing".
-_DEFAULT_POINTING_LABELS: frozenset[str] = frozenset({"point_one", "point_two"})
+_DEFAULT_POINTING_LABELS: frozenset[str] = frozenset({"point_one"})
 
 # Hotkeys to start / stop the laser pointer per platform.
 # macOS PowerPoint (slideshow mode): ⌘+L activates, ⌘+A reverts to arrow.

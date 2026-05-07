@@ -163,6 +163,32 @@ class KeyboardAdapter:
         pyautogui.moveTo(x, y, duration=0.0)
         LOGGER.debug("Mouse moved to (%d, %d)", x, y)
 
+    def mouse_down(self, x: int, y: int) -> None:
+        """Move the OS cursor to (*x*, *y*) and press the primary mouse button.
+
+        Used by :class:`~maestro.pipeline.annotation_pen.AnnotationPenTracker`
+        to begin a pen stroke: the cursor is positioned at the fingertip before
+        the button is pressed so that PowerPoint registers the stroke origin at
+        the correct location.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — mouse_down skipped.")
+            return
+        pyautogui.mouseDown(x, y, button="left")
+        LOGGER.debug("Mouse down at (%d, %d)", x, y)
+
+    def mouse_up(self) -> None:
+        """Release the primary mouse button at the current cursor position.
+
+        Used by :class:`~maestro.pipeline.annotation_pen.AnnotationPenTracker`
+        to end a pen stroke before sending the revert-to-arrow hotkey.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — mouse_up skipped.")
+            return
+        pyautogui.mouseUp(button="left")
+        LOGGER.debug("Mouse up")
+
     def screen_size(self) -> tuple[int, int]:
         """Return the primary monitor dimensions as *(width, height)* in pixels.
 

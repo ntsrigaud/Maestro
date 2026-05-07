@@ -5,7 +5,8 @@ version: v3
 # Discrete gestures are routed through GestureActivationController and
 # CommandDispatcher (one-shot, edge-triggered).
 # Continuous gestures (point_one, point_two) bypass GestureActivationController
-# entirely and are handled exclusively by LaserPointerTracker.
+# entirely — point_one is handled by LaserPointerTracker, point_two by
+# AnnotationPenTracker.
 
 gesture_commands:
   swipe_up: start_presentation
