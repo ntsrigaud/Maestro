@@ -192,7 +192,11 @@ class HeadPoseGazeDetector:
             # copy otherwise.  A reversed-stride view (frame[:, :, ::-1]) is
             # not C-contiguous and can cause silent failures in solvePnP and
             # MediaPipe C extensions that require contiguous memory.
-            rgb = frame.rgb_frame if frame.rgb_frame is not None else cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
+            rgb = (
+                frame.rgb_frame
+                if frame.rgb_frame is not None
+                else cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
+            )
             results = self._face_detection.process(rgb)
             within_cone = self._is_within_cone(results, h, w)
             now_ms = time.monotonic() * 1000.0

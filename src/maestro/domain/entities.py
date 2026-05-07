@@ -8,7 +8,7 @@ import numpy as np
 
 @dataclass(slots=True)
 class FramePacket:
-    frame: Any         # BGR ndarray (OpenCV native)
+    frame: Any  # BGR ndarray (OpenCV native)
     timestamp_ms: int
     frame_id: int
     rgb_frame: np.ndarray | None = None  # pre-converted C-contiguous RGB; None if not available
