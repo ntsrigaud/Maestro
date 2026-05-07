@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import queue
+import threading
 import time
 from collections.abc import Callable
 from typing import Protocol
@@ -13,6 +15,9 @@ from maestro.evaluation.benchmark_latency import (
     LatencyBenchmark,
     write_latency_report,
 )
+from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
+    KeyboardAdapter,
+)
 from maestro.infrastructure.model.checkpoint_loader import InferenceArtifact
 from maestro.interfaces.command_dispatcher import ICommandDispatcher
 from maestro.interfaces.feature_transformer import IFeatureTransformer
@@ -21,17 +26,108 @@ from maestro.interfaces.frame_source import IFrameSource
 from maestro.interfaces.gaze_detector import IGazeIntentDetector
 from maestro.interfaces.landmark_extractor import IHandLandmarkExtractor
 from maestro.interfaces.sequence_buffer import ISequenceBuffer
-from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
-    KeyboardAdapter,
-)
 from maestro.pipeline.activation import GestureActivationController
-from maestro.pipeline.hand_selection import HandSelector
 from maestro.pipeline.annotation_pen import AnnotationPenTracker
+from maestro.pipeline.hand_selection import HandSelector
 from maestro.pipeline.laser_pointer import LaserPointerTracker
 from maestro.pipeline.stabilization import PredictionStabilizer
 from maestro.utils.schema_validation import RuntimeConfig
 
 LOGGER = logging.getLogger(__name__)
+
+
+class _InferenceWorker:
+    """Background worker that runs model forward passes on queued windows."""
+
+    def __init__(self, artifact: InferenceArtifact) -> None:
+        self._artifact = artifact
+        self._model = artifact.model
+        self._device = next(self._model.parameters()).device
+        self._model.eval()
+
+        self._in_queue: queue.Queue[SequenceWindow] = queue.Queue(maxsize=1)
+        self._out_queue: queue.Queue[tuple[Prediction, float]] = queue.Queue(maxsize=1)
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="inference-worker", daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self.clear()
+        self._thread.join(timeout=1.0)
+
+    def submit(self, sequence: SequenceWindow) -> None:
+        if self._stop.is_set():
+            return
+
+        try:
+            self._in_queue.put_nowait(sequence)
+        except queue.Full:
+            try:
+                self._in_queue.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                self._in_queue.put_nowait(sequence)
+            except queue.Full:
+                # If another producer beat us, keep the freshest entry already queued.
+                pass
+
+    def poll(self) -> tuple[Prediction, float] | None:
+        try:
+            return self._out_queue.get_nowait()
+        except queue.Empty:
+            return None
+
+    def clear(self) -> None:
+        while True:
+            try:
+                self._in_queue.get_nowait()
+            except queue.Empty:
+                break
+        while True:
+            try:
+                self._out_queue.get_nowait()
+            except queue.Empty:
+                break
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                sequence = self._in_queue.get(timeout=0.05)
+            except queue.Empty:
+                continue
+
+            infer_start = time.perf_counter()
+            features = sequence.features.astype(np.float32, copy=False)
+            tensor = torch.from_numpy(features).unsqueeze(0).to(self._device)
+            with torch.no_grad():
+                logits = self._model(tensor)
+                probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
+
+            labels = self._artifact.class_labels
+            class_probs = {label: float(probs[idx]) for idx, label in enumerate(labels)}
+            top_idx = int(np.argmax(probs))
+            prediction = Prediction(
+                class_probs=class_probs,
+                top_class=labels[top_idx],
+                confidence=float(probs[top_idx]),
+            )
+            infer_ms = (time.perf_counter() - infer_start) * 1000.0
+
+            try:
+                self._out_queue.put_nowait((prediction, infer_ms))
+            except queue.Full:
+                try:
+                    self._out_queue.get_nowait()
+                except queue.Empty:
+                    pass
+                try:
+                    self._out_queue.put_nowait((prediction, infer_ms))
+                except queue.Full:
+                    pass
 
 
 class RuntimeDependencies(Protocol):
@@ -60,6 +156,7 @@ class Runtime:
         self._container = container
         self._running = False
         self._on_state = on_state
+        self._inference_worker: _InferenceWorker | None = None
         # Pre-compute the active mode display string from config.  This never
         # changes at runtime; storing it once avoids repeated attribute lookups
         # and getattr fallbacks in the hot loop.
@@ -97,6 +194,9 @@ class Runtime:
         LOGGER.info("Starting runtime for %s", app_name)
         LOGGER.info("Loaded model artifact: %s", artifact_path)
         self._running = True
+        if artifact is not None:
+            self._inference_worker = _InferenceWorker(artifact)
+            self._inference_worker.start()
 
         processed_frames = 0
         valid_landmarks = 0
@@ -127,6 +227,8 @@ class Runtime:
                 if not gaze_permitted and _prev_gaze_permitted:
                     self._laser_tracker.deactivate()
                     self._pen_tracker.deactivate()
+                    if self._inference_worker is not None:
+                        self._inference_worker.clear()
                 _prev_gaze_permitted = gaze_permitted
 
                 if not gaze_permitted:
@@ -171,10 +273,12 @@ class Runtime:
                 if self._container.sequence_buffer.ready():
                     window = self._container.sequence_buffer.window()
                     emitted_windows += 1
+                    if self._inference_worker is not None:
+                        self._inference_worker.submit(window)
 
-                    infer_start = time.perf_counter()
-                    prediction = self._predict(window)
-                    inference_ms = (time.perf_counter() - infer_start) * 1000.0
+                worker_result = self._inference_worker.poll() if self._inference_worker else None
+                if worker_result is not None:
+                    prediction, inference_ms = worker_result
                     if benchmark is not None:
                         benchmark.record_inference(inference_ms)
 
@@ -287,28 +391,10 @@ class Runtime:
             self._container.frame_source.close()
             self._container.gaze_detector.close()
             self._container.landmark_extractor.close()
+            if self._inference_worker is not None:
+                self._inference_worker.stop()
+                self._inference_worker = None
             self._laser_tracker.deactivate()
             self._pen_tracker.deactivate()
             self._running = False
             LOGGER.info("Runtime shutdown complete.")
-
-    def _predict(self, sequence: SequenceWindow) -> Prediction:
-        features = np.asarray(sequence.features, dtype=np.float32)
-        tensor = torch.from_numpy(features).unsqueeze(0)
-
-        model = self._container.model_artifact.model
-        device = next(model.parameters()).device
-        tensor = tensor.to(device)
-
-        with torch.no_grad():
-            logits = model(tensor)
-            probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
-
-        labels = self._container.model_artifact.class_labels
-        class_probs = {label: float(probs[idx]) for idx, label in enumerate(labels)}
-        top_idx = int(np.argmax(probs))
-        return Prediction(
-            class_probs=class_probs,
-            top_class=labels[top_idx],
-            confidence=float(probs[top_idx]),
-        )

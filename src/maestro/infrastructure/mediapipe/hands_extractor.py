@@ -32,10 +32,15 @@ class MediaPipeHandsExtractor:
         )
 
     def extract(self, frame: FramePacket) -> MultiHandPacket:
-        # cv2.cvtColor produces a C-contiguous RGB copy; a reversed-stride
-        # view (frame[:, :, ::-1]) is not C-contiguous and can cause silent
-        # failures in MediaPipe's C extensions.
-        rgb_frame = cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
+        # Use the pre-converted RGB frame from the camera source when available.
+        # Fallback: cv2.cvtColor produces a C-contiguous RGB copy; a
+        # reversed-stride view (frame[:, :, ::-1]) is not C-contiguous and can
+        # cause silent failures in MediaPipe's C extensions.
+        rgb_frame = (
+            frame.rgb_frame
+            if frame.rgb_frame is not None
+            else cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
+        )
         result = self._hands.process(rgb_frame)
 
         if not result.multi_hand_landmarks or not result.multi_handedness:
