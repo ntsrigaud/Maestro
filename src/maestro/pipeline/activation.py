@@ -70,12 +70,14 @@ class GestureActivationController:
         idle_timeout_ms: int,
         command_cooldown_ms: int,
         edge_trigger_enabled: bool = True,
+        continuous_labels: frozenset[str] = frozenset(),
         unknown_label: str = "unknown",
     ) -> None:
         self._command_map = dict(command_map)
         self._idle_timeout_ms = idle_timeout_ms
         self._command_cooldown_ms = command_cooldown_ms
         self._edge_trigger_enabled = edge_trigger_enabled
+        self._continuous_labels = continuous_labels
         self._unknown_label = unknown_label
 
         self._mode: RuntimeMode = RuntimeMode.IDLE
@@ -91,6 +93,14 @@ class GestureActivationController:
         return self._mode
 
     def route(self, prediction: StabilizedPrediction) -> ExecutableCommand | None:
+        # Continuous gestures (e.g. point_one, point_two) are owned exclusively
+        # by LaserPointerTracker and must never enter the IDLE/ARMED/COOLDOWN
+        # state machine.  Routing them here would cause CommandDispatcher to
+        # send a deactivation keystroke on every accepted window, fighting
+        # LaserPointerTracker's laser pointer activation.
+        if prediction.label in self._continuous_labels:
+            return None
+
         now = self._now_ms()
 
         # ------------------------------------------------------------------

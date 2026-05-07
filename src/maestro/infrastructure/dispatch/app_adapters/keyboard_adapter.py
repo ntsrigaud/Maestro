@@ -51,9 +51,10 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "backspace",
         # Letter keys used in presentation/meeting shortcuts
         "a",
+        "e",  # E → erase all annotations (PowerPoint slideshow)
         "f",
         "k",
-        "l",  # Ctrl+L → laser pointer (PowerPoint slideshow)
+        "l",  # Ctrl+L (Windows) / Cmd+L (macOS) → laser pointer (PowerPoint slideshow)
         "m",
 
         "n",
@@ -162,6 +163,54 @@ class KeyboardAdapter:
             return
         pyautogui.moveTo(x, y, duration=0.0)
         LOGGER.debug("Mouse moved to (%d, %d)", x, y)
+
+    def mouse_drag_to(self, x: int, y: int) -> None:
+        """Drag the mouse cursor to (*x*, *y*) while the primary button is held.
+
+        On macOS, pyautogui uses ``kCGEventLeftMouseDragged`` for this call,
+        which is the correct event type required by drawing applications such
+        as PowerPoint.  A plain ``moveTo`` call (``kCGEventMouseMoved``) is
+        silently ignored by PowerPoint's pen mode even when the button is
+        already pressed.
+
+        On Windows/Linux, a drag event is equivalent to a move while the button
+        is held, so this delegates to the same underlying Quartz/Win32 drag
+        path via ``pyautogui.dragTo(mouseDownUp=False)``.
+
+        Must only be called after :meth:`mouse_down` and before
+        :meth:`mouse_up`.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — mouse_drag_to skipped.")
+            return
+        pyautogui.dragTo(x, y, duration=0.0, button="left", mouseDownUp=False, _pause=False)
+        LOGGER.debug("Mouse dragged to (%d, %d)", x, y)
+
+    def mouse_down(self, x: int, y: int) -> None:
+        """Move the OS cursor to (*x*, *y*) and press the primary mouse button.
+
+        Used by :class:`~maestro.pipeline.annotation_pen.AnnotationPenTracker`
+        to begin a pen stroke: the cursor is positioned at the fingertip before
+        the button is pressed so that PowerPoint registers the stroke origin at
+        the correct location.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — mouse_down skipped.")
+            return
+        pyautogui.mouseDown(x, y, button="left")
+        LOGGER.debug("Mouse down at (%d, %d)", x, y)
+
+    def mouse_up(self) -> None:
+        """Release the primary mouse button at the current cursor position.
+
+        Used by :class:`~maestro.pipeline.annotation_pen.AnnotationPenTracker`
+        to end a pen stroke before sending the revert-to-arrow hotkey.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — mouse_up skipped.")
+            return
+        pyautogui.mouseUp(button="left")
+        LOGGER.debug("Mouse up")
 
     def screen_size(self) -> tuple[int, int]:
         """Return the primary monitor dimensions as *(width, height)* in pixels.
