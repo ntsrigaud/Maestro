@@ -638,3 +638,329 @@ def train_lstm(
         class_labels=datamodule.class_labels,
         dataset_metadata=datamodule.metadata,
     )
+
+
+def finetune_lstm(
+    *,
+    dataset_path: str | Path,
+    config: TrainingPipelineConfig,
+    pretrained_checkpoint_path: str | Path,
+    output_dir: str | Path,
+    run_root_dir: str | Path,
+    device: torch.device,
+    freeze_epochs: int = 10,
+) -> TrainingResult:
+    """Fine-tune a pretrained ``EnhancedTwoStreamLSTM`` on a new dataset.
+
+    Implements a two-stage transfer learning strategy:
+
+    **Stage A — Head-only** (``freeze_epochs`` epochs):
+        The pretrained backbone (feature projections, BiLSTMs, self-attention,
+        cross-stream gates) is frozen.  Only the new classification head is
+        trained with ``lr=1e-3`` so it converges quickly before the backbone
+        is unfrozen.
+
+    **Stage B — Full model** (``config.training.epochs`` epochs):
+        All layers are unfrozen and jointly fine-tuned with the learning rate
+        and schedule specified in *config*.  Early stopping monitors
+        ``val_macro_f1`` as in :func:`train_lstm`.
+
+    The pretrained checkpoint must have been saved by :func:`train_lstm` and
+    must contain ``model_config`` in its payload so the original architecture
+    (``hidden_size``, ``num_heads``, ``proj_dim``, etc.) can be reconstructed
+    before loading weights.  The classification head is replaced in-place with
+    a new ``Linear`` layer sized for ``config.model.num_classes``.
+
+    Parameters
+    ----------
+    dataset_path:
+        Path to the fine-tuning dataset NPZ (e.g. ``ipn_finetune_dataset.npz``).
+    config:
+        Fine-tuning pipeline config.  ``config.model.num_classes`` must match
+        the number of classes in *dataset_path*.
+    pretrained_checkpoint_path:
+        Path to the ``.pt`` checkpoint produced by a prior :func:`train_lstm`
+        call (e.g. the Jester pretraining checkpoint).
+    output_dir:
+        Directory where the best fine-tuned checkpoint is saved.
+    run_root_dir:
+        Directory under which a timestamped run sub-directory is created.
+    device:
+        Torch device to train on.
+    freeze_epochs:
+        Number of Stage-A epochs with backbone frozen.  Set to ``0`` to skip
+        Stage A and fine-tune all layers from epoch 1.
+    """
+    from dataclasses import replace
+
+    seed_everything(config.training.seed)
+    datamodule = create_datamodule(dataset_path=dataset_path, config=config)
+
+    if not config.model.model_name.startswith("two_stream_attn"):
+        raise ValueError(
+            "finetune_lstm only supports 'two_stream_attn_*' models. "
+            f"Got: {config.model.model_name!r}"
+        )
+
+    # ── Load pretrained checkpoint ────────────────────────────────────────────
+    ckpt = torch.load(
+        pretrained_checkpoint_path, map_location=device, weights_only=False
+    )
+    pretrained_model_config_dict: dict[str, Any] = ckpt.get("model_config", {})
+
+    # Reconstruct pretrained model with the ORIGINAL num_classes so we can load
+    # the full state dict including the old head.
+    pretrained_num_classes = int(pretrained_model_config_dict.get("num_classes", 27))
+    pretrained_mc = replace(config.model, num_classes=pretrained_num_classes)
+    model = _build_model(pretrained_mc, device)
+    model.load_state_dict(ckpt["model_state_dict"])
+
+    # ── Replace classification head ───────────────────────────────────────────
+    # EnhancedTwoStreamLSTM.head is a nn.Sequential ending in Linear(H, old_C).
+    # Replace only the final Linear so all other head layers (LN, GELU, Dropout)
+    # retain their pretrained weights.
+    from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
+
+    if not isinstance(model, EnhancedTwoStreamLSTM):
+        raise TypeError(
+            f"finetune_lstm requires EnhancedTwoStreamLSTM; got {type(model).__name__}"
+        )
+
+    old_head_linear: nn.Linear = model.head[-1]
+    new_num_classes = config.model.num_classes
+    model.head[-1] = nn.Linear(old_head_linear.in_features, new_num_classes).to(device)
+    model.num_classes = new_num_classes
+
+    if datamodule.num_classes != new_num_classes:
+        raise ValueError(
+            f"config.model.num_classes ({new_num_classes}) does not match "
+            f"dataset classes ({datamodule.num_classes})"
+        )
+
+    # ── Criterion / scheduler helpers ─────────────────────────────────────────
+    def _make_criterion(weights: torch.Tensor | None) -> nn.Module:
+        return _build_criterion(weights, label_smoothing=config.training.label_smoothing)
+
+    if config.training.class_weighting:
+        class_weights = _build_class_weights(datamodule, device)
+        criterion: nn.Module = _make_criterion(class_weights)
+    else:
+        criterion = _make_criterion(None)
+
+    train_loader = datamodule.train_dataloader()
+    val_loader = datamodule.val_dataloader()
+    test_loader = datamodule.test_dataloader()
+
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    model_version = f"{config.model.model_name}_finetune_{timestamp}"
+    run_dir = Path(run_root_dir) / model_version
+    run_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_output_dir = Path(output_dir)
+    checkpoint_output_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = checkpoint_output_dir / f"{model_version}.pt"
+
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"\nFine-tuning  {model_version}")
+    print(f"  Pretrained : {Path(pretrained_checkpoint_path).name}")
+    print(f"  Model      : EnhancedTwoStreamLSTM  ({n_params:,} params)")
+    print(f"  Dataset    : train={len(datamodule.train_indices):,}  "
+          f"val={len(datamodule.val_indices):,}")
+    print(f"  Classes    : {new_num_classes}  {datamodule.class_labels}")
+
+    history: list[dict[str, float]] = []
+    best_val_f1 = -float("inf")
+    best_val_loss = float("inf")
+    best_epoch = 0
+    epochs_without_improve = 0
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Stage A — freeze backbone, train head only
+    # ──────────────────────────────────────────────────────────────────────────
+    if freeze_epochs > 0:
+        # Freeze everything except model.head
+        for name, param in model.named_parameters():
+            param.requires_grad = name.startswith("head.")
+        head_params = [p for p in model.parameters() if p.requires_grad]
+        optimizer_a = AdamW(head_params, lr=1e-3, weight_decay=config.training.weight_decay)
+        _sep = "-" * 80
+        print(f"\n{'─'*80}")
+        print(f"Stage A — backbone frozen, head-only  ({freeze_epochs} epochs, lr=1e-3)")
+        print(_sep)
+        print(f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  "
+              f"{'ValLoss':>8}  {'ValAcc':>7}  {'ValF1':>6}")
+        print(_sep, flush=True)
+
+        for epoch in range(1, freeze_epochs + 1):
+            t0 = time.perf_counter()
+            train_loss, train_acc = _train_one_epoch(
+                model=model, dataloader=train_loader, optimizer=optimizer_a,
+                criterion=criterion, device=device,
+                grad_clip_norm=config.training.grad_clip_norm,
+            )
+            val_report = evaluate_model(
+                model=model, dataloader=val_loader,
+                class_labels=datamodule.class_labels, device=device, criterion=criterion,
+            )
+            history.append({
+                "epoch": float(epoch), "stage": 0.0,
+                "train_loss": train_loss, "train_accuracy": train_acc,
+                "val_loss": val_report.loss, "val_accuracy": val_report.accuracy,
+                "val_macro_f1": val_report.macro_f1, "learning_rate": 1e-3,
+                "epoch_secs": time.perf_counter() - t0,
+            })
+            print(f"{epoch:>6}/{freeze_epochs:<4}  {train_loss:>9.4f}  "
+                  f"{train_acc:>8.1%}  {val_report.loss:>8.4f}  "
+                  f"{val_report.accuracy:>7.1%}  {val_report.macro_f1:>6.1%}",
+                  flush=True)
+
+        print(f"\nStage A complete. Val macro-F1 = {val_report.macro_f1:.4f}")
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Stage B — unfreeze all layers, full fine-tuning
+    # ──────────────────────────────────────────────────────────────────────────
+    for param in model.parameters():
+        param.requires_grad = True
+
+    optimizer_b = AdamW(
+        model.parameters(),
+        lr=config.training.learning_rate,
+        weight_decay=config.training.weight_decay,
+    )
+    scheduler: ReduceLROnPlateau | None = None
+    if config.scheduler.enabled:
+        scheduler = ReduceLROnPlateau(
+            optimizer_b, mode="max",
+            factor=config.scheduler.factor, patience=config.scheduler.patience,
+            min_lr=config.scheduler.min_lr,
+        )
+
+    _sep = "-" * 90
+    print(f"\n{'─'*90}")
+    print(f"Stage B — full fine-tuning  (up to {config.training.epochs} epochs, "
+          f"lr={config.training.learning_rate:.2e})")
+    print(_sep)
+    _header = (
+        f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  "
+        f"{'ValLoss':>8}  {'ValAcc':>7}  {'ValF1':>6}  {'LR':>8}  Note"
+    )
+    print(_header)
+    print(_sep, flush=True)
+
+    for epoch in range(1, config.training.epochs + 1):
+        t0 = time.perf_counter()
+        train_loss, train_acc = _train_one_epoch(
+            model=model, dataloader=train_loader, optimizer=optimizer_b,
+            criterion=criterion, device=device,
+            grad_clip_norm=config.training.grad_clip_norm,
+        )
+        val_report = evaluate_model(
+            model=model, dataloader=val_loader,
+            class_labels=datamodule.class_labels, device=device, criterion=criterion,
+        )
+        if scheduler is not None:
+            scheduler.step(val_report.macro_f1)
+        current_lr = float(optimizer_b.param_groups[0]["lr"])
+
+        improved = (val_report.macro_f1 - best_val_f1) > config.training.early_stopping_min_delta
+        if improved:
+            best_val_f1 = val_report.macro_f1
+            best_val_loss = val_report.loss
+            best_epoch = epoch
+            epochs_without_improve = 0
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "model_config": asdict(config.model),
+                    "class_labels": datamodule.class_labels,
+                    "dataset_metadata": datamodule.metadata,
+                    "feature_schema_version": config.export.feature_schema_version,
+                    "pretrained_checkpoint": str(pretrained_checkpoint_path),
+                    "best_epoch": best_epoch, "best_val_f1": best_val_f1,
+                    "best_val_loss": best_val_loss,
+                },
+                checkpoint_path,
+            )
+            _note = "* best"
+        else:
+            epochs_without_improve += 1
+            _note = f"  ES {epochs_without_improve}/{config.training.early_stopping_patience}"
+
+        history.append({
+            "epoch": float(freeze_epochs + epoch), "stage": 1.0,
+            "train_loss": train_loss, "train_accuracy": train_acc,
+            "val_loss": val_report.loss, "val_accuracy": val_report.accuracy,
+            "val_macro_f1": val_report.macro_f1, "learning_rate": current_lr,
+            "epoch_secs": time.perf_counter() - t0,
+        })
+        print(
+            f"{epoch:>6}/{config.training.epochs:<4}  {train_loss:>9.4f}  "
+            f"{train_acc:>8.1%}  {val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  "
+            f"{val_report.macro_f1:>6.1%}  {current_lr:>8.2e}  {_note}",
+            flush=True,
+        )
+
+        if epochs_without_improve >= config.training.early_stopping_patience:
+            print(f"\nEarly stopping at epoch {epoch}  "
+                  f"(no improvement for {config.training.early_stopping_patience} epochs)")
+            break
+    else:
+        print(f"\nCompleted all {config.training.epochs} Stage B epochs.")
+
+    print(f"\nBest epoch : {best_epoch}  val_macro_f1={best_val_f1:.4f}  "
+          f"val_loss={best_val_loss:.4f}")
+
+    # ── Load best checkpoint and evaluate ─────────────────────────────────────
+    best_ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    model.load_state_dict(best_ckpt["model_state_dict"])
+
+    val_report = evaluate_model(
+        model=model, dataloader=val_loader,
+        class_labels=datamodule.class_labels, device=device, criterion=criterion,
+    )
+    test_report = evaluate_model(
+        model=model, dataloader=test_loader,
+        class_labels=datamodule.class_labels, device=device, criterion=criterion,
+    )
+
+    # ── Persist run artefacts ─────────────────────────────────────────────────
+    training_summary = {
+        "model_version": model_version,
+        "pretrained_checkpoint": str(pretrained_checkpoint_path),
+        "freeze_epochs": freeze_epochs,
+        "best_epoch": best_epoch,
+        "best_val_f1": best_val_f1,
+        "best_val_loss": best_val_loss,
+        "history": history,
+        "val_report": val_report.to_dict(),
+        "test_report": test_report.to_dict(),
+        "config": {
+            "model": asdict(config.model),
+            "training": asdict(config.training),
+            "split": asdict(config.split),
+            "scheduler": asdict(config.scheduler),
+            "export": asdict(config.export),
+        },
+        "dataset_metadata": datamodule.metadata,
+        "label_distribution": datamodule.label_distribution(),
+    }
+    (run_dir / "training_metrics.json").write_text(
+        json.dumps(training_summary, indent=2), encoding="utf-8"
+    )
+    (run_dir / "dataset_metadata.json").write_text(
+        json.dumps(datamodule.metadata, indent=2), encoding="utf-8"
+    )
+    (run_dir / "config_snapshot.yaml").write_text(
+        yaml.safe_dump(training_summary["config"], sort_keys=False), encoding="utf-8"
+    )
+
+    return TrainingResult(
+        model=model,
+        model_version=model_version,
+        checkpoint_path=checkpoint_path,
+        run_dir=run_dir,
+        train_history=history,
+        val_report=val_report,
+        test_report=test_report,
+        class_labels=datamodule.class_labels,
+        dataset_metadata=datamodule.metadata,
+    )
