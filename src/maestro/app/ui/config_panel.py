@@ -63,6 +63,7 @@ class ConfigPanel(QWidget):
 
         vbox.addWidget(self._build_group("App", AppConfig))
         vbox.addWidget(self._build_group("Inference", InferenceConfig))
+        vbox.addWidget(self._build_gaze_group())
 
         self._apply_btn = QPushButton("Apply && Restart")
         self._apply_btn.setEnabled(False)
@@ -108,6 +109,26 @@ class ConfigPanel(QWidget):
             if widget is not None:
                 self._widgets[name] = widget
                 form.addRow(name.replace("_", " ").title() + ":", widget)
+        return box
+
+    def _build_gaze_group(self) -> QGroupBox:
+        """Build a dedicated group box exposing ``gaze.enabled``.
+
+        The remaining GazeConfig fields (thresholds, timing) are advanced
+        parameters that most users never need to change; they remain
+        YAML-only and are preserved transparently when the config is saved.
+        """
+        box = QGroupBox("Gaze Detection")
+        form = QFormLayout(box)
+        cb = QCheckBox()
+        cb.setToolTip(
+            "When enabled, gesture commands are only dispatched while the user\n"
+            "is looking at the camera (head-pose gate). Disable to accept gestures\n"
+            "regardless of head orientation."
+        )
+        cb.stateChanged.connect(self._on_any_change)
+        self._widgets["gaze_enabled"] = cb
+        form.addRow("Enable gaze gate:", cb)
         return box
 
     def _make_widget(self, name: str, info: Any) -> QWidget | None:
@@ -173,11 +194,18 @@ class ConfigPanel(QWidget):
                 values[name] = widget.text()
             elif isinstance(widget, QComboBox):
                 values[name] = widget.currentText()
+        # gaze_enabled maps to the nested gaze.enabled field — handle separately
+        gaze_enabled = values.pop("gaze_enabled", None)
         # Partition into AppConfig / InferenceConfig fields
         app_fields = set(AppConfig.model_fields) - _EXCLUDE_FIELDS
         infer_fields = set(InferenceConfig.model_fields)
         app_vals = {k: v for k, v in values.items() if k in app_fields}
         infer_vals = {k: v for k, v in values.items() if k in infer_fields}
+        # Build gaze sub-config: preserve YAML-only fields, only override enabled
+        base_gaze: dict[str, Any] = dict(self._base_infer_vals.get("gaze", {}))
+        if gaze_enabled is not None:
+            base_gaze["enabled"] = gaze_enabled
+        infer_vals["gaze"] = base_gaze
         # Preserve non-editable fields from the loaded config
         return RuntimeConfig(
             app=AppConfig(**{**self._base_app_vals, **app_vals}),
@@ -207,6 +235,8 @@ class ConfigPanel(QWidget):
         app_dump = cfg.app.model_dump()
         infer_dump = cfg.inference.model_dump()
         combined = {**app_dump, **infer_dump}
+        # Flatten the nested gaze config so the gaze_enabled widget is reachable
+        combined["gaze_enabled"] = infer_dump.get("gaze", {}).get("enabled", True)
         for name, widget in self._widgets.items():
             val = combined.get(name)
             if val is None:
