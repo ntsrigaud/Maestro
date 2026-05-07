@@ -53,8 +53,9 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "a",
         "f",
         "k",
-        "l",
+        "l",  # Ctrl+L → laser pointer (PowerPoint slideshow)
         "m",
+
         "n",
         "p",
         "s",
@@ -148,3 +149,27 @@ class KeyboardAdapter:
             # pyautogui.scroll() raises (e.g. display server unavailable).
             pyautogui.keyUp(modifier)
         LOGGER.debug("Zoomed: modifier=%s clicks=%d", modifier, clamped)
+
+    def move_mouse(self, x: int, y: int) -> None:
+        """Move the OS cursor to absolute screen coordinates (*x*, *y*).
+
+        Coordinates are clamped to the screen boundary reported by pyautogui.
+        Duration is 0 so that the cursor tracks the hand in real-time without
+        visible lag.
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — mouse move skipped.")
+            return
+        pyautogui.moveTo(x, y, duration=0.0)
+        LOGGER.debug("Mouse moved to (%d, %d)", x, y)
+
+    def screen_size(self) -> tuple[int, int]:
+        """Return the primary monitor dimensions as *(width, height)* in pixels.
+
+        Falls back to a safe 1920×1080 default when pyautogui is unavailable
+        so that coordinate calculations in headless environments do not crash.
+        """
+        if pyautogui is None:  # pragma: no cover
+            return (1920, 1080)
+        w, h = pyautogui.size()
+        return int(w), int(h)

@@ -21,8 +21,12 @@ from maestro.interfaces.frame_source import IFrameSource
 from maestro.interfaces.gaze_detector import IGazeIntentDetector
 from maestro.interfaces.landmark_extractor import IHandLandmarkExtractor
 from maestro.interfaces.sequence_buffer import ISequenceBuffer
+from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
+    KeyboardAdapter,
+)
 from maestro.pipeline.activation import GestureActivationController
 from maestro.pipeline.hand_selection import HandSelector
+from maestro.pipeline.laser_pointer import LaserPointerTracker
 from maestro.pipeline.stabilization import PredictionStabilizer
 from maestro.utils.schema_validation import RuntimeConfig
 
@@ -61,6 +65,14 @@ class Runtime:
         app_cfg = container.config.app
         nav_mode = getattr(app_cfg, "navigation_mode", "workspace")
         self._active_mode = f"desktop\u00b7{nav_mode}"
+        # Laser pointer tracker — stateful continuous handler for pointing
+        # gestures.  Created here (not in AppContainer) because it is an
+        # internal runtime concern rather than an injected dependency.
+        mirror_x = getattr(app_cfg, "mirror_display", True)
+        self._laser_tracker = LaserPointerTracker(
+            keyboard=KeyboardAdapter(),
+            mirror_x=mirror_x,
+        )
 
     def stop(self) -> None:
         self._running = False
@@ -104,6 +116,9 @@ class Runtime:
                 # Rising edge: gaze just became permitted → transition IDLE → ARMED.
                 if gaze_permitted and not _prev_gaze_permitted:
                     self._container.activation_controller.rearm()
+                # Falling edge: gaze lost → deactivate laser pointer immediately.
+                if not gaze_permitted and _prev_gaze_permitted:
+                    self._laser_tracker.deactivate()
                 _prev_gaze_permitted = gaze_permitted
 
                 if not gaze_permitted:
@@ -181,6 +196,15 @@ class Runtime:
                             result.detail,
                         )
 
+                # Laser pointer — update every frame using the current
+                # landmarks and latest stable label.  This drives real-time
+                # cursor tracking independently of the edge-trigger cooldown.
+                self._laser_tracker.update(
+                    label=latest_label,
+                    landmarks=landmark_packet.landmarks if landmark_packet.valid else None,
+                    valid=landmark_packet.valid,
+                )
+
                 elapsed = time.perf_counter() - start_time
                 fps = (processed_frames / elapsed) if elapsed > 0 else 0.0
                 mode = str(self._container.activation_controller.mode)
@@ -249,6 +273,7 @@ class Runtime:
             self._container.frame_source.close()
             self._container.gaze_detector.close()
             self._container.landmark_extractor.close()
+            self._laser_tracker.deactivate()
             self._running = False
             LOGGER.info("Runtime shutdown complete.")
 

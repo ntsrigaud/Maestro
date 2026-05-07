@@ -138,6 +138,33 @@ class TestKeyboardAdapter:
                 adapter.zoom(2, modifier="ctrl")
             assert mock_pya.keyUp.call_count == 1
 
+    def test_move_mouse_calls_pyautogui_moveto(self):
+        adapter = KeyboardAdapter()
+        with patch(
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            adapter.move_mouse(960, 540)
+            mock_pya.moveTo.assert_called_once_with(960, 540, duration=0.0)
+
+    def test_screen_size_returns_tuple_from_pyautogui(self):
+        adapter = KeyboardAdapter()
+        with patch(
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            mock_pya.size.return_value = (2560, 1440)
+            w, h = adapter.screen_size()
+            assert w == 2560
+            assert h == 1440
+
+    def test_l_key_is_in_safe_allowlist(self):
+        """Ctrl+L (laser pointer shortcut) must pass the safe key allowlist."""
+        adapter = KeyboardAdapter()
+        with patch(
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+        ) as mock_pya:
+            adapter.press_hotkey("ctrl", "l")
+            mock_pya.hotkey.assert_called_once_with("ctrl", "l")
+
 
 # ---------------------------------------------------------------------------
 # CommandDispatcher tests
