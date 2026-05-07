@@ -21,7 +21,7 @@ model:
   model_name: two_stream_lstm_v1
   input_size: 147 # total feature dims (feature-schema-v5); split internally
   hidden_size: 64 # per-stream hidden size; fused layer receives 2×64 = 128
-  num_layers: 4
+  num_layers: 2
   dropout: 0.3
   num_classes: 14 # full IPN baseline: D0X + B0A/B0B + G01..G11
 
@@ -51,6 +51,7 @@ training:
   seed: 42
   num_workers: 0
   class_weighting: false
+  max_samples_per_class: 8000
 
 splits:
   train_ratio: 0.7
