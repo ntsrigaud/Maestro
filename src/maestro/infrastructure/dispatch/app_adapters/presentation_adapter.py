@@ -101,6 +101,13 @@ class PresentationAdapter:
                 self._keyboard.zoom(-3, modifier=self._zoom_modifier)
             case "start_stop_presentation":
                 self._keyboard.press_hotkey(*self._slideshow_keys)
+            case "activate_laser_pointer":
+                # Ctrl+L toggles the laser pointer on during a running slideshow.
+                # Universal across PowerPoint (Windows / macOS).
+                self._keyboard.press_hotkey("ctrl", "l")
+            case "deactivate_laser_pointer":
+                # Ctrl+A reverts the pointer to the default arrow cursor.
+                self._keyboard.press_hotkey("ctrl", "a")
             case "no_action":
                 return DispatchResult(
                     success=False,
