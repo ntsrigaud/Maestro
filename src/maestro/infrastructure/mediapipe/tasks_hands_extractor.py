@@ -6,8 +6,7 @@ from pathlib import Path
 
 import cv2
 import mediapipe as mp
-from mediapipe.tasks.python import BaseOptions
-from mediapipe.tasks.python import vision
+from mediapipe.tasks.python import BaseOptions, vision
 
 from maestro.domain.entities import FramePacket, HandLandmarks, MultiHandPacket
 
@@ -50,7 +49,11 @@ class MediaPipeTasksHandsExtractor:
         self._last_ts_ms = 0
 
     def extract(self, frame: FramePacket) -> MultiHandPacket:
-        rgb = frame.rgb_frame if frame.rgb_frame is not None else cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
+        rgb = (
+            frame.rgb_frame
+            if frame.rgb_frame is not None
+            else cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
+        )
         rgba = cv2.cvtColor(rgb, cv2.COLOR_RGB2RGBA)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGBA, data=rgba)
 
