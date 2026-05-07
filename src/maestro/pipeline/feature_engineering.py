@@ -135,12 +135,12 @@ class LandmarkFeatureTransformer:
         joint_angles = self._joint_angles(normalized)
         vector = np.asarray(
             (
-            self._flatten(normalized)
-            + spread
-            + wrist_traj
-            + self._flatten(velocity)
-            + joint_angles
-            + wrist_vel_raw
+                self._flatten(normalized)
+                + spread
+                + wrist_traj
+                + self._flatten(velocity)
+                + joint_angles
+                + wrist_vel_raw
             ),
             dtype=np.float32,
         )

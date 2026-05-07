@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -77,7 +77,9 @@ def build_container(
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
     thresholds = _load_thresholds(config_root / "thresholds" / "production_ipn.yaml")
-    command_map, continuous_labels = _load_command_map(config_root / "gestures" / config.app.command_map)
+    command_map, continuous_labels = _load_command_map(
+        config_root / "gestures" / config.app.command_map
+    )
 
     frame_source = OpenCVFrameSource(
         camera_index=config.app.camera_index,
