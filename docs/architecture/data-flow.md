@@ -293,16 +293,17 @@ The dispatch chain applies three validation stages before OS interaction:
 
 The keyboard adapter invokes `pyautogui.hotkey(*keys)` with the validated key names. `PresentationAdapter` command-to-key mappings:
 
-| Command                   | Key(s)                                                       |
-| ------------------------- | ------------------------------------------------------------ |
-| `next_slide`              | `("right",)`                                                 |
-| `previous_slide`          | `("left",)`                                                  |
-| `scroll_forward`          | `("down",)`                                                  |
-| `scroll_back`             | `("up",)`                                                    |
-| `zoom_in_view`            | `("command", "equal")` macOS / `("ctrl", "equal")` Win/Linux |
-| `zoom_out_view`           | `("command", "minus")` macOS / `("ctrl", "minus")` Win/Linux |
-| `start_stop_presentation` | `("command", "enter")` macOS / `("f5",)` Win/Linux           |
-| `no_action`               | _(no keystroke; returns `success=False`)_                    |
+| Command              | Key(s) / Action                                    |
+| -------------------- | -------------------------------------------------- |
+| `start_presentation` | `("command", "enter")` macOS / `("f5",)` Win/Linux |
+| `stop_presentation`  | `("escape",)`                                      |
+| `next_slide`         | `("right",)`                                       |
+| `previous_slide`     | `("left",)`                                        |
+| `zoom_in_view`       | Cmd+Scroll ↑ macOS / Ctrl+Scroll ↑ Win/Linux       |
+| `zoom_out_view`      | Cmd+Scroll ↓ macOS / Ctrl+Scroll ↓ Win/Linux       |
+| `zoom_out_totally`   | Cmd+Scroll ↓×5 macOS / Ctrl+Scroll ↓×5 Win/Linux   |
+| `mouse_pointer`      | `("ctrl", "a")` — restores default arrow cursor    |
+| `no_action`          | _(no keystroke; returns `success=False`)_          |
 
 ## 4. UI State Delivery
 
