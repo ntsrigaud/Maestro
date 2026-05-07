@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, call
 
-import pytest
-
 from maestro.pipeline.annotation_pen import AnnotationPenTracker
 
 # ---------------------------------------------------------------------------
@@ -19,12 +17,8 @@ from maestro.pipeline.annotation_pen import AnnotationPenTracker
 _PEN_LABELS = frozenset({"point_two"})
 
 # 21 landmarks; index 8 is the index fingertip.
-_LANDMARKS_CENTER: list[list[float]] = [
-    [0.5, 0.5, 0.0] for _ in range(21)
-]
-_LANDMARKS_TOP_RIGHT: list[list[float]] = [
-    [0.8, 0.2, 0.0] for _ in range(21)
-]
+_LANDMARKS_CENTER: list[list[float]] = [[0.5, 0.5, 0.0] for _ in range(21)]
+_LANDMARKS_TOP_RIGHT: list[list[float]] = [[0.8, 0.2, 0.0] for _ in range(21)]
 
 
 def _mock_keyboard() -> MagicMock:
@@ -258,18 +252,18 @@ class TestAnnotationPenTrackerReactivation:
 
     def test_pen_on_key_fires_again_after_neutral(self):
         tracker, kb = _tracker()
-        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)   # activate
-        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)     # deactivate
-        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)   # re-activate
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # activate
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)  # deactivate
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # re-activate
         ctrl_p_calls = [c for c in kb.press_hotkey.call_args_list if c == call("ctrl", "p")]
         assert len(ctrl_p_calls) == 2
 
     def test_mouse_down_fires_again_after_neutral(self):
         """After re-activation, mouse_down starts a fresh stroke."""
         tracker, kb = _tracker()
-        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)   # activate → mouse_down
-        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)     # deactivate → mouse_up
-        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)   # re-activate → mouse_down
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # activate → mouse_down
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)  # deactivate → mouse_up
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # re-activate → mouse_down
         assert kb.mouse_down.call_count == 2
         assert kb.mouse_up.call_count == 1
 
@@ -312,9 +306,9 @@ class TestAnnotationPenTrackerMacOS:
 
     def test_reactivation_sends_command_p_again(self):
         tracker, kb = _tracker(use_command_key=True)
-        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)   # activate
-        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)     # deactivate
-        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)   # re-activate
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # activate
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)  # deactivate
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # re-activate
         cmd_p_calls = [c for c in kb.press_hotkey.call_args_list if c == call("command", "p")]
         assert len(cmd_p_calls) == 2
 
