@@ -1,16 +1,11 @@
 version: v3
 # Presentation controller gesture-to-command mapping.
 # Commands route to PresentationAdapter → KeyboardAdapter → pyautogui.
-#  swipe_up -> Start Presentation
-#  swipe_down -> Stop Presentation
-# swipe_left -> Previous Slide
-# swipe_right -> Next Slide
-# Point_one -> Mouse pointer
-# Point_two -> Mouse pointer
-# zoom_in -> Zoom In View
-# zoom_out -> Zoom Out View
-# open_palm_hold -> Zoom out totally
-# unknown -> No Action (Noise Class)
+#
+# Discrete gestures are routed through GestureActivationController and
+# CommandDispatcher (one-shot, edge-triggered).
+# Continuous gestures (point_one, point_two) bypass GestureActivationController
+# entirely and are handled exclusively by LaserPointerTracker.
 
 gesture_commands:
   swipe_up: start_presentation
@@ -20,6 +15,15 @@ gesture_commands:
   zoom_in: zoom_in_view
   zoom_out: zoom_out_view
   open_palm_hold: zoom_out_totally
-  point_one: mouse_pointer
-  point_two: mouse_pointer
   unknown: no_action
+
+gesture_modes:
+  swipe_up: discrete
+  swipe_down: discrete
+  swipe_right: discrete
+  swipe_left: discrete
+  zoom_in: discrete
+  zoom_out: discrete
+  open_palm_hold: discrete
+  point_one: continuous
+  point_two: continuous
