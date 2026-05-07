@@ -53,7 +53,7 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "a",
         "f",
         "k",
-        "l",  # Ctrl+L → laser pointer (PowerPoint slideshow)
+        "l",  # Ctrl+L (Windows) / Cmd+L (macOS) → laser pointer (PowerPoint slideshow)
         "m",
 
         "n",

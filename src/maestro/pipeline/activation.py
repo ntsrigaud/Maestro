@@ -96,8 +96,8 @@ class GestureActivationController:
         # Continuous gestures (e.g. point_one, point_two) are owned exclusively
         # by LaserPointerTracker and must never enter the IDLE/ARMED/COOLDOWN
         # state machine.  Routing them here would cause CommandDispatcher to
-        # send Ctrl+A (mouse_pointer → deactivate) on every accepted window,
-        # fighting LaserPointerTracker's Ctrl+L activation.
+        # send a deactivation keystroke on every accepted window, fighting
+        # LaserPointerTracker's laser pointer activation.
         if prediction.label in self._continuous_labels:
             return None
 
