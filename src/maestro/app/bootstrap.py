@@ -73,7 +73,7 @@ def build_container(
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
     thresholds = _load_thresholds(config_root / "thresholds" / "production_ipn.yaml")
-    command_map = _load_command_map(config_root / "gestures" / config.app.command_map)
+    command_map, continuous_labels = _load_command_map(config_root / "gestures" / config.app.command_map)
 
     frame_source = OpenCVFrameSource(
         camera_index=config.app.camera_index,
@@ -126,6 +126,7 @@ def build_container(
         idle_timeout_ms=config.inference.idle_timeout_ms,
         command_cooldown_ms=config.inference.command_cooldown_ms,
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
+        continuous_labels=continuous_labels,
     )
     dispatcher = _build_dispatcher(
         allowed_commands=frozenset(command_map.values()),
@@ -253,8 +254,16 @@ def _load_thresholds(path: Path) -> dict[str, Any]:
     }
 
 
-def _load_command_map(path: Path) -> dict[str, str]:
-    """Load gesture→command_id mapping from YAML.
+def _load_command_map(path: Path) -> tuple[dict[str, str], frozenset[str]]:
+    """Load gesture→command_id mapping and gesture mode classifications from YAML.
+
+    Returns:
+        A tuple of ``(command_map, continuous_labels)`` where *command_map* maps
+        gesture label → command_id for discrete gestures and *continuous_labels*
+        is the frozenset of gesture labels classified as ``"continuous"`` in the
+        optional ``gesture_modes`` block.  Continuous labels bypass
+        ``GestureActivationController`` entirely and are handled by
+        ``LaserPointerTracker``.
 
     Raises:
         FileNotFoundError: If the command map file does not exist.
@@ -271,7 +280,12 @@ def _load_command_map(path: Path) -> dict[str, str]:
     mapping = payload.get("gesture_commands", {})
     if not isinstance(mapping, dict):
         raise ValueError(f"Command map file must contain a 'gesture_commands' mapping: {path}")
-    return {str(k): str(v) for k, v in mapping.items() if k and v}
+    modes = payload.get("gesture_modes", {})
+    if not isinstance(modes, dict):
+        modes = {}
+    continuous_labels = frozenset(k for k, v in modes.items() if str(v) == "continuous")
+    command_map = {str(k): str(v) for k, v in mapping.items() if k and v}
+    return command_map, continuous_labels
 
 
 def _build_dispatcher(
