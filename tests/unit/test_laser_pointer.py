@@ -33,12 +33,19 @@ def _mock_keyboard() -> MagicMock:
     return kb
 
 
-def _tracker(mirror_x: bool = True) -> tuple[LaserPointerTracker, MagicMock]:
+def _tracker(mirror_x: bool = True, use_command_key: bool = False) -> tuple[LaserPointerTracker, MagicMock]:
     kb = _mock_keyboard()
+    # Pin to Windows/Linux path by default (ctrl+l / ctrl+a) so these tests
+    # are platform-independent.  Pass use_command_key=True to exercise the
+    # macOS Command+L / Command+A path.
+    on_keys = ("command", "l") if use_command_key else ("ctrl", "l")
+    off_keys = ("command", "a") if use_command_key else ("ctrl", "a")
     tracker = LaserPointerTracker(
         keyboard=kb,
         pointing_labels=_POINTING_LABELS,
         mirror_x=mirror_x,
+        laser_on_keys=on_keys,
+        laser_off_keys=off_keys,
     )
     return tracker, kb
 
@@ -218,3 +225,62 @@ class TestLaserPointerTrackerReactivation:
         tracker.update("point_one", _LANDMARKS_CENTER, valid=True)  # re-activate
         ctrl_l_calls = [c for c in kb.press_hotkey.call_args_list if c == call("ctrl", "l")]
         assert len(ctrl_l_calls) == 2
+
+
+# ---------------------------------------------------------------------------
+# Tests: macOS Command+L / Command+A mode
+# ---------------------------------------------------------------------------
+
+
+class TestLaserPointerTrackerMacOS:
+    """Tests for the macOS ⌘+L / ⌘+A laser pointer activation mode."""
+
+    def test_activation_sends_command_l(self):
+        tracker, kb = _tracker(use_command_key=True)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        assert tracker.active is True
+        kb.press_hotkey.assert_any_call("command", "l")
+
+    def test_command_l_sent_only_on_entry(self):
+        """Command+L must fire once on first pointing frame, not on subsequent frames."""
+        tracker, kb = _tracker(use_command_key=True)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        cmd_l_calls = [c for c in kb.press_hotkey.call_args_list if c == call("command", "l")]
+        assert len(cmd_l_calls) == 1
+
+    def test_deactivation_sends_command_a(self):
+        tracker, kb = _tracker(use_command_key=True)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)
+        assert tracker.active is False
+        kb.press_hotkey.assert_any_call("command", "a")
+
+    def test_explicit_deactivate_sends_command_a(self):
+        tracker, kb = _tracker(use_command_key=True)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        tracker.deactivate()
+        assert tracker.active is False
+        kb.press_hotkey.assert_any_call("command", "a")
+
+    def test_reactivation_sends_command_l_again(self):
+        tracker, kb = _tracker(use_command_key=True)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)  # activate
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)    # deactivate
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)  # re-activate
+        cmd_l_calls = [c for c in kb.press_hotkey.call_args_list if c == call("command", "l")]
+        assert len(cmd_l_calls) == 2
+
+    def test_mouse_still_tracked_while_active(self):
+        tracker, kb = _tracker(use_command_key=True)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)  # activates + moves
+        kb.move_mouse.reset_mock()
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        kb.move_mouse.assert_called_once()
+
+    def test_invalid_landmarks_prevents_activation(self):
+        tracker, kb = _tracker(use_command_key=True)
+        tracker.update("point_one", None, valid=False)
+        assert tracker.active is False
+        kb.press_hotkey.assert_not_called()
