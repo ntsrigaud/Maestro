@@ -73,12 +73,12 @@ model:
 # ─────────────────────────────────────────────────────────────────────────────
 
 training:
-  epochs: 100
+  epochs: 25
   batch_size: 128
   learning_rate: 0.00009 # 9e-5 — best performing lr from prior ablation
   weight_decay: 0.0005 # was 0.001 — lighter for smaller model
   grad_clip_norm: 1.0
-  early_stopping_patience: 25
+  early_stopping_patience: 7
   early_stopping_min_delta: 0.0001
   label_smoothing: 0.05 # was 0.1 — reduced; class_weighting already handles imbalance
   seed: 42
