@@ -105,6 +105,23 @@ class TestPresentationAdapterZoom:
         assert "modifier" in kwargs
         assert kwargs["modifier"] in {"command", "ctrl"}
 
+    def test_zoom_out_totally_calls_zoom_negative_maximum(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("zoom_out_totally")
+        kb.zoom.assert_called_once()
+        (clicks,) = kb.zoom.call_args.args
+        assert clicks <= -5, "zoom_out_totally must zoom out at maximum magnitude"
+        assert result.success is True
+
+    def test_zoom_out_totally_passes_modifier(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        adapter.execute("zoom_out_totally")
+        _, kwargs = kb.zoom.call_args
+        assert "modifier" in kwargs
+        assert kwargs["modifier"] in {"command", "ctrl"}
+
 
 # ---------------------------------------------------------------------------
 # Tests: start/stop presentation
@@ -112,12 +129,44 @@ class TestPresentationAdapterZoom:
 
 
 class TestPresentationAdapterSlideshow:
+    def test_start_presentation_sends_slideshow_keys(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("start_presentation")
+        # Platform-specific: Cmd+Return on macOS, F5 on Win/Linux.
+        kb.press_hotkey.assert_called_once()
+        assert result.success is True
+
+    def test_stop_presentation_sends_escape(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("stop_presentation")
+        kb.press_hotkey.assert_called_once_with("escape")
+        assert result.success is True
+
     def test_start_stop_presentation_sends_keys(self):
+        # Legacy command kept for backward compat.
         kb = _mock_keyboard()
         adapter = PresentationAdapter(keyboard=kb)
         result = adapter.execute("start_stop_presentation")
         kb.press_hotkey.assert_called_once()
         assert result.success is True
+
+
+# ---------------------------------------------------------------------------
+# Tests: mouse pointer
+# ---------------------------------------------------------------------------
+
+
+class TestPresentationAdapterMousePointer:
+    def test_mouse_pointer_presses_ctrl_a(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("mouse_pointer")
+        kb.press_hotkey.assert_called_once_with("ctrl", "a")
+        assert result.success is True
+        assert result.command_id == "mouse_pointer"
+        assert result.target_app == "presentation"
 
 
 # ---------------------------------------------------------------------------
@@ -147,19 +196,25 @@ class TestPresentationAdapterNoOp:
         adapter = PresentationAdapter(keyboard=_mock_keyboard())
         assert adapter.target_app == "presentation"
 
-    def test_all_eight_commands_handled(self):
-        """Smoke test: none of the ten canonical commands raise."""
+    def test_all_commands_handled(self):
+        """Smoke test: all canonical commands (new and legacy) do not raise."""
         commands = [
+            # Primary gesture-mapped commands
+            "start_presentation",
+            "stop_presentation",
             "next_slide",
             "previous_slide",
-            "scroll_forward",
-            "scroll_back",
             "zoom_in_view",
             "zoom_out_view",
+            "zoom_out_totally",
+            "mouse_pointer",
+            "no_action",
+            # Legacy / extended commands (kept for backward compat)
+            "scroll_forward",
+            "scroll_back",
             "start_stop_presentation",
             "activate_laser_pointer",
             "deactivate_laser_pointer",
-            "no_action",
         ]
         kb = _mock_keyboard()
         adapter = PresentationAdapter(keyboard=kb)
