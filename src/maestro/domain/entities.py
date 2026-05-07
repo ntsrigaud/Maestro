@@ -8,9 +8,10 @@ import numpy as np
 
 @dataclass(slots=True)
 class FramePacket:
-    frame: Any
+    frame: Any  # BGR ndarray (OpenCV native)
     timestamp_ms: int
     frame_id: int
+    rgb_frame: np.ndarray | None = None  # pre-converted C-contiguous RGB; None if not available
 
 
 @dataclass(slots=True)
@@ -49,14 +50,14 @@ class LandmarkPacket:
 
 @dataclass(slots=True)
 class FeatureFrame:
-    vector: list[float]
+    vector: np.ndarray
     timestamp_ms: int
     valid: bool
 
 
 @dataclass(slots=True)
 class SequenceWindow:
-    features: list[list[float]]
+    features: np.ndarray
     start_timestamp_ms: int
     end_timestamp_ms: int
     valid_ratio: float
