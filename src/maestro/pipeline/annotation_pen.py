@@ -230,6 +230,10 @@ class AnnotationPenTracker:
             self._mouse_pressed = True
             LOGGER.debug("AnnotationPenTracker: stroke start at (%d, %d)", screen_x, screen_y)
         else:
-            # Subsequent frames: drag while the button is already held.
-            self._keyboard.move_mouse(screen_x, screen_y)
+            # Subsequent frames: send a drag event while the button is held.
+            # On macOS, pyautogui.dragTo posts kCGEventLeftMouseDragged which
+            # is what PowerPoint requires to actually draw the pen stroke.
+            # pyautogui.moveTo posts kCGEventMouseMoved, which PowerPoint's pen
+            # mode silently ignores — the reason plain move_mouse didn't draw.
+            self._keyboard.mouse_drag_to(screen_x, screen_y)
             LOGGER.debug("AnnotationPenTracker: drag to (%d, %d)", screen_x, screen_y)

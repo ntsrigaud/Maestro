@@ -116,15 +116,17 @@ class TestAnnotationPenTrackerMouseTracking:
         tracker, kb = _tracker(mirror_x=False)
         tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
         kb.mouse_down.assert_called_once()
+        kb.mouse_drag_to.assert_not_called()
         kb.move_mouse.assert_not_called()
 
-    def test_move_mouse_called_on_subsequent_frames(self):
-        """Subsequent frames drag while the button is already held."""
+    def test_drag_called_on_subsequent_frames(self):
+        """Sustained frames send kCGEventLeftMouseDragged (not kCGEventMouseMoved)."""
         tracker, kb = _tracker(mirror_x=False)
         tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # mouse_down
-        kb.move_mouse.reset_mock()
+        kb.mouse_drag_to.reset_mock()
         tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
-        kb.move_mouse.assert_called_once()
+        kb.mouse_drag_to.assert_called_once()
+        kb.move_mouse.assert_not_called()  # plain moveTo must never be used
         kb.mouse_down.assert_called_once()  # not called again
 
     def test_mirror_x_flips_horizontal_coordinate(self):
@@ -231,9 +233,11 @@ class TestAnnotationPenTrackerDeactivation:
         tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
         tracker.update("unknown", _LANDMARKS_CENTER, valid=True)
         kb.move_mouse.reset_mock()
+        kb.mouse_drag_to.reset_mock()
         kb.mouse_down.reset_mock()
         tracker.update("unknown", _LANDMARKS_CENTER, valid=True)
         kb.move_mouse.assert_not_called()
+        kb.mouse_drag_to.assert_not_called()
         kb.mouse_down.assert_not_called()
 
 
@@ -318,9 +322,10 @@ class TestAnnotationPenTrackerMacOS:
         tracker, kb = _tracker(use_command_key=True)
         tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # mouse_down
         kb.mouse_down.reset_mock()
-        kb.move_mouse.reset_mock()
-        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # move_mouse
-        kb.move_mouse.assert_called_once()
+        kb.mouse_drag_to.reset_mock()
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)  # mouse_drag_to
+        kb.mouse_drag_to.assert_called_once()
+        kb.move_mouse.assert_not_called()
         kb.mouse_down.assert_not_called()
 
     def test_invalid_landmarks_prevents_activation(self):
