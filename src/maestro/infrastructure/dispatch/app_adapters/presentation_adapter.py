@@ -61,9 +61,22 @@ _SLIDESHOW_KEYS: dict[str, tuple[str, ...]] = {
 class PresentationAdapter:
     """Maps gesture commands to presentation-controller keyboard shortcuts.
 
-    All eight logical commands from ``command_map_presentation.yaml`` are
-    handled.  Unknown command IDs return a non-executed :class:`DispatchResult`
-    rather than raising an exception, so the runtime loop is never interrupted.
+    All logical commands from ``command_map_presentation.yaml`` are handled.
+    Unknown command IDs return a non-executed :class:`DispatchResult` rather
+    than raising an exception, so the runtime loop is never interrupted.
+
+    Canonical gesture-to-command mapping
+    -------------------------------------
+    swipe_up        → start_presentation
+    swipe_down      → stop_presentation
+    swipe_right     → next_slide
+    swipe_left      → previous_slide
+    zoom_in         → zoom_in_view
+    zoom_out        → zoom_out_view
+    open_palm_hold  → zoom_out_totally
+    point_one       → mouse_pointer
+    point_two       → mouse_pointer
+    unknown         → no_action
     """
 
     @property
@@ -87,18 +100,32 @@ class PresentationAdapter:
             ``success=False`` for ``no_action`` and unrecognised command IDs.
         """
         match command_id:
+            case "start_presentation":
+                # Start the slideshow: Cmd+Return (macOS) / F5 (Win/Linux).
+                self._keyboard.press_hotkey(*self._slideshow_keys)
+            case "stop_presentation":
+                # Stop / exit the slideshow universally.
+                self._keyboard.press_hotkey("escape")
             case "next_slide":
                 self._keyboard.press_hotkey("right")
             case "previous_slide":
                 self._keyboard.press_hotkey("left")
-            case "scroll_forward":
-                self._keyboard.press_hotkey("down")
-            case "scroll_back":
-                self._keyboard.press_hotkey("up")
             case "zoom_in_view":
                 self._keyboard.zoom(3, modifier=self._zoom_modifier)
             case "zoom_out_view":
                 self._keyboard.zoom(-3, modifier=self._zoom_modifier)
+            case "zoom_out_totally":
+                # Zoom out to the minimum by scrolling at maximum magnitude.
+                self._keyboard.zoom(-5, modifier=self._zoom_modifier)
+            case "mouse_pointer":
+                # Revert cursor to the default arrow pointer (Ctrl+A in
+                # PowerPoint slideshow; no-op on apps without a laser mode).
+                self._keyboard.press_hotkey("ctrl", "a")
+            # ── Legacy / extended commands (not in default gesture map) ────
+            case "scroll_forward":
+                self._keyboard.press_hotkey("down")
+            case "scroll_back":
+                self._keyboard.press_hotkey("up")
             case "start_stop_presentation":
                 self._keyboard.press_hotkey(*self._slideshow_keys)
             case "activate_laser_pointer":
