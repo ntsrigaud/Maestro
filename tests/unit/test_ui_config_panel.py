@@ -49,3 +49,94 @@ class TestConfigPanelValidation:
         assert result == {"key": "value"}
         # Temp file must not exist after successful write
         assert not (tmp_path / "test.yaml.tmp").exists()
+
+
+class TestGazeToggle:
+    """Verify that the gaze_enabled checkbox round-trips through config save/load."""
+
+    def _write_valid_configs(self, tmp_path, gaze_enabled: bool) -> None:
+        app_cfg = {
+            "app_name": "test-app",
+            "camera_index": 0,
+            "frame_width": 640,
+            "frame_height": 480,
+            "target_fps": 30,
+            "mirror_display": True,
+            "command_map": "command_map_presentation.yaml",
+            "hand_preference": "right",
+        }
+        infer_cfg = {
+            "window_length": 32,
+            "window_step": 3,
+            "min_valid_ratio": 0.8,
+            "idle_timeout_ms": 100000,
+            "command_cooldown_ms": 1000,
+            "edge_trigger_enabled": True,
+            "gaze": {
+                "enabled": gaze_enabled,
+                "yaw_threshold_deg": 30.0,
+                "pitch_threshold_deg": 25.0,
+                "arm_ms": 500,
+                "grace_ms": 5000,
+                "sample_interval_frames": 3,
+                "min_detection_score": 0.5,
+            },
+        }
+        (tmp_path / "app.yaml").write_text(yaml.dump(app_cfg))
+        (tmp_path / "inference.yaml").write_text(yaml.dump(infer_cfg))
+
+    def test_gaze_enabled_widget_present(self, qtbot, tmp_path) -> None:
+        """The gaze_enabled widget is always created by _build_gaze_group."""
+        panel = ConfigPanel(config_path=str(tmp_path))
+        qtbot.addWidget(panel)
+        assert "gaze_enabled" in panel._widgets
+
+    def test_gaze_enabled_populated_from_yaml_false(self, qtbot, tmp_path) -> None:
+        self._write_valid_configs(tmp_path, gaze_enabled=False)
+        panel = ConfigPanel(config_path=str(tmp_path))
+        qtbot.addWidget(panel)
+        from PySide6.QtWidgets import QCheckBox
+
+        cb = panel._widgets["gaze_enabled"]
+        assert isinstance(cb, QCheckBox)
+        assert not cb.isChecked()
+
+    def test_gaze_enabled_populated_from_yaml_true(self, qtbot, tmp_path) -> None:
+        self._write_valid_configs(tmp_path, gaze_enabled=True)
+        panel = ConfigPanel(config_path=str(tmp_path))
+        qtbot.addWidget(panel)
+        from PySide6.QtWidgets import QCheckBox
+
+        cb = panel._widgets["gaze_enabled"]
+        assert isinstance(cb, QCheckBox)
+        assert cb.isChecked()
+
+    def test_toggling_gaze_writes_correct_value(self, qtbot, tmp_path) -> None:
+        """Flipping the checkbox and applying writes the new value to YAML."""
+        self._write_valid_configs(tmp_path, gaze_enabled=False)
+        panel = ConfigPanel(config_path=str(tmp_path))
+        qtbot.addWidget(panel)
+        from PySide6.QtWidgets import QCheckBox
+
+        cb = panel._widgets["gaze_enabled"]
+        assert isinstance(cb, QCheckBox)
+        cb.setChecked(True)
+        panel._on_apply()
+        written = yaml.safe_load((tmp_path / "inference.yaml").read_text())
+        assert written["gaze"]["enabled"] is True
+
+    def test_gaze_yaml_fields_preserved_after_toggle(self, qtbot, tmp_path) -> None:
+        """Advanced gaze fields (thresholds, timing) survive a toggle+apply cycle."""
+        self._write_valid_configs(tmp_path, gaze_enabled=False)
+        panel = ConfigPanel(config_path=str(tmp_path))
+        qtbot.addWidget(panel)
+        from PySide6.QtWidgets import QCheckBox
+
+        cb = panel._widgets["gaze_enabled"]
+        assert isinstance(cb, QCheckBox)
+        cb.setChecked(True)
+        panel._on_apply()
+        written = yaml.safe_load((tmp_path / "inference.yaml").read_text())
+        assert written["gaze"]["arm_ms"] == 500
+        assert written["gaze"]["grace_ms"] == 5000
+        assert written["gaze"]["yaw_threshold_deg"] == 30.0
