@@ -63,6 +63,12 @@ import cv2
 import numpy as np
 import yaml
 
+try:
+    from tqdm import tqdm
+except ImportError:  # graceful degradation if tqdm is not installed
+    def tqdm(iterable, **kwargs):  # type: ignore[misc]
+        return iterable
+
 # ---------------------------------------------------------------------------
 # Path bootstrap — allow running as a plain script from any cwd.
 # ---------------------------------------------------------------------------
@@ -401,22 +407,21 @@ def extract_all_landmarks(
     t0 = time.perf_counter()
 
     if num_workers <= 1:
-        for task in tasks:
+        for task in tqdm(tasks, desc="Extracting landmarks", unit="video"):
             stem, cpath = _extract_video_worker(task)
             if cpath:
                 result_paths[stem] = Path(cpath)
     else:
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             futures = {executor.submit(_extract_video_worker, t): t[0] for t in tasks}
-            done = 0
-            for future in as_completed(futures):
-                stem, cpath = future.result()
-                done += 1
-                if cpath:
-                    result_paths[stem] = Path(cpath)
-                    logger.info("[%d/%d] %s", done, len(tasks), stem)
-                else:
-                    logger.warning("[%d/%d] FAILED: %s", done, len(tasks), stem)
+            with tqdm(total=len(tasks), desc="Extracting landmarks", unit="video") as pbar:
+                for future in as_completed(futures):
+                    stem, cpath = future.result()
+                    if cpath:
+                        result_paths[stem] = Path(cpath)
+                    else:
+                        logger.warning("Extraction failed: %s", futures[future])
+                    pbar.update(1)
 
     elapsed = time.perf_counter() - t0
     logger.info(
@@ -562,7 +567,8 @@ def assemble_dataset(
     total_windows = 0
     missing_cache = 0
 
-    for video_stem, segments in sorted(final_by_video.items()):
+    video_items = sorted(final_by_video.items())
+    for video_stem, segments in tqdm(video_items, desc="Assembling dataset", unit="video"):
         cache_path = cache_paths.get(video_stem)
         if cache_path is None or not cache_path.exists():
             logger.warning("No cache for video '%s', skipping.", video_stem)
@@ -687,7 +693,8 @@ def assemble_flat_dataset(
     total_windows = 0
     missing_cache = 0
 
-    for video_stem, segments in sorted(final_by_video.items()):
+    video_items = sorted(final_by_video.items())
+    for video_stem, segments in tqdm(video_items, desc="Assembling dataset", unit="video"):
         cache_path = cache_paths.get(video_stem)
         if cache_path is None or not cache_path.exists():
             logger.warning("No cache for video '%s', skipping.", video_stem)
