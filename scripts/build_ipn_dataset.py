@@ -54,7 +54,7 @@ import random
 import sys
 import time
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -412,16 +412,14 @@ def extract_all_landmarks(
             if cpath:
                 result_paths[stem] = Path(cpath)
     else:
+        chunksize = max(1, min(32, len(tasks) // max(1, num_workers * 8)))
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            futures = {executor.submit(_extract_video_worker, t): t[0] for t in tasks}
-            with tqdm(total=len(tasks), desc="Extracting landmarks", unit="video") as pbar:
-                for future in as_completed(futures):
-                    stem, cpath = future.result()
-                    if cpath:
-                        result_paths[stem] = Path(cpath)
-                    else:
-                        logger.warning("Extraction failed: %s", futures[future])
-                    pbar.update(1)
+            iterator = executor.map(_extract_video_worker, tasks, chunksize=chunksize)
+            for stem, cpath in tqdm(iterator, total=len(tasks), desc="Extracting landmarks", unit="video"):
+                if cpath:
+                    result_paths[stem] = Path(cpath)
+                else:
+                    logger.warning("Extraction failed: %s", stem)
 
     elapsed = time.perf_counter() - t0
     logger.info(
