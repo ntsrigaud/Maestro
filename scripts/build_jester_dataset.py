@@ -81,6 +81,34 @@ from maestro.training.dataset_builder import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
+
+def _ensure_protobuf_compat() -> None:
+    """Patch protobuf API changes used by MediaPipe legacy solutions.
+
+    Some environments ship protobuf versions where
+    ``symbol_database.Default().GetPrototype`` no longer exists.  Legacy
+    MediaPipe solutions still call it internally; we provide a small shim to
+    keep dataset builders working across protobuf versions.
+    """
+    try:
+        from google.protobuf import message_factory, symbol_database
+    except Exception:
+        return
+
+    if hasattr(symbol_database.Default(), "GetPrototype"):
+        return
+
+    def _get_prototype(self: Any, descriptor: Any) -> Any:
+        get_message_class = getattr(message_factory, "GetMessageClass", None)
+        if callable(get_message_class):
+            return get_message_class(descriptor)
+
+        # Fallback for older protobuf APIs.
+        factory = message_factory.MessageFactory()
+        return factory.GetPrototype(descriptor)
+
+    symbol_database.SymbolDatabase.GetPrototype = _get_prototype
+
 # ---------------------------------------------------------------------------
 # Jester label → vocabulary key mapping
 # ---------------------------------------------------------------------------
@@ -272,6 +300,8 @@ def _extract_jester_video_worker(
     ``(video_id, cache_path_str)``
         On failure ``cache_path_str`` is an empty string.
     """
+    _ensure_protobuf_compat()
+
     import mediapipe as mp
 
     video_folder_str, cache_path_str, min_det_conf, min_track_conf, fps = args
