@@ -62,6 +62,12 @@ import cv2
 import numpy as np
 import yaml
 
+try:
+    from tqdm import tqdm
+except ImportError:  # graceful degradation if tqdm is not installed
+    def tqdm(iterable, **kwargs):  # type: ignore[misc]
+        return iterable
+
 # ---------------------------------------------------------------------------
 # Path bootstrap — allow running as a plain script from any cwd.
 # ---------------------------------------------------------------------------
@@ -390,23 +396,19 @@ def extract_all_landmarks(
     t0 = time.perf_counter()
 
     if num_workers <= 1:
-        for i, task in enumerate(tasks, 1):
+        for task in tqdm(tasks, desc="Extracting landmarks", unit="video"):
             vid_id, cpath = _extract_jester_video_worker(task)
             if cpath:
                 result_paths[vid_id] = Path(cpath)
-            if i % 1000 == 0:
-                logger.info("[%d/%d] extracted", i, len(tasks))
     else:
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             futures = {executor.submit(_extract_jester_video_worker, t): t for t in tasks}
-            done = 0
-            for future in as_completed(futures):
-                vid_id, cpath = future.result()
-                done += 1
-                if cpath:
-                    result_paths[vid_id] = Path(cpath)
-                if done % 1000 == 0:
-                    logger.info("[%d/%d] extracted", done, len(tasks))
+            with tqdm(total=len(tasks), desc="Extracting landmarks", unit="video") as pbar:
+                for future in as_completed(futures):
+                    vid_id, cpath = future.result()
+                    if cpath:
+                        result_paths[vid_id] = Path(cpath)
+                    pbar.update(1)
 
     elapsed = time.perf_counter() - t0
     logger.info(
@@ -501,7 +503,7 @@ def assemble_dataset(
     total_windows = 0
     missing_cache = 0
 
-    for ann in annotations:
+    for ann in tqdm(annotations, desc="Assembling dataset", unit="video"):
         cache_path = cache_paths.get(ann.video_id)
         if cache_path is None or not cache_path.exists():
             missing_cache += 1
