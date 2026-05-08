@@ -30,7 +30,7 @@ model:
   model_name: two_stream_attn_v1
   input_size: 147         # feature-schema-v5 (must match pretrained backbone)
   hidden_size: 96         # must match pretrained checkpoint (two_stream_attn_jester.yaml)
-  num_layers: 4           # must match pretrained checkpoint
+  num_layers: 2           # must match pretrained checkpoint
   dropout: 0.35
   num_classes: 14         # full IPN vocabulary (all 14 classes)
   num_heads: 8            # must match pretrained checkpoint
@@ -48,7 +48,7 @@ training:
   early_stopping_min_delta: 0.0001
   label_smoothing: 0.05
   seed: 42
-  num_workers: 0
+  num_workers: 2
   class_weighting: false  # handled by max_samples_per_class cap
   # Per-class cap — same reasoning as two_stream_attn_ipn32.yaml
   # IPN has extreme imbalance (point_one/two: ~145,000 samples vs swipe: ~2,400)
