@@ -130,8 +130,8 @@ pytest
 
 The recommended training workflow uses the Jupyter notebooks under `notebooks/`:
 
-| Notebook                       | Purpose                                                  |
-| ------------------------------ | -------------------------------------------------------- |
+| Notebook                                       | Purpose                                                  |
+| ---------------------------------------------- | -------------------------------------------------------- |
 | `01_dataset_preparation_two-stream-lstm.ipynb` | Build the NPZ dataset from IPN Hand video landmarks      |
 | `02_model_training_two-stream-lstm.ipynb`      | Train, evaluate, export, and publish to Hugging Face Hub |
 
