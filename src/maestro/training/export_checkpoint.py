@@ -19,6 +19,25 @@ def compute_sha256(path: str | Path) -> str:
     return hasher.hexdigest()
 
 
+def _two_stream_attn_model_config(
+    *,
+    model: torch.nn.Module,
+    config: TrainingPipelineConfig,
+) -> dict[str, Any]:
+    """Serialize the actual EnhancedTwoStreamLSTM architecture into metadata."""
+
+    return {
+        "model_name": config.model.model_name,
+        "input_size": int(getattr(model, "input_size", config.model.input_size)),
+        "hidden_size": int(getattr(model, "hidden_size", config.model.hidden_size)),
+        "num_layers": int(getattr(model, "num_layers", config.model.num_layers)),
+        "dropout": float(getattr(model, "dropout", config.model.dropout)),
+        "num_classes": int(getattr(model, "num_classes", config.model.num_classes)),
+        "num_heads": int(getattr(model, "num_heads", config.model.num_heads)),
+        "proj_dim": int(getattr(model, "proj_dim", config.model.proj_dim)),
+    }
+
+
 def export_inference_artifact(
     *,
     result: TrainingResult,
@@ -62,16 +81,10 @@ def export_inference_artifact(
         }
     else:
         if is_two_stream_attn:
-            model_config_dict = {
-                "model_name": config.model.model_name,
-                "input_size": config.model.input_size,
-                "hidden_size": config.model.hidden_size,
-                "num_layers": config.model.num_layers,
-                "dropout": config.model.dropout,
-                "num_classes": config.model.num_classes,
-                "num_heads": config.model.num_heads,
-                "proj_dim": config.model.proj_dim,
-            }
+            model_config_dict = _two_stream_attn_model_config(
+                model=result.model,
+                config=config,
+            )
         else:
             model_config_dict = {
                 "model_name": config.model.model_name,
@@ -81,7 +94,6 @@ def export_inference_artifact(
                 "dropout": config.model.dropout,
                 "num_classes": config.model.num_classes,
             }
-
     payload: dict[str, Any] = {
         "artifact_type": artifact_type,
         "artifact_version": result.model_version,
