@@ -107,18 +107,18 @@ contain multiple non-overlapping windows.
 The default vocabulary used by `build_ipn_dataset.py` is
 `configs/gestures/vocabulary_ipn.yaml` (10 classes):
 
-| Vocabulary Class | IPN Source | Runtime Role |
-| ---------------- | ---------- | ------------ |
-| `unknown`        | D0X        | Rejection / background |
-| `point_one`      | B0A        | Continuous laser pointer gesture |
+| Vocabulary Class | IPN Source | Runtime Role                      |
+| ---------------- | ---------- | --------------------------------- |
+| `unknown`        | D0X        | Rejection / background            |
+| `point_one`      | B0A        | Continuous laser pointer gesture  |
 | `point_two`      | B0B        | Continuous annotation pen gesture |
-| `open_palm_hold` | G07        | Discrete command gesture |
-| `swipe_right`    | G06        | Discrete command gesture |
-| `swipe_left`     | G05        | Discrete command gesture |
-| `swipe_up`       | G03        | Discrete command gesture |
-| `swipe_down`     | G04        | Discrete command gesture |
-| `zoom_in`        | G10        | Discrete command gesture |
-| `zoom_out`       | G11        | Discrete command gesture |
+| `open_palm_hold` | G07        | Discrete command gesture          |
+| `swipe_right`    | G06        | Discrete command gesture          |
+| `swipe_left`     | G05        | Discrete command gesture          |
+| `swipe_up`       | G03        | Discrete command gesture          |
+| `swipe_down`     | G04        | Discrete command gesture          |
+| `zoom_in`        | G10        | Discrete command gesture          |
+| `zoom_out`       | G11        | Discrete command gesture          |
 
 > **`open_palm_hold` alias rationale** — IPN G07 is annotated as "Open twice"
 > (the performer opens their hand from a partial to fully open pose, twice in
@@ -317,36 +317,36 @@ The vocabulary is embedded in the dataset NPZ (`metadata_json.vocabulary`).
 
 ## 6. Configuration Files Added
 
-| File                                     | Purpose                               |
-| ---------------------------------------- | ------------------------------------- |
+| File                                     | Purpose                                 |
+| ---------------------------------------- | --------------------------------------- |
 | `configs/gestures/vocabulary_ipn.yaml`   | Default 10-class IPN-derived vocabulary |
-| `configs/thresholds/production_ipn.yaml` | Inference thresholds for IPN classes  |
-| `scripts/build_ipn_dataset.py`           | IPN video processing pipeline         |
+| `configs/thresholds/production_ipn.yaml` | Inference thresholds for IPN classes    |
+| `scripts/build_ipn_dataset.py`           | IPN video processing pipeline           |
 
 ---
 
 ## 7. Key Script Options Reference
 
-| Flag                                 | Default             | Description                                    |
-| ------------------------------------ | ------------------- | ---------------------------------------------- |
-| `--ipn-root`                         | `data/IPN`          | Dataset root directory                         |
-| `--output-npz`                       | _(required)_        | Output NPZ path                                |
-| `--annotation-file`                  | `Annot_List.txt`    | Which annotation file to process               |
-| `--vocab-config`                     | vocabulary_ipn.yaml | Vocabulary definition                          |
-| `--num-workers`                      | `1`                 | Parallel extraction workers (0 = all cores)    |
-| `--no-cache`                         | off                 | Force re-extraction of all videos              |
-| `--max-unknown-segments-per-source`  | `150`               | Subsample unknown segments per source class    |
-| `--max-unknown-frames-per-segment`   | `60`                | Cap unknown segment frame count                |
-| `--unknown-subsample-ratio`          | `1.0`               | Fraction of unknown sequences kept after filtering |
-| `--window-length`                    | `32`                | Sliding window length (frames)                 |
-| `--window-step`                      | `3`                 | Window step size (frames)                      |
-| `--min-valid-ratio`                  | `0.8`               | Min fraction of valid frames to emit a window  |
-| `--label-strategy`                   | `majority`          | Window label assignment (`majority` or `last`) |
-| `--min-detection-confidence`         | `0.7`               | MediaPipe detection confidence threshold       |
-| `--min-tracking-confidence`          | `0.5`               | MediaPipe tracking confidence threshold        |
-| `--format`                           | `graph`             | Output format (`graph` or `flat`)              |
-| `--metadata-json`                    | auto                | Optional metadata summary JSON output path      |
-| `--seed`                             | `42`                | Random seed for unknown segment sampling       |
+| Flag                                | Default             | Description                                        |
+| ----------------------------------- | ------------------- | -------------------------------------------------- |
+| `--ipn-root`                        | `data/IPN`          | Dataset root directory                             |
+| `--output-npz`                      | _(required)_        | Output NPZ path                                    |
+| `--annotation-file`                 | `Annot_List.txt`    | Which annotation file to process                   |
+| `--vocab-config`                    | vocabulary_ipn.yaml | Vocabulary definition                              |
+| `--num-workers`                     | `1`                 | Parallel extraction workers (0 = all cores)        |
+| `--no-cache`                        | off                 | Force re-extraction of all videos                  |
+| `--max-unknown-segments-per-source` | `150`               | Subsample unknown segments per source class        |
+| `--max-unknown-frames-per-segment`  | `60`                | Cap unknown segment frame count                    |
+| `--unknown-subsample-ratio`         | `1.0`               | Fraction of unknown sequences kept after filtering |
+| `--window-length`                   | `32`                | Sliding window length (frames)                     |
+| `--window-step`                     | `3`                 | Window step size (frames)                          |
+| `--min-valid-ratio`                 | `0.8`               | Min fraction of valid frames to emit a window      |
+| `--label-strategy`                  | `majority`          | Window label assignment (`majority` or `last`)     |
+| `--min-detection-confidence`        | `0.7`               | MediaPipe detection confidence threshold           |
+| `--min-tracking-confidence`         | `0.5`               | MediaPipe tracking confidence threshold            |
+| `--format`                          | `graph`             | Output format (`graph` or `flat`)                  |
+| `--metadata-json`                   | auto                | Optional metadata summary JSON output path         |
+| `--seed`                            | `42`                | Random seed for unknown segment sampling           |
 
 ---
 
