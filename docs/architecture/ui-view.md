@@ -254,7 +254,7 @@ implementation. No inference-path code was changed to support the UI.
 ### 4.2 RuntimeState as the UI Data Contract
 
 `RuntimeState` is produced per-frame by `Runtime.run()` and is the sole data type crossing the
-thread boundary. It is a frozen dataclass defined in `domain/entities.py` and carries all
+thread boundary. It is a `dataclass(slots=True)` defined in `domain/entities.py` and carries all
 information the UI requires:
 
 | Field                      | Type          | Consumer               |
@@ -673,4 +673,4 @@ collect and execute all non-UI tests without modification.
 
 **Document**: UI View  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: April 2026
+**Last Updated**: May 2026

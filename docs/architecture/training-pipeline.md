@@ -27,9 +27,9 @@ flowchart TD
 
     subgraph PH1["Phase 1 — Raw Data Sources  (IPN Hand Database)"]
         direction TB
-        VIDEOS["IPN Hand Videos<br/>200 MP4 files · 640×480 · 30 FPS<br/>50 subjects · lab environment"]
+        VIDEOS["IPN Hand Videos<br/>200 AVI files · 640×480 · 30 FPS<br/>50 subjects · lab environment"]
         ANNOT["Annotation Files<br/>Annot_TrainList.txt · Annot_TestList.txt<br/>Columns: video, label, t_start, t_end<br/>14 IPN gesture labels total"]
-        VOCAB["Vocabulary Config<br/>configs/gestures/vocabulary_ipn.yaml<br/>14-class baseline (ipn_v3)<br/>B0A/B0B + D0X + G01..G11"]
+        VOCAB["Vocabulary Config<br/>configs/gestures/vocabulary_ipn.yaml<br/>default 10-class runtime vocabulary<br/>unknown + point_one/point_two + G03/G04/G05/G06/G07/G10/G11"]
     end
 
     class VIDEOS rawNode
@@ -43,9 +43,9 @@ flowchart TD
     subgraph PH2["Phase 2 — Per-Video Landmark Extraction  (parallelised)"]
         direction TB
         DECODE["Video Decoding<br/>cv2.VideoCapture · every frame in source order<br/>Temporal tracker requires sequential processing"]
-        MP["MediaPipe Hands Extractor<br/>MediaPipeHandsExtractor<br/>static_image_mode = False<br/>21 × 3 landmarks per frame · detect_conf · track_conf"]
-        HS["Hand Selection<br/>HandSelector  (preference = 'both')<br/>Selects highest-confidence hand<br/>Emits: landmarks · detect_conf · track_conf · valid"]
-        CACHE["Per-Video Cache<br/>cache/&lt;video_stem&gt;.npz<br/>Arrays: frame_ids · valid · landmarks (N,21,3)<br/>detect_conf · track_conf · handedness<br/>Skipped on subsequent runs if cache exists"]
+        MP["MediaPipe Holistic Extractor (legacy solutions API)<br/>sequential per-frame extraction<br/>67 × 3 keypoints per frame + valid mask"]
+        HS["Frame Parsing + Validity Mask<br/>graph-schema node packing (67 nodes)<br/>No runtime HandSelector in this offline extraction step"]
+        CACHE["Per-Video Cache<br/>cache/&lt;video_stem&gt;_holistic.npz<br/>Arrays: fps · frame_ids · keypoints (N,67,3)<br/>valid_mask (N,67)<br/>Skipped on subsequent runs if cache exists"]
     end
 
     class DECODE procNode
@@ -62,7 +62,7 @@ flowchart TD
     subgraph PH3["Phase 3 — Label Mapping and Segment Filtering"]
         direction TB
         LMAP["IPN → Vocabulary Mapping<br/>B0A → point_one     B0B → point_two<br/>D0X → unknown<br/>G01 → click_one     G02 → click_two<br/>G03 → swipe_up      G04 → swipe_down<br/>G05 → swipe_left    G06 → swipe_right<br/>G07 → open_palm_hold<br/>G08 → double_click_one   G09 → double_click_two<br/>G10 → zoom_in       G11 → zoom_out"]
-        SUBSAMP["Unknown Class Subsampling<br/>unknown sequences subsampled to prevent domination<br/>Inverse-frequency class weights computed for training loss"]
+        SUBSAMP["Unknown Class Subsampling<br/>unknown sequences subsampled to prevent domination<br/>Residual imbalance handled by config (class caps / optional class weights)"]
     end
 
     class LMAP buildNode
@@ -78,7 +78,7 @@ flowchart TD
     subgraph PH4["Phase 4 — Feature Engineering and Sliding Window Assembly"]
         direction TB
         FT["LandmarkFeatureTransformer<br/>per frame · feature-schema-v5<br/>────────────────────────────────────<br/>1. Wrist centering    l_i = l_i - l_0<br/>2. Scale norm         l_i = l_i / dist(l_0, l_9)<br/>3. Orientation norm   DISABLED<br/>4. Velocity           v_i = Δpos / Δt<br/>Output: 147-dim vector per frame"]
-        WIN["SlidingWindowSequenceBuffer<br/>window_size = 32 frames<br/>step = 1  (dense during dataset build)<br/>min_valid_ratio = 0.8<br/>Output: (32, 147) numpy array per window"]
+        WIN["SlidingWindowSequenceBuffer<br/>window_size = 32 frames (default)<br/>step = 3 (default; configurable)<br/>min_valid_ratio = 0.8<br/>Flat output: (32, 147) numpy array per window"]
         LABEL["Window Labelling<br/>Strategy: majority label in window<br/>Windows with &lt; 80% valid frames → discarded"]
     end
 
@@ -111,7 +111,7 @@ flowchart TD
 
     subgraph PH6["Phase 6 — Dataset Loading and Stratified Splits"]
         direction TB
-        DM["GestureDataModule<br/>Stratified split by class + recording<br/>────────────────────────────────────<br/>Train : 70%  of sequences<br/>Val   : 15%  of sequences<br/>Test  : 15%  of sequences<br/>No subject leakage across splits"]
+        DM["GestureDataModule<br/>Stratified split by class + recording<br/>────────────────────────────────────<br/>Train : 70%  of sequences<br/>Val   : 15%  of sequences<br/>Test  : 15%  of sequences<br/>Recording-level split to reduce leakage"]
         CW["Class Weight Computation<br/>w_c = N_total / (N_c × num_classes)<br/>Applied to CrossEntropyLoss<br/>Counteracts unknown class imbalance"]
     end
 
@@ -126,8 +126,8 @@ flowchart TD
 
     subgraph PH7["Phase 7 — Training Configuration"]
         direction LR
-        CFG_MODEL["Model Hyperparameters<br/>two_stream_attn.yaml (default)<br/>────────────────────────────<br/>input_size    : 147<br/>hidden_size   : 96 (per direction)<br/>num_layers    : 2<br/>num_heads     : 8<br/>proj_dim      : 96<br/>num_classes   : 8 (runtime profile)"]
-        CFG_TRAIN["Training Hyperparameters<br/>────────────────────────────<br/>epochs        : 100 (max)<br/>batch_size    : 64<br/>learning_rate : 0.00009<br/>weight_decay  : 0.0005<br/>grad_clip_norm: 1.0<br/>seed          : 42"]
+        CFG_MODEL["Model Hyperparameters<br/>two_stream_attn.yaml (default)<br/>────────────────────────────<br/>input_size    : 147<br/>hidden_size   : 128 (per direction)<br/>num_layers    : 2<br/>num_heads     : 8<br/>proj_dim      : 96<br/>num_classes   : 10 (runtime profile)"]
+        CFG_TRAIN["Training Hyperparameters<br/>────────────────────────────<br/>epochs        : 100 (max)<br/>batch_size    : 64<br/>learning_rate : 0.0002<br/>weight_decay  : 0.0005<br/>grad_clip_norm: 0.5<br/>seed          : 42"]
         CFG_STOP["Early Stopping<br/>────────────────────────────<br/>patience      : 25 epochs<br/>min_delta     : 0.0001<br/>Monitor       : val_loss"]
         CFG_SCHED["LR Scheduler<br/>ReduceLROnPlateau<br/>────────────────────────────<br/>factor        : 0.5<br/>patience      : 3 epochs<br/>min_lr        : 1e-6"]
         CFG_AUG["Augmentation (online)<br/>────────────────────────────<br/>temporal_scale: 0.8 – 1.2×<br/>spatial_jitter: σ = 0.005<br/>apply_prob    : 0.5<br/>mirror_flip   : 0.0  (done offline)"]
@@ -224,15 +224,15 @@ flowchart TD
 
 | Phase                                   | Script / Notebook                                                                     | Key Output                                              |
 | --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| 1 — Raw data                            | External (IPN Hand download)                                                          | 200 MP4 videos + annotation TXT files                   |
-| 2 — Landmark extraction                 | `scripts/build_ipn_dataset.py` Phase 1                                                | `cache/<stem>.npz` per video (parallelised)             |
-| 3 — Label mapping                       | `scripts/build_ipn_dataset.py` Phase 2                                                | 14-class baseline vocabulary mapping                    |
+| 1 — Raw data                            | External (IPN Hand download)                                                          | 200 AVI videos + annotation TXT files                   |
+| 2 — Landmark extraction                 | `scripts/build_ipn_dataset.py` Phase 1                                                | `cache/<stem>_holistic.npz` per video (parallelised)    |
+| 3 — Label mapping                       | `scripts/build_ipn_dataset.py` Phase 2                                                | Default 10-class vocabulary mapping (configurable via `--vocab-config`) |
 | 4 — Feature engineering + windowing     | `build_ipn_dataset.py` → `LandmarkFeatureTransformer` + `SlidingWindowSequenceBuffer` | Sequence windows (N, 32, 147) with majority labels      |
 | 5 — Mirror augmentation + serialisation | `build_ipn_dataset.py`                                                                | `data/processed/*.npz` (output path configurable)       |
-| 6 — Data splits                         | `notebooks/02_model_training.ipynb` → `GestureDataModule`                             | Stratified 70/15/15 train/val/test split                |
+| 6 — Data splits                         | `notebooks/02_model_training_two-stream-lstm.ipynb` → `GestureDataModule`             | Stratified 70/15/15 train/val/test split                |
 | 7 — Configuration                       | `configs/model/two_stream_attn.yaml`                                                  | Default EnhancedTwoStreamLSTM hyperparameters           |
-| 8 — Training loop                       | `notebooks/02_model_training.ipynb` → `train_lstm()`                                  | Per-epoch checkpoints; best saved by `val_loss`         |
-| 9 — Evaluation                          | `notebooks/02_model_training.ipynb`                                                   | Test metrics, confusion matrix, per-class report        |
+| 8 — Training loop                       | `notebooks/02_model_training_two-stream-lstm.ipynb` → `train_lstm()`                  | Per-epoch checkpoints; best saved by `val_loss`         |
+| 9 — Evaluation                          | `notebooks/02_model_training_two-stream-lstm.ipynb`                                   | Test metrics, confusion matrix, per-class report        |
 | 10 — Export                             | `training/export_checkpoint.py`                                                       | `two_stream_attn_v1_*_inference.pt` (no training state) |
 | 11 — Publish                            | `training/hf_publish.py`                                                              | `ntsrigaud/maestro-lstm` on Hugging Face Hub            |
 
@@ -259,18 +259,18 @@ augmentation transforms do not support.
 
 The IPN Hand `D0X` (non-gesture background) class is substantially more frequent than
 the active gesture classes. It is subsampled at dataset build time, and residual
-imbalance is corrected by inverse-frequency class weights applied to
-`CrossEntropyLoss` during training.
+imbalance is controlled by training configuration (for example,
+`max_samples_per_class` and optional class weighting).
 
 ### Sliding Window Step During Build vs. Inference
 
-During **dataset build**, the sliding window advances with `step = 1` (dense) to
-maximise the number of training sequences extracted from each gesture segment.
-During **inference**, the window advances with `step = 3` (every third frame, ≈10 Hz)
-to reduce CPU load. These are independent parameters.
+During **dataset build**, the sliding window uses the CLI-configured `window_step`
+(default `3`) and `window_length` (default `32`).
+During **inference**, the runtime uses `configs/inference.yaml` values (currently
+`window_step=3`, `window_length=32`). These are independent parameter sources.
 
 ---
 
-_See also: [two-stream-lstm-architecture.md](two-stream-lstm-architecture.md) for the
+_See also: [enhanced-two-stream-lstm-architecture.md](enhanced-two-stream-lstm-architecture.md) for the
 model architecture diagram, and [data-flow.md](data-flow.md) for the real-time
 inference pipeline._

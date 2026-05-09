@@ -25,7 +25,7 @@ When launched via `scripts/run_ui.py`, the system uses a **dual-thread execution
 | **Main thread**   | `QApplication.exec()` (Qt event loop)        | UI rendering, signal dispatch, user input |
 | **Worker thread** | `_RuntimeThread` (QThread) → `Runtime.run()` | Full inference pipeline, unmodified       |
 
-Cross-thread communication uses Qt **queued signal connections** — the only safe mechanism for passing data across thread boundaries in Qt. `_RuntimeThread._handle_state()` is called by `Runtime` every frame via the `on_state` callback. The worker increments a frame counter and emits the `state_ready` Qt signal every `emit_every` frames (default 3), capping UI traffic at approximately 10 Hz at 30 FPS. The queued connection delivers each `RuntimeState` frozen dataclass safely to the main thread via Qt's event queue. No mutex, explicit lock, or shared mutable state is used.
+Cross-thread communication uses Qt **queued signal connections** — the safe mechanism for passing data across thread boundaries in Qt. `_RuntimeThread._handle_state()` is called by `Runtime` every frame via the `on_state` callback. The worker increments a frame counter and emits the `state_ready` Qt signal every `emit_every` frames (default 3), capping UI traffic at approximately 10 Hz at 30 FPS. The queued connection delivers each `RuntimeState` (`dataclass(slots=True)`) to the main thread via Qt's event queue. No mutex, explicit lock, or shared mutable state is used.
 
 The inference pipeline is **unmodified between modes**: `on_state` is the only addition to `runtime.py`. When `on_state is None` (CLI mode), there is zero overhead.
 
@@ -50,12 +50,10 @@ graph TD
     Stabilize --> Activate["9. Activation Routing<br/>GestureActivationController.route()"]
     Activate --> HasCmd{Command?}
     HasCmd -->|Yes| Dispatch["10. Dispatch<br/>CommandDispatcher.dispatch()"]
-    HasCmd -->|No| Render
-    Dispatch --> Render["11. Render Overlay<br/>OverlayRenderer.render()"]
-    Render --> Display["Display Frame<br/>cv2.imshow()<br/>(opt-in; GUI default: off)"]
-    Display --> KeyCheck{Key Press?}
-    KeyCheck -->|Q / ESC| Shutdown([Graceful Shutdown])
-    KeyCheck -->|None| Callback["on_state callback<br/>(if registered; throttled ~10 Hz)"]
+    HasCmd -->|No| Continuous
+    Dispatch --> Continuous["11. Continuous Trackers<br/>LaserPointer/AnnotationPen"]
+    Continuous --> Render["12. Render Overlay<br/>OverlayRenderer.render()"]
+    Render --> Callback["on_state callback<br/>(if registered; throttled ~10 Hz)"]
     Callback --> Start
 ```
 
@@ -75,6 +73,7 @@ At 30 FPS target, each loop iteration has a ~33 ms budget. The pipeline stages c
 | Stabilization       | < 0.1 ms        | EMA + deque lookup                                   |
 | Activation Routing  | < 0.1 ms        | State machine transition                             |
 | Command Dispatch    | < 1 ms          | pyautogui call (when command emitted)                |
+| Continuous Trackers | < 1 ms          | Pointer/pen update, mouse drag while gesture active  |
 | Overlay Render      | 1–2 ms          | OpenCV text/rectangle drawing                        |
 
 **Total end-to-end (gaze active)**: ~40–60 ms per frame (without model inference), ~60–80 ms when inference triggers. Gaze estimation adds ~1–2 ms amortized per frame because BlazeFace is sampled at 10 Hz (every 3rd frame) and the result is cached. When gaze is absent, the per-frame cost drops to ~3–5 ms (capture + gaze check + render).
@@ -101,22 +100,22 @@ stateDiagram-v2
 
 **ACQUIRING**: A qualifying head pose has been detected. An internal stability timer starts. The gesture pipeline remains inactive until the state advances to ACTIVE, preventing instantaneous arming when the user glances briefly toward the camera.
 
-**ACTIVE**: Head pose has been within thresholds continuously for `arm_ms` (default 500 ms). The downstream gesture pipeline is fully operational. This is the only state in which `GestureActivationController.route()` is invoked.
+**ACTIVE**: Head pose has been within thresholds continuously for `arm_ms` (default 500 ms). The downstream gesture pipeline is fully operational.
 
 **LOSING**: Head pose has left the acceptance window. A grace timer starts. If the user looks back before the grace period elapses (`grace_ms`, default 5000 ms), no state change in the gesture controller occurs. This prevents disarming during natural head movements mid-presentation.
 
 ### 4.2 Gesture Activation State Machine
 
-The `GestureActivationController` implements a three-state finite state machine that governs command emission. It operates only while the gaze detector is in ACTIVE state:
+The `GestureActivationController` implements a three-state finite state machine that governs command emission. It operates whenever `gaze_permitted=True` (detector in ACTIVE or LOSING grace state):
 
 ```mermaid
 stateDiagram-v2
-    [*] --> ARMED
+    [*] --> IDLE
 
     ARMED --> COOLDOWN : Command dispatched (edge trigger)
     ARMED --> IDLE : Idle timeout (300 s without gesture)
     ARMED --> IDLE : Gaze lost beyond grace period
-    COOLDOWN --> ARMED : Cooldown timer expires (1000 ms)
+    COOLDOWN --> ARMED : Cooldown timer expires (1500 ms)
     IDLE --> ARMED : Gaze restored — rearm() called
 ```
 
@@ -138,12 +137,12 @@ stateDiagram-v2
   3. The label exists in the command map.
 - The `_last_dispatched_label` resets to `"unknown"` whenever the prediction returns to the unknown class (hand in neutral position), enabling the same gesture to be dispatched again after a neutral interval.
 - Any non-unknown prediction refreshes the idle timeout timer, keeping the system armed during active use.
-- If no non-unknown gesture is detected for `idle_timeout_ms` (default 300,000 ms = 5 minutes), the system returns to IDLE.
+- If no non-unknown gesture is detected for `idle_timeout_ms` (default 100,000 ms in current config), the system returns to IDLE.
 
 **COOLDOWN**:
 
 - Entered immediately after a command is dispatched.
-- All dispatch is blocked for `command_cooldown_ms` (default 1000 ms).
+- All dispatch is blocked for `command_cooldown_ms` (default 1500 ms in current config).
 - Provides a secondary guard against rapid re-dispatch (the primary guard is edge-triggering).
 - After the cooldown timer expires, the system returns to ARMED.
 
@@ -178,7 +177,7 @@ graph TD
     Rate -->|Passed| Adapter["PresentationAdapter"]
     Adapter --> KeyValidate{Key Name Validation}
     KeyValidate -->|Invalid| Fail3["DispatchResult<br/>(invalid_key)"]
-    KeyValidate -->|Valid| Execute["pyautogui.hotkey()"]
+    KeyValidate -->|Valid| Execute["KeyboardAdapter action\n(hotkey/zoom/mouse)"]
     Execute --> Success["DispatchResult<br/>(success=True)"]
 ```
 
@@ -197,7 +196,7 @@ graph TD
     JSONL["JSONL Landmark Files"] --> Load["Load Labeled Frames"]
     Load --> FeatTrain["Feature Transform<br/>(same as inference)"]
     FeatTrain --> Window["Sliding Window<br/>(same as inference)"]
-    Window --> NPZ["NPZ Dataset<br/>(N × 24 × 147)"]
+    Window --> NPZ["NPZ Dataset<br/>(N × 32 × 147)"]
     NPZ --> Split["Recording-level Group Split<br/>(70/15/15)"]
     Split --> Augment["On-the-Fly Augmentation<br/>(temporal scale, spatial jitter)"]
     Augment --> Train["EnhancedTwoStreamLSTM Training Loop<br/>(AdamW, class-weighted CE)"]
@@ -212,19 +211,19 @@ The training pipeline reuses `LandmarkFeatureTransformer` and `SlidingWindowSequ
 
 The runtime loop supports three shutdown triggers:
 
-1. **Keyboard interrupt**: Pressing Q or ESC in the optional preview window (CLI mode; the window is opt-in and disabled by default in GUI mode).
+1. **Keyboard interrupt**: Interrupting the process from terminal (headless CLI path).
 2. **Frame limit**: Reaching `--max-frames` count (used in testing and benchmarking).
-3. **UI Stop button**: Clicking Stop in the PySide6 control panel calls `RuntimeController.stop()`, which signals `_RuntimeThread` to exit via Qt's interruption mechanism. The inference loop checks for interruption each frame and exits cleanly; `MainWindow` waits up to 3 seconds for the worker thread to join before hiding the system tray icon.
+3. **UI Stop button**: Clicking Stop in the PySide6 control panel calls `RuntimeController.stop()`, which sets the runtime stop flag. `MainWindow` then waits for worker completion during shutdown.
 
 On shutdown, the runtime:
 
 1. Releases the camera resource (`IFrameSource.close()`).
 2. Closes the MediaPipe model (`IHandLandmarkExtractor.close()`).
-3. Destroys the OpenCV display window.
+3. Deactivates continuous trackers (laser pointer / annotation pen) to restore safe input state.
 4. Optionally writes a latency benchmark report to the specified JSON path.
 
 ---
 
 **Document**: Process View  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: April 2026
+**Last Updated**: May 2026
