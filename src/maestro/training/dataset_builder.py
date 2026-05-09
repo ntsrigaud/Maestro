@@ -136,7 +136,7 @@ class SequenceDatasetBuilder:
                 recording_id=frame.recording_id,
                 label=selected_label,
                 label_id=self._label_to_id[selected_label],
-                sequence=window.features,
+                sequence=window.features.tolist(),
                 start_timestamp_ms=window.start_timestamp_ms,
                 end_timestamp_ms=window.end_timestamp_ms,
                 valid_ratio=window.valid_ratio,
