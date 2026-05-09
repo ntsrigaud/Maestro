@@ -102,26 +102,23 @@ contain multiple non-overlapping windows.
 
 ## 2. Gesture Mapping
 
-### 2.1 IPN → Production Vocabulary
+### 2.1 IPN → Runtime Vocabulary
 
-The original production vocabulary targets a presentation and meeting
-controller. The IPN dataset provides strong coverage for directional swipe
-gestures and an open-palm hold but cannot supply data for fist, thumbs-up,
-v-sign, or pinch poses without additional custom recording.
+The default vocabulary used by `build_ipn_dataset.py` is
+`configs/gestures/vocabulary_ipn.yaml` (10 classes):
 
-A revised vocabulary derived entirely from IPN data is defined in
-`configs/gestures/vocabulary_ipn.yaml`:
-
-| Vocabulary Class | IPN Source      | Semantic Command       | Match Quality |
-| ---------------- | --------------- | ---------------------- | ------------- |
-| `open_palm_hold` | G07             | Activation / toggle UI | Approximate   |
-| `swipe_right`    | G06             | Next slide             | Direct        |
-| `swipe_left`     | G05             | Previous slide         | Direct        |
-| `swipe_up`       | G03             | Start presentation     | Direct        |
-| `swipe_down`     | G04             | Exit presentation      | Direct        |
-| `zoom_in`        | G10             | Zoom in                | Direct        |
-| `zoom_out`       | G11             | Zoom out               | Direct        |
-| `unknown`        | D0X + B0A + B0B | No-gesture / noise     | Direct        |
+| Vocabulary Class | IPN Source | Runtime Role                      |
+| ---------------- | ---------- | --------------------------------- |
+| `unknown`        | D0X        | Rejection / background            |
+| `point_one`      | B0A        | Continuous laser pointer gesture  |
+| `point_two`      | B0B        | Continuous annotation pen gesture |
+| `open_palm_hold` | G07        | Discrete command gesture          |
+| `swipe_right`    | G06        | Discrete command gesture          |
+| `swipe_left`     | G05        | Discrete command gesture          |
+| `swipe_up`       | G03        | Discrete command gesture          |
+| `swipe_down`     | G04        | Discrete command gesture          |
+| `zoom_in`        | G10        | Discrete command gesture          |
+| `zoom_out`       | G11        | Discrete command gesture          |
 
 > **`open_palm_hold` alias rationale** — IPN G07 is annotated as "Open twice"
 > (the performer opens their hand from a partial to fully open pose, twice in
@@ -129,27 +126,27 @@ A revised vocabulary derived entirely from IPN data is defined in
 > is the nearest approximation: the double-open motion naturally involves the
 > palm facing the camera in an open state. During dataset assembly
 > (`scripts/build_ipn_dataset.py`) G07 frames are labeled `open_palm_hold`.
-> The trained model (`lstm_v1_20260330T181558Z`, `training_data_version:
-ipn_dataset`) uses this label in its `class_labels` array.
 > **Retraining is not required** — vocabulary, model, and runtime are fully
 > consistent. The "Approximate" match quality above reflects the semantic
 > distance between G07 ("Open twice") and the intended gesture ("Open palm
 > hold"), not a data or label error.
 
-### 2.2 Omitted IPN Classes
+### 2.2 Extended Labels
 
-| IPN Code | Gesture                       | Reason Omitted                  |
-| -------- | ----------------------------- | ------------------------------- |
-| G01      | Click with one finger         | No directional or hold semantic |
-| G02      | Click with two fingers        | No directional or hold semantic |
-| G08      | Double click with one finger  | No directional or hold semantic |
-| G09      | Double click with two fingers | No directional or hold semantic |
+`build_ipn_dataset.py` contains mappings for G01/G02/G08/G09
+(`click_one`, `click_two`, `double_click_one`, `double_click_two`).
+Those labels are included only when the selected vocabulary YAML contains them.
 
-### 2.3 Command Mapping
+### 2.3 Runtime Command Mapping
 
-Update `configs/app.yaml` and `configs/thresholds/production_ipn.yaml` when
-deploying a model trained on the IPN vocabulary. The IPN threshold config
-is already provided at `configs/thresholds/production_ipn.yaml`.
+Runtime command execution is configured by
+`configs/gestures/command_map_presentation.yaml`:
+
+- Discrete path (`gesture_commands`): `swipe_*`, `zoom_*`, `open_palm_hold`, `unknown`
+- Continuous path (`gesture_modes`): `point_one`, `point_two`
+
+Continuous gestures bypass `CommandDispatcher` and are handled per-frame by
+runtime trackers.
 
 ---
 
@@ -165,10 +162,9 @@ IPN Videos (AVI, 30 FPS)
 │  Phase 1: Landmark Extraction  (parallel + cache)│
 │                                                  │
 │  • OpenCV VideoCapture (sequential read)         │
-│  • MediaPipe Hands (static_image_mode=False)    │
-│  • Per-frame: landmarks (21×3), valid flag,      │
-│    detect_conf, track_conf, handedness           │
-│  • Cache: data/IPN/cache/<stem>.npz             │
+│  • MediaPipe Holistic (legacy solutions API)     │
+│  • Per-frame cache: keypoints (67x3), valid mask │
+│  • Cache: data/IPN/cache/<stem>_holistic.npz     │
 └─────────────────────────────────────────────────┘
        │  per-video NPZ caches
        ▼
@@ -179,30 +175,27 @@ IPN Videos (AVI, 30 FPS)
 │  • IPN label → vocabulary label mapping          │
 │  • Unknown class: subsampled by segment count    │
 │    and per-segment frame cap (default: 60 frames)│
-│  • SequenceDatasetBuilder:                       │
-│    – LandmarkFeatureTransformer (wrist-relative, │
-│      scale-normalised positions + velocities)    │
-│    – SlidingWindowSequenceBuffer (32 frames,     │
-│      step 3, min_valid_ratio 0.8)                │
+│  • Output format selectable:                      │
+│    – graph (default): graph windows (N,T,67,3)    │
+│    – flat: feature-schema-v5 windows (N,T,147)    │
+│  • Sliding window defaults:                        │
+│    window_length=32, step=3, min_valid_ratio=0.8  │
 │  • recording_id = {video}:seg{i:04d}             │
 │    (builder resets feature state at each segment)│
 └─────────────────────────────────────────────────┘
        │
        ▼
   data/processed/ipn_dataset.npz
-  (sequences: N×24×126, labels, label_ids,
+  (sequences, labels, label_ids,
    recording_ids, metadata_json)
 ```
 
 ### 3.2 Feature Dimensions
 
-| Component       | Frames | Features per frame | Total dims |
-| --------------- | ------ | ------------------ | ---------- |
-| Position (21×3) | 24     | 63                 | 126        |
-| Velocity (21×3) | 24     | 63                 | 126        |
-| **Sequence**    | 24     | **126**            |            |
+For `--format flat`, each sequence has shape `(T, 147)` using `feature-schema-v5`.
+With default CLI values this is `(32, 147)`.
 
-This matches `input_size: 126` in `configs/model/lstm_default.yaml` exactly.
+For `--format graph` (default), each sequence has shape `(T, 67, 3)`.
 
 ### 3.3 Frame Sampling Strategy
 
@@ -211,8 +204,8 @@ This matches `input_size: 126` in `configs/model/lstm_default.yaml` exactly.
 - **Annotation boundaries**: only frames within `[t_start, t_end]` for each
   gesture segment are fed to the dataset builder. The rest are cached but
   ignored during assembly.
-- **Sliding windows**: the builder emits one window every `window_step = 3`
-  frames once the buffer reaches `window_length = 24` frames.
+- **Sliding windows**: the builder emits one window every `window_step`
+  frames once the buffer reaches `window_length` frames (defaults: 3 and 32).
 - **Unknown segment capping**: long background spans (D0X, ~300 frames mean)
   are truncated to `max_unknown_frames_per_segment = 60` at assembly time to
   prevent class imbalance from background over-representation.
@@ -226,9 +219,8 @@ Two complementary mechanisms keep the `unknown` class from dominating:
 2. `--max-unknown-frames-per-segment F` (default 60): truncates each selected
    unknown segment to at most F frames before window generation.
 
-Remaining imbalance is handled by `class_weighting: true` in the training
-configuration, which applies inverse-frequency weights to the cross-entropy
-loss.
+Remaining imbalance can be further controlled by training-time class capping
+(`max_samples_per_class`) and optional class weighting in the model config.
 
 ---
 
@@ -239,6 +231,7 @@ loss.
 ```bash
 python scripts/build_ipn_dataset.py \
     --ipn-root data/IPN \
+    --format flat \
     --output-npz data/processed/ipn_dataset.npz \
     --num-workers 4
 ```
@@ -257,6 +250,7 @@ against the IPN benchmark):
 python scripts/build_ipn_dataset.py \
     --ipn-root data/IPN \
     --annotation-file Annot_TrainList.txt \
+    --format flat \
     --output-npz data/processed/ipn_train.npz \
     --num-workers 4
 
@@ -264,6 +258,7 @@ python scripts/build_ipn_dataset.py \
 python scripts/build_ipn_dataset.py \
     --ipn-root data/IPN \
     --annotation-file Annot_TestList.txt \
+    --format flat \
     --output-npz data/processed/ipn_test.npz \
     --num-workers 4
 ```
@@ -273,6 +268,7 @@ python scripts/build_ipn_dataset.py \
 ```bash
 python scripts/build_ipn_dataset.py \
     --ipn-root data/IPN \
+    --format flat \
     --output-npz data/processed/ipn_dataset.npz \
     --no-cache \
     --num-workers 4
@@ -283,6 +279,7 @@ python scripts/build_ipn_dataset.py \
 ```bash
 python scripts/build_ipn_dataset.py \
     --ipn-root data/IPN \
+    --format flat \
     --output-npz data/processed/ipn_dataset.npz \
     --max-unknown-segments-per-source 50 \
     --max-unknown-frames-per-segment 48 \
@@ -294,6 +291,7 @@ python scripts/build_ipn_dataset.py \
 ```bash
 python scripts/build_ipn_dataset.py \
     --ipn-root data/IPN \
+    --format flat \
     --output-npz data/processed/ipn_debug.npz \
     --annotation-file Annot_TrainList.txt \
     --num-workers 1 \
@@ -308,62 +306,60 @@ After generating the dataset, train the LSTM:
 
 ```bash
 python scripts/train_model.py \
-    --dataset data/processed/ipn_dataset.npz \
-    --config configs/model/lstm_default.yaml
+    --dataset-path data/processed/ipn_dataset.npz \
+    --config configs/model/two_stream_attn.yaml
 ```
 
-The vocabulary is already embedded in the dataset NPZ by `build_ipn_dataset.py`
-(under the `vocabulary` key in `metadata_json`). `train_model.py` reads it
-from there — no separate `--vocab-config` flag is needed or accepted.
+The vocabulary is embedded in the dataset NPZ (`metadata_json.vocabulary`).
+`train_model.py` reads labels from the dataset metadata.
 
 ---
 
 ## 6. Configuration Files Added
 
-| File                                     | Purpose                               |
-| ---------------------------------------- | ------------------------------------- |
-| `configs/gestures/vocabulary_ipn.yaml`   | 8-class IPN-native gesture vocabulary |
-| `configs/thresholds/production_ipn.yaml` | Inference thresholds for IPN classes  |
-| `scripts/build_ipn_dataset.py`           | IPN video processing pipeline         |
+| File                                     | Purpose                                 |
+| ---------------------------------------- | --------------------------------------- |
+| `configs/gestures/vocabulary_ipn.yaml`   | Default 10-class IPN-derived vocabulary |
+| `configs/thresholds/production_ipn.yaml` | Inference thresholds for IPN classes    |
+| `scripts/build_ipn_dataset.py`           | IPN video processing pipeline           |
 
 ---
 
 ## 7. Key Script Options Reference
 
-| Flag                                 | Default             | Description                                    |
-| ------------------------------------ | ------------------- | ---------------------------------------------- |
-| `--ipn-root`                         | `data/IPN`          | Dataset root directory                         |
-| `--output-npz`                       | _(required)_        | Output NPZ path                                |
-| `--annotation-file`                  | `Annot_List.txt`    | Which annotation file to process               |
-| `--vocab-config`                     | vocabulary_ipn.yaml | Vocabulary definition                          |
-| `--num-workers`                      | `1`                 | Parallel extraction workers (0 = all cores)    |
-| `--no-cache`                         | off                 | Force re-extraction of all videos              |
-| `--max-unknown-segments-per-source`  | `150`               | Subsample unknown segments per source class    |
-| `--max-unknown-frames-per-segment`   | `60`                | Cap unknown segment frame count                |
-| `--window-length`                    | `24`                | Sliding window length (frames)                 |
-| `--window-step`                      | `3`                 | Window step size (frames)                      |
-| `--min-valid-ratio`                  | `0.8`               | Min fraction of valid frames to emit a window  |
-| `--label-strategy`                   | `majority`          | Window label assignment (`majority` or `last`) |
-| `--min-detection-confidence`         | `0.7`               | MediaPipe detection confidence threshold       |
-| `--min-tracking-confidence`          | `0.5`               | MediaPipe tracking confidence threshold        |
-| `--enable-orientation-normalization` | off                 | Enable palm orientation normalisation          |
-| `--seed`                             | `42`                | Random seed for unknown segment sampling       |
+| Flag                                | Default             | Description                                        |
+| ----------------------------------- | ------------------- | -------------------------------------------------- |
+| `--ipn-root`                        | `data/IPN`          | Dataset root directory                             |
+| `--output-npz`                      | _(required)_        | Output NPZ path                                    |
+| `--annotation-file`                 | `Annot_List.txt`    | Which annotation file to process                   |
+| `--vocab-config`                    | vocabulary_ipn.yaml | Vocabulary definition                              |
+| `--num-workers`                     | `1`                 | Parallel extraction workers (0 = all cores)        |
+| `--no-cache`                        | off                 | Force re-extraction of all videos                  |
+| `--max-unknown-segments-per-source` | `150`               | Subsample unknown segments per source class        |
+| `--max-unknown-frames-per-segment`  | `60`                | Cap unknown segment frame count                    |
+| `--unknown-subsample-ratio`         | `1.0`               | Fraction of unknown sequences kept after filtering |
+| `--window-length`                   | `32`                | Sliding window length (frames)                     |
+| `--window-step`                     | `3`                 | Window step size (frames)                          |
+| `--min-valid-ratio`                 | `0.8`               | Min fraction of valid frames to emit a window      |
+| `--label-strategy`                  | `majority`          | Window label assignment (`majority` or `last`)     |
+| `--min-detection-confidence`        | `0.7`               | MediaPipe detection confidence threshold           |
+| `--min-tracking-confidence`         | `0.5`               | MediaPipe tracking confidence threshold            |
+| `--format`                          | `graph`             | Output format (`graph` or `flat`)                  |
+| `--metadata-json`                   | auto                | Optional metadata summary JSON output path         |
+| `--seed`                            | `42`                | Random seed for unknown segment sampling           |
 
 ---
 
 ## 8. Compatibility Notes
 
-The output NPZ from `build_ipn_dataset.py` is fully compatible with
-`GestureDataModule` and the existing training pipeline. No changes to
-`datamodule.py`, `train_lstm.py`, or the feature transformer are required.
+The output NPZ is compatible with the existing training pipeline:
 
-The bootstrap module (`src/maestro/app/bootstrap.py`) already loads
-the IPN-specific configuration files directly:
+- `--format flat` datasets are consumed by `GestureDataModule` and two-stream models.
+- `--format graph` datasets are consumed by `GraphGestureDataModule` and graph models.
 
-- `configs/gestures/vocabulary_ipn.yaml`
-- `configs/gestures/command_map_ipn.yaml`
-- `configs/thresholds/production_ipn.yaml`
+Runtime config resolution is directory-based (via `--config` path / config root).
+`build_container()` loads:
 
-No command-line flags are required to switch vocabularies at inference time;
-`run_realtime.py` simply calls `main()` which invokes `build_container()`,
-and the IPN configs are hardcoded in `bootstrap.py`.
+- command map from `configs/app.yaml` (`app.command_map`),
+- thresholds from `configs/thresholds/production_ipn.yaml`,
+- model source from `configs/model_source.yaml`.

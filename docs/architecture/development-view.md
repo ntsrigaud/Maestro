@@ -7,14 +7,11 @@ The development view describes the system's source code organization, module dec
 ## 2. Repository Structure
 
 ```
-Semantic-HGR-System/
+Maestro/
 ├── configs/                          # Runtime and model configuration (YAML)
 │   ├── app.yaml                      # Camera, FPS, active application
 │   ├── inference.yaml                # Window geometry, activation timing, thresholds
 │   ├── model_source.yaml             # Model backend: huggingface or local
-│   ├── desktop/                      # Config overrides for close-range desktop use
-│   │   ├── app.yaml                  # Desktop camera/FPS overrides
-│   │   └── inference.yaml            # Desktop timing (shorter timeouts, faster cooldown)
 │   ├── gestures/
 │   │   ├── vocabulary_ipn.yaml       # Full IPN baseline vocabulary (14 classes)
 │   │   └── command_map_presentation.yaml  # Gesture-to-command mapping (presentation vocabulary)
@@ -47,8 +44,8 @@ Semantic-HGR-System/
 ├── experiments/
 │   └── runs/                         # Training run logs
 ├── notebooks/                        # Jupyter ML workflow notebooks
-│   ├── 01_dataset_preparation.ipynb  # Layer 1: IPN → NPZ dataset build
-│   └── 02_model_training.ipynb       # Layer 2: train, eval, export, HF publish
+│   ├── 04_dataset_preparation_jester_ipn.ipynb
+│   └── 07_model_training_jester_pretrain_ipn_finetune.ipynb
 ├── docs/                             # Project documentation
 │   ├── architecture/                 # Architecture documentation suite
 │   ├── ml-system/                    # ML-specific reference (feature schema, etc.)
@@ -74,7 +71,7 @@ Semantic-HGR-System/
 | `events.py`    | `DomainEvent`                                                                                                                                                                                      | Structured event type for telemetry and logging                                 |
 | `contracts.py` | `IRunnable`, `IClosable`                                                                                                                                                                           | Minimal lifecycle protocols                                                     |
 
-**Dependency rule**: This package imports only from the Python standard library. No other package in the system may be imported here.
+**Dependency rule**: This package avoids application/infrastructure dependencies. It may import foundational libraries such as `numpy` for typed arrays used in domain entities.
 
 ### 3.2 `src/maestro/interfaces/`
 
@@ -117,13 +114,15 @@ Semantic-HGR-System/
 
 **Purpose**: Stateful inference pipeline components.
 
-| Module                   | Class                         | State                                                        |
-| ------------------------ | ----------------------------- | ------------------------------------------------------------ |
-| `hand_selection.py`      | `HandSelector`                | Stateless; reads `hand_preference` config at construction    |
-| `feature_engineering.py` | `LandmarkFeatureTransformer`  | Previous frame landmarks (for velocity)                      |
-| `buffering.py`           | `SlidingWindowSequenceBuffer` | Deque of recent feature frames, step counter                 |
-| `stabilization.py`       | `PredictionStabilizer`        | EMA-smoothed probabilities, vote history deque               |
-| `activation.py`          | `GestureActivationController` | Current `RuntimeMode`, activation timer, dispatch edge state |
+| Module                   | Class                         | State                                                                |
+| ------------------------ | ----------------------------- | -------------------------------------------------------------------- |
+| `hand_selection.py`      | `HandSelector`                | Stateless; reads `hand_preference` config at construction            |
+| `feature_engineering.py` | `LandmarkFeatureTransformer`  | Previous frame landmarks (for velocity)                              |
+| `buffering.py`           | `SlidingWindowSequenceBuffer` | Deque of recent feature frames, step counter                         |
+| `stabilization.py`       | `PredictionStabilizer`        | EMA-smoothed probabilities, vote history deque                       |
+| `activation.py`          | `GestureActivationController` | Current `RuntimeMode`, activation timer, dispatch edge state         |
+| `laser_pointer.py`       | `LaserPointerTracker`         | Continuous pointer lifecycle (`point_one`), per-frame cursor mapping |
+| `annotation_pen.py`      | `AnnotationPenTracker`        | Continuous annotation lifecycle (`point_two`), drag-stroke state     |
 
 **Dependency rule**: May import domain entities and interfaces. Must not import from infrastructure or app packages. The `LandmarkFeatureTransformer` and `SlidingWindowSequenceBuffer` are shared with the training package to enforce feature parity.
 
@@ -151,7 +150,7 @@ Semantic-HGR-System/
 | -------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bootstrap.py` | `AppContainer`, `build_container()` | Composition root; reads configs, loads model, instantiates all components. `AppContainer` holds a `hand_selector: HandSelector` field between `landmark_extractor` and `feature_transformer`.                                         |
 | `runtime.py`   | `Runtime`                           | Main event loop; sequential frame processing and optional UI callback. The extraction step now calls `landmark_extractor.extract()` → `MultiHandPacket`, then `hand_selector.select()` → `LandmarkPacket` before feature engineering. |
-| `main.py`      | `main()`, `parse_args()`            | CLI argument parsing and runtime launch (no PySide6 dependency)                                                                                                                                                                       |
+| `main.py`      | `main()`, `parse_args()`            | CLI argument parsing and launch orchestration. Supports headless runtime and Qt preview mode (`--no-display` toggles headless).                                                                                                       |
 
 **Dependency rule**: May import from all other packages. This is the only package that performs concrete instantiation.
 
@@ -229,16 +228,16 @@ graph TD
 
 Configuration files are organized by concern:
 
-| Category         | Files                                    | Schema                                                                                                                |
-| ---------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Application**  | `app.yaml`                               | `AppConfig` — camera index, resolution, FPS                                                                           |
-| **Inference**    | `inference.yaml`                         | `InferenceConfig` — window length/step, activation timing, cooldown                                                   |
-| **Model source** | `model_source.yaml`                      | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename                                      |
-| **Model**        | `model/two_stream_attn.yaml`             | Authoritative training defaults for `EnhancedTwoStreamLSTM`; legacy model configs remain for experimental comparisons |
-| **Features**     | `model/feature_pipeline.yaml`            | `FeaturePipelineConfig` — normalization and velocity toggles                                                          |
-| **Vocabulary**   | `gestures/vocabulary_ipn.yaml`           | Full IPN baseline gesture class list (14 classes)                                                                     |
-| **Commands**     | `gestures/command_map_presentation.yaml` | Gesture-to-command mapping (presentation vocabulary)                                                                  |
-| **Thresholds**   | `thresholds/production_ipn.yaml`         | Per-class confidence thresholds and temporal vote window sizes                                                        |
+| Category         | Files                                    | Schema                                                                                                                            |
+| ---------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Application**  | `app.yaml`                               | `AppConfig` — camera index, resolution, FPS                                                                                       |
+| **Inference**    | `inference.yaml`                         | `InferenceConfig` — window length/step, activation timing, cooldown                                                               |
+| **Model source** | `model_source.yaml`                      | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename                                                  |
+| **Model**        | `model/two_stream_attn.yaml`             | Authoritative training defaults for `EnhancedTwoStreamLSTM`; legacy model configs remain for experimental comparisons             |
+| **Features**     | `model/feature_pipeline.yaml`            | `FeaturePipelineConfig` — normalization and velocity toggles                                                                      |
+| **Vocabulary**   | `gestures/vocabulary_ipn.yaml`           | Full IPN baseline gesture class list (14 classes)                                                                                 |
+| **Commands**     | `gestures/command_map_presentation.yaml` | Gesture command routing: `gesture_commands` (discrete → dispatcher) and `gesture_modes` (continuous gestures handled by trackers) |
+| **Thresholds**   | `thresholds/production_ipn.yaml`         | Per-class confidence thresholds and temporal vote window sizes                                                                    |
 
 All configuration is validated at startup via Pydantic schemas. Invalid configurations cause immediate failure with descriptive error messages.
 
@@ -257,7 +256,7 @@ All configuration is validated at startup via Pydantic schemas. Invalid configur
 ```
 tests/
 ├── conftest.py                              # Shared fixtures; skips test_ui_* when PySide6 absent
-├── unit/                                    # 24 test modules
+├── unit/                                    # Unit test modules
 │   ├── test_opencv_source.py
 │   ├── test_mediapipe_extractor.py
 │   ├── test_feature_engineering.py
@@ -284,7 +283,7 @@ tests/
 │   ├── test_ui_config_panel.py              # UI: form validation, atomic write
 │   ├── test_ui_model_panel.py               # UI: HF / Local tab switching
 │   └── test_ui_tray.py                      # UI: system tray + show_window checkbox
-├── integration/                             # 5 test modules
+├── integration/                             # Integration test modules
 │   ├── test_phase2_pipeline.py
 │   ├── test_phase3_feature_pipeline.py
 │   ├── test_dataset_generation_pipeline.py
@@ -300,4 +299,4 @@ tests/
 
 **Document**: Development View  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: April 2026
+**Last Updated**: May 2026

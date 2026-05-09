@@ -14,7 +14,7 @@ graph TD
     Gz -->|true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
     C -->|MultiHandPacket| Cs["Hand Selection<br/>(HandSelector)"]
     Cs -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
-    D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 24x147)"]
+    D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 32x147)"]
     E --> Wr{"window_ready?"}
     Wr -->|false| O
     Wr -->|true| F["Enhanced Two-Stream<br/>(BiLSTM + MHA + Cross-Stream Gate)"]
@@ -44,7 +44,7 @@ graph TD
 | Field          | Type                           | Description                            |
 | -------------- | ------------------------------ | -------------------------------------- |
 | `frame`        | `numpy.ndarray` (H×W×3, uint8) | BGR color image                        |
-| `timestamp_ms` | `float`                        | Capture timestamp in milliseconds      |
+| `timestamp_ms` | `int`                          | Capture timestamp in milliseconds      |
 | `frame_id`     | `int`                          | Monotonically increasing frame counter |
 
 The frame source reads from `cv2.VideoCapture` with a buffer size of 1 to minimize latency. Frame timing is enforced to match the configured target FPS (default 30). Each frame is assigned a monotonic timestamp for pipeline synchronization.
@@ -132,7 +132,7 @@ A packet is marked `valid=True` only if the selected hand's `detect_conf ≥ min
 | Field          | Type                       | Description                                        |
 | -------------- | -------------------------- | -------------------------------------------------- |
 | `vector`       | `list[float]` (length 147) | Normalized position + velocity features            |
-| `timestamp_ms` | `float`                    | Inherited from input                               |
+| `timestamp_ms` | `int`                      | Inherited from input                               |
 | `valid`        | `bool`                     | `False` if input was invalid (zero vector emitted) |
 
 The transformation pipeline applies four sequential operations:
@@ -166,12 +166,12 @@ If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is em
 **Input**: `FeatureFrame`  
 **Output**: `SequenceWindow` (when ready) or no output (buffer accumulating)
 
-| Field                | Type                              | Description                                 |
-| -------------------- | --------------------------------- | ------------------------------------------- |
-| `features`           | `numpy.ndarray` (24×147, float32) | Stacked feature vectors                     |
-| `start_timestamp_ms` | `float`                           | Timestamp of the oldest frame in the window |
-| `end_timestamp_ms`   | `float`                           | Timestamp of the newest frame in the window |
-| `valid_ratio`        | `float`                           | Fraction of frames with `valid=True`        |
+| Field                | Type                | Description                                  |
+| -------------------- | ------------------- | -------------------------------------------- |
+| `features`           | `list[list[float]]` | Ordered feature vectors in the active window |
+| `start_timestamp_ms` | `int`               | Timestamp of the oldest frame in the window  |
+| `end_timestamp_ms`   | `int`               | Timestamp of the newest frame in the window  |
+| `valid_ratio`        | `float`             | Fraction of frames with `valid=True`         |
 
 The buffer is a fixed-length deque (default length 32). Feature frames are pushed on every iteration. A window is emitted when three conditions are met:
 
@@ -249,11 +249,11 @@ Dynamic gestures use vote_window=1 (immediate response). Static holds use vote_w
 **Input**: `StabilizedPrediction`  
 **Output**: `ExecutableCommand | None`
 
-| Field            | Type    | Description                                      |
-| ---------------- | ------- | ------------------------------------------------ |
-| `command_id`     | `str`   | Mapped command identifier (e.g., `"next_slide"`) |
-| `source_gesture` | `str`   | Original gesture label (e.g., `"swipe_right"`)   |
-| `issued_at_ms`   | `float` | Timestamp of command issuance                    |
+| Field            | Type  | Description                                      |
+| ---------------- | ----- | ------------------------------------------------ |
+| `command_id`     | `str` | Mapped command identifier (e.g., `"next_slide"`) |
+| `source_gesture` | `str` | Original gesture label (e.g., `"swipe_right"`)   |
+| `issued_at_ms`   | `int` | Timestamp of command issuance                    |
 
 The activation controller state machine (IDLE → ARMED → COOLDOWN) determines whether a stabilized prediction results in a command. See the Process View for detailed state machine behavior.
 
@@ -289,9 +289,32 @@ The dispatch chain applies three validation stages before OS interaction:
 
 **Component**: `KeyboardAdapter`  
 **Input**: Validated key tuple from application adapter  
-**Output**: OS keyboard event
+**Output**: OS input event (keyboard and/or pointer)
 
-The keyboard adapter invokes `pyautogui.hotkey(*keys)` with the validated key names. `PresentationAdapter` command-to-key mappings:
+The keyboard adapter invokes validated input actions through `KeyboardAdapter`
+(`press_hotkey`, `zoom`, `move_mouse`, `mouse_down`, `mouse_drag_to`, `mouse_up`).
+
+#### Stage 11A — Discrete command path (via CommandDispatcher)
+
+The runtime allowlist is built from `configs/gestures/command_map_presentation.yaml`
+`gesture_commands` values. In the current repo config this set is:
+
+- `start_presentation`
+- `stop_presentation`
+- `next_slide`
+- `previous_slide`
+- `zoom_in_view`
+- `zoom_out_view`
+- `erase_annotations`
+- `no_action`
+
+Note on defaults: the packaged fallback file
+`src/maestro/_defaults/configs/gestures/command_map_presentation.yaml` contains
+additional legacy mappings (for example `point_one` / `point_two` in
+`gesture_commands`). The effective allowlist always comes from the resolved
+runtime config directory selected at launch.
+
+`PresentationAdapter` mappings for those dispatched commands:
 
 | Command              | Key(s) / Action                                    |
 | -------------------- | -------------------------------------------------- |
@@ -301,9 +324,26 @@ The keyboard adapter invokes `pyautogui.hotkey(*keys)` with the validated key na
 | `previous_slide`     | `("left",)`                                        |
 | `zoom_in_view`       | Cmd+Scroll ↑ macOS / Ctrl+Scroll ↑ Win/Linux       |
 | `zoom_out_view`      | Cmd+Scroll ↓ macOS / Ctrl+Scroll ↓ Win/Linux       |
-| `zoom_out_totally`   | Cmd+Scroll ↓×5 macOS / Ctrl+Scroll ↓×5 Win/Linux   |
-| `mouse_pointer`      | `("ctrl", "a")` — restores default arrow cursor    |
+| `erase_annotations`  | `("e",)`                                           |
 | `no_action`          | _(no keystroke; returns `success=False`)_          |
+
+#### Stage 11B — Continuous control path (bypasses CommandDispatcher)
+
+`point_one` and `point_two` are configured as continuous gestures in
+`gesture_modes` and are processed every frame by trackers in `Runtime`:
+
+- `point_one` → `LaserPointerTracker`
+  - activate: `⌘+L` (macOS) / `Ctrl+L` (Windows/Linux)
+  - sustain: move cursor to fingertip (`KeyboardAdapter.move_mouse`)
+  - deactivate: `⌘+A` (macOS) / `Ctrl+A` (Windows/Linux)
+- `point_two` → `AnnotationPenTracker`
+  - activate: `⌘+P` (macOS) / `Ctrl+P` (Windows/Linux)
+  - sustain: pen stroke via drag (`mouse_down` then `mouse_drag_to`)
+  - deactivate: `mouse_up` then `⌘+A` (macOS) / `Ctrl+A` (Windows/Linux)
+
+This path is intentionally outside `GestureActivationController` and
+`CommandDispatcher` so the pointer/pen can update at frame rate without
+edge-trigger cooldown delays.
 
 ## 4. UI State Delivery
 
@@ -327,8 +367,8 @@ synchronization is required.
 ### Cross-Thread Delivery
 
 Qt's queued signal connection delivers each emitted `RuntimeState` from the worker thread to
-the main (Qt event loop) thread via Qt's event queue. The `RuntimeState` frozen dataclass is
-safe to pass across thread boundaries without copying or locking.
+the main (Qt event loop) thread via Qt's event queue. `RuntimeState` is a
+`dataclass(slots=True)` payload and is passed through Qt queued signals from the worker thread.
 
 ### Consumers
 
@@ -352,7 +392,7 @@ from its pre-UI implementation.
 | Multi-hand packet | 0–504 bytes (0–2 × 21×3×4)     | 30 Hz                 |
 | Landmark packet   | 252 bytes (21×3×4)             | 30 Hz                 |
 | Feature vector    | 588 bytes (147×4)              | 30 Hz                 |
-| Sequence window   | 14,112 bytes (24×147×4)        | ~10 Hz                |
+| Sequence window   | 18,816 bytes (32×147×4)        | ~10 Hz                |
 | Prediction        | ~200 bytes (8 floats + labels) | ~10 Hz                |
 | Command           | ~100 bytes                     | ~0.1 Hz (per gesture) |
 
@@ -372,9 +412,9 @@ graph LR
     subgraph Processing ["Dataset Processing"]
         Extract["Landmark Extraction<br/>(MediaPipe)"]
         JSONL["JSONL Output<br/>(labeled landmarks)"]
-        Feature["Feature Transform<br/>(126-dim vectors)"]
-        Window["Sliding Window<br/>(24×126 sequences)"]
-        NPZ["NPZ Dataset<br/>(N × 24 × 126)"]
+        Feature["Feature Transform<br/>(147-dim vectors)"]
+        Window["Sliding Window<br/>(32×147 sequences)"]
+        NPZ["NPZ Dataset<br/>(N × 32 × 147)"]
     end
 
     subgraph Training ["Model Training"]
@@ -404,4 +444,4 @@ The training pipeline reuses `LandmarkFeatureTransformer` and `SlidingWindowSequ
 
 **Document**: Data Flow  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: April 2026
+**Last Updated**: May 2026
