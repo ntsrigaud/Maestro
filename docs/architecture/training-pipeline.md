@@ -222,19 +222,19 @@ flowchart TD
 
 ## Phase Summary
 
-| Phase                                   | Script / Notebook                                                                     | Key Output                                              |
-| --------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| 1 — Raw data                            | External (IPN Hand download)                                                          | 200 AVI videos + annotation TXT files                   |
-| 2 — Landmark extraction                 | `scripts/build_ipn_dataset.py` Phase 1                                                | `cache/<stem>_holistic.npz` per video (parallelised)    |
+| Phase                                   | Script / Notebook                                                                     | Key Output                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1 — Raw data                            | External (IPN Hand download)                                                          | 200 AVI videos + annotation TXT files                                   |
+| 2 — Landmark extraction                 | `scripts/build_ipn_dataset.py` Phase 1                                                | `cache/<stem>_holistic.npz` per video (parallelised)                    |
 | 3 — Label mapping                       | `scripts/build_ipn_dataset.py` Phase 2                                                | Default 10-class vocabulary mapping (configurable via `--vocab-config`) |
-| 4 — Feature engineering + windowing     | `build_ipn_dataset.py` → `LandmarkFeatureTransformer` + `SlidingWindowSequenceBuffer` | Sequence windows (N, 32, 147) with majority labels      |
-| 5 — Mirror augmentation + serialisation | `build_ipn_dataset.py`                                                                | `data/processed/*.npz` (output path configurable)       |
-| 6 — Data splits                         | `notebooks/02_model_training_two-stream-lstm.ipynb` → `GestureDataModule`             | Stratified 70/15/15 train/val/test split                |
-| 7 — Configuration                       | `configs/model/two_stream_attn.yaml`                                                  | Default EnhancedTwoStreamLSTM hyperparameters           |
-| 8 — Training loop                       | `notebooks/02_model_training_two-stream-lstm.ipynb` → `train_lstm()`                  | Per-epoch checkpoints; best saved by `val_loss`         |
-| 9 — Evaluation                          | `notebooks/02_model_training_two-stream-lstm.ipynb`                                   | Test metrics, confusion matrix, per-class report        |
-| 10 — Export                             | `training/export_checkpoint.py`                                                       | `two_stream_attn_v1_*_inference.pt` (no training state) |
-| 11 — Publish                            | `training/hf_publish.py`                                                              | `ntsrigaud/maestro-lstm` on Hugging Face Hub            |
+| 4 — Feature engineering + windowing     | `build_ipn_dataset.py` → `LandmarkFeatureTransformer` + `SlidingWindowSequenceBuffer` | Sequence windows (N, 32, 147) with majority labels                      |
+| 5 — Mirror augmentation + serialisation | `build_ipn_dataset.py`                                                                | `data/processed/*.npz` (output path configurable)                       |
+| 6 — Data splits                         | `notebooks/02_model_training_two-stream-lstm.ipynb` → `GestureDataModule`             | Stratified 70/15/15 train/val/test split                                |
+| 7 — Configuration                       | `configs/model/two_stream_attn.yaml`                                                  | Default EnhancedTwoStreamLSTM hyperparameters                           |
+| 8 — Training loop                       | `notebooks/02_model_training_two-stream-lstm.ipynb` → `train_lstm()`                  | Per-epoch checkpoints; best saved by `val_loss`                         |
+| 9 — Evaluation                          | `notebooks/02_model_training_two-stream-lstm.ipynb`                                   | Test metrics, confusion matrix, per-class report                        |
+| 10 — Export                             | `training/export_checkpoint.py`                                                       | `two_stream_attn_v1_*_inference.pt` (no training state)                 |
+| 11 — Publish                            | `training/hf_publish.py`                                                              | `ntsrigaud/maestro-lstm` on Hugging Face Hub                            |
 
 ---
 
