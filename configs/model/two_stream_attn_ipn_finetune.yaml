@@ -32,7 +32,7 @@ model:
   hidden_size: 96         # must match pretrained checkpoint (two_stream_attn_jester.yaml)
   num_layers: 2           # must match pretrained checkpoint
   dropout: 0.35
-  num_classes: 14         # full IPN vocabulary (all 14 classes)
+  num_classes: 13         # full IPN vocabulary (all 14 classes)
   num_heads: 8            # must match pretrained checkpoint
   proj_dim: 96            # must match pretrained checkpoint
 
