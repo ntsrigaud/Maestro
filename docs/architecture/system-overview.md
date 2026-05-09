@@ -12,22 +12,29 @@ Provide reliable, low-latency gesture-based desktop control using a small, highl
 
 ## 3. Gesture Vocabulary
 
-Runtime command control uses an 8-class production vocabulary. The dataset preparation pipeline also maintains a full 14-class IPN baseline vocabulary for training/evaluation comparisons.
+Runtime recognition uses a 10-class vocabulary (9 active gestures + `unknown`). Discrete command dispatch uses the subset configured in `gesture_commands`, while `point_one` and `point_two` are continuous tracker gestures configured in `gesture_modes`.
 
-The production runtime vocabulary is:
+The production runtime vocabulary (discrete command path) is:
 
-| Gesture          | Type            | Mapped Command          |
-| ---------------- | --------------- | ----------------------- |
-| `open_palm_hold` | Static          | Start/stop presentation |
-| `swipe_right`    | Dynamic         | Scroll forward          |
-| `swipe_left`     | Dynamic         | Scroll back             |
-| `swipe_up`       | Dynamic         | Previous slide          |
-| `swipe_down`     | Dynamic         | Next slide              |
-| `zoom_in`        | Dynamic         | Zoom in view            |
-| `zoom_out`       | Dynamic         | Zoom out view           |
-| `unknown`        | Rejection class | No action               |
+| Gesture          | Type            | Mapped Command     |
+| ---------------- | --------------- | ------------------ |
+| `open_palm_hold` | Static          | Erase annotations  |
+| `swipe_right`    | Dynamic         | Next slide         |
+| `swipe_left`     | Dynamic         | Previous slide     |
+| `swipe_up`       | Dynamic         | Start presentation |
+| `swipe_down`     | Dynamic         | Stop presentation  |
+| `zoom_in`        | Dynamic         | Zoom in view       |
+| `zoom_out`       | Dynamic         | Zoom out view      |
+| `unknown`        | Rejection class | No action          |
 
-The activation gate is controlled entirely by gaze detection: the system starts in ARMED state and accepts command gestures as long as the user's gaze is directed at the camera. Turning away (gaze lost beyond the grace period) transitions the system to IDLE; looking back triggers `rearm()` and resumes ARMED state. `swipe_down`/`swipe_up` navigate slides (next/previous), `swipe_right`/`swipe_left` scroll content forward/back, `zoom_in`/`zoom_out` adjust view magnification, and `open_palm_hold` starts or stops the presentation.
+The activation gate is controlled by gaze detection plus the activation controller state machine: the controller starts in IDLE and moves to ARMED on gaze-permitted rising edge via `rearm()`. Losing gaze beyond grace transitions back to IDLE through `force_idle()`. Command semantics are configured in `configs/gestures/command_map_presentation.yaml`.
+
+Continuous gestures are configured separately in `gesture_modes`: `point_one` drives the laser pointer tracker and `point_two` drives the annotation pen tracker. These continuous paths bypass command dispatch so cursor/pen updates can run at frame rate.
+
+| Gesture     | Type       | Runtime Path                                  |
+| ----------- | ---------- | --------------------------------------------- |
+| `point_one` | Continuous | `LaserPointerTracker` (per-frame cursor path) |
+| `point_two` | Continuous | `AnnotationPenTracker` (per-frame pen path)   |
 
 ## 4. High-Level Architecture
 
@@ -51,7 +58,7 @@ The system is organized into four layers:
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Domain Layer**: Pure data structures and interface contracts with no framework dependencies. All pipeline data types (`FramePacket`, `HandLandmarks`, `MultiHandPacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`) are frozen dataclasses.
+**Domain Layer**: Pure data structures and interface contracts with minimal dependencies. Pipeline data types (`FramePacket`, `HandLandmarks`, `MultiHandPacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`) are `dataclass(slots=True)` entities.
 
 **Infrastructure Layer**: Concrete implementations of domain interfaces using external libraries (OpenCV, MediaPipe, PyTorch, pyautogui). Each implementation is isolated behind a Protocol interface.
 
@@ -89,12 +96,12 @@ graph LR
 3. **Landmark Extraction**: MediaPipe Hands detects all visible hands (up to 2) and returns a `MultiHandPacket` containing each hand's 21 landmarks, handedness label, detection confidence, and tracking confidence.
 4. **Hand Selection**: `HandSelector` applies the user's `hand_preference` configuration to pick one hand from the `MultiHandPacket`, producing a `LandmarkPacket`. Encodes the selfie-view inversion (`"right"` → MP `"Left"`, `"left"` → MP `"Right"`); marks the packet `valid=False` if the preferred hand is absent or below confidence thresholds.
 5. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity, joint angles, fingertip spread, and wrist trajectory features to produce a 147-dimensional feature vector (feature-schema-v5).
-6. **Temporal Buffering**: A sliding window buffer accumulates 24 consecutive feature vectors with a step size of 3 frames.
-7. **Enhanced Two-Stream Inference**: The buffered sequence (24×147) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory). `EnhancedTwoStreamLSTM` applies per-stream projection, bidirectional LSTM encoding, multi-head self-attention, cross-stream gating, and an MLP head to produce the final class probabilities.
+6. **Temporal Buffering**: A sliding window buffer accumulates 32 consecutive feature vectors with a step size of 3 frames.
+7. **Enhanced Two-Stream Inference**: The buffered sequence (32×147) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory). `EnhancedTwoStreamLSTM` applies per-stream projection, bidirectional LSTM encoding, multi-head self-attention, cross-stream gating, and an MLP head to produce the final class probabilities.
 8. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
-9. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in ARMED state; gaze loss transitions to IDLE; gaze restoration calls `rearm()` to return to ARMED. Edge-triggered dispatch is enforced throughout.
-10. **Command Dispatch**: The gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
-11. **Keyboard Execution**: The adapter translates commands to keyboard shortcuts and invokes them via pyautogui with key-name allowlist validation.
+9. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in IDLE; gaze restoration calls `rearm()` to enter ARMED; gaze-loss expiry calls `force_idle()` to return to IDLE. Edge-triggered dispatch is enforced throughout.
+10. **Command Dispatch**: The discrete gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
+11. **Keyboard/Pointer Execution**: Discrete commands are translated into validated keyboard/zoom actions; continuous `point_one`/`point_two` gestures are executed by runtime trackers as cursor movement and drag-based annotation strokes.
 
 ## 6. Key Architectural Characteristics
 
@@ -142,8 +149,8 @@ Nine `Protocol` interfaces define service contracts. Implementations can be swap
 
 The offline training pipeline converts labeled video data into a trained LSTM checkpoint:
 
-1. **Data Collection**: The IPN Hand dataset is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks and emits NPZ sequence datasets using the full 14-class baseline mapping (with production subsets available for runtime-focused training).
-2. **Model Training**: `scripts/train_model.py` defaults to `configs/model/two_stream_attn.yaml`, training `EnhancedTwoStreamLSTM` with class weighting, AdamW, learning-rate scheduling, and early stopping. Legacy model configs are retained for experimental reference only.
+1. **Data Collection**: The IPN Hand dataset is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks and emits NPZ sequence datasets (default graph format; flat `feature-schema-v5` output via `--format flat` for two-stream LSTM training).
+2. **Model Training**: `scripts/train_model.py` defaults to `configs/model/two_stream_attn.yaml`, training `EnhancedTwoStreamLSTM` with AdamW, learning-rate scheduling, and early stopping (plus optional balancing controls such as class capping/weighting). Legacy model configs are retained for experimental reference only.
 3. **Model Export**: Trained checkpoints are exported as inference artifacts containing state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/maestro-lstm`). Runtime loading is pinned to the enhanced artifact type (`two_stream_attn_inference`).
 
 For detailed model internals, see `enhanced-two-stream-lstm-architecture.md`.
@@ -152,4 +159,4 @@ For detailed model internals, see `enhanced-two-stream-lstm-architecture.md`.
 
 **Document**: System Overview  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: April 2026
+**Last Updated**: May 2026
