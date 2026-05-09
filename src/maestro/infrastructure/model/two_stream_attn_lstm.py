@@ -97,6 +97,7 @@ class EnhancedTwoStreamLSTM(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.dropout = dropout
         self.num_classes = num_classes
         self.num_heads = num_heads
         self.proj_dim = proj_dim
