@@ -263,6 +263,53 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
     )
 
 
+def _model_config_from_checkpoint(
+    checkpoint_model_config: dict[str, Any] | None,
+    fallback: ModelConfig,
+    *,
+    num_classes: int | None = None,
+) -> ModelConfig:
+    """Build a ModelConfig from a checkpoint payload with safe fallbacks.
+
+    Fine-tuning must reconstruct the pretrained architecture exactly so the
+    saved state dict can be loaded without key or shape drift.  The checkpoint
+    model configuration is therefore the source of truth, with *fallback* only
+    used for backward-compatible fields that may be absent in older payloads.
+    """
+
+    payload = checkpoint_model_config or {}
+    resolved_num_classes = (
+        int(num_classes)
+        if num_classes is not None
+        else int(payload.get("num_classes", fallback.num_classes))
+    )
+
+    return ModelConfig(
+        model_name=str(payload.get("model_name", fallback.model_name)),
+        input_size=int(payload.get("input_size", fallback.input_size)),
+        hidden_size=int(payload.get("hidden_size", fallback.hidden_size)),
+        num_layers=int(payload.get("num_layers", fallback.num_layers)),
+        dropout=float(payload.get("dropout", fallback.dropout)),
+        num_classes=resolved_num_classes,
+        num_nodes=int(payload.get("num_nodes", fallback.num_nodes)),
+        num_coords=int(payload.get("num_coords", fallback.num_coords)),
+        stgcn_channels=tuple(
+            int(c) for c in payload.get("stgcn_channels", fallback.stgcn_channels)
+        ),
+        num_stgcn_layers=int(
+            payload.get("num_stgcn_layers", fallback.num_stgcn_layers)
+        ),
+        lstm_hidden=int(payload.get("lstm_hidden", fallback.lstm_hidden)),
+        lstm_layers=int(payload.get("lstm_layers", fallback.lstm_layers)),
+        phono_proj_dim=int(payload.get("phono_proj_dim", fallback.phono_proj_dim)),
+        phono_conv_channels=int(
+            payload.get("phono_conv_channels", fallback.phono_conv_channels)
+        ),
+        num_heads=int(payload.get("num_heads", fallback.num_heads)),
+        proj_dim=int(payload.get("proj_dim", fallback.proj_dim)),
+    )
+
+
 def create_datamodule(
     *,
     dataset_path: str | Path,
@@ -691,8 +738,6 @@ def finetune_lstm(
         Number of Stage-A epochs with backbone frozen.  Set to ``0`` to skip
         Stage A and fine-tune all layers from epoch 1.
     """
-    from dataclasses import replace
-
     seed_everything(config.training.seed)
     datamodule = create_datamodule(dataset_path=dataset_path, config=config)
 
@@ -708,10 +753,13 @@ def finetune_lstm(
     )
     pretrained_model_config_dict: dict[str, Any] = ckpt.get("model_config", {})
 
-    # Reconstruct pretrained model with the ORIGINAL num_classes so we can load
-    # the full state dict including the old head.
-    pretrained_num_classes = int(pretrained_model_config_dict.get("num_classes", 27))
-    pretrained_mc = replace(config.model, num_classes=pretrained_num_classes)
+    # Reconstruct the pretrained model from the checkpoint description so the
+    # saved state dict loads against the exact architecture that produced it.
+    pretrained_mc = _model_config_from_checkpoint(
+        pretrained_model_config_dict,
+        config.model,
+        num_classes=int(pretrained_model_config_dict.get("num_classes", 27)),
+    )
     model = _build_model(pretrained_mc, device)
     model.load_state_dict(ckpt["model_state_dict"])
 
