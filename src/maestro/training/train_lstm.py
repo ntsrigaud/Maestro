@@ -5,7 +5,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
 import yaml
@@ -766,7 +766,12 @@ def finetune_lstm(
     if not isinstance(model, EnhancedTwoStreamLSTM):
         raise TypeError(f"finetune_lstm requires EnhancedTwoStreamLSTM; got {type(model).__name__}")
 
-    old_head_linear: nn.Linear = model.head[-1]
+    if not isinstance(model.head[-1], nn.Linear):
+        raise TypeError(
+            "EnhancedTwoStreamLSTM.head[-1] must be nn.Linear for fine-tuning head replacement"
+        )
+
+    old_head_linear = cast(nn.Linear, model.head[-1])
     new_num_classes = config.model.num_classes
     model.head[-1] = nn.Linear(old_head_linear.in_features, new_num_classes).to(device)
     model.num_classes = new_num_classes
