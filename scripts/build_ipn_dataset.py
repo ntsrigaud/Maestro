@@ -66,8 +66,10 @@ import yaml
 try:
     from tqdm import tqdm
 except ImportError:  # graceful degradation if tqdm is not installed
+
     def tqdm(iterable, **kwargs):  # type: ignore[misc]
         return iterable
+
 
 # ---------------------------------------------------------------------------
 # Path bootstrap — allow running as a plain script from any cwd.
@@ -435,7 +437,9 @@ def extract_all_landmarks(
         chunksize = max(1, min(32, len(tasks) // max(1, num_workers * 8)))
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             iterator = executor.map(_extract_video_worker, tasks, chunksize=chunksize)
-            for stem, cpath in tqdm(iterator, total=len(tasks), desc="Extracting landmarks", unit="video"):
+            for stem, cpath in tqdm(
+                iterator, total=len(tasks), desc="Extracting landmarks", unit="video"
+            ):
                 if cpath:
                     result_paths[stem] = Path(cpath)
                 else:
@@ -1113,7 +1117,9 @@ def main() -> None:
     )
 
     if args.format == "flat":
-        mode_desc = "binary detector (2 classes)" if args.binary_labels else "flat feature-schema-v5"
+        mode_desc = (
+            "binary detector (2 classes)" if args.binary_labels else "flat feature-schema-v5"
+        )
         logger.info("Building %s dataset (right-hand, 147 dims)…", mode_desc)
         builder: SequenceDatasetBuilder | GraphSequenceDatasetBuilder = assemble_flat_dataset(
             **assemble_kwargs
