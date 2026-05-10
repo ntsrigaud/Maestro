@@ -382,6 +382,7 @@ class TestEdgeTriggerSingleDispatch:
             "Edge-trigger failed to suppress repeated predictions."
         )
         assert commands[0].command_id == "next_slide"
+
     def test_gesture_resets_after_unknown_then_redispatches(self):
         """After the gesture transitions through 'unknown', the next accepted
         swipe_right occurrence is treated as a new gesture and fires again."""
@@ -406,6 +407,7 @@ class TestEdgeTriggerSingleDispatch:
             cmd2 = ctrl.route(_pred("swipe_right"))
         assert cmd2 is not None
         assert cmd2.command_id == "next_slide"
+
     def test_repeated_swipe_through_expired_cooldown_still_suppressed(self):
         """The most critical regression: after COOLDOWN expires, if the swipe
         gesture is still recognized (slow swipe or EMA lag), the edge-trigger

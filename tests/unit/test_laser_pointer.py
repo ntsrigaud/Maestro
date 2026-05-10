@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, call
 
-import pytest
-
 from maestro.pipeline.laser_pointer import LaserPointerTracker
 
 # ---------------------------------------------------------------------------
@@ -19,12 +17,8 @@ from maestro.pipeline.laser_pointer import LaserPointerTracker
 _POINTING_LABELS = frozenset({"point_one", "point_two"})
 
 # 21 landmarks; index 8 is the index fingertip.
-_LANDMARKS_CENTER: list[list[float]] = [
-    [0.5, 0.5, 0.0] for _ in range(21)
-]
-_LANDMARKS_TOP_RIGHT: list[list[float]] = [
-    [0.8, 0.2, 0.0] for _ in range(21)
-]
+_LANDMARKS_CENTER: list[list[float]] = [[0.5, 0.5, 0.0] for _ in range(21)]
+_LANDMARKS_TOP_RIGHT: list[list[float]] = [[0.8, 0.2, 0.0] for _ in range(21)]
 
 
 def _mock_keyboard() -> MagicMock:
@@ -33,7 +27,9 @@ def _mock_keyboard() -> MagicMock:
     return kb
 
 
-def _tracker(mirror_x: bool = True, use_command_key: bool = False) -> tuple[LaserPointerTracker, MagicMock]:
+def _tracker(
+    mirror_x: bool = True, use_command_key: bool = False
+) -> tuple[LaserPointerTracker, MagicMock]:
     kb = _mock_keyboard()
     # Pin to Windows/Linux path by default (ctrl+l / ctrl+a) so these tests
     # are platform-independent.  Pass use_command_key=True to exercise the
@@ -221,7 +217,7 @@ class TestLaserPointerTrackerReactivation:
     def test_ctrl_l_fires_again_after_neutral(self):
         tracker, kb = _tracker()
         tracker.update("point_one", _LANDMARKS_CENTER, valid=True)  # activate
-        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)    # deactivate
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)  # deactivate
         tracker.update("point_one", _LANDMARKS_CENTER, valid=True)  # re-activate
         ctrl_l_calls = [c for c in kb.press_hotkey.call_args_list if c == call("ctrl", "l")]
         assert len(ctrl_l_calls) == 2
@@ -267,7 +263,7 @@ class TestLaserPointerTrackerMacOS:
     def test_reactivation_sends_command_l_again(self):
         tracker, kb = _tracker(use_command_key=True)
         tracker.update("point_one", _LANDMARKS_CENTER, valid=True)  # activate
-        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)    # deactivate
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)  # deactivate
         tracker.update("point_one", _LANDMARKS_CENTER, valid=True)  # re-activate
         cmd_l_calls = [c for c in kb.press_hotkey.call_args_list if c == call("command", "l")]
         assert len(cmd_l_calls) == 2
