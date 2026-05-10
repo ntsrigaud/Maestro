@@ -1018,13 +1018,14 @@ def main() -> None:
     if args.binary_labels:
         active_label_mapping = IPN_TO_VOCAB_BINARY
         # Apply binary-mode defaults only when the user has not overridden them.
-        # argparse stores these as their default values, which we compare by
-        # checking against the parser defaults.
-        defaults = parser.parse_args([])  # parse empty to get default values
-        if args.vocab_config == defaults.vocab_config:
+        # Use parser defaults directly to avoid triggering required-argument
+        # validation from parse_args([]).
+        default_vocab_config = parser.get_default("vocab_config")
+        default_window_length = parser.get_default("window_length")
+        if args.vocab_config == default_vocab_config:
             args.vocab_config = "configs/gestures/vocabulary_ipn_binary.yaml"
             logger.info("Binary mode: using default vocab '%s'", args.vocab_config)
-        if args.window_length == defaults.window_length:
+        if args.window_length == default_window_length:
             args.window_length = 8
             logger.info("Binary mode: using default window-length 8 (paper detector window)")
 
