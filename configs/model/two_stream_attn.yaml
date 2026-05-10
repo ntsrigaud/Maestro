@@ -41,7 +41,7 @@ model:
   model_name: two_stream_attn_v1
   input_size: 147 # total feature dims (feature-schema-v5); split internally
   hidden_size: 128 # per-direction per-stream; BiLSTM output = 2×128 = 256
-  num_layers: 2 # grid search: 2L > 3L/4L for this dataset size
+  num_layers: 4 # grid search: 2L > 3L/4L for this dataset size
   dropout: 0.20 # grid search Stage 2 optimal (do=0.2 + wd=5e-4 best val F1)
   num_classes: 10 # 9 active gestures + unknown
   # EnhancedTwoStreamLSTM-specific fields
