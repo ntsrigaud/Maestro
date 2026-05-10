@@ -49,7 +49,6 @@ import argparse
 import json
 import logging
 import os
-import random
 import sys
 import time
 from collections import Counter
@@ -65,8 +64,10 @@ import yaml
 try:
     from tqdm import tqdm
 except ImportError:  # graceful degradation if tqdm is not installed
+
     def tqdm(iterable, **kwargs):  # type: ignore[misc]
         return iterable
+
 
 # ---------------------------------------------------------------------------
 # Path bootstrap — allow running as a plain script from any cwd.
@@ -108,6 +109,7 @@ def _ensure_protobuf_compat() -> None:
         return factory.GetPrototype(descriptor)
 
     symbol_database.SymbolDatabase.GetPrototype = _get_prototype
+
 
 # ---------------------------------------------------------------------------
 # Jester label → vocabulary key mapping
@@ -192,8 +194,8 @@ JESTER_FPS: float = 12.0
 class JesterAnnotation:
     """A single Jester annotation record."""
 
-    video_id: str     # e.g. "34870"
-    label: str        # original Jester label string, e.g. "Swiping Left"
+    video_id: str  # e.g. "34870"
+    label: str  # original Jester label string, e.g. "Swiping Left"
     vocab_label: str  # vocabulary key, e.g. "swiping_left"
 
 
@@ -203,8 +205,8 @@ class VideoLandmarks:
 
     video_id: str
     fps: float
-    frame_ids: np.ndarray   # (N,) int32 — 0-indexed frame order
-    keypoints: np.ndarray   # (N, 67, 3) float32 — pre-normalisation
+    frame_ids: np.ndarray  # (N,) int32 — 0-indexed frame order
+    keypoints: np.ndarray  # (N, 67, 3) float32 — pre-normalisation
     valid_mask: np.ndarray  # (N, 67) bool — per-node detection validity
 
 
@@ -365,7 +367,7 @@ def _load_cache(cache_path: Path) -> VideoLandmarks:
             video_id=cache_path.stem,
             fps=float(data["fps"]),
             frame_ids=data["frame_ids"],
-            keypoints=data["keypoints"],   # (N, 67, 3)
+            keypoints=data["keypoints"],  # (N, 67, 3)
             valid_mask=data["valid_mask"],  # (N, 67)
         )
 
@@ -404,18 +406,21 @@ def extract_all_landmarks(
         if no_cache and cache_path.exists():
             cache_path.unlink()
 
-        tasks.append((
-            str(video_folder),
-            str(cache_path),
-            min_detection_confidence,
-            min_tracking_confidence,
-            fps,
-        ))
+        tasks.append(
+            (
+                str(video_folder),
+                str(cache_path),
+                min_detection_confidence,
+                min_tracking_confidence,
+                fps,
+            )
+        )
 
     if result_paths:
         logger.info(
             "%d video(s) resolved from cache; %d queued for extraction.",
-            len(result_paths), len(tasks),
+            len(result_paths),
+            len(tasks),
         )
 
     if not tasks and not result_paths:
@@ -434,14 +439,18 @@ def extract_all_landmarks(
         chunksize = max(1, min(32, len(tasks) // max(1, num_workers * 8)))
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             iterator = executor.map(_extract_jester_video_worker, tasks, chunksize=chunksize)
-            for vid_id, cpath in tqdm(iterator, total=len(tasks), desc="Extracting landmarks", unit="video"):
+            for vid_id, cpath in tqdm(
+                iterator, total=len(tasks), desc="Extracting landmarks", unit="video"
+            ):
                 if cpath:
                     result_paths[vid_id] = Path(cpath)
 
     elapsed = time.perf_counter() - t0
     logger.info(
         "Extraction complete in %.1fs  (%d / %d videos cached).",
-        elapsed, len(result_paths), len(video_ids),
+        elapsed,
+        len(result_paths),
+        len(video_ids),
     )
     return result_paths
 
@@ -483,11 +492,13 @@ def parse_annotations(
             if vocab_label not in vocabulary_set:
                 continue
 
-            rows.append(JesterAnnotation(
-                video_id=video_id,
-                label=jester_label,
-                vocab_label=vocab_label,
-            ))
+            rows.append(
+                JesterAnnotation(
+                    video_id=video_id,
+                    label=jester_label,
+                    vocab_label=vocab_label,
+                )
+            )
     return rows
 
 
@@ -794,7 +805,10 @@ def main() -> None:
     # ── Phase 2: Dataset assembly ──────────────────────────────────────────────
     logger.info(
         "Assembling dataset  (window=%d  step=%d  strategy=%s  max_per_video=%d)…",
-        args.window_length, args.window_step, args.label_strategy, args.max_samples_per_video,
+        args.window_length,
+        args.window_step,
+        args.label_strategy,
+        args.max_samples_per_video,
     )
     builder = assemble_dataset(
         annotations=all_annotations,
