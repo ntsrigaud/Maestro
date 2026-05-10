@@ -440,17 +440,20 @@ def _train_one_epoch_with_retention(
     teacher: nn.Module,
     target_dataloader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
     replay_iter: Iterator[tuple[torch.Tensor, torch.Tensor]],
+    replay_head: nn.Module,
     optimizer: torch.optim.Optimizer,
     target_criterion: nn.Module,
     device: torch.device,
     grad_clip_norm: float,
     distillation_weight: float,
-) -> tuple[float, float, float]:
+    replay_ce_weight: float,
+) -> tuple[float, float, float, float]:
     model.train()
     teacher.eval()
 
     total_loss = 0.0
     total_distill_loss = 0.0
+    total_replay_ce_loss = 0.0
     total_correct = 0
     total_examples = 0
 
@@ -461,8 +464,9 @@ def _train_one_epoch_with_retention(
         batch_x = batch_x.to(device)
         batch_y = batch_y.to(device)
 
-        replay_x, _ = next(replay_iter)
+        replay_x, replay_y = next(replay_iter)
         replay_x = replay_x.to(device)
+        replay_y = replay_y.to(device)
 
         optimizer.zero_grad(set_to_none=True)
 
@@ -474,7 +478,13 @@ def _train_one_epoch_with_retention(
             teacher_features = teacher_with_features.forward_features(replay_x)
 
         distill_loss = F.mse_loss(student_features, teacher_features)
-        loss = target_loss + (distillation_weight * distill_loss)
+        replay_logits = replay_head(student_features)
+        replay_ce_loss = F.cross_entropy(replay_logits, replay_y)
+        loss = (
+            target_loss
+            + (distillation_weight * distill_loss)
+            + (replay_ce_weight * replay_ce_loss)
+        )
         loss.backward()
 
         if grad_clip_norm > 0:
@@ -485,6 +495,7 @@ def _train_one_epoch_with_retention(
         preds = torch.argmax(logits, dim=1)
         total_loss += float(loss.item()) * batch_x.size(0)
         total_distill_loss += float(distill_loss.item()) * batch_x.size(0)
+        total_replay_ce_loss += float(replay_ce_loss.item()) * batch_x.size(0)
         total_correct += int((preds == batch_y).sum().item())
         total_examples += int(batch_x.size(0))
 
@@ -495,6 +506,7 @@ def _train_one_epoch_with_retention(
         float(total_loss / total_examples),
         float(total_correct / total_examples),
         float(total_distill_loss / total_examples),
+        float(total_replay_ce_loss / total_examples),
     )
 
 
@@ -763,6 +775,7 @@ def finetune_lstm(
     replay_dataset_path: str | Path | None = None,
     replay_max_samples_per_class: int = 500,
     distillation_weight: float = 0.5,
+    replay_ce_weight: float = 0.3,
     backbone_lr_multiplier: float = 0.1,
 ) -> TrainingResult:
     """Fine-tune a pretrained ``EnhancedTwoStreamLSTM`` on a new dataset.
@@ -803,6 +816,14 @@ def finetune_lstm(
     teacher_model = copy.deepcopy(model)
     teacher_model.eval()
     for param in teacher_model.parameters():
+        param.requires_grad = False
+
+    # Keep a frozen copy of the source head (27-class by default) and apply it to
+    # current backbone features on replay batches. This creates an explicit
+    # old-task classification retention objective during Stage B.
+    replay_head = copy.deepcopy(cast(nn.Module, model.head)).to(device)
+    replay_head.eval()
+    for param in replay_head.parameters():
         param.requires_grad = False
 
     from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
@@ -862,6 +883,7 @@ def finetune_lstm(
             f"replay={Path(replay_dataset_path).name}  "
             f"replay_max/class={replay_max_samples_per_class}  "
             f"distill_w={distillation_weight:.3f}  "
+            f"replay_ce_w={replay_ce_weight:.3f}  "
             f"backbone_lr_mult={backbone_lr_multiplier:.3f}"
         )
 
@@ -982,24 +1004,29 @@ def finetune_lstm(
     print(_sep)
     print(
         f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  {'ValLoss':>8}  "
-        f"{'ValAcc':>7}  {'ValF1':>6}  {'LR':>8}  {'Distill':>8}  Note"
+        f"{'ValAcc':>7}  {'ValF1':>6}  {'LR':>8}  {'Distill':>8}  {'ReplayCE':>8}  Note"
     )
     print(_sep, flush=True)
 
     for epoch in range(1, config.training.epochs + 1):
         t0 = time.perf_counter()
         distill_loss_value = float("nan")
+        replay_ce_loss_value = float("nan")
         if replay_iter is not None:
-            train_loss, train_acc, distill_loss_value = _train_one_epoch_with_retention(
+            train_loss, train_acc, distill_loss_value, replay_ce_loss_value = (
+                _train_one_epoch_with_retention(
                 model=model,
                 teacher=teacher_model,
                 target_dataloader=train_loader,
                 replay_iter=replay_iter,
+                replay_head=replay_head,
                 optimizer=optimizer_b,
                 target_criterion=criterion,
                 device=device,
                 grad_clip_norm=config.training.grad_clip_norm,
                 distillation_weight=distillation_weight,
+                replay_ce_weight=replay_ce_weight,
+            )
             )
         else:
             train_loss, train_acc = _train_one_epoch(
@@ -1058,12 +1085,13 @@ def finetune_lstm(
                 "learning_rate": current_lr,
                 "epoch_secs": time.perf_counter() - t0,
                 "distill_loss": distill_loss_value,
+                "replay_ce_loss": replay_ce_loss_value,
             }
         )
         print(
             f"{epoch:>6}/{config.training.epochs:<4}  {train_loss:>9.4f}  {train_acc:>8.1%}  "
             f"{val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  {val_report.macro_f1:>6.1%}  "
-            f"{current_lr:>8.2e}  {distill_loss_value:>8.4f}  {note}",
+            f"{current_lr:>8.2e}  {distill_loss_value:>8.4f}  {replay_ce_loss_value:>8.4f}  {note}",
             flush=True,
         )
 
@@ -1107,6 +1135,7 @@ def finetune_lstm(
         ),
         "replay_max_samples_per_class": replay_max_samples_per_class,
         "distillation_weight": distillation_weight,
+        "replay_ce_weight": replay_ce_weight,
         "backbone_lr_multiplier": backbone_lr_multiplier,
         "best_epoch": best_epoch,
         "best_val_f1": best_val_f1,
