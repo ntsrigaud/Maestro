@@ -543,6 +543,11 @@ def assemble_dataset(
     the form ``{video}:{seg_index}`` so the builder resets its buffer state
     at every segment boundary.
     """
+    effective_mapping = label_mapping if label_mapping is not None else IPN_TO_VOCAB
+    # For binary mode the "background" class may be called 'no_gesture' not 'unknown'.
+    # Determine the background label name so unknown-subsampling logic can be skipped.
+    _is_binary = label_mapping is not None
+
     rng = random.Random(seed)
 
     builder = GraphSequenceDatasetBuilder(
@@ -557,24 +562,28 @@ def assemble_dataset(
     all_mapped: list[tuple[str, AnnotationRow]] = []  # (video_stem, row)
     vocabulary_set = set(vocabulary)
     for row in annotations:
-        if row.ipn_label not in IPN_TO_VOCAB:
+        if row.ipn_label not in effective_mapping:
             continue  # IPN code has no production mapping at all
-        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+        if effective_mapping[row.ipn_label] not in vocabulary_set:
             continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
         all_mapped.append((row.video, row))
 
-    # Subsample unknown segments from the full list.
-    subsampled_unknown = _subsample_unknown_segments(
-        [r for _, r in all_mapped if IPN_TO_VOCAB[r.ipn_label] == "unknown"],
-        max_unknown_segments_per_source,
-        rng,
-    )
-    unknown_set = {id(r) for r in subsampled_unknown}
+    # Subsample unknown segments from the full list (skipped in binary mode —
+    # both classes are equally wanted for detector training).
+    if not _is_binary:
+        subsampled_unknown = _subsample_unknown_segments(
+            [r for _, r in all_mapped if effective_mapping[r.ipn_label] == "unknown"],
+            max_unknown_segments_per_source,
+            rng,
+        )
+        unknown_set = {id(r) for r in subsampled_unknown}
+    else:
+        unknown_set: set[int] = set()
 
     # Rebuild final segment list preserving order and video grouping.
     final_by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
     for video, row in all_mapped:
-        if IPN_TO_VOCAB[row.ipn_label] == "unknown":
+        if not _is_binary and effective_mapping[row.ipn_label] == "unknown":
             if id(row) not in unknown_set:
                 continue
         final_by_video[video].append(row)
@@ -599,14 +608,15 @@ def assemble_dataset(
         fid_to_idx = {int(fid): i for i, fid in enumerate(vl.frame_ids)}
 
         for seg_idx, seg in enumerate(segments):
-            vocab_label = IPN_TO_VOCAB[seg.ipn_label]
+            vocab_label = effective_mapping[seg.ipn_label]
             recording_id = f"{video_stem}:seg{seg_idx:04d}"
 
             # Iterate frames t_start..t_end (1-indexed inclusive).
             # Cap unknown segments to avoid class imbalance from long background
             # spans generating far more windows than short gesture segments.
+            # In binary mode this cap is disabled — the no_gesture class is needed.
             t_end_effective = seg.t_end
-            if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
+            if not _is_binary and vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
                 t_end_effective = min(seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1)
 
             seg_windows_before = len(builder.samples)
@@ -674,6 +684,9 @@ def assemble_flat_dataset(
     produces a flat feature-schema-v5 dataset compatible with
     ``GestureDataModule`` and ``TwoStreamGestureLSTM``.
     """
+    effective_mapping = label_mapping if label_mapping is not None else IPN_TO_VOCAB
+    _is_binary = label_mapping is not None
+
     rng = random.Random(seed)
 
     builder = SequenceDatasetBuilder(
@@ -687,22 +700,25 @@ def assemble_flat_dataset(
     all_mapped: list[tuple[str, AnnotationRow]] = []
     vocabulary_set = set(vocabulary)
     for row in annotations:
-        if row.ipn_label not in IPN_TO_VOCAB:
+        if row.ipn_label not in effective_mapping:
             continue  # IPN code has no production mapping at all
-        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+        if effective_mapping[row.ipn_label] not in vocabulary_set:
             continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
         all_mapped.append((row.video, row))
 
-    subsampled_unknown = _subsample_unknown_segments(
-        [r for _, r in all_mapped if IPN_TO_VOCAB[r.ipn_label] == "unknown"],
-        max_unknown_segments_per_source,
-        rng,
-    )
-    unknown_set = {id(r) for r in subsampled_unknown}
+    if not _is_binary:
+        subsampled_unknown = _subsample_unknown_segments(
+            [r for _, r in all_mapped if effective_mapping[r.ipn_label] == "unknown"],
+            max_unknown_segments_per_source,
+            rng,
+        )
+        unknown_set = {id(r) for r in subsampled_unknown}
+    else:
+        unknown_set: set[int] = set()
 
     final_by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
     for video, row in all_mapped:
-        if IPN_TO_VOCAB[row.ipn_label] == "unknown":
+        if not _is_binary and effective_mapping[row.ipn_label] == "unknown":
             if id(row) not in unknown_set:
                 continue
         final_by_video[video].append(row)
@@ -725,11 +741,11 @@ def assemble_flat_dataset(
         fid_to_idx = {int(fid): i for i, fid in enumerate(vl.frame_ids)}
 
         for seg_idx, seg in enumerate(segments):
-            vocab_label = IPN_TO_VOCAB[seg.ipn_label]
+            vocab_label = effective_mapping[seg.ipn_label]
             recording_id = f"{video_stem}:seg{seg_idx:04d}"
 
             t_end_effective = seg.t_end
-            if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
+            if not _is_binary and vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
                 t_end_effective = min(seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1)
 
             seg_windows_before = len(builder.samples)
@@ -961,6 +977,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--binary-labels",
+        action="store_true",
+        default=False,
+        help=(
+            "Build a binary detector dataset (Phase 3 of the IPN-hand pipeline).  "
+            "Remaps all IPN labels to two classes: 'no_gesture' (D0X) and 'gesture' "
+            "(all other IPN codes).  Mirrors ipnbinary.json from the IPN-hand paper.  "
+            "When set, the default --vocab-config switches to "
+            "configs/gestures/vocabulary_ipn_binary.yaml and the default "
+            "--window-length switches to 8 (matching the paper's 8-frame detector "
+            "window).  Unknown-segment subsampling is disabled in binary mode since "
+            "both classes are needed at full coverage."
+        ),
+    )
+    p.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -978,6 +1009,24 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    # -----------------------------------------------------------------------
+    # Binary-mode defaults: override vocab + window-length when --binary-labels
+    # is set but the user has not explicitly supplied those args.
+    # -----------------------------------------------------------------------
+    active_label_mapping: dict[str, str] | None = None
+    if args.binary_labels:
+        active_label_mapping = IPN_TO_VOCAB_BINARY
+        # Apply binary-mode defaults only when the user has not overridden them.
+        # argparse stores these as their default values, which we compare by
+        # checking against the parser defaults.
+        defaults = parser.parse_args([])  # parse empty to get default values
+        if args.vocab_config == defaults.vocab_config:
+            args.vocab_config = "configs/gestures/vocabulary_ipn_binary.yaml"
+            logger.info("Binary mode: using default vocab '%s'", args.vocab_config)
+        if args.window_length == defaults.window_length:
+            args.window_length = 8
+            logger.info("Binary mode: using default window-length 8 (paper detector window)")
 
     ipn_root = Path(args.ipn_root)
     video_dir = ipn_root / "videos"
@@ -1008,8 +1057,9 @@ def main() -> None:
     logger.info("Loaded %d annotation rows from %s.", len(annotations), annot_path.name)
 
     # Collect the unique video stems that appear in (mapped) annotations.
+    effective_mapping_for_filter = active_label_mapping if active_label_mapping else IPN_TO_VOCAB
     needed_videos: list[str] = sorted(
-        {row.video for row in annotations if row.ipn_label in IPN_TO_VOCAB}
+        {row.video for row in annotations if row.ipn_label in effective_mapping_for_filter}
     )
     logger.info("%d unique videos needed for mapped labels.", len(needed_videos))
 
@@ -1058,10 +1108,12 @@ def main() -> None:
         max_unknown_segments_per_source=args.max_unknown_segments_per_source,
         max_unknown_frames_per_segment=args.max_unknown_frames_per_segment,
         seed=args.seed,
+        label_mapping=active_label_mapping,
     )
 
     if args.format == "flat":
-        logger.info("Building flat feature-schema-v5 dataset (right-hand, 147 dims)…")
+        mode_desc = "binary detector (2 classes)" if args.binary_labels else "flat feature-schema-v5"
+        logger.info("Building %s dataset (right-hand, 147 dims)…", mode_desc)
         builder: SequenceDatasetBuilder | GraphSequenceDatasetBuilder = assemble_flat_dataset(
             **assemble_kwargs
         )
