@@ -25,6 +25,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 try:
     from huggingface_hub import HfApi, login
 
@@ -50,6 +52,8 @@ _FEATURE_SCHEMA_DESCRIPTION = """\
 """
 
 _CLASS_DESCRIPTIONS: dict[str, str] = {
+    "point_one": "Single-finger pointing gesture (continuous laser-pointer control)",
+    "point_two": "Two-finger pointing gesture (continuous annotation-pen control)",
     "open_palm_hold": "Static open palm facing camera",
     "swipe_right": "Horizontal swipe from left to right",
     "swipe_left": "Horizontal swipe from right to left",
@@ -360,7 +364,7 @@ standard webcam using MediaPipe for landmark extraction.
 
 - **Architecture**: {architecture}
 - **Parameters**: {num_params:,}
-- **Input**: `(batch, 32, {feature_dim})` — 32-frame sliding window at 30 FPS ≈ 1067 ms
+- **Input**: `(batch, {window_length}, {feature_dim})` — {window_length}-frame sliding window at 30 FPS ≈ {window_duration_ms} ms
 - **Output**: Softmax logits over {num_classes} gesture classes
 - **Inference latency**: < 1 ms per call (CPU, single sample)
 - **Feature schema**: `{feature_schema_version}`
@@ -408,6 +412,12 @@ Input (B, T=32, 147)
 |-------|-------------|
 {class_table}
 
+## Gesture Usage In Presentation System
+
+| Class | Mode | Command | Runtime handling |
+|-------|------|---------|------------------|
+{gesture_usage_table}
+
 ## Feature Schema (`{feature_schema_version}`)
 
 {feature_schema_description}
@@ -449,6 +459,10 @@ with torch.no_grad():
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
   label-aware horizontal mirror (swipe_left ↔ swipe_right)
 
+## Training Strategy
+
+{training_strategy_section}
+
 ## Training Configuration
 
 | Parameter | Value |
@@ -466,8 +480,9 @@ with torch.no_grad():
 | Max epochs | {epochs} |
 | Early stopping patience | {patience} |
 | Label smoothing | {label_smoothing} |
-| Class weighting | ✓ inverse-frequency |
-| LR scheduler | ReduceLROnPlateau (factor=0.5, patience=8) |
+| Class weighting | {class_weighting} |
+| Max samples per class | {max_samples_per_class} |
+| LR scheduler | ReduceLROnPlateau (factor={scheduler_factor}, patience={scheduler_patience}) |
 
 ## Evaluation Results (Test Set)
 
@@ -559,7 +574,7 @@ standard webcam using MediaPipe for landmark extraction.
 
 - **Architecture**: {architecture}
 - **Parameters**: {num_params:,}
-- **Input**: `(batch, 32, {feature_dim})` — 32-frame sliding window at 30 FPS ≈ 1067 ms
+- **Input**: `(batch, {window_length}, {feature_dim})` — {window_length}-frame sliding window at 30 FPS ≈ {window_duration_ms} ms
 - **Output**: Softmax logits over {num_classes} gesture classes
 - **Inference latency**: ~0.5 ms per call (CPU, single sample)
 - **Feature schema**: `{feature_schema_version}`
@@ -569,6 +584,12 @@ standard webcam using MediaPipe for landmark extraction.
 | Class | Description |
 |-------|-------------|
 {class_table}
+
+## Gesture Usage In Presentation System
+
+| Class | Mode | Command | Runtime handling |
+|-------|------|---------|------------------|
+{gesture_usage_table}
 
 ## Feature Schema (`{feature_schema_version}`)
 
@@ -612,6 +633,10 @@ with torch.no_grad():
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
   label-aware offline horizontal mirror (swipe_left ↔ swipe_right)
 
+## Training Strategy
+
+{training_strategy_section}
+
 ## Training Configuration
 
 | Parameter | Value |
@@ -625,9 +650,10 @@ with torch.no_grad():
 | Batch size | {batch_size} |
 | Max epochs | {epochs} |
 | Early stopping patience | {patience} |
-| Label smoothing | 0.1 |
-| Class weighting | ✓ inverse-frequency |
-| LR scheduler | ReduceLROnPlateau (factor=0.5, patience=3) |
+| Label smoothing | {label_smoothing} |
+| Class weighting | {class_weighting} |
+| Max samples per class | {max_samples_per_class} |
+| LR scheduler | ReduceLROnPlateau (factor={scheduler_factor}, patience={scheduler_patience}) |
 
 ## Evaluation Results (Test Set)
 
@@ -686,6 +712,108 @@ def _build_per_class_table(per_class_recall: dict[str, float]) -> str:
     return "\n".join(rows)
 
 
+def _load_command_mapping() -> tuple[dict[str, str], dict[str, str]]:
+    """Load command and mode mappings used by the production controller."""
+    mapping_path = Path(__file__).resolve().parents[3] / "configs" / "gestures" / "command_map_presentation.yaml"
+    if not mapping_path.exists():
+        return {}, {}
+
+    payload = yaml.safe_load(mapping_path.read_text(encoding="utf-8")) or {}
+    commands = payload.get("gesture_commands", {}) or {}
+    modes = payload.get("gesture_modes", {}) or {}
+    return {str(k): str(v) for k, v in commands.items()}, {str(k): str(v) for k, v in modes.items()}
+
+
+def _build_gesture_usage_table(class_labels: list[str]) -> str:
+    """Render how each gesture is routed in the runtime control pipeline."""
+    commands, modes = _load_command_mapping()
+
+    rows = []
+    for cls in class_labels:
+        mode = modes.get(cls, "unmapped")
+        command = commands.get(cls, "—")
+
+        if mode == "unmapped" and command != "—":
+            mode = "discrete"
+
+        if mode == "continuous":
+            if cls == "point_one":
+                usage = "Continuous tracker: LaserPointerTracker (bypasses discrete dispatcher)"
+            elif cls == "point_two":
+                usage = "Continuous tracker: AnnotationPenTracker (bypasses discrete dispatcher)"
+            else:
+                usage = "Continuous tracker path (not dispatched as one-shot command)"
+        elif command == "no_action":
+            usage = "No-op background class"
+        elif command != "—":
+            usage = "Discrete command via GestureActivationController → CommandDispatcher"
+        else:
+            usage = "Not mapped in command_map_presentation.yaml"
+
+        rows.append(f"| `{cls}` | `{mode}` | `{command}` | {usage} |")
+
+    return "\n".join(rows)
+
+
+def _load_training_metrics(run_dir: Path) -> dict[str, Any]:
+    """Load per-run training metrics emitted by train_lstm/finetune_lstm."""
+    metrics_path = run_dir / "training_metrics.json"
+    if not metrics_path.exists():
+        return {}
+
+    try:
+        payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    return payload if isinstance(payload, dict) else {}
+
+
+def _build_training_strategy_section(
+    *,
+    result: TrainingResult,
+    config: TrainingPipelineConfig,
+) -> str:
+    """Describe whether this run is single-stage training or transfer learning."""
+    metrics = _load_training_metrics(result.run_dir)
+
+    stage_a_epochs = metrics.get("freeze_epochs")
+    if stage_a_epochs is None:
+        stage_a_epochs = sum(1 for h in result.train_history if int(h.get("stage", 1)) == 0)
+
+    stage_b_epochs = sum(1 for h in result.train_history if int(h.get("stage", 1)) == 1)
+    if stage_b_epochs <= 0:
+        stage_b_epochs = int(getattr(config.training, "epochs", 0))
+
+    pretrained_checkpoint = metrics.get("pretrained_checkpoint")
+    if not isinstance(pretrained_checkpoint, str):
+        pretrained_checkpoint = ""
+
+    is_finetune_run = bool(pretrained_checkpoint) or ("finetune" in result.model_version.lower()) or any(
+        "stage" in h for h in result.train_history
+    )
+
+    if not is_finetune_run:
+        return (
+            "Single-stage supervised training on IPN-Hand only.\n"
+            "The model is initialized from scratch and optimized end-to-end on the target gesture set."
+        )
+
+    source_desc = "Jester (27-class)"
+    if pretrained_checkpoint and "jester" not in pretrained_checkpoint.lower():
+        source_desc = f"external checkpoint `{Path(pretrained_checkpoint).name}`"
+
+    target_desc = "IPN 10-gesture production subset" if config.model.num_classes == 10 else "target IPN subset"
+
+    return (
+        "Two-phase transfer learning pipeline:\n"
+        f"- **Phase 1 (pretraining):** backbone pretrained on {source_desc} to learn generic gesture dynamics.\n"
+        f"- **Phase 2 (fine-tuning):** head replaced and model adapted on {target_desc}.\n"
+        f"- **Stage A (frozen backbone):** {int(stage_a_epochs)} epoch(s) head-only warmup.\n"
+        f"- **Stage B (full model):** up to {int(stage_b_epochs)} epoch(s) joint fine-tuning with scheduler/early stopping."
+    )
+
+
 def _build_model_card(
     *,
     result: TrainingResult,
@@ -697,6 +825,17 @@ def _build_model_card(
     num_params = _count_parameters(result.model)
     num_classes_active = len(result.class_labels) - 1  # subtract unknown
     created_at = datetime.now(UTC).strftime("%Y-%m-%d")
+    window_length = int(result.dataset_metadata.get("window_length", 32))
+    window_duration_ms = int(round(window_length * (1000.0 / 30.0)))
+    class_weighting = (
+        "enabled (inverse-frequency)" if getattr(config.training, "class_weighting", False) else "disabled"
+    )
+    max_samples = getattr(config.training, "max_samples_per_class", None)
+    max_samples_per_class = str(max_samples) if max_samples is not None else "not set"
+    scheduler_factor = getattr(config.scheduler, "factor", 0.5)
+    scheduler_patience = getattr(config.scheduler, "patience", 8)
+    gesture_usage_table = _build_gesture_usage_table(result.class_labels)
+    training_strategy_section = _build_training_strategy_section(result=result, config=config)
 
     if is_dual_stgcn:
         lstm_hidden = getattr(config.model, "lstm_hidden", 256)
@@ -758,11 +897,15 @@ def _build_model_card(
             architecture=architecture,
             num_params=num_params,
             feature_dim=config.model.input_size,
+            window_length=window_length,
+            window_duration_ms=window_duration_ms,
             num_classes=config.model.num_classes,
             num_classes_active=num_classes_active,
             feature_schema_version=config.export.feature_schema_version,
             feature_schema_description=_FEATURE_SCHEMA_DESCRIPTION,
             class_table=_build_class_table(result.class_labels),
+            gesture_usage_table=gesture_usage_table,
+            training_strategy_section=training_strategy_section,
             test_accuracy=test_report.accuracy,
             test_f1=test_report.macro_f1,
             hidden_size=hidden_size,
@@ -780,6 +923,10 @@ def _build_model_card(
             epochs=config.training.epochs,
             patience=config.training.early_stopping_patience,
             label_smoothing=getattr(config.training, "label_smoothing", 0.05),
+            class_weighting=class_weighting,
+            max_samples_per_class=max_samples_per_class,
+            scheduler_factor=scheduler_factor,
+            scheduler_patience=scheduler_patience,
             per_class_table=_build_per_class_table(test_report.per_class_recall),
             created_at=created_at,
         )
@@ -795,11 +942,15 @@ def _build_model_card(
         architecture=architecture,
         num_params=num_params,
         feature_dim=config.model.input_size,
+        window_length=window_length,
+        window_duration_ms=window_duration_ms,
         num_classes=config.model.num_classes,
         num_classes_active=num_classes_active,
         feature_schema_version=config.export.feature_schema_version,
         feature_schema_description=_FEATURE_SCHEMA_DESCRIPTION,
         class_table=_build_class_table(result.class_labels),
+        gesture_usage_table=gesture_usage_table,
+        training_strategy_section=training_strategy_section,
         test_accuracy=test_report.accuracy,
         test_f1=test_report.macro_f1,
         hidden_size=getattr(config.model, "hidden_size", "N/A"),
@@ -809,6 +960,11 @@ def _build_model_card(
         batch_size=config.training.batch_size,
         epochs=config.training.epochs,
         patience=config.training.early_stopping_patience,
+        label_smoothing=getattr(config.training, "label_smoothing", 0.0),
+        class_weighting=class_weighting,
+        max_samples_per_class=max_samples_per_class,
+        scheduler_factor=scheduler_factor,
+        scheduler_patience=scheduler_patience,
         per_class_table=_build_per_class_table(test_report.per_class_recall),
         created_at=created_at,
     )
@@ -980,7 +1136,14 @@ def publish_to_huggingface(
             "weight_decay": config.training.weight_decay,
             "grad_clip_norm": config.training.grad_clip_norm,
             "seed": config.training.seed,
-            "label_smoothing": 0.1,
+            "label_smoothing": getattr(config.training, "label_smoothing", 0.0),
+            "class_weighting": getattr(config.training, "class_weighting", False),
+            "max_samples_per_class": getattr(config.training, "max_samples_per_class", None),
+            "scheduler": {
+                "factor": getattr(config.scheduler, "factor", None),
+                "patience": getattr(config.scheduler, "patience", None),
+                "min_lr": getattr(config.scheduler, "min_lr", None),
+            },
         },
         "evaluation": {
             "test_accuracy": test_report.accuracy,
@@ -992,6 +1155,12 @@ def publish_to_huggingface(
         },
         "class_labels": result.class_labels,
         "created_at": datetime.now(UTC).isoformat(),
+    }
+
+    command_mapping_commands, command_mapping_modes = _load_command_mapping()
+    config_snapshot["gesture_command_mapping"] = {
+        "commands": command_mapping_commands,
+        "modes": command_mapping_modes,
     }
 
     commit_msg = commit_message or f"Upload {result.model_version}"
