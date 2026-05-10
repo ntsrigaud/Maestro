@@ -808,9 +808,7 @@ def finetune_lstm(
     from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
     if not isinstance(model, EnhancedTwoStreamLSTM):
-        raise TypeError(
-            f"finetune_lstm requires EnhancedTwoStreamLSTM; got {type(model).__name__}"
-        )
+        raise TypeError(f"finetune_lstm requires EnhancedTwoStreamLSTM; got {type(model).__name__}")
 
     if not isinstance(model.head[-1], nn.Linear):
         raise TypeError(
@@ -1043,7 +1041,7 @@ def finetune_lstm(
                 },
                 checkpoint_path,
             )
-            note = '* best'
+            note = "* best"
         else:
             epochs_without_improve += 1
             note = f"  ES {epochs_without_improve}/{config.training.early_stopping_patience}"
