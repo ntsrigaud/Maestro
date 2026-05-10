@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import copy
+import itertools
 import json
 import time
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
 import torch
+import torch.nn.functional as F
 import yaml
 from torch import nn
 from torch.optim import AdamW
@@ -430,6 +434,70 @@ def _train_one_epoch(
     return float(total_loss / total_examples), float(total_correct / total_examples)
 
 
+def _train_one_epoch_with_retention(
+    *,
+    model: nn.Module,
+    teacher: nn.Module,
+    target_dataloader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
+    replay_iter: Iterator[tuple[torch.Tensor, torch.Tensor]],
+    optimizer: torch.optim.Optimizer,
+    target_criterion: nn.Module,
+    device: torch.device,
+    grad_clip_norm: float,
+    distillation_weight: float,
+) -> tuple[float, float, float]:
+    model.train()
+    teacher.eval()
+
+    total_loss = 0.0
+    total_distill_loss = 0.0
+    total_correct = 0
+    total_examples = 0
+
+    student_with_features = cast(Any, model)
+    teacher_with_features = cast(Any, teacher)
+
+    for batch_x, batch_y in target_dataloader:
+        batch_x = batch_x.to(device)
+        batch_y = batch_y.to(device)
+
+        replay_x, _ = next(replay_iter)
+        replay_x = replay_x.to(device)
+
+        optimizer.zero_grad(set_to_none=True)
+
+        logits = model(batch_x)
+        target_loss = target_criterion(logits, batch_y)
+
+        student_features = student_with_features.forward_features(replay_x)
+        with torch.no_grad():
+            teacher_features = teacher_with_features.forward_features(replay_x)
+
+        distill_loss = F.mse_loss(student_features, teacher_features)
+        loss = target_loss + (distillation_weight * distill_loss)
+        loss.backward()
+
+        if grad_clip_norm > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
+
+        optimizer.step()
+
+        preds = torch.argmax(logits, dim=1)
+        total_loss += float(loss.item()) * batch_x.size(0)
+        total_distill_loss += float(distill_loss.item()) * batch_x.size(0)
+        total_correct += int((preds == batch_y).sum().item())
+        total_examples += int(batch_x.size(0))
+
+    if total_examples == 0:
+        raise RuntimeError("Train dataloader produced no samples")
+
+    return (
+        float(total_loss / total_examples),
+        float(total_correct / total_examples),
+        float(total_distill_loss / total_examples),
+    )
+
+
 def train_lstm(
     *,
     dataset_path: str | Path,
@@ -692,6 +760,10 @@ def finetune_lstm(
     run_root_dir: str | Path,
     device: torch.device,
     freeze_epochs: int = 10,
+    replay_dataset_path: str | Path | None = None,
+    replay_max_samples_per_class: int = 500,
+    distillation_weight: float = 0.5,
+    backbone_lr_multiplier: float = 0.1,
 ) -> TrainingResult:
     """Fine-tune a pretrained ``EnhancedTwoStreamLSTM`` on a new dataset.
 
@@ -699,40 +771,14 @@ def finetune_lstm(
 
     **Stage A — Head-only** (``freeze_epochs`` epochs):
         The pretrained backbone (feature projections, BiLSTMs, self-attention,
-        cross-stream gates) is frozen.  Only the new classification head is
+        cross-stream gates) is frozen. Only the new classification head is
         trained with ``lr=1e-3`` so it converges quickly before the backbone
         is unfrozen.
 
     **Stage B — Full model** (``config.training.epochs`` epochs):
-        All layers are unfrozen and jointly fine-tuned with the learning rate
-        and schedule specified in *config*.  Early stopping monitors
-        ``val_macro_f1`` as in :func:`train_lstm`.
-
-    The pretrained checkpoint must have been saved by :func:`train_lstm` and
-    must contain ``model_config`` in its payload so the original architecture
-    (``hidden_size``, ``num_heads``, ``proj_dim``, etc.) can be reconstructed
-    before loading weights.  The classification head is replaced in-place with
-    a new ``Linear`` layer sized for ``config.model.num_classes``.
-
-    Parameters
-    ----------
-    dataset_path:
-        Path to the fine-tuning dataset NPZ (e.g. ``ipn_finetune_dataset.npz``).
-    config:
-        Fine-tuning pipeline config.  ``config.model.num_classes`` must match
-        the number of classes in *dataset_path*.
-    pretrained_checkpoint_path:
-        Path to the ``.pt`` checkpoint produced by a prior :func:`train_lstm`
-        call (e.g. the Jester pretraining checkpoint).
-    output_dir:
-        Directory where the best fine-tuned checkpoint is saved.
-    run_root_dir:
-        Directory under which a timestamped run sub-directory is created.
-    device:
-        Torch device to train on.
-    freeze_epochs:
-        Number of Stage-A epochs with backbone frozen.  Set to ``0`` to skip
-        Stage A and fine-tune all layers from epoch 1.
+        All layers are unfrozen and jointly fine-tuned with replay,
+        feature-level distillation, and layer-wise learning rates.
+        Early stopping monitors ``val_macro_f1`` as in :func:`train_lstm`.
     """
     seed_everything(config.training.seed)
     datamodule = create_datamodule(dataset_path=dataset_path, config=config)
@@ -743,12 +789,9 @@ def finetune_lstm(
             f"Got: {config.model.model_name!r}"
         )
 
-    # ── Load pretrained checkpoint ────────────────────────────────────────────
     ckpt = torch.load(pretrained_checkpoint_path, map_location=device, weights_only=False)
     pretrained_model_config_dict: dict[str, Any] = ckpt.get("model_config", {})
 
-    # Reconstruct the pretrained model from the checkpoint description so the
-    # saved state dict loads against the exact architecture that produced it.
     pretrained_mc = _model_config_from_checkpoint(
         pretrained_model_config_dict,
         config.model,
@@ -757,14 +800,17 @@ def finetune_lstm(
     model = _build_model(pretrained_mc, device)
     model.load_state_dict(ckpt["model_state_dict"])
 
-    # ── Replace classification head ───────────────────────────────────────────
-    # EnhancedTwoStreamLSTM.head is a nn.Sequential ending in Linear(H, old_C).
-    # Replace only the final Linear so all other head layers (LN, GELU, Dropout)
-    # retain their pretrained weights.
+    teacher_model = copy.deepcopy(model)
+    teacher_model.eval()
+    for param in teacher_model.parameters():
+        param.requires_grad = False
+
     from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
     if not isinstance(model, EnhancedTwoStreamLSTM):
-        raise TypeError(f"finetune_lstm requires EnhancedTwoStreamLSTM; got {type(model).__name__}")
+        raise TypeError(
+            f"finetune_lstm requires EnhancedTwoStreamLSTM; got {type(model).__name__}"
+        )
 
     if not isinstance(model.head[-1], nn.Linear):
         raise TypeError(
@@ -782,7 +828,6 @@ def finetune_lstm(
             f"dataset classes ({datamodule.num_classes})"
         )
 
-    # ── Criterion / scheduler helpers ─────────────────────────────────────────
     def _make_criterion(weights: torch.Tensor | None) -> nn.Module:
         return _build_criterion(weights, label_smoothing=config.training.label_smoothing)
 
@@ -813,6 +858,14 @@ def finetune_lstm(
         f"val={len(datamodule.val_indices):,}"
     )
     print(f"  Classes    : {new_num_classes}  {datamodule.class_labels}")
+    if replay_dataset_path is not None:
+        print(
+            "  Phase 1    : "
+            f"replay={Path(replay_dataset_path).name}  "
+            f"replay_max/class={replay_max_samples_per_class}  "
+            f"distill_w={distillation_weight:.3f}  "
+            f"backbone_lr_mult={backbone_lr_multiplier:.3f}"
+        )
 
     history: list[dict[str, float]] = []
     best_val_f1 = -float("inf")
@@ -820,11 +873,7 @@ def finetune_lstm(
     best_epoch = 0
     epochs_without_improve = 0
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Stage A — freeze backbone, train head only
-    # ──────────────────────────────────────────────────────────────────────────
     if freeze_epochs > 0:
-        # Freeze everything except model.head
         for name, param in model.named_parameters():
             param.requires_grad = name.startswith("head.")
         head_params = [p for p in model.parameters() if p.requires_grad]
@@ -878,17 +927,43 @@ def finetune_lstm(
 
         print(f"\nStage A complete. Val macro-F1 = {val_report.macro_f1:.4f}")
 
-    # ──────────────────────────────────────────────────────────────────────────
-    # Stage B — unfreeze all layers, full fine-tuning
-    # ──────────────────────────────────────────────────────────────────────────
     for param in model.parameters():
         param.requires_grad = True
 
+    backbone_params = [
+        param for name, param in model.named_parameters() if not name.startswith("head.")
+    ]
+    head_params = [param for name, param in model.named_parameters() if name.startswith("head.")]
     optimizer_b = AdamW(
-        model.parameters(),
-        lr=config.training.learning_rate,
+        [
+            {
+                "params": backbone_params,
+                "lr": config.training.learning_rate * backbone_lr_multiplier,
+            },
+            {
+                "params": head_params,
+                "lr": config.training.learning_rate,
+            },
+        ],
         weight_decay=config.training.weight_decay,
     )
+
+    replay_iter: Iterator[tuple[torch.Tensor, torch.Tensor]] | None = None
+    if replay_dataset_path is not None:
+        replay_dm = GestureDataModule(
+            dataset_path=replay_dataset_path,
+            batch_size=config.training.batch_size,
+            split=config.split,
+            seed=config.training.seed,
+            num_workers=config.training.num_workers,
+            pin_memory=False,
+            augmentation=None,
+            max_samples_per_class=replay_max_samples_per_class,
+            exclude_classes=None,
+        )
+        replay_dm.setup()
+        replay_iter = itertools.cycle(iter(replay_dm.train_dataloader()))
+
     scheduler: ReduceLROnPlateau | None = None
     if config.scheduler.enabled:
         scheduler = ReduceLROnPlateau(
@@ -899,30 +974,44 @@ def finetune_lstm(
             min_lr=config.scheduler.min_lr,
         )
 
-    _sep = "-" * 90
-    print(f"\n{'─' * 90}")
+    _sep = "-" * 96
+    print(f"\n{'─' * 96}")
     print(
         f"Stage B — full fine-tuning  (up to {config.training.epochs} epochs, "
-        f"lr={config.training.learning_rate:.2e})"
+        f"head_lr={config.training.learning_rate:.2e}, "
+        f"backbone_lr={config.training.learning_rate * backbone_lr_multiplier:.2e})"
     )
     print(_sep)
-    _header = (
-        f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  "
-        f"{'ValLoss':>8}  {'ValAcc':>7}  {'ValF1':>6}  {'LR':>8}  Note"
+    print(
+        f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  {'ValLoss':>8}  "
+        f"{'ValAcc':>7}  {'ValF1':>6}  {'LR':>8}  {'Distill':>8}  Note"
     )
-    print(_header)
     print(_sep, flush=True)
 
     for epoch in range(1, config.training.epochs + 1):
         t0 = time.perf_counter()
-        train_loss, train_acc = _train_one_epoch(
-            model=model,
-            dataloader=train_loader,
-            optimizer=optimizer_b,
-            criterion=criterion,
-            device=device,
-            grad_clip_norm=config.training.grad_clip_norm,
-        )
+        distill_loss_value = float("nan")
+        if replay_iter is not None:
+            train_loss, train_acc, distill_loss_value = _train_one_epoch_with_retention(
+                model=model,
+                teacher=teacher_model,
+                target_dataloader=train_loader,
+                replay_iter=replay_iter,
+                optimizer=optimizer_b,
+                target_criterion=criterion,
+                device=device,
+                grad_clip_norm=config.training.grad_clip_norm,
+                distillation_weight=distillation_weight,
+            )
+        else:
+            train_loss, train_acc = _train_one_epoch(
+                model=model,
+                dataloader=train_loader,
+                optimizer=optimizer_b,
+                criterion=criterion,
+                device=device,
+                grad_clip_norm=config.training.grad_clip_norm,
+            )
         val_report = evaluate_model(
             model=model,
             dataloader=val_loader,
@@ -932,7 +1021,7 @@ def finetune_lstm(
         )
         if scheduler is not None:
             scheduler.step(val_report.macro_f1)
-        current_lr = float(optimizer_b.param_groups[0]["lr"])
+        current_lr = float(optimizer_b.param_groups[-1]["lr"])
 
         improved = (val_report.macro_f1 - best_val_f1) > config.training.early_stopping_min_delta
         if improved:
@@ -954,10 +1043,10 @@ def finetune_lstm(
                 },
                 checkpoint_path,
             )
-            _note = "* best"
+            note = '* best'
         else:
             epochs_without_improve += 1
-            _note = f"  ES {epochs_without_improve}/{config.training.early_stopping_patience}"
+            note = f"  ES {epochs_without_improve}/{config.training.early_stopping_patience}"
 
         history.append(
             {
@@ -970,12 +1059,13 @@ def finetune_lstm(
                 "val_macro_f1": val_report.macro_f1,
                 "learning_rate": current_lr,
                 "epoch_secs": time.perf_counter() - t0,
+                "distill_loss": distill_loss_value,
             }
         )
         print(
-            f"{epoch:>6}/{config.training.epochs:<4}  {train_loss:>9.4f}  "
-            f"{train_acc:>8.1%}  {val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  "
-            f"{val_report.macro_f1:>6.1%}  {current_lr:>8.2e}  {_note}",
+            f"{epoch:>6}/{config.training.epochs:<4}  {train_loss:>9.4f}  {train_acc:>8.1%}  "
+            f"{val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  {val_report.macro_f1:>6.1%}  "
+            f"{current_lr:>8.2e}  {distill_loss_value:>8.4f}  {note}",
             flush=True,
         )
 
@@ -992,7 +1082,6 @@ def finetune_lstm(
         f"\nBest epoch : {best_epoch}  val_macro_f1={best_val_f1:.4f}  val_loss={best_val_loss:.4f}"
     )
 
-    # ── Load best checkpoint and evaluate ─────────────────────────────────────
     best_ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(best_ckpt["model_state_dict"])
 
@@ -1011,11 +1100,16 @@ def finetune_lstm(
         criterion=criterion,
     )
 
-    # ── Persist run artefacts ─────────────────────────────────────────────────
     training_summary = {
         "model_version": model_version,
         "pretrained_checkpoint": str(pretrained_checkpoint_path),
         "freeze_epochs": freeze_epochs,
+        "replay_dataset_path": (
+            str(replay_dataset_path) if replay_dataset_path is not None else None
+        ),
+        "replay_max_samples_per_class": replay_max_samples_per_class,
+        "distillation_weight": distillation_weight,
+        "backbone_lr_multiplier": backbone_lr_multiplier,
         "best_epoch": best_epoch,
         "best_val_f1": best_val_f1,
         "best_val_loss": best_val_loss,
