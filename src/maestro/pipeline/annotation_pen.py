@@ -123,8 +123,12 @@ class AnnotationPenTracker:
         self._active: bool = False
         self._mouse_pressed: bool = False  # True while the primary button is held for drawing
         _p = _platform_key()
-        self._pen_on_keys: tuple[str, ...] = pen_on_keys if pen_on_keys is not None else _PEN_ON_KEYS[_p]
-        self._pen_off_keys: tuple[str, ...] = pen_off_keys if pen_off_keys is not None else _PEN_OFF_KEYS[_p]
+        self._pen_on_keys: tuple[str, ...] = (
+            pen_on_keys if pen_on_keys is not None else _PEN_ON_KEYS[_p]
+        )
+        self._pen_off_keys: tuple[str, ...] = (
+            pen_off_keys if pen_off_keys is not None else _PEN_OFF_KEYS[_p]
+        )
 
     # ------------------------------------------------------------------
     # Public interface

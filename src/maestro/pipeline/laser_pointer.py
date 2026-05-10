@@ -120,8 +120,12 @@ class LaserPointerTracker:
         self._mirror_x = mirror_x
         self._active: bool = False
         _p = _platform_key()
-        self._laser_on_keys: tuple[str, ...] = laser_on_keys if laser_on_keys is not None else _LASER_ON_KEYS[_p]
-        self._laser_off_keys: tuple[str, ...] = laser_off_keys if laser_off_keys is not None else _LASER_OFF_KEYS[_p]
+        self._laser_on_keys: tuple[str, ...] = (
+            laser_on_keys if laser_on_keys is not None else _LASER_ON_KEYS[_p]
+        )
+        self._laser_off_keys: tuple[str, ...] = (
+            laser_off_keys if laser_off_keys is not None else _LASER_OFF_KEYS[_p]
+        )
 
     # ------------------------------------------------------------------
     # Public interface

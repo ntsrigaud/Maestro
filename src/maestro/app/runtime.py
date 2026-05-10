@@ -13,6 +13,9 @@ from maestro.evaluation.benchmark_latency import (
     LatencyBenchmark,
     write_latency_report,
 )
+from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
+    KeyboardAdapter,
+)
 from maestro.infrastructure.model.checkpoint_loader import InferenceArtifact
 from maestro.interfaces.command_dispatcher import ICommandDispatcher
 from maestro.interfaces.feature_transformer import IFeatureTransformer
@@ -21,12 +24,9 @@ from maestro.interfaces.frame_source import IFrameSource
 from maestro.interfaces.gaze_detector import IGazeIntentDetector
 from maestro.interfaces.landmark_extractor import IHandLandmarkExtractor
 from maestro.interfaces.sequence_buffer import ISequenceBuffer
-from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
-    KeyboardAdapter,
-)
 from maestro.pipeline.activation import GestureActivationController
-from maestro.pipeline.hand_selection import HandSelector
 from maestro.pipeline.annotation_pen import AnnotationPenTracker
+from maestro.pipeline.hand_selection import HandSelector
 from maestro.pipeline.laser_pointer import LaserPointerTracker
 from maestro.pipeline.stabilization import PredictionStabilizer
 from maestro.utils.schema_validation import RuntimeConfig
