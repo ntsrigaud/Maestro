@@ -364,7 +364,8 @@ standard webcam using MediaPipe for landmark extraction.
 
 - **Architecture**: {architecture}
 - **Parameters**: {num_params:,}
-- **Input**: `(batch, {window_length}, {feature_dim})` — {window_length}-frame sliding window at 30 FPS ≈ {window_duration_ms} ms
+- **Input**: `(batch, {window_length}, {feature_dim})`
+    — {window_length}-frame sliding window at 30 FPS ≈ {window_duration_ms} ms
 - **Output**: Softmax logits over {num_classes} gesture classes
 - **Inference latency**: < 1 ms per call (CPU, single sample)
 - **Feature schema**: `{feature_schema_version}`
@@ -574,7 +575,8 @@ standard webcam using MediaPipe for landmark extraction.
 
 - **Architecture**: {architecture}
 - **Parameters**: {num_params:,}
-- **Input**: `(batch, {window_length}, {feature_dim})` — {window_length}-frame sliding window at 30 FPS ≈ {window_duration_ms} ms
+- **Input**: `(batch, {window_length}, {feature_dim})`
+    — {window_length}-frame sliding window at 30 FPS ≈ {window_duration_ms} ms
 - **Output**: Softmax logits over {num_classes} gesture classes
 - **Inference latency**: ~0.5 ms per call (CPU, single sample)
 - **Feature schema**: `{feature_schema_version}`
@@ -714,7 +716,12 @@ def _build_per_class_table(per_class_recall: dict[str, float]) -> str:
 
 def _load_command_mapping() -> tuple[dict[str, str], dict[str, str]]:
     """Load command and mode mappings used by the production controller."""
-    mapping_path = Path(__file__).resolve().parents[3] / "configs" / "gestures" / "command_map_presentation.yaml"
+    mapping_path = (
+        Path(__file__).resolve().parents[3]
+        / "configs"
+        / "gestures"
+        / "command_map_presentation.yaml"
+    )
     if not mapping_path.exists():
         return {}, {}
 
@@ -789,28 +796,37 @@ def _build_training_strategy_section(
     if not isinstance(pretrained_checkpoint, str):
         pretrained_checkpoint = ""
 
-    is_finetune_run = bool(pretrained_checkpoint) or ("finetune" in result.model_version.lower()) or any(
-        "stage" in h for h in result.train_history
+    is_finetune_run = (
+        bool(pretrained_checkpoint)
+        or ("finetune" in result.model_version.lower())
+        or any("stage" in h for h in result.train_history)
     )
 
     if not is_finetune_run:
         return (
             "Single-stage supervised training on IPN-Hand only.\n"
-            "The model is initialized from scratch and optimized end-to-end on the target gesture set."
+            "The model is initialized from scratch and optimized "
+            "end-to-end on the target gesture set."
         )
 
     source_desc = "Jester (27-class)"
     if pretrained_checkpoint and "jester" not in pretrained_checkpoint.lower():
         source_desc = f"external checkpoint `{Path(pretrained_checkpoint).name}`"
 
-    target_desc = "IPN 10-gesture production subset" if config.model.num_classes == 10 else "target IPN subset"
+    target_desc = (
+        "IPN 10-gesture production subset"
+        if config.model.num_classes == 10
+        else "target IPN subset"
+    )
 
     return (
         "Two-phase transfer learning pipeline:\n"
-        f"- **Phase 1 (pretraining):** backbone pretrained on {source_desc} to learn generic gesture dynamics.\n"
+        f"- **Phase 1 (pretraining):** backbone pretrained on {source_desc} "
+        "to learn generic gesture dynamics.\n"
         f"- **Phase 2 (fine-tuning):** head replaced and model adapted on {target_desc}.\n"
         f"- **Stage A (frozen backbone):** {int(stage_a_epochs)} epoch(s) head-only warmup.\n"
-        f"- **Stage B (full model):** up to {int(stage_b_epochs)} epoch(s) joint fine-tuning with scheduler/early stopping."
+        f"- **Stage B (full model):** up to {int(stage_b_epochs)} epoch(s) "
+        "joint fine-tuning with scheduler/early stopping."
     )
 
 
@@ -828,7 +844,9 @@ def _build_model_card(
     window_length = int(result.dataset_metadata.get("window_length", 32))
     window_duration_ms = int(round(window_length * (1000.0 / 30.0)))
     class_weighting = (
-        "enabled (inverse-frequency)" if getattr(config.training, "class_weighting", False) else "disabled"
+        "enabled (inverse-frequency)"
+        if getattr(config.training, "class_weighting", False)
+        else "disabled"
     )
     max_samples = getattr(config.training, "max_samples_per_class", None)
     max_samples_per_class = str(max_samples) if max_samples is not None else "not set"
