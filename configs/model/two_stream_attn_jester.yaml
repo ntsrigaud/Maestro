@@ -52,8 +52,10 @@ training:
   seed: 42
   num_workers: 0
   class_weighting: true   # some Jester classes are rarer (Shaking Hand, etc.)
-  # No per-class cap — Jester is roughly balanced (~4,382 videos/class on average)
-  max_samples_per_class: null
+  # Per-class cap to trim the highest-frequency classes before splitting.
+  # Keeps the full distribution shape visible while preventing a few classes
+  # from dominating train/val/test after splitting.
+  max_samples_per_class: 3000
 
 splits:
   train_ratio: 0.85       # Jester has a large validation set — use it for training
