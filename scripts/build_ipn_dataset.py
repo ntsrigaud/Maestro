@@ -122,6 +122,26 @@ IPN_TO_VOCAB: dict[str, str] = {
     "G09": "double_click_two",  # double click with two fingers
 }
 
+# Binary mapping for detector training (Phase 3 — mirrors ipnbinary.json):
+#   no_gesture (0) ← D0X non-gesture background
+#   gesture    (1) ← all 13 IPN gesture classes
+IPN_TO_VOCAB_BINARY: dict[str, str] = {
+    "D0X": "no_gesture",
+    "B0A": "gesture",
+    "B0B": "gesture",
+    "G01": "gesture",
+    "G02": "gesture",
+    "G03": "gesture",
+    "G04": "gesture",
+    "G05": "gesture",
+    "G06": "gesture",
+    "G07": "gesture",
+    "G08": "gesture",
+    "G09": "gesture",
+    "G10": "gesture",
+    "G11": "gesture",
+}
+
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -515,6 +535,7 @@ def assemble_dataset(
     max_unknown_segments_per_source: int,
     max_unknown_frames_per_segment: int,
     seed: int,
+    label_mapping: dict[str, str] | None = None,
 ) -> GraphSequenceDatasetBuilder:
     """Feed annotated holistic frames into a ``GraphSequenceDatasetBuilder``.
 
@@ -645,6 +666,7 @@ def assemble_flat_dataset(
     max_unknown_segments_per_source: int,
     max_unknown_frames_per_segment: int,
     seed: int,
+    label_mapping: dict[str, str] | None = None,
 ) -> SequenceDatasetBuilder:
     """Feed annotated right-hand landmarks into a ``SequenceDatasetBuilder``.
 
