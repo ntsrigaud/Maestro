@@ -54,7 +54,7 @@ import random
 import sys
 import time
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -62,6 +62,14 @@ from typing import Any
 import cv2
 import numpy as np
 import yaml
+
+try:
+    from tqdm import tqdm
+except ImportError:  # graceful degradation if tqdm is not installed
+
+    def tqdm(iterable, **kwargs):  # type: ignore[misc]
+        return iterable
+
 
 # ---------------------------------------------------------------------------
 # Path bootstrap — allow running as a plain script from any cwd.
@@ -114,6 +122,26 @@ IPN_TO_VOCAB: dict[str, str] = {
     "G02": "click_two",  # click with two fingers
     "G08": "double_click_one",  # double click with one finger
     "G09": "double_click_two",  # double click with two fingers
+}
+
+# Binary mapping for detector training (Phase 3 — mirrors ipnbinary.json):
+#   no_gesture (0) ← D0X non-gesture background
+#   gesture    (1) ← all 13 IPN gesture classes
+IPN_TO_VOCAB_BINARY: dict[str, str] = {
+    "D0X": "no_gesture",
+    "B0A": "gesture",
+    "B0B": "gesture",
+    "G01": "gesture",
+    "G02": "gesture",
+    "G03": "gesture",
+    "G04": "gesture",
+    "G05": "gesture",
+    "G06": "gesture",
+    "G07": "gesture",
+    "G08": "gesture",
+    "G09": "gesture",
+    "G10": "gesture",
+    "G11": "gesture",
 }
 
 # ---------------------------------------------------------------------------
@@ -401,22 +429,21 @@ def extract_all_landmarks(
     t0 = time.perf_counter()
 
     if num_workers <= 1:
-        for task in tasks:
+        for task in tqdm(tasks, desc="Extracting landmarks", unit="video"):
             stem, cpath = _extract_video_worker(task)
             if cpath:
                 result_paths[stem] = Path(cpath)
     else:
+        chunksize = max(1, min(32, len(tasks) // max(1, num_workers * 8)))
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            futures = {executor.submit(_extract_video_worker, t): t[0] for t in tasks}
-            done = 0
-            for future in as_completed(futures):
-                stem, cpath = future.result()
-                done += 1
+            iterator = executor.map(_extract_video_worker, tasks, chunksize=chunksize)
+            for stem, cpath in tqdm(
+                iterator, total=len(tasks), desc="Extracting landmarks", unit="video"
+            ):
                 if cpath:
                     result_paths[stem] = Path(cpath)
-                    logger.info("[%d/%d] %s", done, len(tasks), stem)
                 else:
-                    logger.warning("[%d/%d] FAILED: %s", done, len(tasks), stem)
+                    logger.warning("Extraction failed: %s", stem)
 
     elapsed = time.perf_counter() - t0
     logger.info(
@@ -512,6 +539,7 @@ def assemble_dataset(
     max_unknown_segments_per_source: int,
     max_unknown_frames_per_segment: int,
     seed: int,
+    label_mapping: dict[str, str] | None = None,
 ) -> GraphSequenceDatasetBuilder:
     """Feed annotated holistic frames into a ``GraphSequenceDatasetBuilder``.
 
@@ -519,6 +547,11 @@ def assemble_dataset(
     the form ``{video}:{seg_index}`` so the builder resets its buffer state
     at every segment boundary.
     """
+    effective_mapping = label_mapping if label_mapping is not None else IPN_TO_VOCAB
+    # For binary mode the "background" class may be called 'no_gesture' not 'unknown'.
+    # Determine the background label name so unknown-subsampling logic can be skipped.
+    _is_binary = label_mapping is not None
+
     rng = random.Random(seed)
 
     builder = GraphSequenceDatasetBuilder(
@@ -533,24 +566,28 @@ def assemble_dataset(
     all_mapped: list[tuple[str, AnnotationRow]] = []  # (video_stem, row)
     vocabulary_set = set(vocabulary)
     for row in annotations:
-        if row.ipn_label not in IPN_TO_VOCAB:
+        if row.ipn_label not in effective_mapping:
             continue  # IPN code has no production mapping at all
-        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+        if effective_mapping[row.ipn_label] not in vocabulary_set:
             continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
         all_mapped.append((row.video, row))
 
-    # Subsample unknown segments from the full list.
-    subsampled_unknown = _subsample_unknown_segments(
-        [r for _, r in all_mapped if IPN_TO_VOCAB[r.ipn_label] == "unknown"],
-        max_unknown_segments_per_source,
-        rng,
-    )
-    unknown_set = {id(r) for r in subsampled_unknown}
+    # Subsample unknown segments from the full list (skipped in binary mode —
+    # both classes are equally wanted for detector training).
+    if not _is_binary:
+        subsampled_unknown = _subsample_unknown_segments(
+            [r for _, r in all_mapped if effective_mapping[r.ipn_label] == "unknown"],
+            max_unknown_segments_per_source,
+            rng,
+        )
+        unknown_set = {id(r) for r in subsampled_unknown}
+    else:
+        unknown_set: set[int] = set()
 
     # Rebuild final segment list preserving order and video grouping.
     final_by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
     for video, row in all_mapped:
-        if IPN_TO_VOCAB[row.ipn_label] == "unknown":
+        if not _is_binary and effective_mapping[row.ipn_label] == "unknown":
             if id(row) not in unknown_set:
                 continue
         final_by_video[video].append(row)
@@ -562,7 +599,8 @@ def assemble_dataset(
     total_windows = 0
     missing_cache = 0
 
-    for video_stem, segments in sorted(final_by_video.items()):
+    video_items = sorted(final_by_video.items())
+    for video_stem, segments in tqdm(video_items, desc="Assembling dataset", unit="video"):
         cache_path = cache_paths.get(video_stem)
         if cache_path is None or not cache_path.exists():
             logger.warning("No cache for video '%s', skipping.", video_stem)
@@ -574,14 +612,15 @@ def assemble_dataset(
         fid_to_idx = {int(fid): i for i, fid in enumerate(vl.frame_ids)}
 
         for seg_idx, seg in enumerate(segments):
-            vocab_label = IPN_TO_VOCAB[seg.ipn_label]
+            vocab_label = effective_mapping[seg.ipn_label]
             recording_id = f"{video_stem}:seg{seg_idx:04d}"
 
             # Iterate frames t_start..t_end (1-indexed inclusive).
             # Cap unknown segments to avoid class imbalance from long background
             # spans generating far more windows than short gesture segments.
+            # In binary mode this cap is disabled — the no_gesture class is needed.
             t_end_effective = seg.t_end
-            if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
+            if not _is_binary and vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
                 t_end_effective = min(seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1)
 
             seg_windows_before = len(builder.samples)
@@ -641,6 +680,7 @@ def assemble_flat_dataset(
     max_unknown_segments_per_source: int,
     max_unknown_frames_per_segment: int,
     seed: int,
+    label_mapping: dict[str, str] | None = None,
 ) -> SequenceDatasetBuilder:
     """Feed annotated right-hand landmarks into a ``SequenceDatasetBuilder``.
 
@@ -648,6 +688,9 @@ def assemble_flat_dataset(
     produces a flat feature-schema-v5 dataset compatible with
     ``GestureDataModule`` and ``TwoStreamGestureLSTM``.
     """
+    effective_mapping = label_mapping if label_mapping is not None else IPN_TO_VOCAB
+    _is_binary = label_mapping is not None
+
     rng = random.Random(seed)
 
     builder = SequenceDatasetBuilder(
@@ -661,22 +704,25 @@ def assemble_flat_dataset(
     all_mapped: list[tuple[str, AnnotationRow]] = []
     vocabulary_set = set(vocabulary)
     for row in annotations:
-        if row.ipn_label not in IPN_TO_VOCAB:
+        if row.ipn_label not in effective_mapping:
             continue  # IPN code has no production mapping at all
-        if IPN_TO_VOCAB[row.ipn_label] not in vocabulary_set:
+        if effective_mapping[row.ipn_label] not in vocabulary_set:
             continue  # mapped label not in target vocabulary (e.g. click_* with 8-class vocab)
         all_mapped.append((row.video, row))
 
-    subsampled_unknown = _subsample_unknown_segments(
-        [r for _, r in all_mapped if IPN_TO_VOCAB[r.ipn_label] == "unknown"],
-        max_unknown_segments_per_source,
-        rng,
-    )
-    unknown_set = {id(r) for r in subsampled_unknown}
+    if not _is_binary:
+        subsampled_unknown = _subsample_unknown_segments(
+            [r for _, r in all_mapped if effective_mapping[r.ipn_label] == "unknown"],
+            max_unknown_segments_per_source,
+            rng,
+        )
+        unknown_set = {id(r) for r in subsampled_unknown}
+    else:
+        unknown_set: set[int] = set()
 
     final_by_video: dict[str, list[AnnotationRow]] = defaultdict(list)
     for video, row in all_mapped:
-        if IPN_TO_VOCAB[row.ipn_label] == "unknown":
+        if not _is_binary and effective_mapping[row.ipn_label] == "unknown":
             if id(row) not in unknown_set:
                 continue
         final_by_video[video].append(row)
@@ -687,7 +733,8 @@ def assemble_flat_dataset(
     total_windows = 0
     missing_cache = 0
 
-    for video_stem, segments in sorted(final_by_video.items()):
+    video_items = sorted(final_by_video.items())
+    for video_stem, segments in tqdm(video_items, desc="Assembling dataset", unit="video"):
         cache_path = cache_paths.get(video_stem)
         if cache_path is None or not cache_path.exists():
             logger.warning("No cache for video '%s', skipping.", video_stem)
@@ -698,11 +745,11 @@ def assemble_flat_dataset(
         fid_to_idx = {int(fid): i for i, fid in enumerate(vl.frame_ids)}
 
         for seg_idx, seg in enumerate(segments):
-            vocab_label = IPN_TO_VOCAB[seg.ipn_label]
+            vocab_label = effective_mapping[seg.ipn_label]
             recording_id = f"{video_stem}:seg{seg_idx:04d}"
 
             t_end_effective = seg.t_end
-            if vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
+            if not _is_binary and vocab_label == "unknown" and max_unknown_frames_per_segment > 0:
                 t_end_effective = min(seg.t_end, seg.t_start + max_unknown_frames_per_segment - 1)
 
             seg_windows_before = len(builder.samples)
@@ -934,6 +981,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--binary-labels",
+        action="store_true",
+        default=False,
+        help=(
+            "Build a binary detector dataset (Phase 3 of the IPN-hand pipeline).  "
+            "Remaps all IPN labels to two classes: 'no_gesture' (D0X) and 'gesture' "
+            "(all other IPN codes).  Mirrors ipnbinary.json from the IPN-hand paper.  "
+            "When set, the default --vocab-config switches to "
+            "configs/gestures/vocabulary_ipn_binary.yaml and the default "
+            "--window-length switches to 8 (matching the paper's 8-frame detector "
+            "window).  Unknown-segment subsampling is disabled in binary mode since "
+            "both classes are needed at full coverage."
+        ),
+    )
+    p.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -951,6 +1013,25 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    # -----------------------------------------------------------------------
+    # Binary-mode defaults: override vocab + window-length when --binary-labels
+    # is set but the user has not explicitly supplied those args.
+    # -----------------------------------------------------------------------
+    active_label_mapping: dict[str, str] | None = None
+    if args.binary_labels:
+        active_label_mapping = IPN_TO_VOCAB_BINARY
+        # Apply binary-mode defaults only when the user has not overridden them.
+        # Use parser defaults directly to avoid triggering required-argument
+        # validation from parse_args([]).
+        default_vocab_config = parser.get_default("vocab_config")
+        default_window_length = parser.get_default("window_length")
+        if args.vocab_config == default_vocab_config:
+            args.vocab_config = "configs/gestures/vocabulary_ipn_binary.yaml"
+            logger.info("Binary mode: using default vocab '%s'", args.vocab_config)
+        if args.window_length == default_window_length:
+            args.window_length = 8
+            logger.info("Binary mode: using default window-length 8 (paper detector window)")
 
     ipn_root = Path(args.ipn_root)
     video_dir = ipn_root / "videos"
@@ -981,8 +1062,9 @@ def main() -> None:
     logger.info("Loaded %d annotation rows from %s.", len(annotations), annot_path.name)
 
     # Collect the unique video stems that appear in (mapped) annotations.
+    effective_mapping_for_filter = active_label_mapping if active_label_mapping else IPN_TO_VOCAB
     needed_videos: list[str] = sorted(
-        {row.video for row in annotations if row.ipn_label in IPN_TO_VOCAB}
+        {row.video for row in annotations if row.ipn_label in effective_mapping_for_filter}
     )
     logger.info("%d unique videos needed for mapped labels.", len(needed_videos))
 
@@ -1031,10 +1113,14 @@ def main() -> None:
         max_unknown_segments_per_source=args.max_unknown_segments_per_source,
         max_unknown_frames_per_segment=args.max_unknown_frames_per_segment,
         seed=args.seed,
+        label_mapping=active_label_mapping,
     )
 
     if args.format == "flat":
-        logger.info("Building flat feature-schema-v5 dataset (right-hand, 147 dims)…")
+        mode_desc = (
+            "binary detector (2 classes)" if args.binary_labels else "flat feature-schema-v5"
+        )
+        logger.info("Building %s dataset (right-hand, 147 dims)…", mode_desc)
         builder: SequenceDatasetBuilder | GraphSequenceDatasetBuilder = assemble_flat_dataset(
             **assemble_kwargs
         )

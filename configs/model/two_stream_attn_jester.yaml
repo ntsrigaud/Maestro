@@ -1,0 +1,82 @@
+# ── EnhancedTwoStreamLSTM — Jester 27-class pretraining configuration ────────
+#
+# Phase 1 of the Jester → IPN transfer learning pipeline.
+#
+# This config trains EnhancedTwoStreamLSTM (two_stream_attn_v1) on the full
+# 20BN-Jester-v1 dataset (27 classes, 32-frame windows).  The pretrained
+# backbone is then loaded in Phase 2 (two_stream_attn_ipn_finetune.yaml) where
+# the classification head is replaced and the model is fine-tuned on IPN.
+#
+# Why pretrain on Jester?
+#   - 118,562 training videos (vs ~4,000 IPN gesture segments)
+#   - Diverse hand motion vocabulary: swipes, zooms, rolls, taps, static poses
+#   - Prior art (ResNeXt-101 IPN baselines) all used Jester-pretrained backbones
+#   - Learning general temporal hand dynamics before task-specific IPN fine-tuning
+#     reduces overfitting and closes the IPN accuracy gap vs RGB-based methods
+#
+# Architecture — identical to two_stream_attn_ipn32.yaml (hidden_size=96):
+#   proj_a / proj_b             2 × ~7 K               ≈   14 K
+#   BiLSTM-A  (2L bidir 96)     layer1 148K+layer2 222K ≈  370 K
+#   BiLSTM-B                    (identical)             ≈  370 K
+#   Self-MHA-A / Self-MHA-B     2 × (8 × 192² + …)     ≈  296 K
+#   gate_a / gate_b             2 × MLP(192→96→192)     ≈   74 K
+#   Head MLP                    384 → 192 → 27          ≈   77 K
+#   Total                                               ≈ 1.20 M
+#
+# Dataset: build with build_jester_dataset.py
+#   python scripts/build_jester_dataset.py \
+#       --jester-root data/20bn-jester-v1 \
+#       --output-npz data/processed/jester_pretrain_dataset.npz \
+#       --window-length 32 --window-step 1 --max-samples-per-video 20
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_v1
+  input_size: 147         # feature-schema-v5 (same as IPN)
+  hidden_size: 96         # per-direction per-stream; BiLSTM output = 2×96 = 192
+  num_layers: 4
+  dropout: 0.35
+  num_classes: 27         # full Jester vocabulary
+  num_heads: 8            # MHA heads; 192/8 = 24 dims per head ✓
+  proj_dim: 96            # feature projection (73/74 → 96 before LSTM)
+
+training:
+  epochs: 80
+  batch_size: 256
+  learning_rate: 0.0001   # 1e-4 — slightly higher than IPN (more data, more noise)
+  weight_decay: 0.0005
+  grad_clip_norm: 1.0
+  early_stopping_patience: 15
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.05
+  seed: 42
+  num_workers: 0
+  class_weighting: true   # some Jester classes are rarer (Shaking Hand, etc.)
+  # Per-class cap to trim the highest-frequency classes before splitting.
+  # Keeps the full distribution shape visible while preventing a few classes
+  # from dominating train/val/test after splitting.
+  max_samples_per_class: 3000
+
+splits:
+  train_ratio: 0.85       # Jester has a large validation set — use it for training
+  val_ratio: 0.10
+  test_ratio: 0.05
+  stratified: true
+
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 8
+  min_lr: 0.000001
+
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+
+augmentation:
+  enabled: true
+  temporal_scale_range: [0.75, 1.25]
+  spatial_jitter_sigma: 0.008
+  apply_prob: 0.6
+  mirror_flip_prob: 0.5
