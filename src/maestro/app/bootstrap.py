@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,9 @@ from maestro.infrastructure.feedback.overlay_renderer import OverlayRenderer
 from maestro.infrastructure.gaze import HeadPoseGazeDetector, NullGazeDetector
 from maestro.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
+)
+from maestro.infrastructure.mediapipe.tasks_hands_extractor import (
+    MediaPipeTasksHandsExtractor,
 )
 from maestro.infrastructure.model.checkpoint_loader import (
     InferenceArtifact,
@@ -84,7 +88,7 @@ def build_container(
         target_fps=config.app.target_fps,
     )
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = _select_device()
     if model_artifact_path:
         artifact = load_inference_artifact(artifact_path=model_artifact_path, device=device)
     else:
@@ -96,11 +100,7 @@ def build_container(
 
     validate_runtime_compatibility(runtime_config=config, artifact=artifact)
 
-    landmark_extractor: IHandLandmarkExtractor = MediaPipeHandsExtractor(
-        static_image_mode=False,
-        min_detection_confidence=0.7,
-        min_tracking_confidence=0.5,
-    )
+    landmark_extractor = _build_landmark_extractor(config_root)
     hand_selector = HandSelector(
         hand_preference=config.app.hand_preference,
         min_handedness_conf=0.7,
@@ -197,6 +197,42 @@ def validate_container_dataset(
     # Note: is_compatible=False with only warnings is acceptable
     # FeatureSchemaError will be raised inside validate_dataset_compatibility
     # if critical incompatibilities are detected
+
+
+def _select_device() -> torch.device:
+    """Select the best available compute device: CUDA → MPS → CPU."""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+def _build_landmark_extractor(config_root: Path) -> IHandLandmarkExtractor:
+    """Build hand landmark extractor with Tasks GPU path when available.
+
+    Falls back to the classic MediaPipe solutions extractor if the task model
+    file is unavailable or Tasks initialization fails.
+    """
+    use_tasks = os.getenv("MAESTRO_USE_MEDIAPIPE_TASKS", "0") == "1"
+    task_model = config_root.parent / "models" / "mediapipe" / "hand_landmarker.task"
+    if use_tasks and task_model.exists():
+        try:
+            return MediaPipeTasksHandsExtractor(
+                model_path=task_model,
+                use_gpu_delegate=True,
+                min_detection_confidence=0.7,
+                min_tracking_confidence=0.5,
+            )
+        except Exception:
+            # Safe fallback for environments where the GPU delegate cannot be used.
+            pass
+
+    return MediaPipeHandsExtractor(
+        static_image_mode=False,
+        min_detection_confidence=0.7,
+        min_tracking_confidence=0.5,
+    )
 
 
 def _load_model_from_source(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import deque
 
+import numpy as np
+
 from maestro.domain.entities import FeatureFrame, SequenceWindow
 
 
@@ -50,7 +52,7 @@ class SlidingWindowSequenceBuffer:
         self._last_emit_push = self._push_count
 
         return SequenceWindow(
-            features=[item.vector for item in ordered],
+            features=np.stack([item.vector for item in ordered]).astype(np.float32, copy=False),
             start_timestamp_ms=ordered[0].timestamp_ms,
             end_timestamp_ms=ordered[-1].timestamp_ms,
             valid_ratio=self._current_valid_ratio(),

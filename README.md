@@ -4,19 +4,17 @@ Production-grade webcam-based gesture recognition system for hands-free presenta
 
 ## System Overview
 
-The system recognizes 10 hand gestures from a live webcam feed and maps them to application commands (slide navigation, view zoom, presentation start/stop). It runs in real time on consumer laptops without a GPU.
+The system recognizes a 10-class runtime vocabulary from a live webcam feed (9 active gestures + `unknown`) and executes validated presentation controls in real time on consumer laptops without a GPU.
 
 **Core pipeline:**
 
 ```
 Camera → MediaPipe Hands → Hand Selection → Feature Engineering → Sliding Window Buffer
 → LSTM Inference → Prediction Stabilization → Activation Controller
-→ Command Dispatch → Application Adapter → OS Keyboard Events
+→ Command Dispatch → Application Adapter → OS Keyboard/Pointer Events
 ```
 
 A **PySide6 graphical interface** provides runtime control, live telemetry monitoring, configuration editing, and model selection — all without interfering with the inference pipeline. The inference loop runs in a background `QThread`; the UI receives state updates through Qt signal-slot connections at approximately 10 Hz.
-
-![Maestro running with live camera preview — ARMED mode, swipe_left gesture detected at 79% confidence](docs/assets/screenshots/ui-running-preview.png)
 
 **Two launch modes:**
 
@@ -27,20 +25,23 @@ A **PySide6 graphical interface** provides runtime control, live telemetry monit
 
 For developers who prefer script-based invocation, `scripts/run_ui.py` and `scripts/run_realtime.py` remain available as thin wrappers.
 
-**Gesture vocabulary** (IPN Hand dataset, 10 classes):
+**Gesture vocabulary** (IPN-derived, 10 classes):
 
 | Gesture          | Command                   | IPN Source      |
 | ---------------- | ------------------------- | --------------- |
-| `open_palm_hold` | Start / stop presentation | G07             |
-| `swipe_right`    | Scroll forward            | G06             |
-| `swipe_left`     | Scroll back               | G05             |
-| `swipe_up`       | Previous slide            | G03             |
-| `swipe_down`     | Next slide                | G04             |
+| `open_palm_hold` | Erase annotations         | G07             |
+| `swipe_right`    | Next slide                | G06             |
+| `swipe_left`     | Previous slide            | G05             |
+| `swipe_up`       | Start presentation        | G03             |
+| `swipe_down`     | Stop presentation         | G04             |
 | `zoom_in`        | Zoom in view              | G10             |
 | `zoom_out`       | Zoom out view             | G11             |
-| `point_one`      | (reserved)                | B0A             |
-| `point_two`      | (reserved)                | B0B             |
+| `point_one`      | Continuous laser pointer  | B0A             |
+| `point_two`      | Continuous annotation pen | B0B             |
 | `unknown`        | No action (noise class)   | D0X + B0A + B0B |
+
+Discrete commands are routed through `GestureActivationController` + `CommandDispatcher`.
+`point_one` and `point_two` are continuous gestures handled directly by runtime trackers.
 
 ## Installation
 
@@ -129,10 +130,10 @@ pytest
 
 The recommended training workflow uses the Jupyter notebooks under `notebooks/`:
 
-| Notebook                       | Purpose                                                  |
-| ------------------------------ | -------------------------------------------------------- |
-| `01_dataset_preparation.ipynb` | Build the NPZ dataset from IPN Hand video landmarks      |
-| `02_model_training.ipynb`      | Train, evaluate, export, and publish to Hugging Face Hub |
+| Notebook                                       | Purpose                                                  |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| `01_dataset_preparation_two-stream-lstm.ipynb` | Build the NPZ dataset from IPN Hand video landmarks      |
+| `02_model_training_two-stream-lstm.ipynb`      | Train, evaluate, export, and publish to Hugging Face Hub |
 
 Install the notebook extra and launch Jupyter:
 
@@ -145,7 +146,7 @@ Alternatively, use the CLI scripts:
 
 ```bash
 python scripts/build_ipn_dataset.py --ipn-root data/IPN --output-npz data/processed/ipn_dataset.npz
-python scripts/train_model.py --dataset data/processed/ipn_dataset.npz --config-dir configs
+python scripts/train_model.py --dataset-path data/processed/ipn_dataset.npz --config configs/model/two_stream_attn.yaml --config-dir configs
 ```
 
 ## Project Architecture
@@ -160,7 +161,7 @@ Key directories:
 | `configs/`     | YAML configuration (app, inference, model, gestures, thresholds)                                                                   |
 | `scripts/`     | CLI entry points (`run_ui.py`, `run_realtime.py`, data, training)                                                                  |
 | `models/`      | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/maestro-lstm) |
-| `tests/`       | Unit, integration, and system tests (282 total)                                                                                    |
+| `tests/`       | Unit, integration, and system test suites                                                                                          |
 | `docs/`        | Architecture docs, guides, and decision records                                                                                    |
 
 ### GUI Architecture
@@ -182,6 +183,7 @@ The training dataset is built from the IPN Hand dataset (200 videos, 14 gesture 
 ```bash
 python scripts/build_ipn_dataset.py \
     --ipn-root data/IPN \
+    --format flat \
     --output-npz data/processed/ipn_dataset.npz \
     --num-workers 4
 ```
@@ -192,12 +194,12 @@ Legacy custom webcam collection material has been removed. Contributors should f
 
 ```bash
 python scripts/train_model.py \
-    --dataset data/processed/ipn_dataset.npz \
-    --config configs/model/lstm_default.yaml \
+    --dataset-path data/processed/ipn_dataset.npz \
+    --config configs/model/two_stream_attn.yaml \
     --config-dir configs
 ```
 
-The training pipeline includes group-aware data splitting (no recording leakage), data augmentation (temporal scaling + spatial jitter), early stopping, and class-weighted loss.
+The training pipeline includes group-aware data splitting (no recording leakage), data augmentation (temporal scaling + spatial jitter), early stopping, and scheduler-based learning-rate control.
 
 ## Current System State
 
@@ -206,8 +208,8 @@ The training pipeline includes group-aware data splitting (no recording leakage)
 | Inference feature schema | `feature-schema-v5` (147-dim)                                                                 |
 | Production model         | [`ntsrigaud/maestro-lstm`](https://huggingface.co/ntsrigaud/maestro-lstm) — Macro-F1 **0.96** |
 | Model loading            | Hugging Face Hub (cached, no training required)                                               |
-| Gaze activation          | `HeadPoseGazeDetector` — sole arming mechanism                                                |
-| Test suite               | 282 tests, 0 failures                                                                         |
+| Gaze activation          | `HeadPoseGazeDetector` supported; can be disabled via `inference.yaml`                        |
+| Test suite               | Unit / integration / system coverage under `tests/`                                           |
 | Tracked binary weights   | **0 MB** — all `.pt` artifacts excluded from VCS                                              |
 
 The complete development history is recorded in [docs/architecture/](docs/architecture/) and [docs/archive/work-logs/](docs/archive/work-logs/).

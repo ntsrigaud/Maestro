@@ -187,11 +187,16 @@ class HeadPoseGazeDetector:
         """Advance the gaze state machine and return ``gaze_permitted``."""
         if self._frame_counter % self._cfg.sample_interval_frames == 0:
             h, w = frame.frame.shape[:2]
-            # Use cv2.cvtColor to produce a C-contiguous RGB copy.  A
-            # reversed-stride view (frame[:, :, ::-1]) can cause silent
-            # failures in some solvePnP and MediaPipe C extensions that
-            # require contiguous memory.
-            rgb = cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
+            # Use the pre-converted RGB frame from the camera source when
+            # available; fall back to cv2.cvtColor to produce a C-contiguous
+            # copy otherwise.  A reversed-stride view (frame[:, :, ::-1]) is
+            # not C-contiguous and can cause silent failures in solvePnP and
+            # MediaPipe C extensions that require contiguous memory.
+            rgb = (
+                frame.rgb_frame
+                if frame.rgb_frame is not None
+                else cv2.cvtColor(frame.frame, cv2.COLOR_BGR2RGB)
+            )
             results = self._face_detection.process(rgb)
             within_cone = self._is_within_cone(results, h, w)
             now_ms = time.monotonic() * 1000.0
