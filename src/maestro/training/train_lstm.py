@@ -591,26 +591,40 @@ def _compute_fisher_diagonal(
 
     Only parameters that ``require_grad`` are included in the output dict.
     """
+    # Temporarily enable requires_grad on all parameters so the backward pass
+    # can build a computation graph.  The teacher model is normally frozen
+    # (requires_grad=False), but Fisher estimation needs gradients.
+    original_requires_grad: dict[str, bool] = {
+        n: p.requires_grad for n, p in model.named_parameters()
+    }
+    for p in model.parameters():
+        p.requires_grad_(True)
+
     fisher: dict[str, torch.Tensor] = {
         n: torch.zeros_like(p, device=device)
         for n, p in model.named_parameters()
-        if p.requires_grad
     }
     model.eval()
     model.zero_grad()
     total = 0
-    for x, y in replay_loader:
-        if total >= num_samples:
-            break
-        x, y = x.to(device), y.to(device)
-        logits = model(x)
-        log_probs = F.log_softmax(logits, dim=1)
-        log_probs[torch.arange(len(y)), y].mean().backward()
+    try:
+        for x, y in replay_loader:
+            if total >= num_samples:
+                break
+            x, y = x.to(device), y.to(device)
+            logits = model(x)
+            log_probs = F.log_softmax(logits, dim=1)
+            log_probs[torch.arange(len(y)), y].mean().backward()
+            for n, p in model.named_parameters():
+                if p.grad is not None and n in fisher:
+                    fisher[n].add_(p.grad.detach().pow(2).mul_(float(x.size(0))))
+            model.zero_grad()
+            total += x.size(0)
+    finally:
+        # Always restore the original requires_grad state.
         for n, p in model.named_parameters():
-            if p.grad is not None and n in fisher:
-                fisher[n].add_(p.grad.detach().pow(2).mul_(float(x.size(0))))
-        model.zero_grad()
-        total += x.size(0)
+            p.requires_grad_(original_requires_grad.get(n, False))
+
     count = max(total, 1)
     for n in fisher:
         fisher[n].div_(count)
