@@ -44,6 +44,7 @@ class OpenCVFrameSource:
             frame=frame,
             timestamp_ms=int(time.time() * 1000),
             frame_id=self._frame_id,
+            rgb_frame=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
         )
         self._frame_id += 1
         self._last_read_time = time.perf_counter()

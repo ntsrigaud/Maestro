@@ -111,7 +111,7 @@ The system requires the following OS-level permissions:
 
 - **Protocol**: OS keyboard event injection
 - **Mediated by**: pyautogui → Quartz / X11 / Win32
-- **Data**: Key press/release events (e.g., Right Arrow, Alt+Y)
+- **Data**: Key press/release and pointer events (e.g., Right Arrow, Escape, Cmd/Ctrl+Scroll, mouse drag)
 - **Safety**: Key names validated against hardcoded allowlist before injection
 
 ### 5.3 Application → Display
@@ -150,11 +150,11 @@ Trained inference artifacts are **not tracked in VCS**. The runtime default mode
 ```bash
 # Clone repository
 git clone <repository-url>
-cd Semantic-HGR-System
+cd Maestro
 
 # Create and activate environment
-conda create -n gesture-control python=3.11
-conda activate gesture-control
+conda create -n maestro python=3.11
+conda activate maestro
 
 # Install package with dependencies
 # Include [huggingface] extra for the default Hugging Face Hub model backend
@@ -182,7 +182,7 @@ python scripts/run_realtime.py --config configs --model-artifact path/to/artifac
 ```bash
 # Train model (default: EnhancedTwoStreamLSTM)
 python scripts/train_model.py \
-    --dataset data/processed/gesture_dataset_v2.npz \
+    --dataset-path data/processed/ipn_dataset.npz \
     --config configs/model/two_stream_attn.yaml \
     --config-dir configs
 ```
@@ -195,7 +195,7 @@ The current system is designed for single-user, single-camera operation. The arc
 | ------------------------------ | --------------------------------------------------------------------------- |
 | Additional target applications | Implement `IApplicationAdapter` with application-specific shortcut mappings |
 | Alternative cameras            | Change `camera_index` in `app.yaml` or implement a custom `IFrameSource`    |
-| GPU inference                  | Set `--device cuda` or `--device mps` for PyTorch acceleration              |
+| GPU inference                  | Runtime selects CUDA when available, else CPU (current bootstrap behavior). |
 | Headless deployment            | Use `--no-display` flag to skip OpenCV window rendering                     |
 | Alternative models             | Implement `IGestureModel` with a different classifier (Transformer, TCN)    |
 
@@ -203,4 +203,4 @@ The current system is designed for single-user, single-camera operation. The arc
 
 **Document**: Physical View  
 **Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: April 2026
+**Last Updated**: May 2026
