@@ -604,7 +604,12 @@ def _compute_fisher_diagonal(
         n: torch.zeros_like(p, device=device)
         for n, p in model.named_parameters()
     }
-    model.eval()
+    # cuDNN RNN kernels only register intermediate states needed for backward
+    # when the module is in *training* mode.  Calling model.eval() would break
+    # the backward pass through BiLSTM layers, so we keep training mode here
+    # and restore the original mode in the finally block.
+    was_training = model.training
+    model.train()
     model.zero_grad()
     total = 0
     try:
@@ -621,7 +626,8 @@ def _compute_fisher_diagonal(
             model.zero_grad()
             total += x.size(0)
     finally:
-        # Always restore the original requires_grad state.
+        # Always restore the original training mode and requires_grad state.
+        model.train(was_training)
         for n, p in model.named_parameters():
             p.requires_grad_(original_requires_grad.get(n, False))
 
