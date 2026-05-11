@@ -97,6 +97,7 @@ class EnhancedTwoStreamLSTM(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.dropout = dropout
         self.num_classes = num_classes
         self.num_heads = num_heads
         self.proj_dim = proj_dim
@@ -251,3 +252,36 @@ class EnhancedTwoStreamLSTM(nn.Module):
         # ── Fusion + classification ───────────────────────────────────────────
         fused = torch.cat([ctx_a, ctx_b], dim=-1)  # (B, 4H)
         return self.head(fused)  # (B, C)
+
+    def forward_features(self, x: torch.Tensor) -> torch.Tensor:
+        """Return the pre-head fused backbone representation ``(B, 4H)``.
+
+        Runs the full backbone (projection → BiLSTM → attention → pooling →
+        cross-stream gating → fusion) without passing through the classification
+        head.  Used for feature-level distillation during continual fine-tuning
+        to preserve source-task representations in the backbone.
+
+        Args:
+            x: Input ``(B, T, input_size)`` — same shape as :meth:`forward`.
+
+        Returns:
+            Fused backbone feature tensor ``(B, bilstm_out * 2)`` i.e. ``(B, 4H)``.
+        """
+        pose, motion = self._split(x)
+        pose = self.proj_a(pose)
+        motion = self.proj_b(motion)
+        out_a, _ = self.lstm_a(pose)
+        out_b, _ = self.lstm_b(motion)
+        out_a = self.ln_a(out_a)
+        out_b = self.ln_b(out_b)
+        sa_a, _ = self.mha_a(out_a, out_a, out_a)
+        out_a = self.ln_post_a(out_a + sa_a)
+        sa_b, _ = self.mha_b(out_b, out_b, out_b)
+        out_b = self.ln_post_b(out_b + sa_b)
+        ctx_a = self.pool_ln_a(out_a.mean(dim=1) + out_a.max(dim=1).values)
+        ctx_b = self.pool_ln_b(out_b.mean(dim=1) + out_b.max(dim=1).values)
+        gate_a = self.gate_a(ctx_b)
+        ctx_a = self.ln_cross_a(ctx_a * gate_a + ctx_a)
+        gate_b = self.gate_b(ctx_a)
+        ctx_b = self.ln_cross_b(ctx_b * gate_b + ctx_b)
+        return torch.cat([ctx_a, ctx_b], dim=-1)  # (B, 4H)
