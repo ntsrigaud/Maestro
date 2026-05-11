@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import copy
+import itertools
 import json
 import time
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
+import torch.nn.functional as F
 import yaml
 from torch import nn
 from torch.optim import AdamW
@@ -263,6 +267,49 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
     )
 
 
+def _model_config_from_checkpoint(
+    checkpoint_model_config: dict[str, Any] | None,
+    fallback: ModelConfig,
+    *,
+    num_classes: int | None = None,
+) -> ModelConfig:
+    """Build a ModelConfig from a checkpoint payload with safe fallbacks.
+
+    Fine-tuning must reconstruct the pretrained architecture exactly so the
+    saved state dict can be loaded without key or shape drift.  The checkpoint
+    model configuration is therefore the source of truth, with *fallback* only
+    used for backward-compatible fields that may be absent in older payloads.
+    """
+
+    payload = checkpoint_model_config or {}
+    resolved_num_classes = (
+        int(num_classes)
+        if num_classes is not None
+        else int(payload.get("num_classes", fallback.num_classes))
+    )
+
+    return ModelConfig(
+        model_name=str(payload.get("model_name", fallback.model_name)),
+        input_size=int(payload.get("input_size", fallback.input_size)),
+        hidden_size=int(payload.get("hidden_size", fallback.hidden_size)),
+        num_layers=int(payload.get("num_layers", fallback.num_layers)),
+        dropout=float(payload.get("dropout", fallback.dropout)),
+        num_classes=resolved_num_classes,
+        num_nodes=int(payload.get("num_nodes", fallback.num_nodes)),
+        num_coords=int(payload.get("num_coords", fallback.num_coords)),
+        stgcn_channels=tuple(
+            int(c) for c in payload.get("stgcn_channels", fallback.stgcn_channels)
+        ),
+        num_stgcn_layers=int(payload.get("num_stgcn_layers", fallback.num_stgcn_layers)),
+        lstm_hidden=int(payload.get("lstm_hidden", fallback.lstm_hidden)),
+        lstm_layers=int(payload.get("lstm_layers", fallback.lstm_layers)),
+        phono_proj_dim=int(payload.get("phono_proj_dim", fallback.phono_proj_dim)),
+        phono_conv_channels=int(payload.get("phono_conv_channels", fallback.phono_conv_channels)),
+        num_heads=int(payload.get("num_heads", fallback.num_heads)),
+        proj_dim=int(payload.get("proj_dim", fallback.proj_dim)),
+    )
+
+
 def create_datamodule(
     *,
     dataset_path: str | Path,
@@ -385,6 +432,305 @@ def _train_one_epoch(
         raise RuntimeError("Train dataloader produced no samples")
 
     return float(total_loss / total_examples), float(total_correct / total_examples)
+
+
+def _train_one_epoch_with_retention(
+    *,
+    model: nn.Module,
+    teacher: nn.Module,
+    target_dataloader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
+    replay_iter: Iterator[tuple[torch.Tensor, torch.Tensor]],
+    replay_head: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    target_criterion: nn.Module,
+    device: torch.device,
+    grad_clip_norm: float,
+    distillation_weight: float,
+    replay_ce_weight: float,
+    fisher: dict[str, torch.Tensor] | None = None,
+    pretrained_weights: dict[str, torch.Tensor] | None = None,
+    ewc_weight: float = 0.0,
+    jester_subspace: dict[str, torch.Tensor] | None = None,
+) -> tuple[float, float, float, float, float]:
+    model.train()
+    teacher.eval()
+
+    total_loss = 0.0
+    total_distill_loss = 0.0
+    total_replay_ce_loss = 0.0
+    total_ewc_loss = 0.0
+    total_correct = 0
+    total_examples = 0
+
+    student_with_features = cast(Any, model)
+    teacher_with_features = cast(Any, teacher)
+
+    for batch_x, batch_y in target_dataloader:
+        batch_x = batch_x.to(device)
+        batch_y = batch_y.to(device)
+
+        replay_x, replay_y = next(replay_iter)
+        replay_x = replay_x.to(device)
+        replay_y = replay_y.to(device)
+
+        optimizer.zero_grad(set_to_none=True)
+
+        logits = model(batch_x)
+        target_loss = target_criterion(logits, batch_y)
+
+        student_features = student_with_features.forward_features(replay_x)
+        with torch.no_grad():
+            teacher_features = teacher_with_features.forward_features(replay_x)
+
+        distill_loss = F.mse_loss(student_features, teacher_features)
+        replay_logits = replay_head(student_features)
+        replay_ce_loss = F.cross_entropy(replay_logits, replay_y)
+
+        # EWC regularisation: penalise backbone drift from Jester-pretrained weights
+        ewc_loss = torch.tensor(0.0, device=device)
+        if fisher is not None and pretrained_weights is not None and ewc_weight > 0.0:
+            for n, p in model.named_parameters():
+                if n.startswith("head."):
+                    continue  # only regularise the shared backbone
+                f = fisher.get(n)
+                w0 = pretrained_weights.get(n)
+                if f is not None and w0 is not None:
+                    ewc_loss = ewc_loss + (f * (p - w0).pow(2)).sum()
+            ewc_loss = ewc_loss.mul(0.5)
+
+        loss = (
+            target_loss
+            + (distillation_weight * distill_loss)
+            + (replay_ce_weight * replay_ce_loss)
+            + (ewc_weight * ewc_loss)
+        )
+        loss.backward()
+
+        # GPM: project weight gradients to null-space of Jester activation subspace
+        if jester_subspace is not None:
+            _project_gradients_gpm(model, jester_subspace)
+
+        if grad_clip_norm > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
+
+        optimizer.step()
+
+        preds = torch.argmax(logits, dim=1)
+        total_loss += float(loss.item()) * batch_x.size(0)
+        total_distill_loss += float(distill_loss.item()) * batch_x.size(0)
+        total_replay_ce_loss += float(replay_ce_loss.item()) * batch_x.size(0)
+        total_ewc_loss += float(ewc_loss.item()) * batch_x.size(0)
+        total_correct += int((preds == batch_y).sum().item())
+        total_examples += int(batch_x.size(0))
+
+    if total_examples == 0:
+        raise RuntimeError("Train dataloader produced no samples")
+
+    return (
+        float(total_loss / total_examples),
+        float(total_correct / total_examples),
+        float(total_distill_loss / total_examples),
+        float(total_replay_ce_loss / total_examples),
+        float(total_ewc_loss / total_examples),
+    )
+
+
+def _evaluate_jester_f1(
+    *,
+    model: nn.Module,
+    replay_head: nn.Module,
+    dataloader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
+    device: torch.device,
+) -> float:
+    """Return Jester macro-F1 via backbone features → frozen Jester head.
+
+    Used during Stage B to measure old-task retention without requiring the
+    Jester head to be attached to the live model (which has an IPN head after
+    head replacement).  Computes per-class F1 and returns the unweighted macro
+    average.
+    """
+    model.eval()
+    replay_head.eval()
+    all_preds: list[torch.Tensor] = []
+    all_labels: list[torch.Tensor] = []
+    with torch.no_grad():
+        for x, y in dataloader:
+            features = cast(Any, model).forward_features(x.to(device))
+            preds = torch.argmax(replay_head(features), dim=1).cpu()
+            all_preds.append(preds)
+            all_labels.append(y.cpu())
+    preds_cat = torch.cat(all_preds)
+    labels_cat = torch.cat(all_labels)
+    classes = labels_cat.unique().tolist()
+    per_class_f1: list[float] = []
+    for c in classes:
+        c_int = int(c)
+        tp = int(((preds_cat == c_int) & (labels_cat == c_int)).sum())
+        fp = int(((preds_cat == c_int) & (labels_cat != c_int)).sum())
+        fn = int(((preds_cat != c_int) & (labels_cat == c_int)).sum())
+        prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2.0 * prec * rec / (prec + rec) if (prec + rec) > 0.0 else 0.0
+        per_class_f1.append(f1)
+    return float(sum(per_class_f1) / len(per_class_f1)) if per_class_f1 else 0.0
+
+
+def _compute_fisher_diagonal(
+    *,
+    model: nn.Module,
+    replay_loader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
+    device: torch.device,
+    num_samples: int = 1000,
+) -> dict[str, torch.Tensor]:
+    """Diagonal Fisher information matrix approximation over ``replay_loader``.
+
+    Computes the expected squared gradient of log-likelihood with respect to
+    each parameter using the supervised Fisher approximation (true labels).
+    Used by EWC regularisation to protect high-importance Jester parameters
+    from being overwritten during Stage B IPN fine-tuning.
+
+    Only parameters that ``require_grad`` are included in the output dict.
+    """
+    # Temporarily enable requires_grad on all parameters so the backward pass
+    # can build a computation graph.  The teacher model is normally frozen
+    # (requires_grad=False), but Fisher estimation needs gradients.
+    original_requires_grad: dict[str, bool] = {
+        n: p.requires_grad for n, p in model.named_parameters()
+    }
+    for p in model.parameters():
+        p.requires_grad_(True)
+
+    fisher: dict[str, torch.Tensor] = {
+        n: torch.zeros_like(p, device=device) for n, p in model.named_parameters()
+    }
+    # cuDNN RNN kernels only register intermediate states needed for backward
+    # when the module is in *training* mode.  Calling model.eval() would break
+    # the backward pass through BiLSTM layers, so we keep training mode here
+    # and restore the original mode in the finally block.
+    was_training = model.training
+    model.train()
+    model.zero_grad()
+    total = 0
+    try:
+        for x, y in replay_loader:
+            if total >= num_samples:
+                break
+            x, y = x.to(device), y.to(device)
+            logits = model(x)
+            log_probs = F.log_softmax(logits, dim=1)
+            log_probs[torch.arange(len(y)), y].mean().backward()
+            for n, p in model.named_parameters():
+                if p.grad is not None and n in fisher:
+                    fisher[n].add_(p.grad.detach().pow(2).mul_(float(x.size(0))))
+            model.zero_grad()
+            total += x.size(0)
+    finally:
+        # Always restore the original training mode and requires_grad state.
+        model.train(was_training)
+        for n, p in model.named_parameters():
+            p.requires_grad_(original_requires_grad.get(n, False))
+
+    count = max(total, 1)
+    for n in fisher:
+        fisher[n].div_(count)
+    return fisher
+
+
+def _compute_jester_subspace(
+    *,
+    model: nn.Module,
+    replay_loader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
+    device: torch.device,
+    num_components: int = 20,
+) -> dict[str, torch.Tensor]:
+    """Compute top-``num_components`` principal directions of Jester input activations.
+
+    Registers forward hooks on non-head Linear modules to collect **input**
+    activations over the replay set, then runs truncated SVD to extract the
+    principal component directions in input space.
+
+    Returns a dict mapping module name → ``(in_features, k)`` matrix whose
+    columns are the top-k right singular vectors of the centred input activation
+    matrix.  These directions are used by :func:`_project_gradients_gpm` to
+    constrain Stage B weight gradients to the orthogonal complement of the
+    Jester input subspace.
+
+    Per Saha et al. 2020 (GPM), the subspace is computed from **input**
+    activations so that the projection operates in the same space as the weight
+    columns (``W`` has shape ``(out_features, in_features)``).
+    """
+    activations: dict[str, list[torch.Tensor]] = {}
+    hooks: list[Any] = []
+
+    def _make_hook(name: str) -> Any:
+        def _hook(module: nn.Module, inp: Any, out: Any) -> None:
+            x = inp[0]  # (batch, *, in_features) — first positional input
+            # Collapse all leading dims except the last (in_features) so each
+            # timestep / position contributes an independent row to the SVD.
+            activations.setdefault(name, []).append(
+                x.detach().cpu().reshape(-1, x.shape[-1])  # (N, in_features)
+            )
+
+        return _hook
+
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Linear) and not name.startswith("head"):
+            hooks.append(module.register_forward_hook(_make_hook(name)))
+
+    model.eval()
+    with torch.no_grad():
+        for x, _ in replay_loader:
+            model(x.to(device))
+
+    for h in hooks:
+        h.remove()
+
+    subspace: dict[str, torch.Tensor] = {}
+    for name, acts in activations.items():
+        A = torch.cat(acts, dim=0).float()  # (N, in_features)
+        k = min(num_components, A.shape[0] - 1, A.shape[1])
+        if k < 1:
+            continue
+        A = A - A.mean(dim=0, keepdim=True)  # centre activations
+        _, _, Vt = torch.linalg.svd(A, full_matrices=False)
+        subspace[name] = Vt[:k].T  # (in_features, k) — principal directions as columns
+    return subspace
+
+
+def _project_gradients_gpm(
+    model: nn.Module,
+    subspace: dict[str, torch.Tensor],
+) -> None:
+    """Project weight gradients to the null-space of the Jester input activation subspace.
+
+    For each Linear module present in ``subspace``, the weight gradient matrix
+    is projected to the orthogonal complement of the module's Jester principal
+    input directions::
+
+        dW = dW - (dW @ U) @ U.T
+
+    where ``U`` is the ``(in_features, k)`` matrix of Jester principal input
+    components (columns).  This operates row-wise in input space: each output
+    neuron's incoming weight vector is projected away from the Jester input
+    directions, preserving the directions that encode Jester temporal gesture
+    patterns (GPM, Saha et al. 2020).
+
+    Gradients are modified **in-place** and should be called immediately after
+    ``loss.backward()`` and before ``clip_grad_norm_`` and the optimiser step.
+    """
+    for name, module in model.named_modules():
+        if name not in subspace:
+            continue
+        U = subspace[name]  # (in_features, k) — orthonormal columns
+        weight = getattr(module, "weight", None)
+        if weight is None or weight.grad is None:
+            continue
+        U_dev = U.to(weight.grad.device)
+        # weight.grad shape: (out_features, in_features)
+        # Project each output neuron's gradient away from Jester input subspace:
+        #   dW = dW - (dW @ U) @ U.T
+        dW = weight.grad  # (out_features, in_features)
+        weight.grad.copy_(dW - (dW @ U_dev) @ U_dev.T)
 
 
 def train_lstm(
@@ -625,6 +971,532 @@ def train_lstm(
     (run_dir / "config_snapshot.yaml").write_text(
         yaml.safe_dump(training_summary["config"], sort_keys=False),
         encoding="utf-8",
+    )
+
+    return TrainingResult(
+        model=model,
+        model_version=model_version,
+        checkpoint_path=checkpoint_path,
+        run_dir=run_dir,
+        train_history=history,
+        val_report=val_report,
+        test_report=test_report,
+        class_labels=datamodule.class_labels,
+        dataset_metadata=datamodule.metadata,
+    )
+
+
+def finetune_lstm(
+    *,
+    dataset_path: str | Path,
+    config: TrainingPipelineConfig,
+    pretrained_checkpoint_path: str | Path,
+    output_dir: str | Path,
+    run_root_dir: str | Path,
+    device: torch.device,
+    freeze_epochs: int = 10,
+    replay_dataset_path: str | Path | None = None,
+    replay_max_samples_per_class: int = 500,
+    distillation_weight: float = 0.5,
+    replay_ce_weight: float = 0.3,
+    backbone_lr_multiplier: float = 0.1,
+    ewc_weight: float = 0.0,
+    forgetting_penalty_weight: float = 0.5,
+    gpm_components: int = 20,
+) -> TrainingResult:
+    """Fine-tune a pretrained ``EnhancedTwoStreamLSTM`` on a new dataset.
+
+    Implements a two-stage transfer learning strategy:
+
+    **Stage A — Head-only** (``freeze_epochs`` epochs):
+        The pretrained backbone (feature projections, BiLSTMs, self-attention,
+        cross-stream gates) is frozen. Only the new classification head is
+        trained with ``lr=1e-3`` so it converges quickly before the backbone
+        is unfrozen.
+
+    **Stage B — Full model** (``config.training.epochs`` epochs):
+        All layers are unfrozen and jointly fine-tuned with:
+        - Feature-level distillation (MSE between student/teacher features)
+        - Frozen-head replay CE (old-task classification objective)
+        - EWC regularisation (Fisher-weighted backbone parameter anchor)
+        - GPM gradient projection (Jester subspace orthogonality constraint)
+        - Jester retention monitoring (macro-F1 on held-out Jester val split)
+        Early stopping uses a composite score that penalises Jester forgetting.
+    """
+    seed_everything(config.training.seed)
+    datamodule = create_datamodule(dataset_path=dataset_path, config=config)
+
+    if not config.model.model_name.startswith("two_stream_attn"):
+        raise ValueError(
+            "finetune_lstm only supports 'two_stream_attn_*' models. "
+            f"Got: {config.model.model_name!r}"
+        )
+
+    ckpt = torch.load(pretrained_checkpoint_path, map_location=device, weights_only=False)
+    pretrained_model_config_dict: dict[str, Any] = ckpt.get("model_config", {})
+
+    pretrained_mc = _model_config_from_checkpoint(
+        pretrained_model_config_dict,
+        config.model,
+        num_classes=int(pretrained_model_config_dict.get("num_classes", 27)),
+    )
+    model = _build_model(pretrained_mc, device)
+    model.load_state_dict(ckpt["model_state_dict"])
+
+    teacher_model = copy.deepcopy(model)
+    teacher_model.eval()
+    for param in teacher_model.parameters():
+        param.requires_grad = False
+
+    # Keep a frozen copy of the source head (27-class by default) and apply it to
+    # current backbone features on replay batches. This creates an explicit
+    # old-task classification retention objective during Stage B.
+    replay_head = copy.deepcopy(cast(nn.Module, model.head)).to(device)
+    replay_head.eval()
+    for param in replay_head.parameters():
+        param.requires_grad = False
+
+    # ── Jester replay DM: created here (before Stage A) so we can measure the
+    # Jester retention baseline before any IPN training begins.
+    replay_dm: GestureDataModule | None = None
+    jester_eval_loader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]] | None = None
+    jester_pretrain_f1 = float("nan")
+    if replay_dataset_path is not None:
+        replay_dm = GestureDataModule(
+            dataset_path=replay_dataset_path,
+            batch_size=config.training.batch_size,
+            split=config.split,
+            seed=config.training.seed,
+            num_workers=config.training.num_workers,
+            pin_memory=False,
+            augmentation=None,
+            max_samples_per_class=replay_max_samples_per_class,
+            exclude_classes=None,
+        )
+        replay_dm.setup()
+        jester_eval_loader = replay_dm.val_dataloader()
+        # Jester retention BEFORE any IPN training: use teacher model (unmodified backbone)
+        jester_pretrain_f1 = _evaluate_jester_f1(
+            model=teacher_model,
+            replay_head=replay_head,
+            dataloader=jester_eval_loader,
+            device=device,
+        )
+
+    from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
+
+    if not isinstance(model, EnhancedTwoStreamLSTM):
+        raise TypeError(f"finetune_lstm requires EnhancedTwoStreamLSTM; got {type(model).__name__}")
+
+    if not isinstance(model.head[-1], nn.Linear):
+        raise TypeError(
+            "EnhancedTwoStreamLSTM.head[-1] must be nn.Linear for fine-tuning head replacement"
+        )
+
+    old_head_linear = cast(nn.Linear, model.head[-1])
+    new_num_classes = config.model.num_classes
+    model.head[-1] = nn.Linear(old_head_linear.in_features, new_num_classes).to(device)
+    model.num_classes = new_num_classes
+
+    if datamodule.num_classes != new_num_classes:
+        raise ValueError(
+            f"config.model.num_classes ({new_num_classes}) does not match "
+            f"dataset classes ({datamodule.num_classes})"
+        )
+
+    def _make_criterion(weights: torch.Tensor | None) -> nn.Module:
+        return _build_criterion(weights, label_smoothing=config.training.label_smoothing)
+
+    if config.training.class_weighting:
+        class_weights = _build_class_weights(datamodule, device)
+        criterion: nn.Module = _make_criterion(class_weights)
+    else:
+        criterion = _make_criterion(None)
+
+    train_loader = datamodule.train_dataloader()
+    val_loader = datamodule.val_dataloader()
+    test_loader = datamodule.test_dataloader()
+
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    model_version = f"{config.model.model_name}_finetune_{timestamp}"
+    run_dir = Path(run_root_dir) / model_version
+    run_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_output_dir = Path(output_dir)
+    checkpoint_output_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_path = checkpoint_output_dir / f"{model_version}.pt"
+
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"\nFine-tuning  {model_version}")
+    print(f"  Pretrained : {Path(pretrained_checkpoint_path).name}")
+    print(f"  Model      : EnhancedTwoStreamLSTM  ({n_params:,} params)")
+    print(
+        f"  Dataset    : train={len(datamodule.train_indices):,}  "
+        f"val={len(datamodule.val_indices):,}"
+    )
+    print(f"  Classes    : {new_num_classes}  {datamodule.class_labels}")
+    if replay_dataset_path is not None:
+        print(
+            "  Phase 1    : "
+            f"replay={Path(replay_dataset_path).name}  "
+            f"replay_max/class={replay_max_samples_per_class}  "
+            f"distill_w={distillation_weight:.3f}  "
+            f"replay_ce_w={replay_ce_weight:.3f}  "
+            f"backbone_lr_mult={backbone_lr_multiplier:.3f}  "
+            f"ewc_w={ewc_weight:.1f}  "
+            f"gpm_k={gpm_components}  "
+            f"forget_pen={forgetting_penalty_weight:.2f}"
+        )
+        print(f"  Jester baseline val macro-F1 = {jester_pretrain_f1:.4f}")
+
+    history: list[dict[str, float]] = []
+    best_val_f1 = -float("inf")
+    best_composite = -float("inf")
+    best_val_loss = float("inf")
+    best_epoch = 0
+    epochs_without_improve = 0
+
+    if freeze_epochs > 0:
+        for name, param in model.named_parameters():
+            param.requires_grad = name.startswith("head.")
+        head_params = [p for p in model.parameters() if p.requires_grad]
+        optimizer_a = AdamW(head_params, lr=1e-3, weight_decay=config.training.weight_decay)
+        _sep = "-" * 80
+        print(f"\n{'─' * 80}")
+        print(f"Stage A — backbone frozen, head-only  ({freeze_epochs} epochs, lr=1e-3)")
+        print(_sep)
+        print(
+            f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  "
+            f"{'ValLoss':>8}  {'ValAcc':>7}  {'ValF1':>6}"
+        )
+        print(_sep, flush=True)
+
+        for epoch in range(1, freeze_epochs + 1):
+            t0 = time.perf_counter()
+            train_loss, train_acc = _train_one_epoch(
+                model=model,
+                dataloader=train_loader,
+                optimizer=optimizer_a,
+                criterion=criterion,
+                device=device,
+                grad_clip_norm=config.training.grad_clip_norm,
+            )
+            val_report = evaluate_model(
+                model=model,
+                dataloader=val_loader,
+                class_labels=datamodule.class_labels,
+                device=device,
+                criterion=criterion,
+            )
+            history.append(
+                {
+                    "epoch": float(epoch),
+                    "stage": 0.0,
+                    "train_loss": train_loss,
+                    "train_accuracy": train_acc,
+                    "val_loss": val_report.loss,
+                    "val_accuracy": val_report.accuracy,
+                    "val_macro_f1": val_report.macro_f1,
+                    "learning_rate": 1e-3,
+                    "epoch_secs": time.perf_counter() - t0,
+                }
+            )
+            print(
+                f"{epoch:>6}/{freeze_epochs:<4}  {train_loss:>9.4f}  "
+                f"{train_acc:>8.1%}  {val_report.loss:>8.4f}  "
+                f"{val_report.accuracy:>7.1%}  {val_report.macro_f1:>6.1%}",
+                flush=True,
+            )
+
+        print(f"\nStage A complete. Val macro-F1 = {val_report.macro_f1:.4f}")
+
+    for param in model.parameters():
+        param.requires_grad = True
+
+    backbone_params = [
+        param for name, param in model.named_parameters() if not name.startswith("head.")
+    ]
+    head_params = [param for name, param in model.named_parameters() if name.startswith("head.")]
+    optimizer_b = AdamW(
+        [
+            {
+                "params": backbone_params,
+                "lr": config.training.learning_rate * backbone_lr_multiplier,
+            },
+            {
+                "params": head_params,
+                "lr": config.training.learning_rate,
+            },
+        ],
+        weight_decay=config.training.weight_decay,
+    )
+
+    # Create replay iterator from the training split of the replay DM created earlier.
+    # The val split of replay_dm is held out exclusively for Jester retention monitoring.
+    replay_iter: Iterator[tuple[torch.Tensor, torch.Tensor]] | None = None
+    if replay_dm is not None:
+        replay_iter = itertools.cycle(iter(replay_dm.train_dataloader()))
+
+    # ── EWC: Fisher information diagonal over Jester replay ───────────────────
+    # Computed on the teacher (Jester-pretrained) model so the Fisher reflects
+    # the Jester loss landscape. Anchor weights are the backbone parameters of
+    # the teacher (backbone is identical to student at this point since Stage A
+    # kept the backbone frozen).
+    fisher: dict[str, torch.Tensor] | None = None
+    pretrained_weights: dict[str, torch.Tensor] | None = None
+    if ewc_weight > 0.0 and replay_dm is not None:
+        print(f"\nComputing EWC Fisher diagonal (ewc_weight={ewc_weight:.1f})...")
+        pretrained_weights = {
+            n: p.detach().clone()
+            for n, p in teacher_model.named_parameters()
+            if not n.startswith("head.")
+        }
+        fisher = _compute_fisher_diagonal(
+            model=teacher_model,
+            replay_loader=replay_dm.train_dataloader(),
+            device=device,
+        )
+        print(f"  Fisher diagonal computed for {len(fisher)} parameter tensors.")
+
+    # ── GPM: Jester activation subspace for gradient projection ───────────────
+    # Computed on the teacher backbone so principal directions reflect Jester's
+    # feature geometry. GPM projects each Stage B gradient update to the null-
+    # space of these directions, preventing IPN from overwriting Jester weights.
+    jester_subspace: dict[str, torch.Tensor] | None = None
+    if gpm_components > 0 and replay_dm is not None:
+        print(f"Computing Jester activation subspace (k={gpm_components}) for GPM...")
+        jester_subspace = _compute_jester_subspace(
+            model=teacher_model,
+            replay_loader=replay_dm.train_dataloader(),
+            device=device,
+            num_components=gpm_components,
+        )
+        print(f"  Subspace computed for {len(jester_subspace)} layers.")
+
+    scheduler: ReduceLROnPlateau | None = None
+    if config.scheduler.enabled:
+        scheduler = ReduceLROnPlateau(
+            optimizer_b,
+            mode="max",
+            factor=config.scheduler.factor,
+            patience=config.scheduler.patience,
+            min_lr=config.scheduler.min_lr,
+        )
+
+    _sep = "-" * 110
+    print(f"\n{'─' * 110}")
+    print(
+        f"Stage B — full fine-tuning  (up to {config.training.epochs} epochs, "
+        f"head_lr={config.training.learning_rate:.2e}, "
+        f"backbone_lr={config.training.learning_rate * backbone_lr_multiplier:.2e})"
+    )
+    if ewc_weight > 0.0:
+        print(f"  EWC regularisation  ewc_weight={ewc_weight:.1f}")
+    if jester_subspace is not None:
+        print(f"  GPM projection      {len(jester_subspace)} layers  k={gpm_components}")
+    if jester_eval_loader is not None:
+        print(
+            f"  Jester monitoring   baseline_f1={jester_pretrain_f1:.4f}  "
+            f"forgetting_penalty_weight={forgetting_penalty_weight:.2f}"
+        )
+    print(_sep)
+    print(
+        f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  {'ValLoss':>8}  "
+        f"{'ValAcc':>7}  {'ValF1':>6}  {'JstrF1':>7}  {'LR':>8}  "
+        f"{'Distill':>8}  {'ReplayCE':>8}  {'EWC':>8}  Note"
+    )
+    print(_sep, flush=True)
+
+    for epoch in range(1, config.training.epochs + 1):
+        t0 = time.perf_counter()
+        distill_loss_value = float("nan")
+        replay_ce_loss_value = float("nan")
+        ewc_loss_value = float("nan")
+        if replay_iter is not None:
+            train_loss, train_acc, distill_loss_value, replay_ce_loss_value, ewc_loss_value = (
+                _train_one_epoch_with_retention(
+                    model=model,
+                    teacher=teacher_model,
+                    target_dataloader=train_loader,
+                    replay_iter=replay_iter,
+                    replay_head=replay_head,
+                    optimizer=optimizer_b,
+                    target_criterion=criterion,
+                    device=device,
+                    grad_clip_norm=config.training.grad_clip_norm,
+                    distillation_weight=distillation_weight,
+                    replay_ce_weight=replay_ce_weight,
+                    fisher=fisher,
+                    pretrained_weights=pretrained_weights,
+                    ewc_weight=ewc_weight,
+                    jester_subspace=jester_subspace,
+                )
+            )
+        else:
+            train_loss, train_acc = _train_one_epoch(
+                model=model,
+                dataloader=train_loader,
+                optimizer=optimizer_b,
+                criterion=criterion,
+                device=device,
+                grad_clip_norm=config.training.grad_clip_norm,
+            )
+        val_report = evaluate_model(
+            model=model,
+            dataloader=val_loader,
+            class_labels=datamodule.class_labels,
+            device=device,
+            criterion=criterion,
+        )
+
+        # ── Jester retention monitoring ────────────────────────────────────────
+        jester_val_f1 = float("nan")
+        if jester_eval_loader is not None:
+            jester_val_f1 = _evaluate_jester_f1(
+                model=model,
+                replay_head=replay_head,
+                dataloader=jester_eval_loader,
+                device=device,
+            )
+
+        if scheduler is not None:
+            scheduler.step(val_report.macro_f1)
+        current_lr = float(optimizer_b.param_groups[-1]["lr"])
+
+        # ── Composite early stopping score ────────────────────────────────────
+        # Penalise the IPN val F1 by the amount of Jester forgetting so that
+        # the best checkpoint balances IPN performance with source-task retention.
+        jester_gap = 0.0
+        if jester_eval_loader is not None and jester_pretrain_f1 == jester_pretrain_f1:  # not nan
+            jester_gap = max(0.0, jester_pretrain_f1 - jester_val_f1)
+        composite = val_report.macro_f1 - forgetting_penalty_weight * jester_gap
+
+        improved = (composite - best_composite) > config.training.early_stopping_min_delta
+        if improved:
+            best_composite = composite
+            best_val_f1 = val_report.macro_f1
+            best_val_loss = val_report.loss
+            best_epoch = epoch
+            epochs_without_improve = 0
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "model_config": asdict(config.model),
+                    "class_labels": datamodule.class_labels,
+                    "dataset_metadata": datamodule.metadata,
+                    "feature_schema_version": config.export.feature_schema_version,
+                    "pretrained_checkpoint": str(pretrained_checkpoint_path),
+                    "best_epoch": best_epoch,
+                    "best_val_f1": best_val_f1,
+                    "best_val_loss": best_val_loss,
+                    "best_composite": best_composite,
+                    "jester_val_f1": jester_val_f1,
+                },
+                checkpoint_path,
+            )
+            note = "* best"
+        else:
+            epochs_without_improve += 1
+            note = f"  ES {epochs_without_improve}/{config.training.early_stopping_patience}"
+
+        history.append(
+            {
+                "epoch": float(freeze_epochs + epoch),
+                "stage": 1.0,
+                "train_loss": train_loss,
+                "train_accuracy": train_acc,
+                "val_loss": val_report.loss,
+                "val_accuracy": val_report.accuracy,
+                "val_macro_f1": val_report.macro_f1,
+                "jester_val_f1": jester_val_f1,
+                "composite_score": composite,
+                "learning_rate": current_lr,
+                "epoch_secs": time.perf_counter() - t0,
+                "distill_loss": distill_loss_value,
+                "replay_ce_loss": replay_ce_loss_value,
+                "ewc_loss": ewc_loss_value,
+            }
+        )
+        print(
+            f"{epoch:>6}/{config.training.epochs:<4}  {train_loss:>9.4f}  {train_acc:>8.1%}  "
+            f"{val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  {val_report.macro_f1:>6.1%}  "
+            f"{jester_val_f1:>7.4f}  "
+            f"{current_lr:>8.2e}  {distill_loss_value:>8.4f}  "
+            f"{replay_ce_loss_value:>8.4f}  {ewc_loss_value:>8.4f}  {note}",
+            flush=True,
+        )
+
+        if epochs_without_improve >= config.training.early_stopping_patience:
+            print(
+                f"\nEarly stopping at epoch {epoch}  "
+                f"(no improvement for {config.training.early_stopping_patience} epochs)"
+            )
+            break
+    else:
+        print(f"\nCompleted all {config.training.epochs} Stage B epochs.")
+
+    print(
+        f"\nBest epoch : {best_epoch}  val_macro_f1={best_val_f1:.4f}  "
+        f"composite={best_composite:.4f}  val_loss={best_val_loss:.4f}"
+    )
+
+    best_ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    model.load_state_dict(best_ckpt["model_state_dict"])
+
+    val_report = evaluate_model(
+        model=model,
+        dataloader=val_loader,
+        class_labels=datamodule.class_labels,
+        device=device,
+        criterion=criterion,
+    )
+    test_report = evaluate_model(
+        model=model,
+        dataloader=test_loader,
+        class_labels=datamodule.class_labels,
+        device=device,
+        criterion=criterion,
+    )
+
+    training_summary = {
+        "model_version": model_version,
+        "pretrained_checkpoint": str(pretrained_checkpoint_path),
+        "freeze_epochs": freeze_epochs,
+        "replay_dataset_path": (
+            str(replay_dataset_path) if replay_dataset_path is not None else None
+        ),
+        "replay_max_samples_per_class": replay_max_samples_per_class,
+        "distillation_weight": distillation_weight,
+        "replay_ce_weight": replay_ce_weight,
+        "backbone_lr_multiplier": backbone_lr_multiplier,
+        "ewc_weight": ewc_weight,
+        "forgetting_penalty_weight": forgetting_penalty_weight,
+        "gpm_components": gpm_components,
+        "jester_pretrain_f1": jester_pretrain_f1,
+        "best_epoch": best_epoch,
+        "best_val_f1": best_val_f1,
+        "best_val_loss": best_val_loss,
+        "best_composite": best_composite,
+        "history": history,
+        "val_report": val_report.to_dict(),
+        "test_report": test_report.to_dict(),
+        "config": {
+            "model": asdict(config.model),
+            "training": asdict(config.training),
+            "split": asdict(config.split),
+            "scheduler": asdict(config.scheduler),
+            "export": asdict(config.export),
+        },
+        "dataset_metadata": datamodule.metadata,
+        "label_distribution": datamodule.label_distribution(),
+    }
+    (run_dir / "training_metrics.json").write_text(
+        json.dumps(training_summary, indent=2), encoding="utf-8"
+    )
+    (run_dir / "dataset_metadata.json").write_text(
+        json.dumps(datamodule.metadata, indent=2), encoding="utf-8"
+    )
+    (run_dir / "config_snapshot.yaml").write_text(
+        yaml.safe_dump(training_summary["config"], sort_keys=False), encoding="utf-8"
     )
 
     return TrainingResult(
