@@ -516,14 +516,14 @@ Calibration ECE (val): N/A (not present in source JSON) · Mean confidence: 0.85
 - Weak classes: `zoom_in` and `zoom_out` remained lowest recall in this final run.
 - Confusion trend: matrix shows remaining zoom-direction trade-offs but strong unknown separation.
 - Calibration quality: ECE unavailable; mean confidence 0.850.
-- Comparison: this is the current runtime-default artifact run; slightly below the best validation peak but with strong test Macro F1.
+- Comparison: this run remains a strong reference point in the selected two-stream attention series, slightly below the best validation peak but with strong test Macro F1.
 
 ---
 
 ## Comparative Analysis
 
 - Best performing model (by validation Macro F1): `two_stream_attn_v1_20260503T064347Z` (**80.82%**).
-- Most stable model family (among audited multi-run families): `two_stream_attn` in the selected set (population std of selected validation Macro F1 ≈ **0.0442**), with the near-final 8-class sub-cluster (`061857Z`, `064347Z`, `065204Z`) showing tighter stability (std ≈ **0.0087**).
-- Most improved classes across selected runs (core 8-class vocabulary, min-to-max recall spread): `zoom_out` (+0.3009), `zoom_in` (+0.2848), `swipe_down` (+0.2713).
-- Persistent failure cases: click-family classes (`click_one`, `click_two`) in 12-class setups; `zoom_in`/`zoom_out` remain recurrent weak points even in high-performing 8-class runs.
-- Production recommendation: keep `EnhancedTwoStreamLSTM` as authoritative runtime path, prioritize checkpoints from the 8-class final cluster, and continue targeted error reduction on zoom/directional confusions and click-family robustness in extended-vocabulary experiments.
+- Most stable model family (among audited multi-run families): `two_stream_attn` in the selected set (population std of selected validation Macro F1 ≈ **0.0442**), with the near-final subgroup (`061857Z`, `064347Z`, `065204Z`) showing tighter stability (std ≈ **0.0087**).
+- Most improved classes across selected runs (core gesture subset in this report, min-to-max recall spread): `zoom_out` (+0.3009), `zoom_in` (+0.2848), `swipe_down` (+0.2713).
+- Persistent failure cases: click-family classes (`click_one`, `click_two`) in extended-vocabulary setups; `zoom_in`/`zoom_out` remain recurrent weak points in several runs.
+- Production recommendation: keep `EnhancedTwoStreamLSTM` as authoritative runtime path, prioritize top-performing recent checkpoints, and continue targeted error reduction on zoom/directional confusions plus click-family robustness in extended-vocabulary experiments.
