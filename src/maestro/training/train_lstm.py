@@ -644,33 +644,37 @@ def _compute_jester_subspace(
     device: torch.device,
     num_components: int = 20,
 ) -> dict[str, torch.Tensor]:
-    """Compute top-``num_components`` principal directions of Jester activations.
+    """Compute top-``num_components`` principal directions of Jester input activations.
 
-    Registers forward hooks on LSTM and non-head Linear modules to collect
+    Registers forward hooks on non-head Linear modules to collect **input**
     activations over the replay set, then runs truncated SVD to extract the
-    principal component directions.
+    principal component directions in input space.
 
-    Returns a dict mapping module name → ``(d, k)`` matrix whose columns are
-    the top-k right singular vectors of the centred activation matrix.  These
-    directions are used by :func:`_project_gradients_gpm` to constrain Stage B
-    weight gradients to the orthogonal complement of the Jester subspace.
+    Returns a dict mapping module name → ``(in_features, k)`` matrix whose
+    columns are the top-k right singular vectors of the centred input activation
+    matrix.  These directions are used by :func:`_project_gradients_gpm` to
+    constrain Stage B weight gradients to the orthogonal complement of the
+    Jester input subspace.
+
+    Per Saha et al. 2020 (GPM), the subspace is computed from **input**
+    activations so that the projection operates in the same space as the weight
+    columns (``W`` has shape ``(out_features, in_features)``).
     """
     activations: dict[str, list[torch.Tensor]] = {}
     hooks: list[Any] = []
 
     def _make_hook(name: str) -> Any:
         def _hook(module: nn.Module, inp: Any, out: Any) -> None:
-            if isinstance(out, tuple):  # LSTM → (output, (h_n, c_n))
-                out = out[0]
+            x = inp[0]  # (batch, *, in_features) — first positional input
+            # Collapse all leading dims except the last (in_features) so each
+            # timestep / position contributes an independent row to the SVD.
             activations.setdefault(name, []).append(
-                out.detach().cpu().reshape(out.size(0), -1)
+                x.detach().cpu().reshape(-1, x.shape[-1])  # (N, in_features)
             )
         return _hook
 
     for name, module in model.named_modules():
-        if isinstance(module, nn.LSTM) or (
-            isinstance(module, nn.Linear) and not name.startswith("head")
-        ):
+        if isinstance(module, nn.Linear) and not name.startswith("head"):
             hooks.append(module.register_forward_hook(_make_hook(name)))
 
     model.eval()
@@ -683,13 +687,13 @@ def _compute_jester_subspace(
 
     subspace: dict[str, torch.Tensor] = {}
     for name, acts in activations.items():
-        A = torch.cat(acts, dim=0).float()  # (N, d)
+        A = torch.cat(acts, dim=0).float()  # (N, in_features)
         k = min(num_components, A.shape[0] - 1, A.shape[1])
         if k < 1:
             continue
         A = A - A.mean(dim=0, keepdim=True)  # centre activations
         _, _, Vt = torch.linalg.svd(A, full_matrices=False)
-        subspace[name] = Vt[:k].T  # (d, k) — principal directions as columns
+        subspace[name] = Vt[:k].T  # (in_features, k) — principal directions as columns
     return subspace
 
 
@@ -697,31 +701,36 @@ def _project_gradients_gpm(
     model: nn.Module,
     subspace: dict[str, torch.Tensor],
 ) -> None:
-    """Project weight gradients to the null-space of the Jester activation subspace.
+    """Project weight gradients to the null-space of the Jester input activation subspace.
 
-    For each module present in ``subspace``, the weight gradient is projected
-    to the orthogonal complement of the module's Jester principal directions::
+    For each Linear module present in ``subspace``, the weight gradient matrix
+    is projected to the orthogonal complement of the module's Jester principal
+    input directions::
 
-        g_perp = g - U @ (U.T @ g)
+        dW = dW - (dW @ U) @ U.T
 
-    where ``U`` is the ``(d, k)`` matrix of Jester principal components (columns).
+    where ``U`` is the ``(in_features, k)`` matrix of Jester principal input
+    components (columns).  This operates row-wise in input space: each output
+    neuron's incoming weight vector is projected away from the Jester input
+    directions, preserving the directions that encode Jester temporal gesture
+    patterns (GPM, Saha et al. 2020).
 
-    This prevents IPN fine-tuning from overwriting the weight-space directions
-    that encode Jester temporal gesture patterns (GPM, Saha et al. 2020).
     Gradients are modified **in-place** and should be called immediately after
     ``loss.backward()`` and before ``clip_grad_norm_`` and the optimiser step.
     """
     for name, module in model.named_modules():
         if name not in subspace:
             continue
-        U = subspace[name]  # (d, k) — orthonormal columns
+        U = subspace[name]  # (in_features, k) — orthonormal columns
         weight = getattr(module, "weight", None)
         if weight is None or weight.grad is None:
             continue
         U_dev = U.to(weight.grad.device)
-        g = weight.grad.reshape(-1)
-        g_perp = g - U_dev @ (U_dev.T @ g)
-        weight.grad.copy_(g_perp.view_as(weight.grad))
+        # weight.grad shape: (out_features, in_features)
+        # Project each output neuron's gradient away from Jester input subspace:
+        #   dW = dW - (dW @ U) @ U.T
+        dW = weight.grad  # (out_features, in_features)
+        weight.grad.copy_(dW - (dW @ U_dev) @ U_dev.T)
 
 
 def train_lstm(
