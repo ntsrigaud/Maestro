@@ -447,13 +447,18 @@ def _train_one_epoch_with_retention(
     grad_clip_norm: float,
     distillation_weight: float,
     replay_ce_weight: float,
-) -> tuple[float, float, float, float]:
+    fisher: dict[str, torch.Tensor] | None = None,
+    pretrained_weights: dict[str, torch.Tensor] | None = None,
+    ewc_weight: float = 0.0,
+    jester_subspace: dict[str, torch.Tensor] | None = None,
+) -> tuple[float, float, float, float, float]:
     model.train()
     teacher.eval()
 
     total_loss = 0.0
     total_distill_loss = 0.0
     total_replay_ce_loss = 0.0
+    total_ewc_loss = 0.0
     total_correct = 0
     total_examples = 0
 
@@ -480,12 +485,30 @@ def _train_one_epoch_with_retention(
         distill_loss = F.mse_loss(student_features, teacher_features)
         replay_logits = replay_head(student_features)
         replay_ce_loss = F.cross_entropy(replay_logits, replay_y)
+
+        # EWC regularisation: penalise backbone drift from Jester-pretrained weights
+        ewc_loss = torch.tensor(0.0, device=device)
+        if fisher is not None and pretrained_weights is not None and ewc_weight > 0.0:
+            for n, p in model.named_parameters():
+                if n.startswith("head."):
+                    continue  # only regularise the shared backbone
+                f = fisher.get(n)
+                w0 = pretrained_weights.get(n)
+                if f is not None and w0 is not None:
+                    ewc_loss = ewc_loss + (f * (p - w0).pow(2)).sum()
+            ewc_loss = ewc_loss.mul(0.5)
+
         loss = (
             target_loss
             + (distillation_weight * distill_loss)
             + (replay_ce_weight * replay_ce_loss)
+            + (ewc_weight * ewc_loss)
         )
         loss.backward()
+
+        # GPM: project weight gradients to null-space of Jester activation subspace
+        if jester_subspace is not None:
+            _project_gradients_gpm(model, jester_subspace)
 
         if grad_clip_norm > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
@@ -496,6 +519,7 @@ def _train_one_epoch_with_retention(
         total_loss += float(loss.item()) * batch_x.size(0)
         total_distill_loss += float(distill_loss.item()) * batch_x.size(0)
         total_replay_ce_loss += float(replay_ce_loss.item()) * batch_x.size(0)
+        total_ewc_loss += float(ewc_loss.item()) * batch_x.size(0)
         total_correct += int((preds == batch_y).sum().item())
         total_examples += int(batch_x.size(0))
 
@@ -507,7 +531,177 @@ def _train_one_epoch_with_retention(
         float(total_correct / total_examples),
         float(total_distill_loss / total_examples),
         float(total_replay_ce_loss / total_examples),
+        float(total_ewc_loss / total_examples),
     )
+
+
+def _evaluate_jester_f1(
+    *,
+    model: nn.Module,
+    replay_head: nn.Module,
+    dataloader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
+    device: torch.device,
+) -> float:
+    """Return Jester macro-F1 via backbone features → frozen Jester head.
+
+    Used during Stage B to measure old-task retention without requiring the
+    Jester head to be attached to the live model (which has an IPN head after
+    head replacement).  Computes per-class F1 and returns the unweighted macro
+    average.
+    """
+    model.eval()
+    replay_head.eval()
+    all_preds: list[torch.Tensor] = []
+    all_labels: list[torch.Tensor] = []
+    with torch.no_grad():
+        for x, y in dataloader:
+            features = cast(Any, model).forward_features(x.to(device))
+            preds = torch.argmax(replay_head(features), dim=1).cpu()
+            all_preds.append(preds)
+            all_labels.append(y.cpu())
+    preds_cat = torch.cat(all_preds)
+    labels_cat = torch.cat(all_labels)
+    classes = labels_cat.unique().tolist()
+    per_class_f1: list[float] = []
+    for c in classes:
+        c_int = int(c)
+        tp = int(((preds_cat == c_int) & (labels_cat == c_int)).sum())
+        fp = int(((preds_cat == c_int) & (labels_cat != c_int)).sum())
+        fn = int(((preds_cat != c_int) & (labels_cat == c_int)).sum())
+        prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2.0 * prec * rec / (prec + rec) if (prec + rec) > 0.0 else 0.0
+        per_class_f1.append(f1)
+    return float(sum(per_class_f1) / len(per_class_f1)) if per_class_f1 else 0.0
+
+
+def _compute_fisher_diagonal(
+    *,
+    model: nn.Module,
+    replay_loader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
+    device: torch.device,
+    num_samples: int = 1000,
+) -> dict[str, torch.Tensor]:
+    """Diagonal Fisher information matrix approximation over ``replay_loader``.
+
+    Computes the expected squared gradient of log-likelihood with respect to
+    each parameter using the supervised Fisher approximation (true labels).
+    Used by EWC regularisation to protect high-importance Jester parameters
+    from being overwritten during Stage B IPN fine-tuning.
+
+    Only parameters that ``require_grad`` are included in the output dict.
+    """
+    fisher: dict[str, torch.Tensor] = {
+        n: torch.zeros_like(p, device=device)
+        for n, p in model.named_parameters()
+        if p.requires_grad
+    }
+    model.eval()
+    model.zero_grad()
+    total = 0
+    for x, y in replay_loader:
+        if total >= num_samples:
+            break
+        x, y = x.to(device), y.to(device)
+        logits = model(x)
+        log_probs = F.log_softmax(logits, dim=1)
+        log_probs[torch.arange(len(y)), y].mean().backward()
+        for n, p in model.named_parameters():
+            if p.grad is not None and n in fisher:
+                fisher[n].add_(p.grad.detach().pow(2).mul_(float(x.size(0))))
+        model.zero_grad()
+        total += x.size(0)
+    count = max(total, 1)
+    for n in fisher:
+        fisher[n].div_(count)
+    return fisher
+
+
+def _compute_jester_subspace(
+    *,
+    model: nn.Module,
+    replay_loader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]],
+    device: torch.device,
+    num_components: int = 20,
+) -> dict[str, torch.Tensor]:
+    """Compute top-``num_components`` principal directions of Jester activations.
+
+    Registers forward hooks on LSTM and non-head Linear modules to collect
+    activations over the replay set, then runs truncated SVD to extract the
+    principal component directions.
+
+    Returns a dict mapping module name → ``(d, k)`` matrix whose columns are
+    the top-k right singular vectors of the centred activation matrix.  These
+    directions are used by :func:`_project_gradients_gpm` to constrain Stage B
+    weight gradients to the orthogonal complement of the Jester subspace.
+    """
+    activations: dict[str, list[torch.Tensor]] = {}
+    hooks: list[Any] = []
+
+    def _make_hook(name: str) -> Any:
+        def _hook(module: nn.Module, inp: Any, out: Any) -> None:
+            if isinstance(out, tuple):  # LSTM → (output, (h_n, c_n))
+                out = out[0]
+            activations.setdefault(name, []).append(
+                out.detach().cpu().reshape(out.size(0), -1)
+            )
+        return _hook
+
+    for name, module in model.named_modules():
+        if isinstance(module, nn.LSTM) or (
+            isinstance(module, nn.Linear) and not name.startswith("head")
+        ):
+            hooks.append(module.register_forward_hook(_make_hook(name)))
+
+    model.eval()
+    with torch.no_grad():
+        for x, _ in replay_loader:
+            model(x.to(device))
+
+    for h in hooks:
+        h.remove()
+
+    subspace: dict[str, torch.Tensor] = {}
+    for name, acts in activations.items():
+        A = torch.cat(acts, dim=0).float()  # (N, d)
+        k = min(num_components, A.shape[0] - 1, A.shape[1])
+        if k < 1:
+            continue
+        A = A - A.mean(dim=0, keepdim=True)  # centre activations
+        _, _, Vt = torch.linalg.svd(A, full_matrices=False)
+        subspace[name] = Vt[:k].T  # (d, k) — principal directions as columns
+    return subspace
+
+
+def _project_gradients_gpm(
+    model: nn.Module,
+    subspace: dict[str, torch.Tensor],
+) -> None:
+    """Project weight gradients to the null-space of the Jester activation subspace.
+
+    For each module present in ``subspace``, the weight gradient is projected
+    to the orthogonal complement of the module's Jester principal directions::
+
+        g_perp = g - U @ (U.T @ g)
+
+    where ``U`` is the ``(d, k)`` matrix of Jester principal components (columns).
+
+    This prevents IPN fine-tuning from overwriting the weight-space directions
+    that encode Jester temporal gesture patterns (GPM, Saha et al. 2020).
+    Gradients are modified **in-place** and should be called immediately after
+    ``loss.backward()`` and before ``clip_grad_norm_`` and the optimiser step.
+    """
+    for name, module in model.named_modules():
+        if name not in subspace:
+            continue
+        U = subspace[name]  # (d, k) — orthonormal columns
+        weight = getattr(module, "weight", None)
+        if weight is None or weight.grad is None:
+            continue
+        U_dev = U.to(weight.grad.device)
+        g = weight.grad.reshape(-1)
+        g_perp = g - U_dev @ (U_dev.T @ g)
+        weight.grad.copy_(g_perp.view_as(weight.grad))
 
 
 def train_lstm(
@@ -777,6 +971,9 @@ def finetune_lstm(
     distillation_weight: float = 0.5,
     replay_ce_weight: float = 0.3,
     backbone_lr_multiplier: float = 0.1,
+    ewc_weight: float = 0.0,
+    forgetting_penalty_weight: float = 0.5,
+    gpm_components: int = 20,
 ) -> TrainingResult:
     """Fine-tune a pretrained ``EnhancedTwoStreamLSTM`` on a new dataset.
 
@@ -789,9 +986,13 @@ def finetune_lstm(
         is unfrozen.
 
     **Stage B — Full model** (``config.training.epochs`` epochs):
-        All layers are unfrozen and jointly fine-tuned with replay,
-        feature-level distillation, and layer-wise learning rates.
-        Early stopping monitors ``val_macro_f1`` as in :func:`train_lstm`.
+        All layers are unfrozen and jointly fine-tuned with:
+        - Feature-level distillation (MSE between student/teacher features)
+        - Frozen-head replay CE (old-task classification objective)
+        - EWC regularisation (Fisher-weighted backbone parameter anchor)
+        - GPM gradient projection (Jester subspace orthogonality constraint)
+        - Jester retention monitoring (macro-F1 on held-out Jester val split)
+        Early stopping uses a composite score that penalises Jester forgetting.
     """
     seed_everything(config.training.seed)
     datamodule = create_datamodule(dataset_path=dataset_path, config=config)
@@ -825,6 +1026,33 @@ def finetune_lstm(
     replay_head.eval()
     for param in replay_head.parameters():
         param.requires_grad = False
+
+    # ── Jester replay DM: created here (before Stage A) so we can measure the
+    # Jester retention baseline before any IPN training begins.
+    replay_dm: GestureDataModule | None = None
+    jester_eval_loader: torch.utils.data.DataLoader[tuple[torch.Tensor, torch.Tensor]] | None = None
+    jester_pretrain_f1 = float("nan")
+    if replay_dataset_path is not None:
+        replay_dm = GestureDataModule(
+            dataset_path=replay_dataset_path,
+            batch_size=config.training.batch_size,
+            split=config.split,
+            seed=config.training.seed,
+            num_workers=config.training.num_workers,
+            pin_memory=False,
+            augmentation=None,
+            max_samples_per_class=replay_max_samples_per_class,
+            exclude_classes=None,
+        )
+        replay_dm.setup()
+        jester_eval_loader = replay_dm.val_dataloader()
+        # Jester retention BEFORE any IPN training: use teacher model (unmodified backbone)
+        jester_pretrain_f1 = _evaluate_jester_f1(
+            model=teacher_model,
+            replay_head=replay_head,
+            dataloader=jester_eval_loader,
+            device=device,
+        )
 
     from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
@@ -884,11 +1112,16 @@ def finetune_lstm(
             f"replay_max/class={replay_max_samples_per_class}  "
             f"distill_w={distillation_weight:.3f}  "
             f"replay_ce_w={replay_ce_weight:.3f}  "
-            f"backbone_lr_mult={backbone_lr_multiplier:.3f}"
+            f"backbone_lr_mult={backbone_lr_multiplier:.3f}  "
+            f"ewc_w={ewc_weight:.1f}  "
+            f"gpm_k={gpm_components}  "
+            f"forget_pen={forgetting_penalty_weight:.2f}"
         )
+        print(f"  Jester baseline val macro-F1 = {jester_pretrain_f1:.4f}")
 
     history: list[dict[str, float]] = []
     best_val_f1 = -float("inf")
+    best_composite = -float("inf")
     best_val_loss = float("inf")
     best_epoch = 0
     epochs_without_improve = 0
@@ -968,21 +1201,47 @@ def finetune_lstm(
         weight_decay=config.training.weight_decay,
     )
 
+    # Create replay iterator from the training split of the replay DM created earlier.
+    # The val split of replay_dm is held out exclusively for Jester retention monitoring.
     replay_iter: Iterator[tuple[torch.Tensor, torch.Tensor]] | None = None
-    if replay_dataset_path is not None:
-        replay_dm = GestureDataModule(
-            dataset_path=replay_dataset_path,
-            batch_size=config.training.batch_size,
-            split=config.split,
-            seed=config.training.seed,
-            num_workers=config.training.num_workers,
-            pin_memory=False,
-            augmentation=None,
-            max_samples_per_class=replay_max_samples_per_class,
-            exclude_classes=None,
-        )
-        replay_dm.setup()
+    if replay_dm is not None:
         replay_iter = itertools.cycle(iter(replay_dm.train_dataloader()))
+
+    # ── EWC: Fisher information diagonal over Jester replay ───────────────────
+    # Computed on the teacher (Jester-pretrained) model so the Fisher reflects
+    # the Jester loss landscape. Anchor weights are the backbone parameters of
+    # the teacher (backbone is identical to student at this point since Stage A
+    # kept the backbone frozen).
+    fisher: dict[str, torch.Tensor] | None = None
+    pretrained_weights: dict[str, torch.Tensor] | None = None
+    if ewc_weight > 0.0 and replay_dm is not None:
+        print(f"\nComputing EWC Fisher diagonal (ewc_weight={ewc_weight:.1f})...")
+        pretrained_weights = {
+            n: p.detach().clone()
+            for n, p in teacher_model.named_parameters()
+            if not n.startswith("head.")
+        }
+        fisher = _compute_fisher_diagonal(
+            model=teacher_model,
+            replay_loader=replay_dm.train_dataloader(),
+            device=device,
+        )
+        print(f"  Fisher diagonal computed for {len(fisher)} parameter tensors.")
+
+    # ── GPM: Jester activation subspace for gradient projection ───────────────
+    # Computed on the teacher backbone so principal directions reflect Jester's
+    # feature geometry. GPM projects each Stage B gradient update to the null-
+    # space of these directions, preventing IPN from overwriting Jester weights.
+    jester_subspace: dict[str, torch.Tensor] | None = None
+    if gpm_components > 0 and replay_dm is not None:
+        print(f"Computing Jester activation subspace (k={gpm_components}) for GPM...")
+        jester_subspace = _compute_jester_subspace(
+            model=teacher_model,
+            replay_loader=replay_dm.train_dataloader(),
+            device=device,
+            num_components=gpm_components,
+        )
+        print(f"  Subspace computed for {len(jester_subspace)} layers.")
 
     scheduler: ReduceLROnPlateau | None = None
     if config.scheduler.enabled:
@@ -994,17 +1253,27 @@ def finetune_lstm(
             min_lr=config.scheduler.min_lr,
         )
 
-    _sep = "-" * 96
-    print(f"\n{'─' * 96}")
+    _sep = "-" * 110
+    print(f"\n{'─' * 110}")
     print(
         f"Stage B — full fine-tuning  (up to {config.training.epochs} epochs, "
         f"head_lr={config.training.learning_rate:.2e}, "
         f"backbone_lr={config.training.learning_rate * backbone_lr_multiplier:.2e})"
     )
+    if ewc_weight > 0.0:
+        print(f"  EWC regularisation  ewc_weight={ewc_weight:.1f}")
+    if jester_subspace is not None:
+        print(f"  GPM projection      {len(jester_subspace)} layers  k={gpm_components}")
+    if jester_eval_loader is not None:
+        print(
+            f"  Jester monitoring   baseline_f1={jester_pretrain_f1:.4f}  "
+            f"forgetting_penalty_weight={forgetting_penalty_weight:.2f}"
+        )
     print(_sep)
     print(
         f"{'Epoch':>6}  {'TrainLoss':>9}  {'TrainAcc':>8}  {'ValLoss':>8}  "
-        f"{'ValAcc':>7}  {'ValF1':>6}  {'LR':>8}  {'Distill':>8}  {'ReplayCE':>8}  Note"
+        f"{'ValAcc':>7}  {'ValF1':>6}  {'JstrF1':>7}  {'LR':>8}  "
+        f"{'Distill':>8}  {'ReplayCE':>8}  {'EWC':>8}  Note"
     )
     print(_sep, flush=True)
 
@@ -1012,8 +1281,9 @@ def finetune_lstm(
         t0 = time.perf_counter()
         distill_loss_value = float("nan")
         replay_ce_loss_value = float("nan")
+        ewc_loss_value = float("nan")
         if replay_iter is not None:
-            train_loss, train_acc, distill_loss_value, replay_ce_loss_value = (
+            train_loss, train_acc, distill_loss_value, replay_ce_loss_value, ewc_loss_value = (
                 _train_one_epoch_with_retention(
                 model=model,
                 teacher=teacher_model,
@@ -1026,6 +1296,10 @@ def finetune_lstm(
                 grad_clip_norm=config.training.grad_clip_norm,
                 distillation_weight=distillation_weight,
                 replay_ce_weight=replay_ce_weight,
+                fisher=fisher,
+                pretrained_weights=pretrained_weights,
+                ewc_weight=ewc_weight,
+                jester_subspace=jester_subspace,
             )
             )
         else:
@@ -1044,12 +1318,32 @@ def finetune_lstm(
             device=device,
             criterion=criterion,
         )
+
+        # ── Jester retention monitoring ────────────────────────────────────────
+        jester_val_f1 = float("nan")
+        if jester_eval_loader is not None:
+            jester_val_f1 = _evaluate_jester_f1(
+                model=model,
+                replay_head=replay_head,
+                dataloader=jester_eval_loader,
+                device=device,
+            )
+
         if scheduler is not None:
             scheduler.step(val_report.macro_f1)
         current_lr = float(optimizer_b.param_groups[-1]["lr"])
 
-        improved = (val_report.macro_f1 - best_val_f1) > config.training.early_stopping_min_delta
+        # ── Composite early stopping score ────────────────────────────────────
+        # Penalise the IPN val F1 by the amount of Jester forgetting so that
+        # the best checkpoint balances IPN performance with source-task retention.
+        jester_gap = 0.0
+        if jester_eval_loader is not None and jester_pretrain_f1 == jester_pretrain_f1:  # not nan
+            jester_gap = max(0.0, jester_pretrain_f1 - jester_val_f1)
+        composite = val_report.macro_f1 - forgetting_penalty_weight * jester_gap
+
+        improved = (composite - best_composite) > config.training.early_stopping_min_delta
         if improved:
+            best_composite = composite
             best_val_f1 = val_report.macro_f1
             best_val_loss = val_report.loss
             best_epoch = epoch
@@ -1065,6 +1359,8 @@ def finetune_lstm(
                     "best_epoch": best_epoch,
                     "best_val_f1": best_val_f1,
                     "best_val_loss": best_val_loss,
+                    "best_composite": best_composite,
+                    "jester_val_f1": jester_val_f1,
                 },
                 checkpoint_path,
             )
@@ -1082,16 +1378,21 @@ def finetune_lstm(
                 "val_loss": val_report.loss,
                 "val_accuracy": val_report.accuracy,
                 "val_macro_f1": val_report.macro_f1,
+                "jester_val_f1": jester_val_f1,
+                "composite_score": composite,
                 "learning_rate": current_lr,
                 "epoch_secs": time.perf_counter() - t0,
                 "distill_loss": distill_loss_value,
                 "replay_ce_loss": replay_ce_loss_value,
+                "ewc_loss": ewc_loss_value,
             }
         )
         print(
             f"{epoch:>6}/{config.training.epochs:<4}  {train_loss:>9.4f}  {train_acc:>8.1%}  "
             f"{val_report.loss:>8.4f}  {val_report.accuracy:>7.1%}  {val_report.macro_f1:>6.1%}  "
-            f"{current_lr:>8.2e}  {distill_loss_value:>8.4f}  {replay_ce_loss_value:>8.4f}  {note}",
+            f"{jester_val_f1:>7.4f}  "
+            f"{current_lr:>8.2e}  {distill_loss_value:>8.4f}  "
+            f"{replay_ce_loss_value:>8.4f}  {ewc_loss_value:>8.4f}  {note}",
             flush=True,
         )
 
@@ -1105,7 +1406,8 @@ def finetune_lstm(
         print(f"\nCompleted all {config.training.epochs} Stage B epochs.")
 
     print(
-        f"\nBest epoch : {best_epoch}  val_macro_f1={best_val_f1:.4f}  val_loss={best_val_loss:.4f}"
+        f"\nBest epoch : {best_epoch}  val_macro_f1={best_val_f1:.4f}  "
+        f"composite={best_composite:.4f}  val_loss={best_val_loss:.4f}"
     )
 
     best_ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
@@ -1137,9 +1439,14 @@ def finetune_lstm(
         "distillation_weight": distillation_weight,
         "replay_ce_weight": replay_ce_weight,
         "backbone_lr_multiplier": backbone_lr_multiplier,
+        "ewc_weight": ewc_weight,
+        "forgetting_penalty_weight": forgetting_penalty_weight,
+        "gpm_components": gpm_components,
+        "jester_pretrain_f1": jester_pretrain_f1,
         "best_epoch": best_epoch,
         "best_val_f1": best_val_f1,
         "best_val_loss": best_val_loss,
+        "best_composite": best_composite,
         "history": history,
         "val_report": val_report.to_dict(),
         "test_report": test_report.to_dict(),
