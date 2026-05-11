@@ -601,8 +601,7 @@ def _compute_fisher_diagonal(
         p.requires_grad_(True)
 
     fisher: dict[str, torch.Tensor] = {
-        n: torch.zeros_like(p, device=device)
-        for n, p in model.named_parameters()
+        n: torch.zeros_like(p, device=device) for n, p in model.named_parameters()
     }
     # cuDNN RNN kernels only register intermediate states needed for backward
     # when the module is in *training* mode.  Calling model.eval() would break
@@ -671,6 +670,7 @@ def _compute_jester_subspace(
             activations.setdefault(name, []).append(
                 x.detach().cpu().reshape(-1, x.shape[-1])  # (N, in_features)
             )
+
         return _hook
 
     for name, module in model.named_modules():
@@ -1314,22 +1314,22 @@ def finetune_lstm(
         if replay_iter is not None:
             train_loss, train_acc, distill_loss_value, replay_ce_loss_value, ewc_loss_value = (
                 _train_one_epoch_with_retention(
-                model=model,
-                teacher=teacher_model,
-                target_dataloader=train_loader,
-                replay_iter=replay_iter,
-                replay_head=replay_head,
-                optimizer=optimizer_b,
-                target_criterion=criterion,
-                device=device,
-                grad_clip_norm=config.training.grad_clip_norm,
-                distillation_weight=distillation_weight,
-                replay_ce_weight=replay_ce_weight,
-                fisher=fisher,
-                pretrained_weights=pretrained_weights,
-                ewc_weight=ewc_weight,
-                jester_subspace=jester_subspace,
-            )
+                    model=model,
+                    teacher=teacher_model,
+                    target_dataloader=train_loader,
+                    replay_iter=replay_iter,
+                    replay_head=replay_head,
+                    optimizer=optimizer_b,
+                    target_criterion=criterion,
+                    device=device,
+                    grad_clip_norm=config.training.grad_clip_norm,
+                    distillation_weight=distillation_weight,
+                    replay_ce_weight=replay_ce_weight,
+                    fisher=fisher,
+                    pretrained_weights=pretrained_weights,
+                    ewc_weight=ewc_weight,
+                    jester_subspace=jester_subspace,
+                )
             )
         else:
             train_loss, train_acc = _train_one_epoch(
