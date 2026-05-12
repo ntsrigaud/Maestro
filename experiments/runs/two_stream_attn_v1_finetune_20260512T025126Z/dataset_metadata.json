@@ -1,0 +1,21 @@
+{
+  "feature_schema_version": "feature-schema-v5",
+  "feature_dim": 147,
+  "window_length": 32,
+  "window_step": null,
+  "min_valid_ratio": null,
+  "label_strategy": "hybrid_merge",
+  "vocabulary": [
+    "no_gesture",
+    "point_one",
+    "point_two",
+    "stop_sign",
+    "swiping_down",
+    "swiping_left",
+    "swiping_right",
+    "swiping_up",
+    "zooming_in_full_hand",
+    "zooming_out_full_hand"
+  ],
+  "seed": 42
+}
