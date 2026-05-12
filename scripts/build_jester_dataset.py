@@ -699,6 +699,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Ignore existing per-video caches and re-extract all landmarks.",
     )
     p.add_argument(
+        "--exclude-classes",
+        type=str,
+        default="",
+        metavar="CLASS1,CLASS2,...",
+        help=(
+            "Comma-separated list of vocabulary class names to exclude from the output. "
+            "Use this to prevent data leakage when the Jester dataset is used as a "
+            "pretraining source before fine-tuning on a hybrid vocabulary that shares "
+            "some of the same Jester classes (e.g. swiping_left, swiping_right, "
+            "stop_sign, no_gesture, zooming_in_full_hand, zooming_out_full_hand, "
+            "swiping_down, swiping_up)."
+        ),
+    )
+    p.add_argument(
         "--skip-train",
         action="store_true",
         help="Skip the training split (use validation only).",
@@ -758,6 +772,22 @@ def main() -> None:
     vocabulary_set = set(vocabulary)
     logger.info("Vocabulary   : %d classes", len(vocabulary))
 
+    # ── Class exclusion ───────────────────────────────────────────────────────
+    excluded_classes: set[str] = set()
+    if args.exclude_classes.strip():
+        excluded_classes = {c.strip() for c in args.exclude_classes.split(",") if c.strip()}
+        invalid = excluded_classes - vocabulary_set
+        if invalid:
+            logger.warning(
+                "--exclude-classes contains labels not in vocabulary (ignored): %s", invalid
+            )
+        excluded_classes &= vocabulary_set
+        logger.info(
+            "Excluding %d class(es) from output: %s",
+            len(excluded_classes),
+            sorted(excluded_classes),
+        )
+
     # ── Annotations ───────────────────────────────────────────────────────────
     all_annotations: list[JesterAnnotation] = []
 
@@ -782,6 +812,20 @@ def main() -> None:
     if not all_annotations:
         logger.error("No annotations loaded. Aborting.")
         sys.exit(1)
+
+    # Apply class exclusion filter.
+    if excluded_classes:
+        before = len(all_annotations)
+        all_annotations = [a for a in all_annotations if a.vocab_label not in excluded_classes]
+        logger.info(
+            "After exclusion: %d videos retained  (%d excluded)",
+            len(all_annotations),
+            before - len(all_annotations),
+        )
+        # Rebuild vocabulary without excluded classes so the embedded metadata
+        # and label_id assignments reflect only the classes actually present.
+        vocabulary = [v for v in vocabulary if v not in excluded_classes]
+        vocabulary_set = set(vocabulary)
 
     logger.info(
         "Total        : %d videos across %d classes",
