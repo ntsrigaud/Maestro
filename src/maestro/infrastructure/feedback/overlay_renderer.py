@@ -89,7 +89,7 @@ class OverlayRenderer:
         # Render "[active_mode]" at the very top of the frame when a mode has
         # been set (i.e. it is not the default sentinel "unknown").
         y_offset = 0
-        if state.active_mode != "unknown":
+        if state.active_mode != "no_gesture":
             badge_text = f"[{state.active_mode}]"
             self._put(canvas, badge_text, 12, 18, color=_TEXT_BADGE)
             y_offset = 24  # push HUD lines down to avoid overlapping the badge
