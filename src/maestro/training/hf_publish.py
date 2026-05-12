@@ -249,8 +249,7 @@ with torch.no_grad():
 - **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
 - **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
 - **Graph**: 67 nodes — 42 hand + 11 pose + 14 face contour landmarks
-- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.003;
-  label-aware offline horizontal mirror (swiping_left ↔ swiping_right, node-block swap)
+- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.003
 
 ## Training Configuration
 
@@ -457,8 +456,7 @@ with torch.no_grad():
 - **Source**: {dataset_source_desc}
 - **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
 - **Dataset split**: 70% train / 15% val / 15% test (stratified by class)
-- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
-  label-aware horizontal mirror (swiping_left ↔ swiping_right)
+- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005
 
 ## Training Strategy
 
@@ -632,8 +630,7 @@ with torch.no_grad():
 - **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
 - **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
 - **Sequences**: ~22,973 sliding windows × 32 frames × {feature_dim} features
-- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
-  label-aware offline horizontal mirror (swiping_left ↔ swiping_right)
+- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005
 
 ## Training Strategy
 
