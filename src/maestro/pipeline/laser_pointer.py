@@ -28,7 +28,7 @@ Lifecycle
   The OS mouse cursor is moved to the screen position of the index fingertip
   (landmark 8 in the MediaPipe 21-point hand model).  PowerPoint’s laser dot
   follows the cursor in real-time.
-- **Exit** (gesture returns to ``unknown`` or gaze is lost):
+- **Exit** (gesture returns to ``no_gesture`` or gaze is lost):
   The laser-off hotkey (``⌘+A`` or ``Ctrl+A``) is pressed once to revert the
   cursor to the default arrow pointer.
 
@@ -148,7 +148,7 @@ class LaserPointerTracker:
         ----------
         label:
             The current stabilised gesture label (e.g. ``"point_one"`` or
-            ``"unknown"``).
+            ``"no_gesture"``).
         landmarks:
             21-entry list of ``[x, y, z]`` normalised landmark coordinates, or
             ``None`` when no valid hand is detected.

@@ -31,16 +31,16 @@ from maestro.pipeline.activation import GestureActivationController
 # ---------------------------------------------------------------------------
 
 _COMMAND_MAP: dict[str, str] = {
-    "swipe_up": "start_presentation",
-    "swipe_down": "stop_presentation",
-    "swipe_right": "next_slide",
-    "swipe_left": "previous_slide",
-    "zoom_in": "zoom_in_view",
-    "zoom_out": "zoom_out_view",
-    "open_palm_hold": "erase_annotations",
+    "swiping_up": "start_presentation",
+    "swiping_down": "stop_presentation",
+    "swiping_right": "next_slide",
+    "swiping_left": "previous_slide",
+    "zooming_in_full_hand": "zoom_in_view",
+    "zooming_out_full_hand": "zoom_out_view",
+    "stop_sign": "erase_annotations",
     "point_one": "mouse_pointer",
     "point_two": "mouse_pointer",
-    "unknown": "no_action",
+    "no_gesture": "no_action",
 }
 
 # Kept as a timing base constant so that test timestamps are non-trivially
@@ -107,30 +107,30 @@ class TestActivationStateMachine:
         controller = _make_controller()
         controller.rearm()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 1000)):
-            cmd = controller.route(_pred("swipe_right"))
+            cmd = controller.route(_pred("swiping_right"))
         assert cmd is not None
         assert cmd.command_id == "next_slide"
-        assert cmd.source_gesture == "swipe_right"
+        assert cmd.source_gesture == "swiping_right"
 
     def test_command_triggers_cooldown(self):
         controller = _make_controller()
         controller.rearm()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred("swipe_right"))
+            controller.route(_pred("swiping_right"))
         assert controller.mode is RuntimeMode.COOLDOWN
 
     def test_cooldown_expires_back_to_armed(self):
         controller = _make_controller()
         controller.rearm()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
-            controller.route(_pred("swipe_right"))
-        # Unknown resets edge trigger; after cooldown a different gesture fires.
+            controller.route(_pred("swiping_right"))
+        # no_gesture resets edge trigger; after cooldown a different gesture fires.
         with patch.object(
             type(controller),
             "_now_ms",
             staticmethod(lambda: _COOLDOWN_MS + 10),
         ):
-            cmd = controller.route(_pred("swipe_left"))
+            cmd = controller.route(_pred("swiping_left"))
         assert cmd is not None
         assert cmd.command_id == "previous_slide"
 
@@ -147,7 +147,7 @@ class TestActivationStateMachine:
             "_now_ms",
             staticmethod(lambda: _IDLE_TIMEOUT_MS + 200),
         ):
-            controller.route(_pred("unknown", accepted=False))
+            controller.route(_pred("no_gesture", accepted=False))
         assert controller.mode is RuntimeMode.IDLE
 
     def test_unmapped_gesture_does_not_dispatch(self):
@@ -168,10 +168,10 @@ class TestActivationStateMachine:
         assert controller.mode is RuntimeMode.ARMED
 
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 100)):
-            cmd = controller.route(_pred("swipe_right"))
+            cmd = controller.route(_pred("swiping_right"))
         assert cmd is not None
         assert cmd.command_id == "next_slide"
-        assert cmd.source_gesture == "swipe_right"
+        assert cmd.source_gesture == "swiping_right"
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ class TestGestureDispatchPipeline:
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
         ):
-            cmd = self.controller.route(_pred("swipe_right"))
+            cmd = self.controller.route(_pred("swiping_right"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
@@ -225,7 +225,7 @@ class TestGestureDispatchPipeline:
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
         ):
-            cmd = self.controller.route(_pred("swipe_left"))
+            cmd = self.controller.route(_pred("swiping_left"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
@@ -238,7 +238,7 @@ class TestGestureDispatchPipeline:
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
         ):
-            cmd = self.controller.route(_pred("swipe_up"))
+            cmd = self.controller.route(_pred("swiping_up"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
@@ -252,14 +252,14 @@ class TestGestureDispatchPipeline:
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
         ):
-            cmd = self.controller.route(_pred("swipe_right"))
+            cmd = self.controller.route(_pred("swiping_right"))
         # During cooldown the same gesture produces no second command
         with patch.object(
             type(self.controller),
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 100),
         ):
-            cmd2 = self.controller.route(_pred("swipe_right"))
+            cmd2 = self.controller.route(_pred("swiping_right"))
         assert cmd is not None
         assert cmd2 is None  # cooldown suppresses repeat
 
@@ -270,7 +270,7 @@ class TestGestureDispatchPipeline:
 
         bad_cmd = ExecutableCommand(
             command_id="delete_everything",
-            source_gesture="unknown",
+            source_gesture="no_gesture",
             issued_at_ms=0,
         )
         result = self.dispatcher.dispatch(bad_cmd)
@@ -286,7 +286,7 @@ class TestGestureDispatchPipeline:
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
         ):
-            cmd = self.controller.route(_pred("swipe_right"))
+            cmd = self.controller.route(_pred("swiping_right"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is False  # graceful failure
@@ -315,7 +315,7 @@ class TestIntegrationRateLimiting:
             for i in range(5):
                 cmd = ExecutableCommand(
                     command_id="next_slide",
-                    source_gesture="swipe_right",
+                    source_gesture="swiping_right",
                     issued_at_ms=i * 10,
                 )
                 results.append(dispatcher.dispatch(cmd))
@@ -337,11 +337,11 @@ class TestEdgeTriggerSingleDispatch:
     trigger detection.
 
     Scenario modelled:
-        unknown, unknown, swipe_right, swipe_right, swipe_right, unknown
-                                 ↑
-                             dispatch here (rising edge)
-                                         ↑↑↑
-                                  suppressed (same label)
+        no_gesture, no_gesture, swiping_right, swiping_right, swiping_right, no_gesture
+                                       ↑
+                                   dispatch here (rising edge)
+                                                  ↑↑↑
+                                           suppressed (same label)
     """
 
     def _make_armed_controller(
@@ -362,18 +362,18 @@ class TestEdgeTriggerSingleDispatch:
     # ------------------------------------------------------------------
 
     def test_single_swipe_dispatches_exactly_once(self):
-        """A stream of repeated swipe_right predictions (simulating overlapping
+        """A stream of repeated swiping_right predictions (simulating overlapping
         inference windows during a single slow swipe) yields only one command."""
         ctrl = self._make_armed_controller()
         t_base = _ACTIVATION_HOLD_MS + 50
 
         commands = []
-        # Simulate 8 consecutive accepted swipe_right predictions (one per
+        # Simulate 8 consecutive accepted swiping_right predictions (one per
         # 100 ms window at step=3, 30 FPS), as produced by a 0.8-second swipe.
         for i in range(8):
             t = t_base + i * 100
             with patch.object(type(ctrl), "_now_ms", staticmethod(lambda _t=t: _t)):
-                cmd = ctrl.route(_pred("swipe_right"))
+                cmd = ctrl.route(_pred("swiping_right"))
             if cmd is not None:
                 commands.append(cmd)
 
@@ -384,27 +384,27 @@ class TestEdgeTriggerSingleDispatch:
         assert commands[0].command_id == "next_slide"
 
     def test_gesture_resets_after_unknown_then_redispatches(self):
-        """After the gesture transitions through 'unknown', the next accepted
-        swipe_right occurrence is treated as a new gesture and fires again."""
+        """After the gesture transitions through 'no_gesture', the next accepted
+        swiping_right occurrence is treated as a new gesture and fires again."""
         ctrl = self._make_armed_controller()
         t = _ACTIVATION_HOLD_MS + 50
 
-        # First swipe_right — fires.
+        # First swiping_right — fires.
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t)):
-            cmd1 = ctrl.route(_pred("swipe_right"))
+            cmd1 = ctrl.route(_pred("swiping_right"))
         assert cmd1 is not None
         assert cmd1.command_id == "next_slide"
 
-        # Hand returns to unknown — resets the edge-trigger.
+        # Hand returns to no_gesture — resets the edge-trigger.
         t_unknown = t + _COOLDOWN_MS + 10
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_unknown)):
-            no_cmd = ctrl.route(_pred("unknown", accepted=False))
+            no_cmd = ctrl.route(_pred("no_gesture", accepted=False))
         assert no_cmd is None
 
-        # Second distinct swipe_right (new gesture) — should fire again.
+        # Second distinct swiping_right (new gesture) — should fire again.
         t2 = t_unknown + 50
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t2)):
-            cmd2 = ctrl.route(_pred("swipe_right"))
+            cmd2 = ctrl.route(_pred("swiping_right"))
         assert cmd2 is not None
         assert cmd2.command_id == "next_slide"
 
@@ -415,9 +415,9 @@ class TestEdgeTriggerSingleDispatch:
         ctrl = self._make_armed_controller()
         t_base = _ACTIVATION_HOLD_MS + 50
 
-        # First swipe_right — fires, enters COOLDOWN.
+        # First swiping_right — fires, enters COOLDOWN.
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
-            cmd1 = ctrl.route(_pred("swipe_right"))
+            cmd1 = ctrl.route(_pred("swiping_right"))
         assert cmd1 is not None
         assert ctrl.mode is RuntimeMode.COOLDOWN
 
@@ -425,7 +425,7 @@ class TestEdgeTriggerSingleDispatch:
         # (slow swipe or EMA memory — the label has not changed).
         t_after_cool = t_base + _COOLDOWN_MS + 10
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_after_cool)):
-            cmd2 = ctrl.route(_pred("swipe_right"))
+            cmd2 = ctrl.route(_pred("swiping_right"))
         assert ctrl.mode is RuntimeMode.ARMED
         assert cmd2 is None, (
             "Edge-trigger must suppress re-dispatch when the gesture label "
@@ -438,15 +438,15 @@ class TestEdgeTriggerSingleDispatch:
         ctrl = self._make_armed_controller()
         t_base = _ACTIVATION_HOLD_MS + 50
 
-        # swipe_right fires.
+        # swiping_right fires.
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
-            cmd1 = ctrl.route(_pred("swipe_right"))
+            cmd1 = ctrl.route(_pred("swiping_right"))
         assert cmd1 is not None
 
-        # After cooldown, a swipe_left arrives — different label → fires.
+        # After cooldown, a swiping_left arrives — different label → fires.
         t_after = t_base + _COOLDOWN_MS + 10
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_after)):
-            cmd2 = ctrl.route(_pred("swipe_left"))
+            cmd2 = ctrl.route(_pred("swiping_left"))
         assert cmd2 is not None
         assert cmd2.command_id == "previous_slide"
 
@@ -458,13 +458,13 @@ class TestEdgeTriggerSingleDispatch:
         t_base = _ACTIVATION_HOLD_MS + 50
 
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
-            cmd1 = ctrl.route(_pred("swipe_right"))
+            cmd1 = ctrl.route(_pred("swiping_right"))
         assert cmd1 is not None
 
         # After cooldown, same gesture fires again (legacy behaviour).
         t_after = t_base + _COOLDOWN_MS + 10
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_after)):
-            cmd2 = ctrl.route(_pred("swipe_right"))
+            cmd2 = ctrl.route(_pred("swiping_right"))
         assert cmd2 is not None, (
             "With edge_trigger_enabled=False the cooldown-only guard should "
             "allow re-dispatch after the cooldown window expires."
@@ -476,7 +476,7 @@ class TestEdgeTriggerSingleDispatch:
 
     def test_full_pipeline_single_swipe_one_dispatch(self):
         """End-to-end: a realistic prediction stream for one swipe gesture
-        (unknown × 2, swipe_right × 5, unknown × 2) calls pyautogui exactly
+        (no_gesture × 2, swiping_right × 5, no_gesture × 2) calls pyautogui exactly
         once."""
         ctrl = self._make_armed_controller()
         kb = KeyboardAdapter()
@@ -489,15 +489,15 @@ class TestEdgeTriggerSingleDispatch:
         )
 
         prediction_stream = [
-            _pred("unknown", accepted=False),
-            _pred("unknown", accepted=False),
-            _pred("swipe_right"),  # rising edge → dispatch
-            _pred("swipe_right"),  # suppressed by edge-trigger
-            _pred("swipe_right"),  # suppressed
-            _pred("swipe_right"),  # suppressed
-            _pred("swipe_right"),  # suppressed
-            _pred("unknown", accepted=False),
-            _pred("unknown", accepted=False),
+            _pred("no_gesture", accepted=False),
+            _pred("no_gesture", accepted=False),
+            _pred("swiping_right"),  # rising edge → dispatch
+            _pred("swiping_right"),  # suppressed by edge-trigger
+            _pred("swiping_right"),  # suppressed
+            _pred("swiping_right"),  # suppressed
+            _pred("swiping_right"),  # suppressed
+            _pred("no_gesture", accepted=False),
+            _pred("no_gesture", accepted=False),
         ]
 
         dispatched = []
@@ -530,40 +530,40 @@ class TestEdgeTriggerSingleDispatch:
         session was silently dropped.
 
         The fix: compare against ``_last_dispatched_label`` (only updated on
-        actual dispatch, reset to unknown on neutral prediction).  Unaccepted
+        actual dispatch, reset to no_gesture on neutral prediction).  Unaccepted
         frames must never consume the rising edge.
         """
         ctrl = self._make_armed_controller()
         t_base = _ACTIVATION_HOLD_MS + 50
 
-        # --- First gesture: swipe_right fires normally ---
+        # --- First gesture: swiping_right fires normally ---
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_base)):
-            cmd1 = ctrl.route(_pred("swipe_right"))
+            cmd1 = ctrl.route(_pred("swiping_right"))
         assert cmd1 is not None
         assert cmd1.command_id == "next_slide"
 
         # --- COOLDOWN + reset: gesture ends, hand goes neutral ---
         t_rest = t_base + _COOLDOWN_MS + 20
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_rest)):
-            ctrl.route(_pred("unknown", accepted=False))
+            ctrl.route(_pred("no_gesture", accepted=False))
 
-        # --- Second gesture: swipe_left builds up via temporal voting ---
+        # --- Second gesture: swiping_left builds up via temporal voting ---
         # Frames 1 and 2: stabiliser not yet temporally consistent → accepted=False
         t1 = t_rest + 50
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t1)):
-            no_cmd = ctrl.route(_pred("swipe_left", accepted=False))
+            no_cmd = ctrl.route(_pred("swiping_left", accepted=False))
         assert no_cmd is None
 
         t2 = t1 + 100
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t2)):
-            no_cmd = ctrl.route(_pred("swipe_left", accepted=False))
+            no_cmd = ctrl.route(_pred("swiping_left", accepted=False))
         assert no_cmd is None
 
         # Frame 3: vote window satisfied → accepted=True.  The rising edge
         # must fire here; unaccepted frames must not have consumed it.
         t3 = t2 + 100
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t3)):
-            cmd2 = ctrl.route(_pred("swipe_left", accepted=True))
+            cmd2 = ctrl.route(_pred("swiping_left", accepted=True))
         assert cmd2 is not None, (
             "Second gesture suppressed. Unaccepted temporal-voting frames "
             "must not advance the edge-trigger counter (_prev_label regression)."
@@ -583,28 +583,28 @@ class TestEdgeTriggerSingleDispatch:
             t += 150
             return cmd
 
-        # Gesture 1: swipe_right
-        cmd1 = _route("swipe_right")
+        # Gesture 1: swiping_right
+        cmd1 = _route("swiping_right")
         assert cmd1 is not None and cmd1.command_id == "next_slide"
 
         # Cooldown + neutral
         for _ in range(8):
-            _route("unknown", accepted=False)
+            _route("no_gesture", accepted=False)
 
         # Gesture 2: temporal buildup (2 unaccepted) then accepted
-        assert _route("swipe_left", accepted=False) is None
-        assert _route("swipe_left", accepted=False) is None
-        cmd2 = _route("swipe_left", accepted=True)
+        assert _route("swiping_left", accepted=False) is None
+        assert _route("swiping_left", accepted=False) is None
+        cmd2 = _route("swiping_left", accepted=True)
         assert cmd2 is not None and cmd2.command_id == "previous_slide"
 
         # Cooldown + neutral
         for _ in range(8):
-            _route("unknown", accepted=False)
+            _route("no_gesture", accepted=False)
 
         # Gesture 3: same label as gesture 1 — must fire again after neutral reset
-        assert _route("swipe_right", accepted=False) is None
-        assert _route("swipe_right", accepted=False) is None
-        cmd3 = _route("swipe_right", accepted=True)
+        assert _route("swiping_right", accepted=False) is None
+        assert _route("swiping_right", accepted=False) is None
+        cmd3 = _route("swiping_right", accepted=True)
         assert cmd3 is not None and cmd3.command_id == "next_slide"
 
 
@@ -679,7 +679,7 @@ class TestGazeGateIntegration:
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
         ):
-            cmd = self.controller.route(_pred("swipe_right"))
+            cmd = self.controller.route(_pred("swiping_right"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
@@ -702,24 +702,24 @@ class TestGazeGateIntegration:
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 200),
         ):
-            cmd = self.controller.route(_pred("swipe_right"))
+            cmd = self.controller.route(_pred("swiping_right"))
         assert cmd is None
         self.mock_pya.hotkey.assert_not_called()
 
     def test_force_idle_prevents_dispatch_for_all_mapped_gestures(self) -> None:
         """Every mapped gesture is suppressed after force_idle(), not just
-        swipe_right."""
+        swiping_right."""
         self._arm()
         self.controller.force_idle()
 
         t = _ACTIVATION_HOLD_MS + 100
         for gesture in (
-            "swipe_right",
-            "swipe_left",
-            "swipe_up",
-            "swipe_down",
-            "zoom_in",
-            "zoom_out",
+            "swiping_right",
+            "swiping_left",
+            "swiping_up",
+            "swiping_down",
+            "zooming_in_full_hand",
+            "zooming_out_full_hand",
         ):
             with patch.object(type(self.controller), "_now_ms", staticmethod(lambda _t=t: _t)):
                 cmd = self.controller.route(_pred(gesture))
@@ -748,7 +748,7 @@ class TestGazeGateIntegration:
             "_now_ms",
             staticmethod(lambda: 600),
         ):
-            cmd = self.controller.route(_pred("swipe_up"))
+            cmd = self.controller.route(_pred("swiping_up"))
         assert cmd is not None
         result = self.dispatcher.dispatch(cmd)
         assert result.success is True
@@ -756,7 +756,7 @@ class TestGazeGateIntegration:
         self.mock_pya.hotkey.assert_called_once()  # start_presentation
 
     def test_swipe_down_does_not_dispatch_when_gaze_absent(self) -> None:
-        """swipe_down must be suppressed when the gaze gate is closed (IDLE)."""
+        """swiping_down must be suppressed when the gaze gate is closed (IDLE)."""
         self._arm()
         self.controller.force_idle()
         with patch.object(
@@ -764,6 +764,6 @@ class TestGazeGateIntegration:
             "_now_ms",
             staticmethod(lambda: _ACTIVATION_HOLD_MS + 50),
         ):
-            cmd = self.controller.route(_pred("swipe_down"))
+            cmd = self.controller.route(_pred("swiping_down"))
         assert cmd is None
         self.mock_pya.hotkey.assert_not_called()
