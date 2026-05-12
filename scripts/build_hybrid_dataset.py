@@ -12,7 +12,7 @@ before this script is called.
 Source provenance is read from the ``sources`` section of the vocabulary YAML::
 
     sources:
-      no_gesture:  jester
+      unknown:   ipn
       point_one:   ipn
       ...
 

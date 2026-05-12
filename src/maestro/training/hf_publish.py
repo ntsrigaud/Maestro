@@ -52,7 +52,7 @@ _FEATURE_SCHEMA_DESCRIPTION = """\
 """
 
 _CLASS_DESCRIPTIONS: dict[str, str] = {
-    "no_gesture": "Background / transition / no gesture",
+    "unknown": "Background / transition / no gesture",
     "point_one": "Single-finger pointing gesture (continuous laser-pointer control)",
     "point_two": "Two-finger pointing gesture (continuous annotation-pen control)",
     "stop_sign": "Static open palm facing camera (Jester class)",
@@ -246,7 +246,7 @@ with torch.no_grad():
 ## Training Dataset
 
 - **Source**: IPN Hand database — multi-subject, multi-session gesture recordings
-- **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
+- **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
 - **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
 - **Graph**: 67 nodes — 42 hand + 11 pose + 14 face contour landmarks
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.003
@@ -286,7 +286,7 @@ with torch.no_grad():
 
 - Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
   skin tones, or lighting conditions not represented in training data.
-- The `no_gesture` class represents background/transition frames. At runtime, predictions
+- The `unknown` class represents background/transition frames. At runtime, predictions
   are filtered through per-class confidence thresholds defined in `production_hybrid.yaml`.
 - Requires **mediapipe>=0.10.14** for landmark extraction at inference time.
 - Not intended for safety-critical or accessibility-critical applications.
@@ -454,7 +454,7 @@ with torch.no_grad():
 ## Training Dataset
 
 - **Source**: {dataset_source_desc}
-- **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
+- **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
 - **Dataset split**: 70% train / 15% val / 15% test (stratified by class)
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005
 
@@ -511,7 +511,7 @@ with torch.no_grad():
 
 - Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
   skin tones, or lighting conditions not represented in training data.
-- The `no_gesture` class represents background/transition frames. At runtime, predictions
+- The `unknown` class represents background/transition frames. At runtime, predictions
   are filtered through per-class confidence thresholds defined in `production_hybrid.yaml`.
 - Requires **mediapipe>=0.10.14** for landmark extraction at inference time.
 - Not intended for safety-critical or accessibility-critical applications.
@@ -627,7 +627,7 @@ with torch.no_grad():
 ## Training Dataset
 
 - **Source**: IPN Hand database — multi-subject, multi-session gesture recordings
-- **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
+- **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
 - **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
 - **Sequences**: ~22,973 sliding windows × 32 frames × {feature_dim} features
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005
@@ -671,7 +671,7 @@ with torch.no_grad():
 
 - Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
   skin tones, or lighting conditions not represented in training data.
-- The `no_gesture` class represents background/transition frames. At runtime, predictions
+- The `unknown` class represents background/transition frames. At runtime, predictions
   are filtered through per-class confidence thresholds defined in `production_hybrid.yaml`.
 - Requires **mediapipe==0.10.14** for landmark extraction at inference time.
 - Not intended for safety-critical or accessibility-critical applications.
@@ -866,7 +866,7 @@ def _build_model_card(
 ) -> str:
     is_dual_stgcn = config.model.model_name.startswith("dual_stgcn")
     num_params = _count_parameters(result.model)
-    num_classes_active = len(result.class_labels) - 1  # subtract no_gesture
+    num_classes_active = len(result.class_labels) - 1  # subtract unknown background
     created_at = datetime.now(UTC).strftime("%Y-%m-%d")
     window_length = int(result.dataset_metadata.get("window_length", 32))
     window_duration_ms = int(round(window_length * (1000.0 / 30.0)))
@@ -897,7 +897,7 @@ def _build_model_card(
         )
         dataset_source_desc = (
             "Hybrid merge of Jester and IPN-Hand windows: Jester provides "
-            "no_gesture/swiping/zoom/stop_sign classes; IPN-Hand provides point_one and point_two"
+            "unknown/swiping/zoom/stop_sign classes; IPN-Hand provides point_one and point_two"
         )
     else:
         dataset_name_markdown = "the [IPN Hand dataset](https://gibranbenitez.github.io/IPN_Hand/)"
