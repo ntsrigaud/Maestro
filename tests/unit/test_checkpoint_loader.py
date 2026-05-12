@@ -14,16 +14,16 @@ from maestro.utils.schema_validation import RuntimeConfig
 
 def _write_artifact(path: Path, *, window_length: int = 32, num_classes: int = 10) -> None:
     _labels_10 = [
-        "unknown",
+        "no_gesture",
         "point_one",
         "point_two",
-        "open_palm_hold",
-        "swipe_right",
-        "swipe_left",
-        "swipe_up",
-        "swipe_down",
-        "zoom_in",
-        "zoom_out",
+        "stop_sign",
+        "swiping_down",
+        "swiping_left",
+        "swiping_right",
+        "swiping_up",
+        "zooming_in_full_hand",
+        "zooming_out_full_hand",
     ]
     _labels_8 = [
         "open_palm_hold",
@@ -86,7 +86,7 @@ def test_load_inference_artifact(tmp_path: Path) -> None:
     assert artifact.window_step == 3
     assert artifact.orientation_normalization is True
     assert len(artifact.class_labels) == 10
-    assert artifact.class_labels[0] == "unknown"
+    assert artifact.class_labels[0] == "no_gesture"
 
 
 def test_load_inference_artifact_rejects_legacy_two_stream_type(tmp_path: Path) -> None:
