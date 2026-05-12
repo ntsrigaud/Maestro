@@ -14,14 +14,14 @@ def test_prediction_stabilizer_rejects_low_confidence() -> None:
 
     result = stabilizer.update(
         Prediction(
-            class_probs={"swiping_right": 0.82, "no_gesture": 0.18},
+            class_probs={"swiping_right": 0.82, "unknown": 0.18},
             top_class="swiping_right",
             confidence=0.82,
         )
     )
 
     assert result.accepted is False
-    assert result.label == "no_gesture"
+    assert result.label == "unknown"
 
 
 def test_prediction_stabilizer_requires_temporal_consistency() -> None:
@@ -35,7 +35,7 @@ def test_prediction_stabilizer_requires_temporal_consistency() -> None:
     for _ in range(2):
         result = stabilizer.update(
             Prediction(
-                class_probs={"swiping_right": 0.95, "no_gesture": 0.05},
+                class_probs={"swiping_right": 0.95, "unknown": 0.05},
                 top_class="swiping_right",
                 confidence=0.95,
             )
@@ -44,7 +44,7 @@ def test_prediction_stabilizer_requires_temporal_consistency() -> None:
 
     result = stabilizer.update(
         Prediction(
-            class_probs={"swiping_right": 0.93, "no_gesture": 0.07},
+            class_probs={"swiping_right": 0.93, "unknown": 0.07},
             top_class="swiping_right",
             confidence=0.93,
         )
@@ -63,15 +63,15 @@ def test_prediction_stabilizer_ema_smoothing() -> None:
 
     stabilizer.update(
         Prediction(
-            class_probs={"swiping_left": 1.0, "no_gesture": 0.0},
+            class_probs={"swiping_left": 1.0, "unknown": 0.0},
             top_class="swiping_left",
             confidence=1.0,
         )
     )
     result = stabilizer.update(
         Prediction(
-            class_probs={"swiping_left": 0.0, "no_gesture": 1.0},
-            top_class="no_gesture",
+            class_probs={"swiping_left": 0.0, "unknown": 1.0},
+            top_class="unknown",
             confidence=1.0,
         )
     )
@@ -83,7 +83,7 @@ def test_prediction_stabilizer_ema_smoothing() -> None:
 def test_ema_bypassed_for_vote_window_one_class() -> None:
     """Classes with class_vote_windows=1 use raw probs, not EMA-smoothed probs.
 
-    With ema_alpha=0.4 and EMA state primed at no_gesture≈1.0, the smoothed value
+    With ema_alpha=0.4 and EMA state primed at unknown≈1.0, the smoothed value
     for swiping_right on the next frame would be 0.4 * 0.95 = 0.38 — well below
     the 0.80 threshold.  The bypass must let the raw 0.95 through so that a
     single confident frame is sufficient for acceptance.
@@ -96,11 +96,11 @@ def test_ema_bypassed_for_vote_window_one_class() -> None:
         ema_alpha=0.4,
     )
 
-    # Prime EMA state: no_gesture is dominant.
+    # Prime EMA state: unknown is dominant.
     stabilizer.update(
         Prediction(
-            class_probs={"swiping_right": 0.0, "no_gesture": 1.0},
-            top_class="no_gesture",
+            class_probs={"swiping_right": 0.0, "unknown": 1.0},
+            top_class="unknown",
             confidence=1.0,
         )
     )
@@ -108,7 +108,7 @@ def test_ema_bypassed_for_vote_window_one_class() -> None:
     # One high-confidence swipe frame — must be accepted immediately.
     result = stabilizer.update(
         Prediction(
-            class_probs={"swiping_right": 0.95, "no_gesture": 0.05},
+            class_probs={"swiping_right": 0.95, "unknown": 0.05},
             top_class="swiping_right",
             confidence=0.95,
         )

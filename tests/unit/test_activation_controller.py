@@ -111,9 +111,9 @@ def test_cooldown_expires_back_to_armed() -> None:
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 510)):
         cmd = ctrl.route(_pred("swiping_right", accepted=False))
     # Just expired, should be ARMED now, but swiping_right is the same label.
-    # no_gesture resets edge trigger — verify ARMED at minimum.
+    # unknown resets edge trigger — verify ARMED at minimum.
     assert ctrl.mode is RuntimeMode.ARMED
-    assert cmd is None  # edge-trigger: same label as last dispatch, no_gesture not yet seen
+    assert cmd is None  # edge-trigger: same label as last dispatch, unknown not yet seen
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ def test_idle_timeout_transitions_to_idle() -> None:
         ctrl = _make_controller(idle_timeout_ms=1000)
         ctrl.rearm()  # IDLE → ARMED; _last_active_ms = 0 while still patched
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 2000)):
-        cmd = ctrl.route(_pred("no_gesture", accepted=False))
+        cmd = ctrl.route(_pred("unknown", accepted=False))
     assert cmd is None
     assert ctrl.mode is RuntimeMode.IDLE
 
@@ -355,8 +355,8 @@ def test_held_discrete_gesture_dispatches_once_then_edge_blocked() -> None:
 
 
 def test_held_gesture_redispatches_after_neutral_reset() -> None:
-    """After a held gesture → no_gesture → same gesture again, exactly one more
-    dispatch must occur (the no_gesture resets _last_dispatched_label)."""
+    """After a held gesture → unknown → same gesture again, exactly one more
+    dispatch must occur (the unknown resets _last_dispatched_label)."""
     ctrl = _make_armed_controller(
         command_map={"swiping_right": "next_slide"},
         command_cooldown_ms=100,
@@ -369,7 +369,7 @@ def test_held_gesture_redispatches_after_neutral_reset() -> None:
 
     # Cooldown expires + hand goes neutral
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 200)):
-        ctrl.route(_pred("no_gesture", accepted=False))  # resets _last_dispatched_label
+        ctrl.route(_pred("unknown", accepted=False))  # resets _last_dispatched_label
 
     # Second occurrence of same gesture — must dispatch again
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 300)):

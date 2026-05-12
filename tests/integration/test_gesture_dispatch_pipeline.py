@@ -40,7 +40,7 @@ _COMMAND_MAP: dict[str, str] = {
     "stop_sign": "erase_annotations",
     "point_one": "mouse_pointer",
     "point_two": "mouse_pointer",
-    "no_gesture": "no_action",
+    "unknown": "no_action",
 }
 
 # Kept as a timing base constant so that test timestamps are non-trivially
@@ -124,7 +124,7 @@ class TestActivationStateMachine:
         controller.rearm()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
             controller.route(_pred("swiping_right"))
-        # no_gesture resets edge trigger; after cooldown a different gesture fires.
+        # unknown resets edge trigger; after cooldown a different gesture fires.
         with patch.object(
             type(controller),
             "_now_ms",
@@ -147,7 +147,7 @@ class TestActivationStateMachine:
             "_now_ms",
             staticmethod(lambda: _IDLE_TIMEOUT_MS + 200),
         ):
-            controller.route(_pred("no_gesture", accepted=False))
+            controller.route(_pred("unknown", accepted=False))
         assert controller.mode is RuntimeMode.IDLE
 
     def test_unmapped_gesture_does_not_dispatch(self):
@@ -270,7 +270,7 @@ class TestGestureDispatchPipeline:
 
         bad_cmd = ExecutableCommand(
             command_id="delete_everything",
-            source_gesture="no_gesture",
+            source_gesture="unknown",
             issued_at_ms=0,
         )
         result = self.dispatcher.dispatch(bad_cmd)
@@ -337,7 +337,7 @@ class TestEdgeTriggerSingleDispatch:
     trigger detection.
 
     Scenario modelled:
-        no_gesture, no_gesture, swiping_right, swiping_right, swiping_right, no_gesture
+        unknown, unknown, swiping_right, swiping_right, swiping_right, unknown
                                        ↑
                                    dispatch here (rising edge)
                                                   ↑↑↑
@@ -384,7 +384,7 @@ class TestEdgeTriggerSingleDispatch:
         assert commands[0].command_id == "next_slide"
 
     def test_gesture_resets_after_unknown_then_redispatches(self):
-        """After the gesture transitions through 'no_gesture', the next accepted
+        """After the gesture transitions through 'unknown', the next accepted
         swiping_right occurrence is treated as a new gesture and fires again."""
         ctrl = self._make_armed_controller()
         t = _ACTIVATION_HOLD_MS + 50
@@ -395,10 +395,10 @@ class TestEdgeTriggerSingleDispatch:
         assert cmd1 is not None
         assert cmd1.command_id == "next_slide"
 
-        # Hand returns to no_gesture — resets the edge-trigger.
+        # Hand returns to unknown — resets the edge-trigger.
         t_unknown = t + _COOLDOWN_MS + 10
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_unknown)):
-            no_cmd = ctrl.route(_pred("no_gesture", accepted=False))
+            no_cmd = ctrl.route(_pred("unknown", accepted=False))
         assert no_cmd is None
 
         # Second distinct swiping_right (new gesture) — should fire again.
@@ -476,7 +476,7 @@ class TestEdgeTriggerSingleDispatch:
 
     def test_full_pipeline_single_swipe_one_dispatch(self):
         """End-to-end: a realistic prediction stream for one swipe gesture
-        (no_gesture × 2, swiping_right × 5, no_gesture × 2) calls pyautogui exactly
+        (unknown × 2, swiping_right × 5, unknown × 2) calls pyautogui exactly
         once."""
         ctrl = self._make_armed_controller()
         kb = KeyboardAdapter()
@@ -489,15 +489,15 @@ class TestEdgeTriggerSingleDispatch:
         )
 
         prediction_stream = [
-            _pred("no_gesture", accepted=False),
-            _pred("no_gesture", accepted=False),
+            _pred("unknown", accepted=False),
+            _pred("unknown", accepted=False),
             _pred("swiping_right"),  # rising edge → dispatch
             _pred("swiping_right"),  # suppressed by edge-trigger
             _pred("swiping_right"),  # suppressed
             _pred("swiping_right"),  # suppressed
             _pred("swiping_right"),  # suppressed
-            _pred("no_gesture", accepted=False),
-            _pred("no_gesture", accepted=False),
+            _pred("unknown", accepted=False),
+            _pred("unknown", accepted=False),
         ]
 
         dispatched = []
@@ -530,7 +530,7 @@ class TestEdgeTriggerSingleDispatch:
         session was silently dropped.
 
         The fix: compare against ``_last_dispatched_label`` (only updated on
-        actual dispatch, reset to no_gesture on neutral prediction).  Unaccepted
+        actual dispatch, reset to unknown on neutral prediction).  Unaccepted
         frames must never consume the rising edge.
         """
         ctrl = self._make_armed_controller()
@@ -545,7 +545,7 @@ class TestEdgeTriggerSingleDispatch:
         # --- COOLDOWN + reset: gesture ends, hand goes neutral ---
         t_rest = t_base + _COOLDOWN_MS + 20
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_rest)):
-            ctrl.route(_pred("no_gesture", accepted=False))
+            ctrl.route(_pred("unknown", accepted=False))
 
         # --- Second gesture: swiping_left builds up via temporal voting ---
         # Frames 1 and 2: stabiliser not yet temporally consistent → accepted=False
@@ -589,7 +589,7 @@ class TestEdgeTriggerSingleDispatch:
 
         # Cooldown + neutral
         for _ in range(8):
-            _route("no_gesture", accepted=False)
+            _route("unknown", accepted=False)
 
         # Gesture 2: temporal buildup (2 unaccepted) then accepted
         assert _route("swiping_left", accepted=False) is None
@@ -599,7 +599,7 @@ class TestEdgeTriggerSingleDispatch:
 
         # Cooldown + neutral
         for _ in range(8):
-            _route("no_gesture", accepted=False)
+            _route("unknown", accepted=False)
 
         # Gesture 3: same label as gesture 1 — must fire again after neutral reset
         assert _route("swiping_right", accepted=False) is None

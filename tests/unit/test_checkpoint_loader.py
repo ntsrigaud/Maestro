@@ -14,7 +14,7 @@ from maestro.utils.schema_validation import RuntimeConfig
 
 def _write_artifact(path: Path, *, window_length: int = 32, num_classes: int = 10) -> None:
     _labels_10 = [
-        "no_gesture",
+        "unknown",
         "point_one",
         "point_two",
         "stop_sign",
@@ -86,7 +86,7 @@ def test_load_inference_artifact(tmp_path: Path) -> None:
     assert artifact.window_step == 3
     assert artifact.orientation_normalization is True
     assert len(artifact.class_labels) == 10
-    assert artifact.class_labels[0] == "no_gesture"
+    assert artifact.class_labels[0] == "unknown"
 
 
 def test_load_inference_artifact_rejects_legacy_two_stream_type(tmp_path: Path) -> None:

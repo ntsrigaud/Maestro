@@ -121,7 +121,7 @@ def build_container(
         vote_window=3,
         class_vote_windows=thresholds.get("class_vote_windows") or None,
         ema_alpha=0.4,
-        unknown_label="no_gesture",
+        unknown_label="unknown",
     )
     activation_controller = GestureActivationController(
         command_map=command_map,
@@ -129,7 +129,7 @@ def build_container(
         command_cooldown_ms=config.inference.command_cooldown_ms,
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
         continuous_labels=continuous_labels,
-        unknown_label="no_gesture",
+        unknown_label="unknown",
     )
     dispatcher = _build_dispatcher(
         allowed_commands=frozenset(command_map.values()),
