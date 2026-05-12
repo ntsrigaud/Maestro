@@ -1,4 +1,7 @@
-# ── EnhancedTwoStreamLSTM — IPN 13-class classifier fine-tuning configuration ─
+# ── EnhancedTwoStreamLSTM — IPN fine-tuning configuration (DEPRECATED) ────────
+#
+# DEPRECATED: Superseded by two_stream_attn_hybrid.yaml for the Jester→IPN
+# transfer learning pipeline. Keep this file for benchmark reproducibility only.
 #
 # Phase 2 of the Jester → IPN transfer learning pipeline.
 #

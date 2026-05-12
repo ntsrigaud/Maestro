@@ -1,3 +1,8 @@
+> **LEGACY DOCUMENT** — This guide describes the original IPN-only training pipeline.
+> The production system now uses the hybrid Jester+IPN vocabulary (`vocabulary_hybrid.yaml`).
+> See `configs/gestures/vocabulary_hybrid.yaml` and `configs/thresholds/production_hybrid.yaml`
+> for the current production configuration.
+
 # IPN Hand Dataset Integration Guide
 
 ## Overview

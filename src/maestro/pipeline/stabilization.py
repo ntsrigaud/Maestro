@@ -16,7 +16,7 @@ class PredictionStabilizer:
         vote_window: int = 3,
         class_vote_windows: dict[str, int] | None = None,
         ema_alpha: float = 0.4,
-        unknown_label: str = "unknown",
+        unknown_label: str = "no_gesture",
     ) -> None:
         if vote_window <= 0:
             raise ValueError("vote_window must be > 0")

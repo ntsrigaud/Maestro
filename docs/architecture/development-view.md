@@ -13,14 +13,15 @@ Maestro/
 │   ├── inference.yaml                # Window geometry, activation timing, thresholds
 │   ├── model_source.yaml             # Model backend: huggingface or local
 │   ├── gestures/
-│   │   ├── vocabulary_ipn.yaml       # Full IPN baseline vocabulary (14 classes)
+│   │   ├── vocabulary_ipn.yaml       # Full IPN baseline vocabulary (14 classes, legacy)
+│   │   ├── vocabulary_hybrid.yaml    # Production hybrid Jester+IPN vocabulary (10 classes)
 │   │   └── command_map_presentation.yaml  # Gesture-to-command mapping (presentation vocabulary)
 │   ├── model/
 │   │   ├── two_stream_attn.yaml      # EnhancedTwoStreamLSTM (authoritative default)
 │   │   ├── two_stream_lstm.yaml      # Legacy two-stream LSTM (experimental reference)
 │   │   └── feature_pipeline.yaml     # Feature normalization toggles
 │   └── thresholds/
-│       └── production_ipn.yaml       # Per-class confidence thresholds and vote windows
+│       └── production_hybrid.yaml    # Per-class confidence thresholds and vote windows (hybrid)
 ├── src/maestro/              # Main application package
 │   ├── app/                          # Application layer
 │   ├── domain/                       # Domain entities and interfaces
@@ -235,9 +236,9 @@ Configuration files are organized by concern:
 | **Model source** | `model_source.yaml`                      | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename                                                  |
 | **Model**        | `model/two_stream_attn.yaml`             | Authoritative training defaults for `EnhancedTwoStreamLSTM`; legacy model configs remain for experimental comparisons             |
 | **Features**     | `model/feature_pipeline.yaml`            | `FeaturePipelineConfig` — normalization and velocity toggles                                                                      |
-| **Vocabulary**   | `gestures/vocabulary_ipn.yaml`           | Full IPN baseline gesture class list (14 classes)                                                                                 |
+| **Vocabulary**   | `gestures/vocabulary_hybrid.yaml`        | Hybrid Jester+IPN production gesture class list (10 classes)                                                                      |
 | **Commands**     | `gestures/command_map_presentation.yaml` | Gesture command routing: `gesture_commands` (discrete → dispatcher) and `gesture_modes` (continuous gestures handled by trackers) |
-| **Thresholds**   | `thresholds/production_ipn.yaml`         | Per-class confidence thresholds and temporal vote window sizes                                                                    |
+| **Thresholds**   | `thresholds/production_hybrid.yaml`      | Per-class confidence thresholds and temporal vote window sizes                                                                    |
 
 All configuration is validated at startup via Pydantic schemas. Invalid configurations cause immediate failure with descriptive error messages.
 

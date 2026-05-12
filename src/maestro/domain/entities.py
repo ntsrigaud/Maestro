@@ -124,7 +124,7 @@ class RuntimeState:
     last_label: str = "unknown"
     last_confidence: float = 0.0
     gaze_permitted: bool = True
-    active_mode: str = "unknown"
+    active_mode: str = "no_gesture"
     info: dict[str, Any] = field(default_factory=dict)
     # Rendered BGR frame for display.  Populated by Runtime when show_window is
     # True; None otherwise.  Consumers (GUI PreviewWidget or CLI on_state
