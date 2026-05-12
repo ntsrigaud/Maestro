@@ -29,7 +29,7 @@ class GestureActivationController:
 
     Armed-state persistence
     -----------------------
-    ``_last_active_ms`` is refreshed whenever any *non-no_gesture* label is seen,
+    ``_last_active_ms`` is refreshed whenever any *non-unknown* label is seen,
     not only when an accepted command gesture is recognised.  Combined with a
     generous default ``idle_timeout_ms`` (5 minutes), this prevents the system
     from dropping back to IDLE between the natural pauses of a presentation.
@@ -39,8 +39,8 @@ class GestureActivationController:
     When ``edge_trigger_enabled=True`` (the default), a command gesture is only
     dispatched when the accepted label differs from ``_last_dispatched_label``
     --- the label of the most recently executed command.
-    ``_last_dispatched_label`` is reset to ``no_gesture`` whenever the prediction
-    returns to the ``no_gesture`` class (the hand goes neutral between gestures).
+    ``_last_dispatched_label`` is reset to ``unknown`` whenever the prediction
+    returns to the ``unknown`` class (the hand goes neutral between gestures).
 
     **Why not track the previous frame's label?**  An earlier implementation
     advanced a ``_prev_label`` counter on *every* call to ``route()``, including
@@ -55,7 +55,7 @@ class GestureActivationController:
     advance the counter, so the first accepted prediction of a new gesture always
     sees a label change relative to the last dispatched command.
 
-    The same-gesture-twice case is handled by the ``no_gesture`` reset: after the
+    The same-gesture-twice case is handled by the ``unknown`` reset: after the
     hand returns to neutral between two identical gestures,
     ``_last_dispatched_label`` is cleared, allowing the second occurrence to fire.
 
@@ -71,7 +71,7 @@ class GestureActivationController:
         command_cooldown_ms: int,
         edge_trigger_enabled: bool = True,
         continuous_labels: frozenset[str] = frozenset(),
-        unknown_label: str = "no_gesture",
+        unknown_label: str = "unknown",
     ) -> None:
         self._command_map = dict(command_map)
         self._idle_timeout_ms = idle_timeout_ms
@@ -84,7 +84,7 @@ class GestureActivationController:
         self._last_active_ms: int = self._now_ms()
         self._cooldown_started_ms: int | None = None
         # Label of the most recently dispatched command.  Reset to unknown_label
-        # whenever the prediction returns to no_gesture (hand goes neutral).
+        # whenever the prediction returns to unknown (hand goes neutral).
         # See class docstring for the rationale over frame-by-frame label tracking.
         self._last_dispatched_label: str = unknown_label
 

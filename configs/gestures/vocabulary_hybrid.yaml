@@ -2,16 +2,16 @@ version: hybrid_v1
 
 # 10-class hybrid vocabulary for EnhancedTwoStreamLSTM.
 #
-# Combines a Jester-sourced subset (8 classes) with IPN-sourced pointing
-# gestures (2 classes) to create a presentation-control vocabulary that
-# benefits from Jester's scale and diversity while retaining IPN's unique
-# pointing gestures.
+# Combines a Jester-sourced subset (7 classes) with IPN-sourced gestures
+# (3 classes) to create a presentation-control vocabulary that benefits from
+# Jester's scale and diversity while retaining IPN's unique pointing gestures
+# and its richer background/unknown class (D0X).
 #
 # Source mapping:
 # ─────────────────────────────────────────────────────────────────────
 #  Hybrid label              Source   Replaces (IPN 10-class)
 # ─────────────────────────────────────────────────────────────────────
-#  no_gesture                Jester   unknown          (IPN D0X)
+#  unknown                   IPN      unknown          (IPN D0X)
 #  point_one                 IPN      point_one        (IPN B0A)
 #  point_two                 IPN      point_two        (IPN B0B)
 #  stop_sign                 Jester   open_palm_hold   (IPN G07)
@@ -30,19 +30,22 @@ version: hybrid_v1
 #                    Jester has ~4,000 videos per direction vs IPN ~2,400.
 #   zooming_*_full_hand — Full-hand zoom has a cleaner, larger motion arc
 #                    than two-finger zoom; preferred over zooming_in_two_fingers.
-#   no_gesture     — Jester "No gesture" is a controlled idle condition
-#                    (subject at rest) vs IPN D0X (arbitrary background);
-#                    produces a more discriminable background class.
+#
+# Rationale for IPN unknown (D0X) over Jester no_gesture:
+#   IPN D0X contains substantially more background samples than Jester
+#   "No gesture", providing a larger and more diverse training pool for the
+#   background class. This improves rejection of non-gesture inputs at
+#   inference time.
 #
 # Use with:
 #   python scripts/build_hybrid_dataset.py \
 #       --vocab-config configs/gestures/vocabulary_hybrid.yaml \
 #       --jester-npz  data/processed/jester_pretrain_dataset.npz \
-#       --ipn-npz     data/processed/ipn_dataset_v5_10class_mirrored.npz \
+#       --ipn-npz     data/processed/ipn_dataset_v5_10class.npz \
 #       --output-npz  data/processed/hybrid_dataset.npz
 
 gestures:
-  - no_gesture
+  - unknown
   - point_one
   - point_two
   - stop_sign
@@ -57,7 +60,7 @@ gestures:
 # "jester" classes are taken from the Jester NPZ;
 # "ipn"    classes are taken from the IPN NPZ.
 sources:
-  no_gesture: jester
+  unknown: ipn
   point_one: ipn
   point_two: ipn
   stop_sign: jester

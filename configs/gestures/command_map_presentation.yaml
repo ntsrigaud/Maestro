@@ -18,7 +18,7 @@ gesture_commands:
   zooming_in_full_hand: zoom_in_view
   zooming_out_full_hand: zoom_out_view
   stop_sign: erase_annotations
-  no_gesture: no_action
+  unknown: no_action
 
 gesture_modes:
   swiping_up: discrete

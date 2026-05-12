@@ -19,8 +19,8 @@
 #
 # Key differences vs two_stream_attn_ipn_finetune.yaml:
 #   - num_classes: 10 (vs 13 for IPN benchmark)
-#   - Longer early_stopping_patience: the hybrid dataset is better balanced so
-#     validation curves are smoother — patience of 20 is appropriate.
+#   - Shorter early_stopping_patience: the hybrid dataset is better balanced so
+#     validation curves are smoother — patience of 12 is appropriate.
 #   - max_samples_per_class: 5000 — Jester classes have ~3,000-8,000 samples
 #     each in the subset NPZ; IPN pointing classes are typically ~3,000-12,000.
 #     The cap prevents Jester from swamping point_one / point_two.
@@ -53,7 +53,7 @@ training:
   learning_rate: 0.00003 # 3e-5 — same conservative fine-tuning LR as IPN
   weight_decay: 0.0005
   grad_clip_norm: 1.0
-  early_stopping_patience: 20
+  early_stopping_patience: 12
   early_stopping_min_delta: 0.0001
   label_smoothing: 0.05
   seed: 42

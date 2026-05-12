@@ -29,7 +29,7 @@ Lifecycle
   The OS mouse cursor is dragged (button held) to the screen position of the
   index fingertip each frame.  PowerPoint draws the annotation path in
   real-time while the button is held.
-- **Exit** (gesture returns to ``no_gesture`` or gaze is lost):
+- **Exit** (gesture returns to ``unknown`` or gaze is lost):
   The primary mouse button is released first (ending the current stroke), then
   the pen-off hotkey (``⌘+A`` or ``Ctrl+A``) is sent to revert the cursor to
   the default arrow pointer.
@@ -151,7 +151,7 @@ class AnnotationPenTracker:
         ----------
         label:
             The current stabilised gesture label (e.g. ``"point_two"`` or
-            ``"no_gesture"``).
+            ``"unknown"``).
         landmarks:
             21-entry list of ``[x, y, z]`` normalised landmark coordinates, or
             ``None`` when no valid hand is detected.
