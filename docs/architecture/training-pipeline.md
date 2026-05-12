@@ -29,7 +29,7 @@ flowchart TD
         direction TB
         VIDEOS["IPN Hand Videos<br/>200 AVI files · 640×480 · 30 FPS<br/>50 subjects · lab environment"]
         ANNOT["Annotation Files<br/>Annot_TrainList.txt · Annot_TestList.txt<br/>Columns: video, label, t_start, t_end<br/>14 IPN gesture labels total"]
-        VOCAB["Vocabulary Config<br/>configs/gestures/vocabulary_ipn.yaml<br/>default 10-class runtime vocabulary<br/>unknown + point_one/point_two + G03/G04/G05/G06/G07/G10/G11"]
+        VOCAB["Vocabulary Config<br/>configs/gestures/vocabulary_hybrid.yaml<br/>production 10-class hybrid vocabulary<br/>no_gesture + point_one/point_two + swiping_*/zooming_*/stop_sign"]
     end
 
     class VIDEOS rawNode
@@ -61,8 +61,8 @@ flowchart TD
 
     subgraph PH3["Phase 3 — Label Mapping and Segment Filtering"]
         direction TB
-        LMAP["IPN → Vocabulary Mapping<br/>B0A → point_one     B0B → point_two<br/>D0X → unknown<br/>G01 → click_one     G02 → click_two<br/>G03 → swipe_up      G04 → swipe_down<br/>G05 → swipe_left    G06 → swipe_right<br/>G07 → open_palm_hold<br/>G08 → double_click_one   G09 → double_click_two<br/>G10 → zoom_in       G11 → zoom_out"]
-        SUBSAMP["Unknown Class Subsampling<br/>unknown sequences subsampled to prevent domination<br/>Residual imbalance handled by config (class caps / optional class weights)"]
+        LMAP["IPN → Vocabulary Mapping<br/>B0A → point_one     B0B → point_two<br/>D0X → no_gesture<br/>G03 → swiping_up      G04 → swiping_down<br/>G05 → swiping_left    G06 → swiping_right<br/>G07 → stop_sign (Jester)<br/>G10 → zooming_in_full_hand       G11 → zooming_out_full_hand"]
+        SUBSAMP["Background Class Subsampling<br/>no_gesture sequences subsampled to prevent domination<br/>Residual imbalance handled by config (class caps / optional class weights)"]
     end
 
     class LMAP buildNode
@@ -96,7 +96,7 @@ flowchart TD
 
     subgraph PH5["Phase 5 — Mirror Augmentation and Dataset Serialisation"]
         direction TB
-        MIRR["Mirror Augmentation (optional)<br/>Label-aware horizontal flip<br/>swipe_left ↔ swipe_right are swapped<br/>Doubles training set size"]
+        MIRR["Mirror Augmentation (optional)<br/>Label-aware horizontal flip<br/>swiping_left ↔ swiping_right are swapped<br/>Doubles training set size"]
         NPZ["Output NPZ Dataset<br/>data/processed/*.npz (configurable output path)<br/>────────────────────────────────────<br/>sequences   (N, 32, 147)  float32<br/>labels      (N,)          str<br/>label_ids   (N,)          int64<br/>recording_ids (N,)        str<br/>valid_ratio (N,)          float32<br/>metadata_json             JSON blob"]
     end
 
@@ -112,7 +112,7 @@ flowchart TD
     subgraph PH6["Phase 6 — Dataset Loading and Stratified Splits"]
         direction TB
         DM["GestureDataModule<br/>Stratified split by class + recording<br/>────────────────────────────────────<br/>Train : 70%  of sequences<br/>Val   : 15%  of sequences<br/>Test  : 15%  of sequences<br/>Recording-level split to reduce leakage"]
-        CW["Class Weight Computation<br/>w_c = N_total / (N_c × num_classes)<br/>Applied to CrossEntropyLoss<br/>Counteracts unknown class imbalance"]
+        CW["Class Weight Computation<br/>w_c = N_total / (N_c × num_classes)<br/>Applied to CrossEntropyLoss<br/>Counteracts no_gesture class imbalance"]
     end
 
     class DM trainNode
@@ -252,10 +252,10 @@ identical velocity vectors after rotation. This is deliberately disabled at the
 Mirror augmentation (horizontal flip) doubles the dataset size and balances
 left-vs-right representation. It is applied **offline** at dataset build time rather
 than online during training, because a naive horizontal flip must also swap
-`swipe_left` ↔ `swipe_right` labels — a label-aware operation that the standard
+`swiping_left` ↔ `swiping_right` labels — a label-aware operation that the standard
 augmentation transforms do not support.
 
-### Unknown Class Subsampling
+### Background Class Subsampling
 
 The IPN Hand `D0X` (non-gesture background) class is substantially more frequent than
 the active gesture classes. It is subsampled at dataset build time, and residual
