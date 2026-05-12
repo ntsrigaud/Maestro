@@ -53,14 +53,14 @@ Usage
     python scripts/build_hybrid_dataset.py \\
         --vocab-config configs/gestures/vocabulary_hybrid.yaml \\
         --jester-npz   data/processed/jester_pretrain_dataset.npz \\
-        --ipn-npz      data/processed/ipn_dataset_v5_10class_mirrored.npz \\
+        --ipn-npz      data/processed/ipn_dataset_v5_10class.npz \
         --output-npz   data/processed/hybrid_dataset.npz
 
     # Custom per-class cap:
-    python scripts/build_hybrid_dataset.py \\
-        --vocab-config configs/gestures/vocabulary_hybrid.yaml \\
-        --jester-npz   data/processed/jester_pretrain_dataset.npz \\
-        --ipn-npz      data/processed/ipn_dataset_v5_10class_mirrored.npz \\
+    python scripts/build_hybrid_dataset.py \
+        --vocab-config configs/gestures/vocabulary_hybrid.yaml \
+        --jester-npz   data/processed/jester_pretrain_dataset.npz \
+        --ipn-npz      data/processed/ipn_dataset_v5_10class.npz \
         --output-npz   data/processed/hybrid_dataset.npz \\
         --max-samples-per-class 3000
 
@@ -322,7 +322,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--ipn-npz",
         type=Path,
-        default=Path("data/processed/ipn_dataset_v5_10class_mirrored.npz"),
+        default=Path("data/processed/ipn_dataset_v5_10class.npz"),
         help="Pre-built IPN NPZ (output of build_ipn_dataset.py with 10-class vocab).",
     )
     p.add_argument(
