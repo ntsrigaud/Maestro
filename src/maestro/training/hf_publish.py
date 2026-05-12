@@ -823,10 +823,14 @@ def _build_training_strategy_section(
         "zooming_out_full_hand",
     }.issubset(class_set)
 
-    target_desc = "Hybrid Jester+IPN 10-gesture vocabulary" if is_hybrid else (
-        "IPN 10-gesture production subset"
-        if config.model.num_classes == 10
-        else "target IPN subset"
+    target_desc = (
+        "Hybrid Jester+IPN 10-gesture vocabulary"
+        if is_hybrid
+        else (
+            "IPN 10-gesture production subset"
+            if config.model.num_classes == 10
+            else "target IPN subset"
+        )
     )
 
     distillation_weight = metrics.get("distillation_weight", "N/A")

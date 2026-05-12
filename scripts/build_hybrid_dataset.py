@@ -73,7 +73,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -93,6 +92,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 # ---------------------------------------------------------------------------
 # NPZ loading helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_source_npz(path: Path) -> dict[str, np.ndarray]:
     """Load all arrays from a source NPZ into a plain dict."""
@@ -121,6 +121,7 @@ def _get_metadata(data: dict[str, np.ndarray]) -> dict:
 # ---------------------------------------------------------------------------
 # Subset extraction
 # ---------------------------------------------------------------------------
+
 
 def _extract_class_subset(
     data: dict[str, np.ndarray],
@@ -167,9 +168,7 @@ def _extract_class_subset(
             if len(cls_idx) > max_samples_per_class:
                 chosen = rng.choice(cls_idx, max_samples_per_class, replace=False)
                 kept.extend(chosen.tolist())
-                logger.info(
-                    "    Capped %s: %d → %d", cls, len(cls_idx), max_samples_per_class
-                )
+                logger.info("    Capped %s: %d → %d", cls, len(cls_idx), max_samples_per_class)
             else:
                 kept.extend(cls_idx.tolist())
         indices = np.array(sorted(kept), dtype=np.int64)
@@ -202,6 +201,7 @@ def _extract_class_subset(
 # ---------------------------------------------------------------------------
 # Merge and save
 # ---------------------------------------------------------------------------
+
 
 def _merge_subsets(
     subsets: list[dict[str, np.ndarray]],
@@ -247,20 +247,12 @@ def _merge_subsets(
         n = len(subset["labels"])
         zeros_i64 = np.zeros(n, dtype=np.int64)
         ones_f32 = np.ones(n, dtype=np.float32)
-        all_arrays["start_timestamp_ms"].append(
-            subset.get("start_timestamp_ms", zeros_i64)
-        )
-        all_arrays["end_timestamp_ms"].append(
-            subset.get("end_timestamp_ms", zeros_i64)
-        )
-        all_arrays["valid_ratio"].append(
-            subset.get("valid_ratio", ones_f32)
-        )
+        all_arrays["start_timestamp_ms"].append(subset.get("start_timestamp_ms", zeros_i64))
+        all_arrays["end_timestamp_ms"].append(subset.get("end_timestamp_ms", zeros_i64))
+        all_arrays["valid_ratio"].append(subset.get("valid_ratio", ones_f32))
 
     merged: dict[str, np.ndarray] = {
-        key: np.concatenate(arrays, axis=0)
-        for key, arrays in all_arrays.items()
-        if arrays
+        key: np.concatenate(arrays, axis=0) for key, arrays in all_arrays.items() if arrays
     }
 
     # Warn about any unknown labels.
@@ -300,7 +292,7 @@ def _save_npz(data: dict[str, np.ndarray], output_path: Path) -> None:
     """Save merged arrays to a compressed NPZ file."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output_path, **data)
-    size_mb = output_path.stat().st_size / (1024 ** 2)
+    size_mb = output_path.stat().st_size / (1024**2)
     n = len(data["labels"])
     logger.info("Saved %d samples → %s  (%.1f MB)", n, output_path, size_mb)
 
@@ -309,11 +301,10 @@ def _save_npz(data: dict[str, np.ndarray], output_path: Path) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description=(
-            "Merge Jester and IPN NPZ datasets into a hybrid 10-class dataset."
-        ),
+        description=("Merge Jester and IPN NPZ datasets into a hybrid 10-class dataset."),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument(
@@ -345,8 +336,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         type=int,
         default=5000,
         help=(
-            "Per-class sample cap applied before merging. "
-            "0 = no cap (use all available samples)."
+            "Per-class sample cap applied before merging. 0 = no cap (use all available samples)."
         ),
     )
     p.add_argument(
@@ -379,9 +369,7 @@ def main() -> None:
 
     # ── Guard ────────────────────────────────────────────────────────────────
     if args.output_npz.exists() and not args.force:
-        logger.info(
-            "Output already exists: %s  (use --force to overwrite)", args.output_npz
-        )
+        logger.info("Output already exists: %s  (use --force to overwrite)", args.output_npz)
         sys.exit(0)
 
     # ── Vocabulary ────────────────────────────────────────────────────────────
@@ -399,11 +387,10 @@ def main() -> None:
 
     # Sources map: class_name → "jester" | "ipn" (defaults to "jester").
     sources_map: dict[str, str] = {
-        cls: str(src)
-        for cls, src in (vcfg.get("sources") or {}).items()
+        cls: str(src) for cls, src in (vcfg.get("sources") or {}).items()
     }
     jester_classes = [cls for cls in vocabulary if sources_map.get(cls, "jester") == "jester"]
-    ipn_classes    = [cls for cls in vocabulary if sources_map.get(cls, "jester") == "ipn"]
+    ipn_classes = [cls for cls in vocabulary if sources_map.get(cls, "jester") == "ipn"]
 
     logger.info("Hybrid vocabulary: %d classes", len(vocabulary))
     logger.info("  Jester-sourced: %s", jester_classes)
@@ -422,21 +409,20 @@ def main() -> None:
 
     if ipn_classes and not args.ipn_npz.exists():
         logger.error(
-            "IPN NPZ not found: %s\n"
-            "  Build it first with: python scripts/build_ipn_dataset.py",
+            "IPN NPZ not found: %s\n  Build it first with: python scripts/build_ipn_dataset.py",
             args.ipn_npz,
         )
         sys.exit(1)
 
     jester_data = _load_source_npz(args.jester_npz)
-    ipn_data    = _load_source_npz(args.ipn_npz) if ipn_classes else {}
+    ipn_data = _load_source_npz(args.ipn_npz) if ipn_classes else {}
 
     # ── Infer window / feature dims from Jester ───────────────────────────────
     seqs_shape = jester_data["sequences"].shape
     if seqs_shape.ndim if hasattr(seqs_shape, "ndim") else len(seqs_shape) != 3:
         pass  # ndarray.shape is a plain tuple; always length 3
     window_length: int = int(seqs_shape[1])
-    feature_dim: int   = int(seqs_shape[2])
+    feature_dim: int = int(seqs_shape[2])
 
     jester_meta = _get_metadata(jester_data)
     feature_schema = jester_meta.get("feature_schema_version", "feature-schema-v5")
@@ -449,7 +435,10 @@ def main() -> None:
                 "Shape mismatch: Jester (N, %d, %d) vs IPN (N, %d, %d). "
                 "Ensure both datasets were built with identical window_length "
                 "and feature_schema.",
-                window_length, feature_dim, ipn_shape[1], ipn_shape[2],
+                window_length,
+                feature_dim,
+                ipn_shape[1],
+                ipn_shape[2],
             )
             sys.exit(1)
 
@@ -500,9 +489,7 @@ def main() -> None:
     _save_npz(merged, args.output_npz)
 
     # ── Metadata sidecar ──────────────────────────────────────────────────────
-    meta_path = args.output_npz.with_suffix("").parent / (
-        args.output_npz.stem + ".metadata.json"
-    )
+    meta_path = args.output_npz.with_suffix("").parent / (args.output_npz.stem + ".metadata.json")
     meta_path.write_text(
         json.dumps(
             {
