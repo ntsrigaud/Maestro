@@ -52,16 +52,16 @@ _FEATURE_SCHEMA_DESCRIPTION = """\
 """
 
 _CLASS_DESCRIPTIONS: dict[str, str] = {
+    "no_gesture": "Background / transition / no gesture",
     "point_one": "Single-finger pointing gesture (continuous laser-pointer control)",
     "point_two": "Two-finger pointing gesture (continuous annotation-pen control)",
-    "open_palm_hold": "Static open palm facing camera",
-    "swipe_right": "Horizontal swipe from left to right",
-    "swipe_left": "Horizontal swipe from right to left",
-    "swipe_up": "Vertical swipe upward",
-    "swipe_down": "Vertical swipe downward",
-    "zoom_in": "Pinch-open (spread fingers away from each other)",
-    "zoom_out": "Pinch-close (bring fingers together)",
-    "unknown": "Background / transition / no gesture",
+    "stop_sign": "Static open palm facing camera (Jester class)",
+    "swiping_down": "Vertical swipe downward (Jester class)",
+    "swiping_left": "Horizontal swipe from right to left (Jester class)",
+    "swiping_right": "Horizontal swipe from left to right (Jester class)",
+    "swiping_up": "Vertical swipe upward (Jester class)",
+    "zooming_in_full_hand": "Pinch-open / spread fingers away from each other (Jester class)",
+    "zooming_out_full_hand": "Pinch-close / bring fingers together (Jester class)",
 }
 
 _GRAPH_SCHEMA_DESCRIPTION = """\
@@ -246,11 +246,11 @@ with torch.no_grad():
 ## Training Dataset
 
 - **Source**: IPN Hand database — multi-subject, multi-session gesture recordings
-- **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
+- **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
 - **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
 - **Graph**: 67 nodes — 42 hand + 11 pose + 14 face contour landmarks
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.003;
-  label-aware offline horizontal mirror (swipe_left ↔ swipe_right, node-block swap)
+  label-aware offline horizontal mirror (swiping_left ↔ swiping_right, node-block swap)
 
 ## Training Configuration
 
@@ -287,8 +287,8 @@ with torch.no_grad():
 
 - Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
   skin tones, or lighting conditions not represented in training data.
-- The `unknown` class represents background/transition frames. At runtime, predictions
-  are filtered through per-class confidence thresholds defined in `production_ipn.yaml`.
+- The `no_gesture` class represents background/transition frames. At runtime, predictions
+  are filtered through per-class confidence thresholds defined in `production_hybrid.yaml`.
 - Requires **mediapipe>=0.10.14** for landmark extraction at inference time.
 - Not intended for safety-critical or accessibility-critical applications.
 
@@ -455,10 +455,10 @@ with torch.no_grad():
 ## Training Dataset
 
 - **Source**: {dataset_source_desc}
-- **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
+- **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
 - **Dataset split**: 70% train / 15% val / 15% test (stratified by class)
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
-  label-aware horizontal mirror (swipe_left ↔ swipe_right)
+  label-aware horizontal mirror (swiping_left ↔ swiping_right)
 
 ## Training Strategy
 
@@ -513,8 +513,8 @@ with torch.no_grad():
 
 - Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
   skin tones, or lighting conditions not represented in training data.
-- The `unknown` class represents background/transition frames. At runtime, predictions
-  are filtered through per-class confidence thresholds defined in `production_ipn.yaml`.
+- The `no_gesture` class represents background/transition frames. At runtime, predictions
+  are filtered through per-class confidence thresholds defined in `production_hybrid.yaml`.
 - Requires **mediapipe>=0.10.14** for landmark extraction at inference time.
 - Not intended for safety-critical or accessibility-critical applications.
 - Performance was measured on a held-out test split from the same dataset; real-world
@@ -629,11 +629,11 @@ with torch.no_grad():
 ## Training Dataset
 
 - **Source**: IPN Hand database — multi-subject, multi-session gesture recordings
-- **Used classes**: {num_classes} ({num_classes_active} active gestures + `unknown` background)
+- **Used classes**: {num_classes} ({num_classes_active} active gestures + `no_gesture` background)
 - **Dataset split**: 70% train / 15% val / 15% test (group-aware split by recording session)
 - **Sequences**: ~22,973 sliding windows × 32 frames × {feature_dim} features
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
-  label-aware offline horizontal mirror (swipe_left ↔ swipe_right)
+  label-aware offline horizontal mirror (swiping_left ↔ swiping_right)
 
 ## Training Strategy
 
@@ -674,8 +674,8 @@ with torch.no_grad():
 
 - Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
   skin tones, or lighting conditions not represented in training data.
-- The `unknown` class represents background/transition frames. At runtime, predictions
-  are filtered through per-class confidence thresholds defined in `production_ipn.yaml`.
+- The `no_gesture` class represents background/transition frames. At runtime, predictions
+  are filtered through per-class confidence thresholds defined in `production_hybrid.yaml`.
 - Requires **mediapipe==0.10.14** for landmark extraction at inference time.
 - Not intended for safety-critical or accessibility-critical applications.
 - Performance was measured on a held-out test split from the same dataset; real-world
@@ -823,10 +823,14 @@ def _build_training_strategy_section(
         "zooming_out_full_hand",
     }.issubset(class_set)
 
-    target_desc = "Hybrid Jester+IPN 10-gesture vocabulary" if is_hybrid else (
-        "IPN 10-gesture production subset"
-        if config.model.num_classes == 10
-        else "target IPN subset"
+    target_desc = (
+        "Hybrid Jester+IPN 10-gesture vocabulary"
+        if is_hybrid
+        else (
+            "IPN 10-gesture production subset"
+            if config.model.num_classes == 10
+            else "target IPN subset"
+        )
     )
 
     distillation_weight = metrics.get("distillation_weight", "N/A")
@@ -865,7 +869,7 @@ def _build_model_card(
 ) -> str:
     is_dual_stgcn = config.model.model_name.startswith("dual_stgcn")
     num_params = _count_parameters(result.model)
-    num_classes_active = len(result.class_labels) - 1  # subtract unknown
+    num_classes_active = len(result.class_labels) - 1  # subtract no_gesture
     created_at = datetime.now(UTC).strftime("%Y-%m-%d")
     window_length = int(result.dataset_metadata.get("window_length", 32))
     window_duration_ms = int(round(window_length * (1000.0 / 30.0)))
