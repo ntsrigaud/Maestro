@@ -58,7 +58,7 @@ training:
   label_smoothing: 0.05
   seed: 42
   num_workers: 2
-  class_weighting: false # max_samples_per_class cap handles balance
+  class_weighting: False # max_samples_per_class cap handles balance
   # Per-class cap — prevents Jester's larger classes from dominating.
   # Jester classes (swiping_*, stop_sign, etc.) typically yield ~3,000-8,000
   # windows per class in the filtered subset.  IPN point_one/point_two yield
@@ -69,10 +69,10 @@ splits:
   train_ratio: 0.70
   val_ratio: 0.15
   test_ratio: 0.15
-  stratified: true
+  stratified: True
 
 scheduler:
-  enabled: true
+  enabled: True
   factor: 0.5
   patience: 8
   min_lr: 0.000001
@@ -83,7 +83,7 @@ export:
   feature_schema_version: feature-schema-v5
 
 augmentation:
-  enabled: true
+  enabled: True
   temporal_scale_range: [0.75, 1.25]
   spatial_jitter_sigma: 0.008
   apply_prob: 0.6
