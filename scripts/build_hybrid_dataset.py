@@ -1,8 +1,8 @@
 """Merge pre-built Jester and IPN NPZ datasets into a hybrid 10-class dataset.
 
 The hybrid dataset combines:
-  - 8 classes from Jester (swiping_*, stop_sign, zooming_*_full_hand, no_gesture)
-  - 2 classes from IPN    (point_one, point_two — no Jester equivalent)
+  - 7 classes from Jester (swiping_*, stop_sign, zooming_*_full_hand)
+  - 3 classes from IPN    (unknown/D0X background, point_one, point_two)
 
 This script operates on **pre-built NPZ files** produced by
 ``build_jester_dataset.py`` and ``build_ipn_dataset.py`` respectively.  It
@@ -13,12 +13,16 @@ Source provenance is read from the ``sources`` section of the vocabulary YAML::
 
     sources:
       unknown:   ipn
-      point_one:   ipn
+      point_one: ipn
       ...
 
-Any class listed as ``jester`` is taken from the Jester NPZ; any class listed
-as ``ipn`` is taken from the IPN NPZ.  Classes listed under ``gestures`` but
-absent from ``sources`` default to ``jester``.
+Any class listed as ``ipn`` is taken from the IPN NPZ.  Classes absent from
+``sources`` (or listed as ``jester``) default to the Jester source.  Jester
+data can be provided either as a single pre-built NPZ (``--jester-npz``) or as
+a directory of per-class chunk NPZs (``--jester-chunk-dir``) produced by
+``build_jester_dataset.py --chunk-dir``.  The chunk-dir approach is strongly
+preferred because it loads only the 7 needed Jester class files instead of
+the full ~27-class Jester NPZ, avoiding OOM kills on memory-constrained hosts.
 
 Per-class balancing
 -------------------
@@ -50,19 +54,19 @@ training pipeline.  Keys:
 
 Usage
 -----
+    # Preferred: use per-class Jester chunks (low memory):
+    python scripts/build_hybrid_dataset.py \\
+        --vocab-config   configs/gestures/vocabulary_hybrid.yaml \\
+        --jester-chunk-dir data/processed/jester_chunks \\
+        --ipn-npz        data/processed/ipn_dataset_v5_10class_mirrored.npz \\
+        --output-npz     data/processed/hybrid_dataset.npz
+
+    # Alternative: use a single pre-built Jester NPZ:
     python scripts/build_hybrid_dataset.py \\
         --vocab-config configs/gestures/vocabulary_hybrid.yaml \\
         --jester-npz   data/processed/jester_pretrain_dataset.npz \\
-        --ipn-npz      data/processed/ipn_dataset_v5_10class.npz \
+        --ipn-npz      data/processed/ipn_dataset_v5_10class_mirrored.npz \\
         --output-npz   data/processed/hybrid_dataset.npz
-
-    # Custom per-class cap:
-    python scripts/build_hybrid_dataset.py \
-        --vocab-config configs/gestures/vocabulary_hybrid.yaml \
-        --jester-npz   data/processed/jester_pretrain_dataset.npz \
-        --ipn-npz      data/processed/ipn_dataset_v5_10class.npz \
-        --output-npz   data/processed/hybrid_dataset.npz \\
-        --max-samples-per-class 3000
 
     # Rebuild even if output already exists:
     python scripts/build_hybrid_dataset.py ... --force
@@ -116,6 +120,91 @@ def _get_metadata(data: dict[str, np.ndarray]) -> dict:
     if "metadata_json" in data:
         return json.loads(str(data["metadata_json"].item()))
     return {}
+
+
+# ---------------------------------------------------------------------------
+# Per-class Jester chunk loader
+# ---------------------------------------------------------------------------
+
+
+def _load_jester_from_chunks(
+    chunk_dir: Path,
+    classes: list[str],
+    *,
+    max_samples_per_class: int,
+    rng: np.random.Generator,
+) -> dict[str, np.ndarray]:
+    """Load only the requested Jester classes from a per-class chunk directory.
+
+    Each chunk file is expected at ``chunk_dir/{class_name}.npz`` and was
+    produced by ``build_jester_dataset.py --chunk-dir``.  Only the files for
+    the *classes* needed by the hybrid vocabulary are loaded, keeping memory
+    usage proportional to the number of hybrid Jester classes (7) rather than
+    the full 27-class Jester vocabulary.
+
+    Recording and sample IDs are prefixed with ``jester_`` to match the
+    namespacing convention used by ``_extract_class_subset``.
+    """
+    all_seqs: list[np.ndarray] = []
+    all_labels: list[np.ndarray] = []
+    all_rids: list[np.ndarray] = []
+    all_sids: list[np.ndarray] = []
+    all_start: list[np.ndarray] = []
+    all_end: list[np.ndarray] = []
+    all_valid: list[np.ndarray] = []
+
+    for cls in classes:
+        chunk_path = chunk_dir / f"{cls}.npz"
+        if not chunk_path.exists():
+            logger.warning(
+                "Jester chunk not found for class %r: %s — skipped.", cls, chunk_path
+            )
+            continue
+        with np.load(chunk_path, allow_pickle=True) as raw:
+            seqs = raw["sequences"].astype(np.float32)
+            lbs = raw["labels"].astype(str)
+            rids = raw["recording_ids"].astype(str)
+            sids = raw["sample_ids"].astype(str)
+            n = len(lbs)
+            zeros = np.zeros(n, dtype=np.int64)
+            ones = np.ones(n, dtype=np.float32)
+            starts = raw["start_timestamp_ms"].astype(np.int64) if "start_timestamp_ms" in raw else zeros
+            ends = raw["end_timestamp_ms"].astype(np.int64) if "end_timestamp_ms" in raw else zeros
+            valid = raw["valid_ratio"].astype(np.float32) if "valid_ratio" in raw else ones
+
+        # Per-class cap.
+        if max_samples_per_class > 0 and n > max_samples_per_class:
+            idx = rng.choice(n, max_samples_per_class, replace=False)
+            seqs, lbs, rids, sids = seqs[idx], lbs[idx], rids[idx], sids[idx]
+            starts, ends, valid = starts[idx], ends[idx], valid[idx]
+            n = max_samples_per_class
+            logger.info("    Capped %s (chunk): %d → %d", cls, len(lbs) + (n - max_samples_per_class if max_samples_per_class else 0), n)
+
+        logger.info("  jester_chunk: %s  %d samples", cls, n)
+        all_seqs.append(seqs)
+        all_labels.append(lbs)
+        all_rids.append(np.array([f"jester_{rid}" for rid in rids], dtype=object))
+        all_sids.append(np.array([f"jester_{sid}" for sid in sids], dtype=object))
+        all_start.append(starts)
+        all_end.append(ends)
+        all_valid.append(valid)
+
+    if not all_seqs:
+        logger.warning("No Jester chunk data loaded for classes: %s", classes)
+        return {}
+
+    result: dict[str, np.ndarray] = {
+        "sequences": np.concatenate(all_seqs, axis=0),
+        "labels": np.concatenate(all_labels, axis=0),
+        "recording_ids": np.concatenate(all_rids, axis=0),
+        "sample_ids": np.concatenate(all_sids, axis=0),
+        "start_timestamp_ms": np.concatenate(all_start, axis=0),
+        "end_timestamp_ms": np.concatenate(all_end, axis=0),
+        "valid_ratio": np.concatenate(all_valid, axis=0),
+    }
+    # label_ids will be recomputed in _merge_subsets from the hybrid vocabulary.
+    result["label_ids"] = np.zeros(len(result["labels"]), dtype=np.int64)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -316,8 +405,23 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--jester-npz",
         type=Path,
-        default=Path("data/processed/jester_pretrain_dataset.npz"),
-        help="Pre-built full Jester NPZ (output of build_jester_dataset.py).",
+        default=None,
+        help=(
+            "Pre-built full Jester NPZ (output of build_jester_dataset.py).  "
+            "Provide either this or --jester-chunk-dir (not both)."
+        ),
+    )
+    p.add_argument(
+        "--jester-chunk-dir",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help=(
+            "Directory of per-class Jester chunk NPZs produced by "
+            "'build_jester_dataset.py --chunk-dir'.  Only the files for the "
+            "Jester classes in the hybrid vocabulary are loaded, which is much "
+            "more memory-efficient than loading the full Jester NPZ."
+        ),
     )
     p.add_argument(
         "--ipn-npz",
@@ -398,15 +502,64 @@ def main() -> None:
 
     rng = np.random.default_rng(args.seed)
 
-    # ── Load source NPZs ──────────────────────────────────────────────────────
-    if not args.jester_npz.exists():
+    # ── Jester data — chunk dir or full NPZ ───────────────────────────────────
+    use_chunks = args.jester_chunk_dir is not None
+    if not use_chunks and args.jester_npz is None:
         logger.error(
-            "Jester NPZ not found: %s\n"
-            "  Build it first with: python scripts/build_jester_dataset.py",
-            args.jester_npz,
+            "Provide either --jester-chunk-dir or --jester-npz (neither was set)."
         )
         sys.exit(1)
+    if use_chunks and args.jester_npz is not None:
+        logger.warning(
+            "Both --jester-chunk-dir and --jester-npz provided; "
+            "--jester-chunk-dir takes precedence."
+        )
 
+    if use_chunks:
+        if not args.jester_chunk_dir.is_dir():
+            logger.error(
+                "Jester chunk directory not found: %s\n"
+                "  Build chunks first with: python scripts/build_jester_dataset.py --chunk-dir",
+                args.jester_chunk_dir,
+            )
+            sys.exit(1)
+        logger.info("Loading Jester classes from chunks: %s", args.jester_chunk_dir)
+        jester_subset = _load_jester_from_chunks(
+            chunk_dir=args.jester_chunk_dir,
+            classes=jester_classes,
+            max_samples_per_class=args.max_samples_per_class,
+            rng=rng,
+        )
+        if not jester_subset:
+            logger.error("No Jester data loaded from chunks — aborting.")
+            sys.exit(1)
+        seqs_shape = jester_subset["sequences"].shape
+        feature_schema = "feature-schema-v5"
+    else:
+        if not args.jester_npz.exists():
+            logger.error(
+                "Jester NPZ not found: %s\n"
+                "  Build it first with: python scripts/build_jester_dataset.py",
+                args.jester_npz,
+            )
+            sys.exit(1)
+        jester_data = _load_source_npz(args.jester_npz)
+        seqs_shape = jester_data["sequences"].shape
+        jester_meta = _get_metadata(jester_data)
+        feature_schema = jester_meta.get("feature_schema_version", "feature-schema-v5")
+        jester_subset = _extract_class_subset(
+            jester_data,
+            jester_classes,
+            source_prefix="jester_",
+            max_samples_per_class=args.max_samples_per_class,
+            rng=rng,
+        )
+        del jester_data  # free memory after extraction
+
+    window_length: int = int(seqs_shape[1])
+    feature_dim: int = int(seqs_shape[2])
+
+    # ── IPN data ──────────────────────────────────────────────────────────────
     if ipn_classes and not args.ipn_npz.exists():
         logger.error(
             "IPN NPZ not found: %s\n  Build it first with: python scripts/build_ipn_dataset.py",
@@ -414,18 +567,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    jester_data = _load_source_npz(args.jester_npz)
     ipn_data = _load_source_npz(args.ipn_npz) if ipn_classes else {}
-
-    # ── Infer window / feature dims from Jester ───────────────────────────────
-    seqs_shape = jester_data["sequences"].shape
-    if seqs_shape.ndim if hasattr(seqs_shape, "ndim") else len(seqs_shape) != 3:
-        pass  # ndarray.shape is a plain tuple; always length 3
-    window_length: int = int(seqs_shape[1])
-    feature_dim: int = int(seqs_shape[2])
-
-    jester_meta = _get_metadata(jester_data)
-    feature_schema = jester_meta.get("feature_schema_version", "feature-schema-v5")
 
     # Validate IPN shape compatibility.
     if ipn_data:
@@ -442,21 +584,7 @@ def main() -> None:
             )
             sys.exit(1)
 
-    logger.info(
-        "Source shapes — Jester: %s  IPN: %s",
-        jester_data["sequences"].shape,
-        ipn_data.get("sequences", np.array([])).shape if ipn_data else "N/A",
-    )
-
-    # ── Extract subsets ────────────────────────────────────────────────────────
-    jester_subset = _extract_class_subset(
-        jester_data,
-        jester_classes,
-        source_prefix="jester_",
-        max_samples_per_class=args.max_samples_per_class,
-        rng=rng,
-    )
-
+    # ── Extract IPN subset ────────────────────────────────────────────────────
     ipn_subset = {}
     if ipn_classes and ipn_data:
         ipn_subset = _extract_class_subset(
@@ -495,7 +623,9 @@ def main() -> None:
             {
                 "vocabulary": vocabulary,
                 "sources": sources_map,
-                "jester_npz": str(args.jester_npz),
+                "jester_source": (
+                    str(args.jester_chunk_dir) if use_chunks else str(args.jester_npz)
+                ),
                 "ipn_npz": str(args.ipn_npz),
                 "max_samples_per_class": args.max_samples_per_class,
                 "window_length": window_length,
@@ -513,3 +643,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
