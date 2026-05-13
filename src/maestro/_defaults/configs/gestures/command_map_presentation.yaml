@@ -10,7 +10,7 @@ version: hybrid_v1
 #  zooming_in_full_hand -> Zoom In View
 #  zooming_out_full_hand -> Zoom Out View
 #  stop_sign -> Erase annotations
-#  unknown -> No Action (background class)
+#  no_gesture -> No Action (background class)
 #
 # Vocabulary: hybrid Jester+IPN (vocabulary_hybrid.yaml)
 gesture_commands:
