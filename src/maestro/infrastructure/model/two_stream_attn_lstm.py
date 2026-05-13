@@ -218,6 +218,11 @@ class EnhancedTwoStreamLSTM(nn.Module):
         motion = self.proj_b(motion)  # (B, T, proj_dim)
 
         # ── BiLSTM encoding ───────────────────────────────────────────────────
+        # flatten_parameters() compacts LSTM weights into a single contiguous
+        # memory block, which is required for cuDNN efficiency and suppresses
+        # the "weights are not part of single contiguous chunk" UserWarning.
+        self.lstm_a.flatten_parameters()
+        self.lstm_b.flatten_parameters()
         out_a, _ = self.lstm_a(pose)  # (B, T, 2H)
         out_b, _ = self.lstm_b(motion)  # (B, T, 2H)
 
@@ -270,6 +275,8 @@ class EnhancedTwoStreamLSTM(nn.Module):
         pose, motion = self._split(x)
         pose = self.proj_a(pose)
         motion = self.proj_b(motion)
+        self.lstm_a.flatten_parameters()
+        self.lstm_b.flatten_parameters()
         out_a, _ = self.lstm_a(pose)
         out_b, _ = self.lstm_b(motion)
         out_a = self.ln_a(out_a)

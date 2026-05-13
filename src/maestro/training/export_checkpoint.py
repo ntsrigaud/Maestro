@@ -103,6 +103,15 @@ def export_inference_artifact(
         "class_labels": result.class_labels,
     }
 
+    def _meta_int(key: str, default: int) -> int:
+        """Return int from dataset_metadata[key], falling back to *default* on None or missing."""
+        val = result.dataset_metadata.get(key)
+        return int(val) if val is not None else default
+
+    def _meta_bool(key: str, default: bool = False) -> bool:
+        val = result.dataset_metadata.get(key)
+        return bool(val) if val is not None else default
+
     if is_graph_model:
         # Include adjacency from model buffer for self-contained inference.
         adjacency_tensor = result.model.adjacency  # type: ignore[attr-defined]
@@ -110,19 +119,17 @@ def export_inference_artifact(
             "graph_schema_version": config.export.graph_schema_version,
             "num_nodes": config.model.num_nodes,
             "num_coords": config.model.num_coords,
-            "window_length": int(result.dataset_metadata.get("window_length", 24)),
-            "window_step": int(result.dataset_metadata.get("window_step", 3)),
+            "window_length": _meta_int("window_length", 24),
+            "window_step": _meta_int("window_step", 3),
             "adjacency": adjacency_tensor,
         }
     else:
         payload["feature_schema"] = {
             "feature_schema_version": config.export.feature_schema_version,
-            "feature_dim": int(result.dataset_metadata.get("feature_dim", 126)),
-            "window_length": int(result.dataset_metadata.get("window_length", 24)),
-            "window_step": int(result.dataset_metadata.get("window_step", 3)),
-            "orientation_normalization": bool(
-                result.dataset_metadata.get("enable_orientation_normalization", False)
-            ),
+            "feature_dim": _meta_int("feature_dim", 126),
+            "window_length": _meta_int("window_length", 24),
+            "window_step": _meta_int("window_step", 3),
+            "orientation_normalization": _meta_bool("enable_orientation_normalization"),
         }
 
     torch.save(payload, artifact_path)
