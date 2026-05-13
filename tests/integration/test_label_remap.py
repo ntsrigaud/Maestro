@@ -13,14 +13,11 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from maestro.app.bootstrap import _load_command_map, build_container
 from maestro.domain.entities import StabilizedPrediction
 from maestro.infrastructure.model.checkpoint_loader import InferenceArtifact
 from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 from maestro.pipeline.activation import GestureActivationController
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -89,15 +86,29 @@ def test_production_command_map_has_swipe_remap(config_dir: Path) -> None:
 
 def _mock_artifact() -> InferenceArtifact:
     model = EnhancedTwoStreamLSTM(
-        input_size=147, hidden_size=64, num_layers=2, dropout=0.1,
-        num_classes=10, num_heads=4, proj_dim=64,
+        input_size=147,
+        hidden_size=64,
+        num_layers=2,
+        dropout=0.1,
+        num_classes=10,
+        num_heads=4,
+        proj_dim=64,
     )
     return InferenceArtifact(
         model=model,
         model_version="test_remap_v1",
-        class_labels=["unknown", "point_one", "point_two", "swiping_up",
-                       "swiping_down", "swiping_left", "swiping_right",
-                       "stop_sign", "zooming_in_full_hand", "zooming_out_full_hand"],
+        class_labels=[
+            "unknown",
+            "point_one",
+            "point_two",
+            "swiping_up",
+            "swiping_down",
+            "swiping_left",
+            "swiping_right",
+            "stop_sign",
+            "zooming_in_full_hand",
+            "zooming_out_full_hand",
+        ],
         feature_schema_version="feature-schema-v5",
         feature_dim=147,
         window_length=32,
