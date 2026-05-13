@@ -17,7 +17,7 @@ metrics:
 - accuracy
 - f1
 model-index:
-- name: two_stream_attn_v1_finetune_20260513T050407Z
+- name: two_stream_attn_v1_finetune_20260513T054113Z
   results:
   - task:
       type: gesture-recognition
@@ -26,12 +26,12 @@ model-index:
       type: IPN-Hand
     metrics:
     - type: accuracy
-      value: 0.9551
+      value: 0.9610
     - type: f1
-      value: 0.9481
+      value: 0.9545
 ---
 
-# two_stream_attn_v1_finetune_20260513T050407Z
+# two_stream_attn_v1_finetune_20260513T054113Z
 
 A real-time hand gesture classifier trained on
 a Hybrid Jester+IPN gesture dataset (Jester dynamic classes + IPN pointing classes).
@@ -139,7 +139,7 @@ from maestro.infrastructure.model.checkpoint_loader import load_inference_artifa
 # Download the artifact (cached after first call)
 local_path = hf_hub_download(
     repo_id="ntsrigaud/maestro-lstm-hybrid",
-    filename="two_stream_attn_v1_finetune_20260513T050407Z_inference.pt",
+    filename="two_stream_attn_v1_finetune_20260513T054113Z_inference.pt",
 )
 
 # Load the artifact (includes model, class labels, and feature schema)
@@ -168,10 +168,10 @@ with torch.no_grad():
 ## Training Strategy
 
 Two-phase transfer learning pipeline:
-- **Phase 1 (pretraining):** backbone pretrained on external checkpoint `two_stream_attn_v1_20260513T045733Z.pt` to learn generic gesture dynamics.
+- **Phase 1 (pretraining):** backbone pretrained on external checkpoint `two_stream_attn_v1_20260513T053647Z.pt` to learn generic gesture dynamics.
 - **Phase 2 (fine-tuning):** head replaced and model adapted on Hybrid Jester+IPN 10-gesture vocabulary.
 - **Stage A (frozen backbone):** 10 epoch(s) head-only warmup.
-- **Stage B (full model):** up to 58 epoch(s) joint fine-tuning with scheduler/early stopping.
+- **Stage B (full model):** up to 60 epoch(s) joint fine-tuning with scheduler/early stopping.
 - **Stage B retention defences:** replay_max_samples_per_class=500, distillation_weight=0.5, replay_ce_weight=0.3, backbone_lr_multiplier=0.1, ewc_weight=100.0, gpm_components=20, forgetting_penalty_weight=0.5.
 
 ## Training Configuration
@@ -199,23 +199,23 @@ Two-phase transfer learning pipeline:
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 95.5% |
-| Macro F1 | 94.8% |
+| Accuracy | 96.1% |
+| Macro F1 | 95.4% |
 
 ### Per-Class Recall
 
 | Class | Recall |
 |-------|--------|
-| `unknown` | 82.8% |
-| `point_one` | 98.1% |
-| `point_two` | 97.2% |
-| `stop_sign` | 98.5% |
+| `unknown` | 84.1% |
+| `point_one` | 98.4% |
+| `point_two` | 97.6% |
+| `stop_sign` | 98.2% |
 | `swiping_down` | 92.2% |
-| `swiping_left` | 93.6% |
-| `swiping_right` | 88.5% |
-| `swiping_up` | 92.3% |
-| `zooming_in_full_hand` | 97.0% |
-| `zooming_out_full_hand` | 97.1% |
+| `swiping_left` | 98.2% |
+| `swiping_right` | 90.8% |
+| `swiping_up` | 92.9% |
+| `zooming_in_full_hand` | 97.1% |
+| `zooming_out_full_hand` | 98.3% |
 
 ## Comparison with Previous Architecture
 
