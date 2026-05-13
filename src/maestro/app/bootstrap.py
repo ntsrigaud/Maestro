@@ -332,7 +332,11 @@ def _load_command_map(path: Path) -> tuple[dict[str, str], frozenset[str], dict[
     continuous_labels = frozenset(k for k, v in modes.items() if str(v) == "continuous")
     command_map = {str(k): str(v) for k, v in mapping.items() if k and v}
     raw_remap = payload.get("label_remap", {})
-    label_remap = {str(k): str(v) for k, v in raw_remap.items() if k and v} if isinstance(raw_remap, dict) else {}
+    label_remap = (
+        {str(k): str(v) for k, v in raw_remap.items() if k and v}
+        if isinstance(raw_remap, dict)
+        else {}
+    )
     return command_map, continuous_labels, label_remap
 
 
