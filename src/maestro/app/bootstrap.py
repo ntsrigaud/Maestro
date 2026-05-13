@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +65,10 @@ class AppContainer:
     overlay_renderer: IFeedbackRenderer
     benchmark: LatencyBenchmark
     show_window: bool
+    # Model output → display/dispatch label remapping (from command map YAML).
+    # Applied after stabilization: replaces the model's raw label with its
+    # user-facing equivalent before command dispatch and UI rendering.
+    label_remap: dict[str, str] = field(default_factory=dict)
 
 
 def build_container(
@@ -77,7 +81,7 @@ def build_container(
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
     thresholds = _load_thresholds(config_root / "thresholds" / "production_hybrid.yaml")
-    command_map, continuous_labels = _load_command_map(
+    command_map, continuous_labels, label_remap = _load_command_map(
         config_root / "gestures" / config.app.command_map
     )
 
@@ -167,6 +171,7 @@ def build_container(
         overlay_renderer=overlay_renderer,
         benchmark=benchmark,
         show_window=show_window,
+        label_remap=label_remap,
     )
 
 
@@ -293,16 +298,18 @@ def _load_thresholds(path: Path) -> dict[str, Any]:
     }
 
 
-def _load_command_map(path: Path) -> tuple[dict[str, str], frozenset[str]]:
-    """Load gesture→command_id mapping and gesture mode classifications from YAML.
+def _load_command_map(path: Path) -> tuple[dict[str, str], frozenset[str], dict[str, str]]:
+    """Load gesture→command_id mapping, gesture mode classifications, and label
+    remapping from YAML.
 
     Returns:
-        A tuple of ``(command_map, continuous_labels)`` where *command_map* maps
-        gesture label → command_id for discrete gestures and *continuous_labels*
-        is the frozenset of gesture labels classified as ``"continuous"`` in the
-        optional ``gesture_modes`` block.  Continuous labels bypass
-        ``GestureActivationController`` entirely and are handled by
-        ``LaserPointerTracker``.
+        A tuple of ``(command_map, continuous_labels, label_remap)`` where
+        *command_map* maps gesture label → command_id for discrete gestures,
+        *continuous_labels* is the frozenset of gesture labels classified as
+        ``"continuous"`` in the optional ``gesture_modes`` block, and
+        *label_remap* is an optional dict that maps model output labels to
+        their display/dispatch equivalents (e.g. correcting for mirror-view
+        swipe direction without retraining).
 
     Raises:
         FileNotFoundError: If the command map file does not exist.
@@ -324,7 +331,13 @@ def _load_command_map(path: Path) -> tuple[dict[str, str], frozenset[str]]:
         modes = {}
     continuous_labels = frozenset(k for k, v in modes.items() if str(v) == "continuous")
     command_map = {str(k): str(v) for k, v in mapping.items() if k and v}
-    return command_map, continuous_labels
+    raw_remap = payload.get("label_remap", {})
+    label_remap = (
+        {str(k): str(v) for k, v in raw_remap.items() if k and v}
+        if isinstance(raw_remap, dict)
+        else {}
+    )
+    return command_map, continuous_labels, label_remap
 
 
 def _build_dispatcher(
