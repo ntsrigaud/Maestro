@@ -1,4 +1,4 @@
-version: v3
+version: hybrid_v1
 # Presentation controller gesture-to-command mapping.
 # Commands route to PresentationAdapter → KeyboardAdapter → pyautogui.
 #
@@ -7,24 +7,26 @@ version: v3
 # Continuous gestures (point_one, point_two) bypass GestureActivationController
 # entirely — point_one is handled by LaserPointerTracker, point_two by
 # AnnotationPenTracker.
+#
+# Vocabulary: hybrid Jester+IPN (vocabulary_hybrid.yaml)
 
 gesture_commands:
-  swipe_up: start_presentation
-  swipe_down: stop_presentation
-  swipe_right: next_slide
-  swipe_left: previous_slide
-  zoom_in: zoom_in_view
-  zoom_out: zoom_out_view
-  open_palm_hold: erase_annotations
+  swiping_up: start_presentation
+  swiping_down: stop_presentation
+  swiping_right: next_slide
+  swiping_left: previous_slide
+  zooming_in_full_hand: zoom_in_view
+  zooming_out_full_hand: zoom_out_view
+  stop_sign: erase_annotations
   unknown: no_action
 
 gesture_modes:
-  swipe_up: discrete
-  swipe_down: discrete
-  swipe_right: discrete
-  swipe_left: discrete
-  zoom_in: discrete
-  zoom_out: discrete
-  open_palm_hold: discrete
+  swiping_up: discrete
+  swiping_down: discrete
+  swiping_right: discrete
+  swiping_left: discrete
+  zooming_in_full_hand: discrete
+  zooming_out_full_hand: discrete
+  stop_sign: discrete
   point_one: continuous
   point_two: continuous

@@ -124,7 +124,7 @@ stateDiagram-v2
 **IDLE**:
 
 - The system is suspended — no commands are dispatched and gesture predictions are ignored.
-- The system enters IDLE when gaze is lost beyond the configured grace period, or when no non-unknown gesture is detected for `idle_timeout_ms`.
+- The system enters IDLE when gaze is lost beyond the configured grace period, or when no non-no_gesture gesture is detected for `idle_timeout_ms`.
 - The system exits IDLE only via an explicit `rearm()` call, which is issued by the runtime when gaze is restored.
 - No commands are dispatched in this state.
 
@@ -135,9 +135,9 @@ stateDiagram-v2
   1. The stabilized prediction is `accepted` (temporal voting passed).
   2. The label differs from the last dispatched label (rising-edge detection).
   3. The label exists in the command map.
-- The `_last_dispatched_label` resets to `"unknown"` whenever the prediction returns to the unknown class (hand in neutral position), enabling the same gesture to be dispatched again after a neutral interval.
-- Any non-unknown prediction refreshes the idle timeout timer, keeping the system armed during active use.
-- If no non-unknown gesture is detected for `idle_timeout_ms` (default 100,000 ms in current config), the system returns to IDLE.
+- The `_last_dispatched_label` resets to `"no_gesture"` whenever the prediction returns to the no_gesture class (hand in neutral position), enabling the same gesture to be dispatched again after a neutral interval.
+- Any non-no_gesture prediction refreshes the idle timeout timer, keeping the system armed during active use.
+- If no non-no_gesture gesture is detected for `idle_timeout_ms` (default 100,000 ms in current config), the system returns to IDLE.
 
 **COOLDOWN**:
 
@@ -160,9 +160,9 @@ graph LR
 
 **Stage 1 — EMA Smoothing**: Each class probability is smoothed over time using exponential moving average: `p'[c] = α · p_current[c] + (1 - α) · p_previous[c]`. This dampens frame-to-frame fluctuations.
 
-**Stage 2 — Confidence Thresholding**: The smoothed top-class probability is compared against the class-specific threshold from `production_ipn.yaml`. If below threshold, the candidate is demoted to `unknown` with reason `"below_threshold_or_unknown"`.
+**Stage 2 — Confidence Thresholding**: The smoothed top-class probability is compared against the class-specific threshold from `production_hybrid.yaml`. If below threshold, the candidate is demoted to `no_gesture` with reason `"below_threshold_or_no_gesture"`.
 
-**Stage 3 — Temporal Majority Voting**: The last N predictions (where N = `class_vote_windows[label]`) must all agree on the same class. Dynamic gestures (swipe_right, swipe_left) use N=1 for immediate response. Static holds (open_palm_hold) use N=3 for stability. Disagreement results in rejection with reason `"temporal_inconsistency"`.
+**Stage 3 — Temporal Majority Voting**: The last N predictions (where N = `class_vote_windows[label]`) must all agree on the same class. Dynamic gestures (swiping_right, swiping_left) use N=1 for immediate response. Static holds (stop_sign) use N=3 for stability. Disagreement results in rejection with reason `"temporal_inconsistency"`.
 
 ## 6. Command Dispatch Pipeline
 

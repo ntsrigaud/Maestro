@@ -995,6 +995,7 @@ def finetune_lstm(
     run_root_dir: str | Path,
     device: torch.device,
     freeze_epochs: int = 10,
+    stage_b_warmup_epochs: int = 5,
     replay_dataset_path: str | Path | None = None,
     replay_max_samples_per_class: int = 500,
     distillation_weight: float = 0.5,
@@ -1016,12 +1017,17 @@ def finetune_lstm(
 
     **Stage B — Full model** (``config.training.epochs`` epochs):
         All layers are unfrozen and jointly fine-tuned with:
+        - Backbone LR linear warmup over ``stage_b_warmup_epochs`` epochs
+          (ramps from 0 → target to prevent the loss spike caused by the
+          cold AdamW state of previously-frozen backbone parameters).
         - Feature-level distillation (MSE between student/teacher features)
         - Frozen-head replay CE (old-task classification objective)
         - EWC regularisation (Fisher-weighted backbone parameter anchor)
         - GPM gradient projection (Jester subspace orthogonality constraint)
         - Jester retention monitoring (macro-F1 on held-out Jester val split)
         Early stopping uses a composite score that penalises Jester forgetting.
+        The ReduceLROnPlateau scheduler patience counter only starts after
+        the backbone warmup completes.
     """
     seed_everything(config.training.seed)
     datamodule = create_datamodule(dataset_path=dataset_path, config=config)
@@ -1216,11 +1222,17 @@ def finetune_lstm(
         param for name, param in model.named_parameters() if not name.startswith("head.")
     ]
     head_params = [param for name, param in model.named_parameters() if name.startswith("head.")]
+    target_backbone_lr = config.training.learning_rate * backbone_lr_multiplier
+    # Start backbone at 0 when warmup is enabled; the training loop ramps it
+    # linearly to target_backbone_lr over stage_b_warmup_epochs epochs.  This
+    # prevents the loss spike caused by AdamW's cold (zero) second-moment state
+    # for backbone params that were frozen throughout Stage A.
+    initial_backbone_lr = 0.0 if stage_b_warmup_epochs > 0 else target_backbone_lr
     optimizer_b = AdamW(
         [
             {
                 "params": backbone_params,
-                "lr": config.training.learning_rate * backbone_lr_multiplier,
+                "lr": initial_backbone_lr,
             },
             {
                 "params": head_params,
@@ -1287,7 +1299,8 @@ def finetune_lstm(
     print(
         f"Stage B — full fine-tuning  (up to {config.training.epochs} epochs, "
         f"head_lr={config.training.learning_rate:.2e}, "
-        f"backbone_lr={config.training.learning_rate * backbone_lr_multiplier:.2e})"
+        f"backbone_lr={target_backbone_lr:.2e}  "
+        f"[warmup {stage_b_warmup_epochs} epochs: 0→target])"
     )
     if ewc_weight > 0.0:
         print(f"  EWC regularisation  ewc_weight={ewc_weight:.1f}")
@@ -1307,6 +1320,16 @@ def finetune_lstm(
     print(_sep, flush=True)
 
     for epoch in range(1, config.training.epochs + 1):
+        # ── Backbone LR linear warmup ──────────────────────────────────────────
+        # Ramp backbone LR from 0 → target_backbone_lr over the first
+        # stage_b_warmup_epochs epochs.  This prevents the loss spike that
+        # occurs because AdamW's second-moment estimate (v_t) starts at zero
+        # for backbone params that were frozen throughout Stage A — without
+        # warmup the initial adaptive step is unreasonably large.
+        if stage_b_warmup_epochs > 0 and epoch <= stage_b_warmup_epochs:
+            warmup_factor = epoch / stage_b_warmup_epochs
+            optimizer_b.param_groups[0]["lr"] = target_backbone_lr * warmup_factor
+
         t0 = time.perf_counter()
         distill_loss_value = float("nan")
         replay_ce_loss_value = float("nan")
@@ -1358,9 +1381,13 @@ def finetune_lstm(
                 device=device,
             )
 
-        if scheduler is not None:
+        # Only step the LR scheduler after backbone warmup has completed so
+        # that the ReduceLROnPlateau patience counter is not wasted on warmup
+        # epochs where loss is artificially high due to the ramp.
+        if scheduler is not None and epoch > stage_b_warmup_epochs:
             scheduler.step(val_report.macro_f1)
         current_lr = float(optimizer_b.param_groups[-1]["lr"])
+        current_backbone_lr = float(optimizer_b.param_groups[0]["lr"])
 
         # ── Composite early stopping score ────────────────────────────────────
         # Penalise the IPN val F1 by the amount of Jester forgetting so that
@@ -1410,6 +1437,8 @@ def finetune_lstm(
                 "jester_val_f1": jester_val_f1,
                 "composite_score": composite,
                 "learning_rate": current_lr,
+                "backbone_lr": current_backbone_lr,
+                "stage_b_warmup": epoch <= stage_b_warmup_epochs,
                 "epoch_secs": time.perf_counter() - t0,
                 "distill_loss": distill_loss_value,
                 "replay_ce_loss": replay_ce_loss_value,
@@ -1461,6 +1490,7 @@ def finetune_lstm(
         "model_version": model_version,
         "pretrained_checkpoint": str(pretrained_checkpoint_path),
         "freeze_epochs": freeze_epochs,
+        "stage_b_warmup_epochs": stage_b_warmup_epochs,
         "replay_dataset_path": (
             str(replay_dataset_path) if replay_dataset_path is not None else None
         ),

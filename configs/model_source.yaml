@@ -2,7 +2,7 @@
 #
 # Artifacts are loaded exclusively from Hugging Face Hub (cached after first use).
 backend: huggingface
-repo_id: ntsrigaud/maestro-lstm
+repo_id: ntsrigaud/maestro-lstm-hybrid
 revision: main
-filename: two_stream_attn_v1_finetune_20260510T160508Z_inference.pt
+filename: two_stream_attn_v1_finetune_20260513T093937Z_inference.pt
 cache_dir: null # null = HF default (~/.cache/huggingface/hub)

@@ -25,20 +25,20 @@ A **PySide6 graphical interface** provides runtime control, live telemetry monit
 
 For developers who prefer script-based invocation, `scripts/run_ui.py` and `scripts/run_realtime.py` remain available as thin wrappers.
 
-**Gesture vocabulary** (IPN-derived, 10 classes):
+**Gesture vocabulary** (hybrid Jester+IPN, 10 classes):
 
-| Gesture          | Command                   | IPN Source      |
-| ---------------- | ------------------------- | --------------- |
-| `open_palm_hold` | Erase annotations         | G07             |
-| `swipe_right`    | Next slide                | G06             |
-| `swipe_left`     | Previous slide            | G05             |
-| `swipe_up`       | Start presentation        | G03             |
-| `swipe_down`     | Stop presentation         | G04             |
-| `zoom_in`        | Zoom in view              | G10             |
-| `zoom_out`       | Zoom out view             | G11             |
-| `point_one`      | Continuous laser pointer  | B0A             |
-| `point_two`      | Continuous annotation pen | B0B             |
-| `unknown`        | No action (noise class)   | D0X + B0A + B0B |
+| Gesture                 | Command                   | Source |
+| ----------------------- | ------------------------- | ------ |
+| `stop_sign`             | Erase annotations         | Jester |
+| `swiping_right`         | Next slide                | Jester |
+| `swiping_left`          | Previous slide            | Jester |
+| `swiping_up`            | Start presentation        | Jester |
+| `swiping_down`          | Stop presentation         | Jester |
+| `zooming_in_full_hand`  | Zoom in view              | Jester |
+| `zooming_out_full_hand` | Zoom out view             | Jester |
+| `point_one`             | Continuous laser pointer  | IPN    |
+| `point_two`             | Continuous annotation pen | IPN    |
+| `unknown`               | No action (noise class)   | IPN    |
 
 Discrete commands are routed through `GestureActivationController` + `CommandDispatcher`.
 `point_one` and `point_two` are continuous gestures handled directly by runtime trackers.

@@ -76,7 +76,7 @@ def build_container(
 ) -> AppContainer:
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
-    thresholds = _load_thresholds(config_root / "thresholds" / "production_ipn.yaml")
+    thresholds = _load_thresholds(config_root / "thresholds" / "production_hybrid.yaml")
     command_map, continuous_labels = _load_command_map(
         config_root / "gestures" / config.app.command_map
     )
@@ -129,6 +129,7 @@ def build_container(
         command_cooldown_ms=config.inference.command_cooldown_ms,
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
         continuous_labels=continuous_labels,
+        unknown_label="unknown",
     )
     dispatcher = _build_dispatcher(
         allowed_commands=frozenset(command_map.values()),

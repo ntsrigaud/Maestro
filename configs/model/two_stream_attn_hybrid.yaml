@@ -1,0 +1,90 @@
+# ── EnhancedTwoStreamLSTM — Hybrid 10-class fine-tuning configuration ─────────
+#
+# Fine-tuning configuration for the Jester → Hybrid transfer learning pipeline.
+#
+# The hybrid dataset combines 8 Jester gesture classes with 2 IPN pointing
+# gestures (point_one, point_two) to form a presentation-control vocabulary
+# that benefits from Jester's scale while retaining IPN-specific pointing cues.
+#
+# Backbone architecture is IDENTICAL to two_stream_attn_jester.yaml so Jester
+# pretrained weights can be loaded directly via finetune_lstm().  Only the
+# classification head (num_classes) changes from 27 → 10.
+#
+# Fine-tuning strategy (same as notebook 03 / two_stream_attn_ipn_finetune.yaml):
+#   Stage A — Head-only warm-up (freeze_epochs, default 10):
+#     Only the 10-class classification head is trained.  Backbone frozen.
+#   Stage B — Full model (backbone_lr_multiplier×lr):
+#     Joint optimisation with EWC + GPM + distillation to limit forgetting of
+#     Jester backbone patterns not covered by the 10-class subset.
+#
+# Key differences vs two_stream_attn_ipn_finetune.yaml:
+#   - num_classes: 10 (vs 13 for IPN benchmark)
+#   - Shorter early_stopping_patience: the hybrid dataset is better balanced so
+#     validation curves are smoother — patience of 12 is appropriate.
+#   - max_samples_per_class: 5000 — Jester classes have ~3,000-8,000 samples
+#     each in the subset NPZ; IPN pointing classes are typically ~3,000-12,000.
+#     The cap prevents Jester from swamping point_one / point_two.
+#   - label_smoothing: 0.05 — same as IPN finetune; Jester labels are clean.
+#
+# Dataset: build with build_hybrid_dataset.py
+#   python scripts/build_hybrid_dataset.py \
+#       --vocab-config configs/gestures/vocabulary_hybrid.yaml \
+#       --jester-npz  data/processed/jester_pretrain_dataset.npz \
+#       --ipn-npz     data/processed/ipn_dataset_v5_10class_mirrored.npz \
+#       --output-npz  data/processed/hybrid_dataset.npz \
+#       --max-samples-per-class 5000
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_v1
+  input_size: 147 # feature-schema-v5 (must match pretrained backbone)
+  hidden_size: 96 # must match pretrained checkpoint (two_stream_attn_jester.yaml)
+  num_layers: 4 # must match pretrained checkpoint
+  dropout: 0.35
+  num_classes: 10 # 10 hybrid classes (8 Jester + 2 IPN pointing)
+  num_heads: 8 # must match pretrained checkpoint
+  proj_dim: 96 # must match pretrained checkpoint
+
+training:
+  epochs: 60
+  batch_size: 128
+  # Stage B learning rate (full-model fine-tuning).
+  # Stage A (head-only) uses lr=1e-3 and is run inline in finetune_lstm.
+  learning_rate: 0.00003 # 3e-5 — same conservative fine-tuning LR as IPN
+  weight_decay: 0.0005
+  grad_clip_norm: 1.0
+  early_stopping_patience: 12
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.05
+  seed: 42
+  num_workers: 2
+  class_weighting: False # max_samples_per_class cap handles balance
+  # Per-class cap — prevents Jester's larger classes from dominating.
+  # Jester classes (swiping_*, stop_sign, etc.) typically yield ~3,000-8,000
+  # windows per class in the filtered subset.  IPN point_one/point_two yield
+  # ~3,000-12,000.  Cap at 5,000 to achieve balanced training.
+  max_samples_per_class: 5000
+
+splits:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: True
+
+scheduler:
+  enabled: True
+  factor: 0.5
+  patience: 8
+  min_lr: 0.000001
+
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+
+augmentation:
+  enabled: True
+  temporal_scale_range: [0.75, 1.25]
+  spatial_jitter_sigma: 0.008
+  apply_prob: 0.6
+  mirror_flip_prob: 0.0 # Disabled — mirroring directional gestures (swiping_left/right) without swapping labels creates contradictory training signal
