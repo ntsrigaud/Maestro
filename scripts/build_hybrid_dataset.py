@@ -156,9 +156,7 @@ def _load_jester_from_chunks(
     for cls in classes:
         chunk_path = chunk_dir / f"{cls}.npz"
         if not chunk_path.exists():
-            logger.warning(
-                "Jester chunk not found for class %r: %s — skipped.", cls, chunk_path
-            )
+            logger.warning("Jester chunk not found for class %r: %s — skipped.", cls, chunk_path)
             continue
         with np.load(chunk_path, allow_pickle=True) as raw:
             seqs = raw["sequences"].astype(np.float32)
@@ -168,7 +166,9 @@ def _load_jester_from_chunks(
             n = len(lbs)
             zeros = np.zeros(n, dtype=np.int64)
             ones = np.ones(n, dtype=np.float32)
-            starts = raw["start_timestamp_ms"].astype(np.int64) if "start_timestamp_ms" in raw else zeros
+            starts = (
+                raw["start_timestamp_ms"].astype(np.int64) if "start_timestamp_ms" in raw else zeros
+            )
             ends = raw["end_timestamp_ms"].astype(np.int64) if "end_timestamp_ms" in raw else zeros
             valid = raw["valid_ratio"].astype(np.float32) if "valid_ratio" in raw else ones
 
@@ -178,7 +178,12 @@ def _load_jester_from_chunks(
             seqs, lbs, rids, sids = seqs[idx], lbs[idx], rids[idx], sids[idx]
             starts, ends, valid = starts[idx], ends[idx], valid[idx]
             n = max_samples_per_class
-            logger.info("    Capped %s (chunk): %d → %d", cls, len(lbs) + (n - max_samples_per_class if max_samples_per_class else 0), n)
+            logger.info(
+                "    Capped %s (chunk): %d → %d",
+                cls,
+                len(lbs) + (n - max_samples_per_class if max_samples_per_class else 0),
+                n,
+            )
 
         logger.info("  jester_chunk: %s  %d samples", cls, n)
         all_seqs.append(seqs)
@@ -505,9 +510,7 @@ def main() -> None:
     # ── Jester data — chunk dir or full NPZ ───────────────────────────────────
     use_chunks = args.jester_chunk_dir is not None
     if not use_chunks and args.jester_npz is None:
-        logger.error(
-            "Provide either --jester-chunk-dir or --jester-npz (neither was set)."
-        )
+        logger.error("Provide either --jester-chunk-dir or --jester-npz (neither was set).")
         sys.exit(1)
     if use_chunks and args.jester_npz is not None:
         logger.warning(
@@ -643,4 +646,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
