@@ -1,7 +1,11 @@
-# ── EnhancedTwoStreamLSTM — 10-class production configuration ─────────────────
+# ── EnhancedTwoStreamLSTM — IPN-only 10-class configuration (DEPRECATED) ──────
+#
+# DEPRECATED: This config trains on the legacy IPN-only vocabulary.
+# The production config is now two_stream_attn_hybrid.yaml (hybrid Jester+IPN).
+# Keep this file for IPN baseline reproducibility only.
 #
 # This config trains the EnhancedTwoStreamLSTM (two_stream_attn_v1) on the
-# production 10-gesture vocabulary at a 32-frame sliding window (≈1067 ms at 30 FPS):
+# IPN-only 10-gesture vocabulary at a 32-frame sliding window (≈1067 ms at 30 FPS):
 #
 #   point_one, point_two, open_palm_hold, swipe_right, swipe_left, swipe_up,
 #   swipe_down, zoom_in, zoom_out, unknown

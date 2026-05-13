@@ -1,0 +1,69 @@
+version: hybrid_v2
+
+# 10-class hybrid vocabulary for EnhancedTwoStreamLSTM.
+#
+# Combines a Jester-sourced subset (7 classes) with IPN-sourced classes
+# (3 classes: unknown/D0X background + pointing gestures) to create a
+# presentation-control vocabulary that benefits from Jester's scale and
+# diversity while using IPN's richer background class (D0X).
+#
+# Source mapping:
+# ─────────────────────────────────────────────────────────────────────
+#  Hybrid label              Source   Replaces (IPN 10-class)
+# ─────────────────────────────────────────────────────────────────────
+#  unknown                   IPN      unknown          (IPN D0X)
+#  point_one                 IPN      point_one        (IPN B0A)
+#  point_two                 IPN      point_two        (IPN B0B)
+#  stop_sign                 Jester   open_palm_hold   (IPN G07)
+#  swiping_down              Jester   swipe_down       (IPN G04)
+#  swiping_left              Jester   swipe_left       (IPN G05)
+#  swiping_right             Jester   swipe_right      (IPN G06)
+#  swiping_up                Jester   swipe_up         (IPN G03)
+#  zooming_in_full_hand      Jester   zoom_in          (IPN G10)
+#  zooming_out_full_hand     Jester   zoom_out         (IPN G11)
+# ─────────────────────────────────────────────────────────────────────
+#
+# Rationale for Jester choices:
+#   stop_sign      — "Stop Sign" is a held open-palm, visually equivalent to
+#                    IPN G07 "open twice" but with more consistent examples.
+#   swiping_*      — Direct equivalents of IPN G03-G06 throw gestures;
+#                    Jester has ~4,000 videos per direction vs IPN ~2,400.
+#   zooming_*_full_hand — Full-hand zoom has a cleaner, larger motion arc
+#                    than two-finger zoom; preferred over zooming_in_two_fingers.
+#   unknown (IPN)  — IPN D0X has significantly more background samples than
+#                    Jester "No gesture", giving the model a stronger and
+#                    more varied negative class signal.
+#
+# Use with:
+#   python scripts/build_hybrid_dataset.py \
+#       --vocab-config configs/gestures/vocabulary_hybrid.yaml \
+#       --jester-chunk-dir data/processed/jester_chunks \
+#       --ipn-npz     data/processed/ipn_dataset_v5_10class_mirrored.npz \
+#       --output-npz  data/processed/hybrid_dataset.npz
+
+gestures:
+  - unknown
+  - point_one
+  - point_two
+  - stop_sign
+  - swiping_down
+  - swiping_left
+  - swiping_right
+  - swiping_up
+  - zooming_in_full_hand
+  - zooming_out_full_hand
+
+# Source provenance — consumed by build_hybrid_dataset.py.
+# "jester" classes are taken from the Jester NPZ or chunk dir;
+# "ipn"    classes are taken from the IPN NPZ.
+sources:
+  unknown: ipn
+  point_one: ipn
+  point_two: ipn
+  stop_sign: jester
+  swiping_down: jester
+  swiping_left: jester
+  swiping_right: jester
+  swiping_up: jester
+  zooming_in_full_hand: jester
+  zooming_out_full_hand: jester

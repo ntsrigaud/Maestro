@@ -392,10 +392,10 @@ class TestModeBadge:
 
     def test_command_map_accepted_in_constructor(self) -> None:
         """OverlayRenderer must accept command_map param without error."""
-        cmap = {"open_palm_hold": "mission_control", "unknown": "no_action"}
+        cmap = {"stop_sign": "mission_control", "unknown": "no_action"}
         renderer = OverlayRenderer(mirror_display=False, command_map=cmap)
         frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
-        state = self._make_desktop_state("desktop\u00b7workspace", label="open_palm_hold")
+        state = self._make_desktop_state("desktop\u00b7workspace", label="stop_sign")
         result = renderer.render(frame, state)
         assert result.frame.shape == (self.HEIGHT, self.WIDTH, 3)
 
@@ -411,20 +411,20 @@ class TestModeBadge:
         """Gate: overlay displays [desktop·workspace] → mission_control.
 
         A synthetic RuntimeState with active_mode='desktop·workspace' and
-        last_label='open_palm_hold', rendered through a renderer with the
+        last_label='stop_sign', rendered through a renderer with the
         desktop command map, must produce a non-empty canvas containing
         visible pixels in both the badge row (y≈18) and pred ring row (y≈72).
         """
         cmap = {
-            "open_palm_hold": "mission_control",
+            "stop_sign": "mission_control",
             "unknown": "no_action",
-            "swipe_up": "scroll_forward",
+            "swiping_up": "scroll_forward",
         }
         renderer = OverlayRenderer(mirror_display=False, command_map=cmap)
         frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
         state = RuntimeState(
             mode="armed",
-            last_label="open_palm_hold",
+            last_label="stop_sign",
             last_confidence=0.97,
             active_mode="desktop\u00b7workspace",
         )

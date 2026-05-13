@@ -1,0 +1,39 @@
+{
+  "feature_schema_version": "feature-schema-v5",
+  "feature_dim": 147,
+  "window_length": 32,
+  "window_step": 1,
+  "vocabulary": [
+    "pushing_hand_away",
+    "pulling_hand_in",
+    "sliding_two_fingers_left",
+    "sliding_two_fingers_right",
+    "sliding_two_fingers_down",
+    "sliding_two_fingers_up",
+    "pushing_two_fingers_away",
+    "pulling_two_fingers_in",
+    "rolling_hand_forward",
+    "rolling_hand_backward",
+    "turning_hand_clockwise",
+    "turning_hand_counterclockwise",
+    "zooming_in_two_fingers",
+    "zooming_out_two_fingers",
+    "thumb_up",
+    "thumb_down",
+    "shaking_hand",
+    "drumming_fingers",
+    "no_gesture",
+    "doing_other_things"
+  ],
+  "excluded_classes": [
+    "stop_sign",
+    "swiping_down",
+    "swiping_left",
+    "swiping_right",
+    "swiping_up",
+    "zooming_in_full_hand",
+    "zooming_out_full_hand"
+  ],
+  "assembled_from_chunks": "/home/divclab/.Neil/Maestro/data/processed/jester_chunks",
+  "seed": 42
+}

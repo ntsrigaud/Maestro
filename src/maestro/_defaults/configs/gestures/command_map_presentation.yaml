@@ -1,24 +1,26 @@
-version: v3
+version: hybrid_v1
 # Presentation controller gesture-to-command mapping.
 # Commands route to PresentationAdapter → KeyboardAdapter → pyautogui.
-#  swipe_up -> Start Presentation
-#  swipe_down -> Stop Presentation
-# swipe_left -> Previous Slide
-# swipe_right -> Next Slide
-# point_one -> Mouse pointer
-# point_two -> Mouse pointer
-# zoom_in -> Zoom In View
-# zoom_out -> Zoom Out View
-# open_palm_hold -> Zoom out totally
-# unknown -> No Action (Noise Class)
+#  swiping_up -> Start Presentation
+#  swiping_down -> Stop Presentation
+#  swiping_left -> Previous Slide
+#  swiping_right -> Next Slide
+#  point_one -> Mouse pointer
+#  point_two -> Mouse pointer
+#  zooming_in_full_hand -> Zoom In View
+#  zooming_out_full_hand -> Zoom Out View
+#  stop_sign -> Erase annotations
+#  no_gesture -> No Action (background class)
+#
+# Vocabulary: hybrid Jester+IPN (vocabulary_hybrid.yaml)
 gesture_commands:
-  swipe_up: start_presentation
-  swipe_down: stop_presentation
-  swipe_right: next_slide
-  swipe_left: previous_slide
-  zoom_in: zoom_in_view
-  zoom_out: zoom_out_view
-  open_palm_hold: erase_annotations
+  swiping_up: start_presentation
+  swiping_down: stop_presentation
+  swiping_right: next_slide
+  swiping_left: previous_slide
+  zooming_in_full_hand: zoom_in_view
+  zooming_out_full_hand: zoom_out_view
+  stop_sign: erase_annotations
   point_one: mouse_pointer
   point_two: mouse_pointer
   unknown: no_action

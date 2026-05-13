@@ -1,0 +1,41 @@
+acceptance:
+  default: 0.85
+  critical: 0.90
+
+# Per-class confidence thresholds for the hybrid Jester+IPN vocabulary.
+# Derived by mapping IPN production thresholds (production_ipn.yaml) to their
+# hybrid equivalents via vocabulary_hybrid.yaml source annotations.
+#
+# Dynamic swipe gestures tolerate a lower threshold because their short
+# temporal span makes high-confidence peaks harder to sustain.
+# Post-diagnostic IPN values (0.70) are confirmed stable and carried over.
+#
+# NOTE: These are initial estimates based on IPN threshold mapping.
+# Empirical calibration against the trained hybrid model validation split
+# is required before final production deployment.
+class_thresholds:
+  stop_sign: 0.75            # was open_palm_hold: 0.75
+  swiping_right: 0.70        # was swipe_right: 0.70
+  swiping_left: 0.70         # was swipe_left: 0.70
+  swiping_up: 0.70           # was swipe_up: 0.70
+  swiping_down: 0.70         # was swipe_down: 0.70
+  zooming_in_full_hand: 0.70 # was zoom_in: 0.70
+  zooming_out_full_hand: 0.70 # was zoom_out: 0.70
+  unknown: 1.00              # IPN D0X background class
+  point_one: 0.70
+  point_two: 0.70
+
+# Stability vote windows (consecutive stabilised decisions required).
+# Dynamic gestures use a window of 1 so they are dispatched immediately.
+# Held gestures use 3 for false-trigger protection.
+class_vote_windows:
+  stop_sign: 3               # was open_palm_hold: 3
+  swiping_right: 1           # was swipe_right: 1
+  swiping_left: 1            # was swipe_left: 1
+  swiping_up: 1              # was swipe_up: 1
+  swiping_down: 1            # was swipe_down: 1
+  zooming_in_full_hand: 2    # was zoom_in: 2
+  zooming_out_full_hand: 2   # was zoom_out: 2
+  unknown: 1                 # IPN D0X background class
+  point_one: 1
+  point_two: 1

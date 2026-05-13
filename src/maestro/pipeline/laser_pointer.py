@@ -148,7 +148,7 @@ class LaserPointerTracker:
         ----------
         label:
             The current stabilised gesture label (e.g. ``"point_one"`` or
-            ``"unknown"``).
+            ``"unknown"``).`
         landmarks:
             21-entry list of ``[x, y, z]`` normalised landmark coordinates, or
             ``None`` when no valid hand is detected.
