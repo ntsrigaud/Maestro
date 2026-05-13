@@ -738,9 +738,7 @@ def _save_chunks_streaming(
                 saved[cls] = n_existing
                 continue
             except Exception:
-                logger.warning(
-                    "Corrupt chunk file for %r — will rebuild: %s", cls, out_path.name
-                )
+                logger.warning("Corrupt chunk file for %r — will rebuild: %s", cls, out_path.name)
                 out_path.unlink(missing_ok=True)
 
         cls_annotations = by_class.get(cls, [])
@@ -748,9 +746,7 @@ def _save_chunks_streaming(
             logger.warning("Class %r has no annotations — chunk not saved.", cls)
             continue
 
-        logger.info(
-            "  Building chunk: %-35s  (%d videos) …", cls, len(cls_annotations)
-        )
+        logger.info("  Building chunk: %-35s  (%d videos) …", cls, len(cls_annotations))
 
         # Assemble only this class's videos into a temporary builder.
         cls_builder = assemble_dataset(
@@ -786,9 +782,7 @@ def _save_chunks_streaming(
             del cls_builder  # release builder memory before next class
 
         size_mb = out_path.stat().st_size / 1024**2
-        logger.info(
-            "    → %s  %d samples  %.1f MB", out_path.name, n, size_mb
-        )
+        logger.info("    → %s  %d samples  %.1f MB", out_path.name, n, size_mb)
         saved[cls] = n
 
     total = sum(saved.values())
@@ -1272,9 +1266,7 @@ def main() -> None:
     # 27-class dataset (~50 GB), which causes an OOM kill.
     if args.chunk_dir:
         chunk_dir_resolved = args.chunk_dir.resolve()
-        logger.info(
-            "Building per-class chunks (streaming) → %s …", chunk_dir_resolved
-        )
+        logger.info("Building per-class chunks (streaming) → %s …", chunk_dir_resolved)
         logger.info(
             "  window=%d  step=%d  strategy=%s  max_per_video=%d",
             args.window_length,
@@ -1299,9 +1291,7 @@ def main() -> None:
 
         # Optionally also write the full combined NPZ (rarely needed).
         if args.output_npz:
-            logger.info(
-                "Also assembling full NPZ from chunks → %s …", args.output_npz
-            )
+            logger.info("Also assembling full NPZ from chunks → %s …", args.output_npz)
             _assemble_from_chunks(
                 chunk_dir=chunk_dir_resolved,
                 vocabulary=vocabulary,
