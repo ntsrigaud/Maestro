@@ -55,7 +55,7 @@ training:
   # Per-class cap to trim the highest-frequency classes before splitting.
   # Keeps the full distribution shape visible while preventing a few classes
   # from dominating train/val/test after splitting.
-  max_samples_per_class: 3000
+  max_samples_per_class: 4000
 
 splits:
   train_ratio: 0.85       # Jester has a large validation set — use it for training
