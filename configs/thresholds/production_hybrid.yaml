@@ -21,7 +21,7 @@ class_thresholds:
   swiping_down: 0.70         # was swipe_down: 0.70
   zooming_in_full_hand: 0.70 # was zoom_in: 0.70
   zooming_out_full_hand: 0.70 # was zoom_out: 0.70
-  unknown: 1.00               # IPN D0X background class
+  unknown: 1.00              # IPN D0X background class
   point_one: 0.70
   point_two: 0.70
 
@@ -36,6 +36,6 @@ class_vote_windows:
   swiping_down: 1            # was swipe_down: 1
   zooming_in_full_hand: 2    # was zoom_in: 2
   zooming_out_full_hand: 2   # was zoom_out: 2
-  unknown: 1                  # IPN D0X background class
+  unknown: 1                 # IPN D0X background class
   point_one: 1
   point_two: 1

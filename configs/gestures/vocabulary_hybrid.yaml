@@ -1,11 +1,11 @@
-version: hybrid_v1
+version: hybrid_v2
 
 # 10-class hybrid vocabulary for EnhancedTwoStreamLSTM.
 #
-# Combines a Jester-sourced subset (7 classes) with IPN-sourced gestures
-# (3 classes) to create a presentation-control vocabulary that benefits from
-# Jester's scale and diversity while retaining IPN's unique pointing gestures
-# and its richer background/unknown class (D0X).
+# Combines a Jester-sourced subset (7 classes) with IPN-sourced classes
+# (3 classes: unknown/D0X background + pointing gestures) to create a
+# presentation-control vocabulary that benefits from Jester's scale and
+# diversity while using IPN's richer background class (D0X).
 #
 # Source mapping:
 # ─────────────────────────────────────────────────────────────────────
@@ -30,18 +30,15 @@ version: hybrid_v1
 #                    Jester has ~4,000 videos per direction vs IPN ~2,400.
 #   zooming_*_full_hand — Full-hand zoom has a cleaner, larger motion arc
 #                    than two-finger zoom; preferred over zooming_in_two_fingers.
-#
-# Rationale for IPN unknown (D0X) over Jester no_gesture:
-#   IPN D0X contains substantially more background samples than Jester
-#   "No gesture", providing a larger and more diverse training pool for the
-#   background class. This improves rejection of non-gesture inputs at
-#   inference time.
+#   unknown (IPN)  — IPN D0X has significantly more background samples than
+#                    Jester "No gesture", giving the model a stronger and
+#                    more varied negative class signal.
 #
 # Use with:
 #   python scripts/build_hybrid_dataset.py \
 #       --vocab-config configs/gestures/vocabulary_hybrid.yaml \
-#       --jester-npz  data/processed/jester_pretrain_dataset.npz \
-#       --ipn-npz     data/processed/ipn_dataset_v5_10class.npz \
+#       --jester-chunk-dir data/processed/jester_chunks \
+#       --ipn-npz     data/processed/ipn_dataset_v5_10class_mirrored.npz \
 #       --output-npz  data/processed/hybrid_dataset.npz
 
 gestures:
@@ -57,7 +54,7 @@ gestures:
   - zooming_out_full_hand
 
 # Source provenance — consumed by build_hybrid_dataset.py.
-# "jester" classes are taken from the Jester NPZ;
+# "jester" classes are taken from the Jester NPZ or chunk dir;
 # "ipn"    classes are taken from the IPN NPZ.
 sources:
   unknown: ipn
