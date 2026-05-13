@@ -17,7 +17,7 @@ metrics:
 - accuracy
 - f1
 model-index:
-- name: two_stream_attn_v1_finetune_20260512T041947Z
+- name: two_stream_attn_v1_finetune_20260513T050407Z
   results:
   - task:
       type: gesture-recognition
@@ -26,12 +26,12 @@ model-index:
       type: IPN-Hand
     metrics:
     - type: accuracy
-      value: 0.9898
+      value: 0.9551
     - type: f1
-      value: 0.9917
+      value: 0.9481
 ---
 
-# two_stream_attn_v1_finetune_20260512T041947Z
+# two_stream_attn_v1_finetune_20260513T050407Z
 
 A real-time hand gesture classifier trained on
 a Hybrid Jester+IPN gesture dataset (Jester dynamic classes + IPN pointing classes).
@@ -91,31 +91,31 @@ Input (B, T=32, 147)
 
 | Class | Description |
 |-------|-------------|
-| `no_gesture` | — |
+| `unknown` | Background / transition / no gesture |
 | `point_one` | Single-finger pointing gesture (continuous laser-pointer control) |
 | `point_two` | Two-finger pointing gesture (continuous annotation-pen control) |
-| `stop_sign` | — |
-| `swiping_down` | — |
-| `swiping_left` | — |
-| `swiping_right` | — |
-| `swiping_up` | — |
-| `zooming_in_full_hand` | — |
-| `zooming_out_full_hand` | — |
+| `stop_sign` | Static open palm facing camera (Jester class) |
+| `swiping_down` | Vertical swipe downward (Jester class) |
+| `swiping_left` | Horizontal swipe from right to left (Jester class) |
+| `swiping_right` | Horizontal swipe from left to right (Jester class) |
+| `swiping_up` | Vertical swipe upward (Jester class) |
+| `zooming_in_full_hand` | Pinch-open / spread fingers away from each other (Jester class) |
+| `zooming_out_full_hand` | Pinch-close / bring fingers together (Jester class) |
 
 ## Gesture Usage In Presentation System
 
 | Class | Mode | Command | Runtime handling |
 |-------|------|---------|------------------|
-| `no_gesture` | `unmapped` | `—` | Not mapped in command_map_presentation.yaml |
+| `unknown` | `discrete` | `no_action` | No-op background class |
 | `point_one` | `continuous` | `—` | Continuous tracker: LaserPointerTracker (bypasses discrete dispatcher) |
 | `point_two` | `continuous` | `—` | Continuous tracker: AnnotationPenTracker (bypasses discrete dispatcher) |
-| `stop_sign` | `unmapped` | `—` | Not mapped in command_map_presentation.yaml |
-| `swiping_down` | `unmapped` | `—` | Not mapped in command_map_presentation.yaml |
-| `swiping_left` | `unmapped` | `—` | Not mapped in command_map_presentation.yaml |
-| `swiping_right` | `unmapped` | `—` | Not mapped in command_map_presentation.yaml |
-| `swiping_up` | `unmapped` | `—` | Not mapped in command_map_presentation.yaml |
-| `zooming_in_full_hand` | `unmapped` | `—` | Not mapped in command_map_presentation.yaml |
-| `zooming_out_full_hand` | `unmapped` | `—` | Not mapped in command_map_presentation.yaml |
+| `stop_sign` | `discrete` | `erase_annotations` | Discrete command via GestureActivationController → CommandDispatcher |
+| `swiping_down` | `discrete` | `stop_presentation` | Discrete command via GestureActivationController → CommandDispatcher |
+| `swiping_left` | `discrete` | `previous_slide` | Discrete command via GestureActivationController → CommandDispatcher |
+| `swiping_right` | `discrete` | `next_slide` | Discrete command via GestureActivationController → CommandDispatcher |
+| `swiping_up` | `discrete` | `start_presentation` | Discrete command via GestureActivationController → CommandDispatcher |
+| `zooming_in_full_hand` | `discrete` | `zoom_in_view` | Discrete command via GestureActivationController → CommandDispatcher |
+| `zooming_out_full_hand` | `discrete` | `zoom_out_view` | Discrete command via GestureActivationController → CommandDispatcher |
 
 ## Feature Schema (`feature-schema-v5`)
 
@@ -139,7 +139,7 @@ from maestro.infrastructure.model.checkpoint_loader import load_inference_artifa
 # Download the artifact (cached after first call)
 local_path = hf_hub_download(
     repo_id="ntsrigaud/maestro-lstm-hybrid",
-    filename="two_stream_attn_v1_finetune_20260512T041947Z_inference.pt",
+    filename="two_stream_attn_v1_finetune_20260513T050407Z_inference.pt",
 )
 
 # Load the artifact (includes model, class labels, and feature schema)
@@ -160,19 +160,18 @@ with torch.no_grad():
 
 ## Training Dataset
 
-- **Source**: Hybrid merge of Jester and IPN-Hand windows: Jester provides no_gesture/swiping/zoom/stop_sign classes; IPN-Hand provides point_one and point_two
+- **Source**: Hybrid merge of Jester and IPN-Hand windows: Jester provides unknown/swiping/zoom/stop_sign classes; IPN-Hand provides point_one and point_two
 - **Used classes**: 10 (9 active gestures + `unknown` background)
 - **Dataset split**: 70% train / 15% val / 15% test (stratified by class)
-- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005;
-  label-aware horizontal mirror (swipe_left ↔ swipe_right)
+- **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005
 
 ## Training Strategy
 
 Two-phase transfer learning pipeline:
-- **Phase 1 (pretraining):** backbone pretrained on external checkpoint `two_stream_attn_v1_20260512T041219Z.pt` to learn generic gesture dynamics.
+- **Phase 1 (pretraining):** backbone pretrained on external checkpoint `two_stream_attn_v1_20260513T045733Z.pt` to learn generic gesture dynamics.
 - **Phase 2 (fine-tuning):** head replaced and model adapted on Hybrid Jester+IPN 10-gesture vocabulary.
 - **Stage A (frozen backbone):** 10 epoch(s) head-only warmup.
-- **Stage B (full model):** up to 60 epoch(s) joint fine-tuning with scheduler/early stopping.
+- **Stage B (full model):** up to 58 epoch(s) joint fine-tuning with scheduler/early stopping.
 - **Stage B retention defences:** replay_max_samples_per_class=500, distillation_weight=0.5, replay_ce_weight=0.3, backbone_lr_multiplier=0.1, ewc_weight=100.0, gpm_components=20, forgetting_penalty_weight=0.5.
 
 ## Training Configuration
@@ -190,7 +189,7 @@ Two-phase transfer learning pipeline:
 | Weight decay | 0.0005 |
 | Batch size | 128 |
 | Max epochs | 60 |
-| Early stopping patience | 20 |
+| Early stopping patience | 12 |
 | Label smoothing | 0.05 |
 | Class weighting | disabled |
 | Max samples per class | 5000 |
@@ -200,23 +199,23 @@ Two-phase transfer learning pipeline:
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 99.0% |
-| Macro F1 | 99.2% |
+| Accuracy | 95.5% |
+| Macro F1 | 94.8% |
 
 ### Per-Class Recall
 
 | Class | Recall |
 |-------|--------|
-| `no_gesture` | 100.0% |
-| `point_one` | 98.9% |
-| `point_two` | 98.5% |
-| `stop_sign` | 99.5% |
-| `swiping_down` | 99.0% |
-| `swiping_left` | 100.0% |
-| `swiping_right` | 99.1% |
-| `swiping_up` | 98.1% |
-| `zooming_in_full_hand` | 99.2% |
-| `zooming_out_full_hand` | 99.0% |
+| `unknown` | 82.8% |
+| `point_one` | 98.1% |
+| `point_two` | 97.2% |
+| `stop_sign` | 98.5% |
+| `swiping_down` | 92.2% |
+| `swiping_left` | 93.6% |
+| `swiping_right` | 88.5% |
+| `swiping_up` | 92.3% |
+| `zooming_in_full_hand` | 97.0% |
+| `zooming_out_full_hand` | 97.1% |
 
 ## Comparison with Previous Architecture
 
@@ -234,7 +233,7 @@ Two-phase transfer learning pipeline:
 - Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
   skin tones, or lighting conditions not represented in training data.
 - The `unknown` class represents background/transition frames. At runtime, predictions
-  are filtered through per-class confidence thresholds defined in `production_ipn.yaml`.
+  are filtered through per-class confidence thresholds defined in `production_hybrid.yaml`.
 - Requires **mediapipe>=0.10.14** for landmark extraction at inference time.
 - Not intended for safety-critical or accessibility-critical applications.
 - Performance was measured on a held-out test split from the same dataset; real-world
@@ -247,4 +246,4 @@ Estimated CO₂ equivalent: negligible (<0.001 kg CO₂eq).
 
 ---
 
-*Generated by the Maestro training pipeline on 2026-05-12.*
+*Generated by the Maestro training pipeline on 2026-05-13.*
