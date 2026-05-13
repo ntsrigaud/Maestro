@@ -20,6 +20,16 @@ gesture_commands:
   stop_sign: erase_annotations
   unknown: no_action
 
+# Model output → display/dispatch label remapping.
+# Applied after prediction stabilization, before command dispatch and UI display.
+# The model was trained on raw camera frames where a natural right-swipe (palm
+# facing the camera at end of stroke) appears as swiping_left from the camera's
+# perspective.  Swapping here makes the gesture feel correct to the user without
+# any retraining.
+label_remap:
+  swiping_left: swiping_right
+  swiping_right: swiping_left
+
 gesture_modes:
   swiping_up: discrete
   swiping_down: discrete
