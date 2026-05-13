@@ -17,7 +17,7 @@ metrics:
 - accuracy
 - f1
 model-index:
-- name: two_stream_attn_v1_finetune_20260513T054113Z
+- name: two_stream_attn_v1_finetune_20260513T093937Z
   results:
   - task:
       type: gesture-recognition
@@ -26,12 +26,12 @@ model-index:
       type: IPN-Hand
     metrics:
     - type: accuracy
-      value: 0.9610
+      value: 0.9648
     - type: f1
-      value: 0.9545
+      value: 0.9638
 ---
 
-# two_stream_attn_v1_finetune_20260513T054113Z
+# two_stream_attn_v1_finetune_20260513T093937Z
 
 A real-time hand gesture classifier trained on
 a Hybrid Jester+IPN gesture dataset (Jester dynamic classes + IPN pointing classes).
@@ -139,7 +139,7 @@ from maestro.infrastructure.model.checkpoint_loader import load_inference_artifa
 # Download the artifact (cached after first call)
 local_path = hf_hub_download(
     repo_id="ntsrigaud/maestro-lstm-hybrid",
-    filename="two_stream_attn_v1_finetune_20260513T054113Z_inference.pt",
+    filename="two_stream_attn_v1_finetune_20260513T093937Z_inference.pt",
 )
 
 # Load the artifact (includes model, class labels, and feature schema)
@@ -168,7 +168,7 @@ with torch.no_grad():
 ## Training Strategy
 
 Two-phase transfer learning pipeline:
-- **Phase 1 (pretraining):** backbone pretrained on external checkpoint `two_stream_attn_v1_20260513T053647Z.pt` to learn generic gesture dynamics.
+- **Phase 1 (pretraining):** backbone pretrained on external checkpoint `two_stream_attn_v1_20260513T093445Z.pt` to learn generic gesture dynamics.
 - **Phase 2 (fine-tuning):** head replaced and model adapted on Hybrid Jester+IPN 10-gesture vocabulary.
 - **Stage A (frozen backbone):** 10 epoch(s) head-only warmup.
 - **Stage B (full model):** up to 60 epoch(s) joint fine-tuning with scheduler/early stopping.
@@ -199,23 +199,23 @@ Two-phase transfer learning pipeline:
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 96.1% |
-| Macro F1 | 95.4% |
+| Accuracy | 96.5% |
+| Macro F1 | 96.4% |
 
 ### Per-Class Recall
 
 | Class | Recall |
 |-------|--------|
-| `unknown` | 84.1% |
-| `point_one` | 98.4% |
-| `point_two` | 97.6% |
-| `stop_sign` | 98.2% |
-| `swiping_down` | 92.2% |
-| `swiping_left` | 98.2% |
-| `swiping_right` | 90.8% |
-| `swiping_up` | 92.9% |
-| `zooming_in_full_hand` | 97.1% |
-| `zooming_out_full_hand` | 98.3% |
+| `unknown` | 91.4% |
+| `point_one` | 98.1% |
+| `point_two` | 98.0% |
+| `stop_sign` | 98.7% |
+| `swiping_down` | 93.1% |
+| `swiping_left` | 96.7% |
+| `swiping_right` | 95.5% |
+| `swiping_up` | 98.7% |
+| `zooming_in_full_hand` | 96.7% |
+| `zooming_out_full_hand` | 95.3% |
 
 ## Comparison with Previous Architecture
 
