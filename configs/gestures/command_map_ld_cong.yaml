@@ -19,9 +19,9 @@ gesture_commands:
   zooming_out_full_hand: zoom_out_view
 
   # ── LD-CONG unique gestures ────────────────────────────────────────────────
-  palm:  erase_annotations     # open palm   → erase all slide annotations (E)
+  palm: erase_annotations # open palm   → erase all slide annotations (E)
   pinch: activate_laser_pointer # precision pinch → enable laser-pointer mode (Ctrl+L)
-  click: mouse_click            # finger click → left-click at cursor (links / animations)
+  click: mouse_click # finger click → left-click at cursor (links / animations)
 
   # ── IPN classes ────────────────────────────────────────────────────────────
   unknown: no_action

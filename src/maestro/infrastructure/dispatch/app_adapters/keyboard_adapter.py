@@ -68,7 +68,7 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "command",  # macOS modifier for zoom and slideshow start/stop
         # Slide navigation jump keys
         "home",  # Home → go to first slide (universal)
-        "end",   # End  → go to last slide  (universal)
+        "end",  # End  → go to last slide  (universal)
         # Retained for completeness (workspace navigation removed but keys kept safe)
         "win",
         "super",
