@@ -722,7 +722,9 @@ def _build_per_class_table(per_class_recall: dict[str, float]) -> str:
     return "\n".join(rows)
 
 
-def _load_command_mapping(class_labels: list[str] | None = None) -> tuple[dict[str, str], dict[str, str]]:
+def _load_command_mapping(
+    class_labels: list[str] | None = None,
+) -> tuple[dict[str, str], dict[str, str]]:
     """Load command and mode mappings used by the production controller.
 
     Prefers ``command_map_ld_cong.yaml`` when the class set contains LD-CONG
@@ -744,7 +746,9 @@ def _load_command_mapping(class_labels: list[str] | None = None) -> tuple[dict[s
             payload = yaml.safe_load(mapping_path.read_text(encoding="utf-8")) or {}
             commands = payload.get("gesture_commands", {}) or {}
             modes = payload.get("gesture_modes", {}) or {}
-            return {str(k): str(v) for k, v in commands.items()}, {str(k): str(v) for k, v in modes.items()}
+            return {str(k): str(v) for k, v in commands.items()}, {
+                str(k): str(v) for k, v in modes.items()
+            }
 
     return {}, {}
 
@@ -915,17 +919,14 @@ def _build_model_card(
         "zooming_in_full_hand",
         "zooming_out_full_hand",
     }.issubset(class_set)
-    is_hybrid = (
-        is_ld_cong_hybrid
-        or {
-            "point_one",
-            "point_two",
-            "swiping_left",
-            "swiping_right",
-            "zooming_in_full_hand",
-            "zooming_out_full_hand",
-        }.issubset(class_set)
-    )
+    is_hybrid = is_ld_cong_hybrid or {
+        "point_one",
+        "point_two",
+        "swiping_left",
+        "swiping_right",
+        "zooming_in_full_hand",
+        "zooming_out_full_hand",
+    }.issubset(class_set)
 
     if is_ld_cong_hybrid:
         dataset_name_markdown = (
