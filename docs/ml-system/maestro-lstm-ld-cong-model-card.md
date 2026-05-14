@@ -30,7 +30,7 @@ Model card for the Jester→LD-CONG hybrid fine-tuned model.
 - Feature schema: `feature-schema-v5`
 - Class counts:
   - Pretraining: 27 (Jester)
-  - Fine-tuning: 12 (LD-CONG hybrid; `fist` and `thumb_up` excluded via `training.exclude_classes`)
+  - Fine-tuning: 10 (LD-CONG hybrid; `fist`, `thumb_up`, `pinch`, and `click` excluded via `training.exclude_classes`)
 
 ## Training Data
 
@@ -48,8 +48,8 @@ Model card for the Jester→LD-CONG hybrid fine-tuned model.
   1. LD-CONG laboratory recordings (CSV-annotated RGB video)
   2. 20BN-Jester-v1 clips center-cropped to W=16
   3. IPN Hand clips center-cropped to W=16 (`point_one`, `point_two`, `unknown`)
-- Labels (12 active classes; `fist` and `thumb_up` excluded):
-  - `palm`, `pinch`, `click`
+- Labels (10 active classes; `fist`, `thumb_up`, `pinch`, and `click` excluded):
+  - `palm`
   - `swiping_right`, `swiping_left`, `swiping_down`, `swiping_up`
   - `zooming_in_full_hand`, `zooming_out_full_hand`
   - `point_one`, `point_two`
@@ -74,14 +74,13 @@ Model card for the Jester→LD-CONG hybrid fine-tuned model.
 
 - Config file: `configs/model/two_stream_attn_ld_cong_12class.yaml`
 - Stage A (head-only warm-up):
-  - frozen backbone, new 12-class head only
+  - frozen backbone, new 10-class head only
   - epochs: 10
   - learning rate: `1e-3`
 - Stage B (full fine-tune):
-  - unfreeze all layers + EWC penalty
+  - unfreeze all layers, full fine-tune with backbone LR warmup
   - epochs: 60
   - learning rate: `3e-5`, `backbone_lr_multiplier=0.1`
-  - EWC weight: `2000.0`
   - `max_samples_per_class: 3000`
 - Batch size: 128
 - Dropout: `0.35`
@@ -96,7 +95,7 @@ Model card for the Jester→LD-CONG hybrid fine-tuned model.
 
 - Depends on landmark quality; poor hand tracking degrades predictions
 - Trained on LD-CONG laboratory conditions; domain shift across lighting, users, and viewpoints may reduce performance
-- `fist` and `thumb_up` are excluded — the model will not recognise these classes; they map to `unknown` in practice
+- `fist`, `thumb_up`, `pinch`, and `click` are excluded — the model will not recognise these classes; they map to `unknown` in practice
 - Not a safety-certified model for critical decision systems
 
 ## Evaluation

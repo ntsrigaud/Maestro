@@ -14,7 +14,7 @@
 #   Stage A — Head-only warm-up (freeze_epochs, default 10):
 #     Only the 10-class classification head is trained.  Backbone frozen.
 #   Stage B — Full model (backbone_lr_multiplier×lr):
-#     Joint optimisation with EWC + GPM + distillation to limit forgetting of
+#     All layers fine-tuned with backbone LR warmup to limit forgetting of
 #     Jester backbone patterns not covered by the 10-class subset.
 #
 # Key differences vs two_stream_attn_ipn_finetune.yaml:
