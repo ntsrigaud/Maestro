@@ -10,7 +10,7 @@ from typing import Protocol
 import numpy as np
 import torch
 
-from maestro.domain.entities import Prediction, RuntimeState, SequenceWindow
+from maestro.domain.entities import Prediction, RuntimeState, SequenceWindow, StabilizedPrediction
 from maestro.evaluation.benchmark_latency import (
     LatencyBenchmark,
     write_latency_report,
@@ -145,6 +145,7 @@ class RuntimeDependencies(Protocol):
     overlay_renderer: IFeedbackRenderer
     benchmark: LatencyBenchmark
     show_window: bool
+    label_remap: dict[str, str]
 
 
 class Runtime:
@@ -283,6 +284,18 @@ class Runtime:
                         benchmark.record_inference(inference_ms)
 
                     stabilized_prediction = self._container.stabilizer.update(prediction)
+                    # Apply label remapping (e.g. swipe direction correction for
+                    # mirror-view training data).  Remapping runs after stabilization
+                    # so that threshold/voting decisions use the raw model labels;
+                    # the remapped label flows to command dispatch and UI display.
+                    _remap = self._container.label_remap
+                    if _remap and stabilized_prediction.label in _remap:
+                        stabilized_prediction = StabilizedPrediction(
+                            label=_remap[stabilized_prediction.label],
+                            confidence=stabilized_prediction.confidence,
+                            accepted=stabilized_prediction.accepted,
+                            reason=stabilized_prediction.reason,
+                        )
                     latest_label = stabilized_prediction.label
                     latest_conf = stabilized_prediction.confidence
 
