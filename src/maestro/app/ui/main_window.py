@@ -7,7 +7,7 @@ from PySide6.QtCore import QCoreApplication, QSignalBlocker, QTimer
 from PySide6.QtGui import QAction, QColor, QIcon, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon, QWidget
 
-from maestro.app._paths import get_config_dir
+from maestro.app._paths import get_app_icon, get_config_dir
 from maestro.app.ui.controller import RuntimeController
 from maestro.app.ui.floating_preview import FloatingPreviewWindow
 from maestro.domain.entities import RuntimeState
@@ -34,8 +34,12 @@ class MainWindow(QWidget):
         self.setWindowTitle("Maestro")
         self.hide()
 
+        # Inactive tray icon — the real app icon when available, grey dot otherwise.
+        icon_path = get_app_icon()
+        self._inactive_icon = QIcon(str(icon_path)) if icon_path else _make_tray_icon("#6B7280")
+
         self._tray = QSystemTrayIcon(self)
-        self._tray.setIcon(_make_tray_icon("#6B7280"))
+        self._tray.setIcon(self._inactive_icon)
         self._tray.setToolTip("Maestro: inactive")
 
         self._active_action = QAction("Active", self)
@@ -66,9 +70,6 @@ class MainWindow(QWidget):
 
         self._controller.runtime_started.connect(self._on_runtime_started)
         self._controller.runtime_stopped.connect(self._on_runtime_stopped)
-        self._controller.runtime_stopped.connect(
-            lambda: self._tray.setIcon(_make_tray_icon("#6B7280"))
-        )
         self._controller.error_occurred.connect(self._on_error)
         self._controller.state_updated.connect(self._preview_window.on_state)
         self._controller.state_updated.connect(self._on_tray_update)
@@ -115,6 +116,7 @@ class MainWindow(QWidget):
 
     def _on_runtime_stopped(self) -> None:
         self._tray.setToolTip("Maestro: inactive")
+        self._tray.setIcon(self._inactive_icon)
         self._preview_window.hide()
         with QSignalBlocker(self._active_action):
             self._active_action.setChecked(False)
@@ -137,20 +139,29 @@ class MainWindow(QWidget):
         )
 
     def _on_tray_update(self, state: RuntimeState) -> None:
+        # Mirror the overlay_renderer colour convention:
+        #   grey  — gaze absent (system paused)
+        #   amber — gaze present, system idle (awaiting activation gesture)
+        #   green — system armed (accepting command gestures)
         if not state.gaze_permitted:
-            self._tray.setIcon(_make_tray_icon("#6B7280"))
-            return
+            steady = "#6B7280"  # grey — gaze gate closed
+        elif state.mode == "armed":
+            steady = "#059669"  # green — armed and accepting gestures
+        else:
+            steady = "#D97706"  # amber — idle / awaiting activation
+
         if state.info.get("accepted"):
-            self._tray.setIcon(_make_tray_icon("#D97706"))
+            # Brief white-hot flash to signal a dispatched command, then restore.
+            self._tray.setIcon(_make_tray_icon("#F9FAFB"))
             self._tray.showMessage(
                 "Gesture",
-                state.last_label,
+                str(state.last_label),
                 QSystemTrayIcon.MessageIcon.Information,
                 800,
             )
-            QTimer.singleShot(300, lambda: self._tray.setIcon(_make_tray_icon("#059669")))
-            return
-        self._tray.setIcon(_make_tray_icon("#059669"))
+            QTimer.singleShot(300, lambda _c=steady: self._tray.setIcon(_make_tray_icon(_c)))
+        else:
+            self._tray.setIcon(_make_tray_icon(steady))
 
     def _sync_preview_visibility(self) -> None:
         if self._preview_action.isChecked() and self._controller.is_running:
