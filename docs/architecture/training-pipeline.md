@@ -258,11 +258,11 @@ flowchart TD
     JESTER_CLIPS["Jester W16 Clips<br/>center-cropped W32→16 from Jester dataset"]
     IPN_CLIPS["IPN W16 Clips<br/>center-cropped W32→16<br/>point_one · point_two · unknown"]
 
-    BUILD["build_ld_cong_dataset.py<br/>Merges three sources:<br/>LD-CONG + Jester (W16) + IPN (W16)<br/>→ max_samples_per_class balancing<br/>→ mirror augmentation<br/>→ 12-class exclusion via exclude_classes"]
+    BUILD["build_ld_cong_dataset.py<br/>Merges three sources:<br/>LD-CONG + Jester (W16) + IPN (W16)<br/>→ max_samples_per_class balancing<br/>→ mirror augmentation<br/>→ 10-class exclusion via exclude_classes"]
     NPZ["ld_cong_hybrid_dataset.npz<br/>train / val / test split<br/>classes: 12 (fist + thumb_up excluded)"]
 
     STAGE_A["Stage A — Head warm-up<br/>backbone frozen · 10 epochs<br/>lr = 1e-3 · new head only"]
-    STAGE_B["Stage B — Full fine-tune<br/>all layers + EWC penalty<br/>60 epochs · lr = 3e-5<br/>backbone_lr_multiplier = 0.1<br/>EWC_WEIGHT = 2000.0"]
+    STAGE_B["Stage B — Full fine-tune<br/>all layers · backbone LR warmup<br/>60 epochs · lr = 3e-5<br/>backbone_lr_multiplier = 0.1"]
 
     CKPT_LD["two_stream_attn_v1_finetune_&lt;ts&gt;.pt"]
 
@@ -304,9 +304,7 @@ so the pretrained backbone loads and runs cleanly on shorter sequences.
 The hybrid dataset NPZ still contains all 14 source classes; exclusion happens at
 dataloader construction time inside `finetune_lstm()`.
 
-**Anti-forgetting**: EWC (Elastic Weight Consolidation) with `EWC_WEIGHT=2000.0`
-limits catastrophic forgetting of Jester representations during fine-tuning.
-This achieves only −0.9 pp Jester drop after fine-tuning (vs −13.1 pp for LLRD).
+**Anti-forgetting**: backbone LR warmup (`stage_b_warmup_epochs=5`) and discriminative learning rates (`backbone_lr_multiplier=0.1`) limit catastrophic forgetting during fine-tuning.
 
 ---
 
