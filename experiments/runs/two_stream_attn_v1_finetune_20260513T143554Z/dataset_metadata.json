@@ -1,0 +1,21 @@
+{
+  "feature_schema_version": "feature-schema-v5",
+  "feature_dim": 147,
+  "window_length": 16,
+  "window_step": 2,
+  "min_valid_ratio": 0.5,
+  "label_strategy": "majority",
+  "enable_orientation_normalization": false,
+  "vocabulary": [
+    "palm",
+    "fist",
+    "thumb_up",
+    "shift_right",
+    "downward",
+    "upward",
+    "left",
+    "right",
+    "pinch",
+    "click"
+  ]
+}

@@ -1,0 +1,83 @@
+# ── EnhancedTwoStreamLSTM — LD-CONG Hybrid 14-class fine-tuning configuration ─
+#
+# Fine-tuning configuration for the Jester → LD-CONG Hybrid transfer learning
+# pipeline.
+#
+# The LD-CONG Hybrid dataset merges:
+#   - LD-CONG unique gestures (kept as-is): palm, fist, thumb_up, pinch, click
+#   - LD-CONG directional gestures (renamed): right→swiping_right,
+#     left→swiping_left, downward→swiping_down, upward→swiping_up
+#     (pooled with Jester swipe data for the same classes)
+#   - Jester zoom classes (LD-CONG has none): zooming_in_full_hand,
+#     zooming_out_full_hand (W=32 center-cropped to W=16)
+#   - shift_right DROPPED entirely
+#
+# Key difference vs hybrid/ipn configs:
+#   WINDOW_LENGTH = 16 frames  (LD-CONG median gesture segment ≈ 15 frames,
+#   vs 32 frames for Jester/IPN).  EnhancedTwoStreamLSTM is sequence-length-
+#   agnostic (LSTM + temporal pooling), so the pretrained backbone loads cleanly.
+#
+# Backbone architecture is IDENTICAL to two_stream_attn_jester.yaml so Jester
+# pretrained weights can be loaded directly via finetune_lstm().  Only the
+# classification head (num_classes) changes from 27 → 14.
+#
+# Fine-tuning strategy (production — EWC-only, identical to notebook 03):
+#   Stage A — Head-only warm-up (freeze_epochs, default 10):
+#     Only the 11-class classification head is trained.  Backbone frozen.
+#   Stage B — Full model (backbone_lr_multiplier×lr):
+#     Joint optimisation with EWC (weight=2000) to limit Jester forgetting.
+#     Distillation, replay-CE, and GPM are disabled — EWC-only is the
+#     production choice from catastrophic-forgetting experiments (−0.9 pp
+#     Jester drop vs −13.1 pp for LLRD).
+#
+# Dataset: built by scripts/build_ld_cong_dataset.py
+#   --vocab-config configs/gestures/vocabulary_ld_cong_hybrid.yaml
+#   --ld-cong-npz  data/processed/ld_cong_w16_dataset.npz
+#   --jester-npz   data/processed/jester_pretrain_dataset.npz
+#   --output-npz   data/processed/ld_cong_hybrid_dataset.npz
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_v1
+  input_size: 147       # feature-schema-v5 (must match pretrained backbone)
+  hidden_size: 96       # must match pretrained checkpoint (two_stream_attn_jester.yaml)
+  num_layers: 4         # must match pretrained checkpoint
+  dropout: 0.35
+  num_classes: 14       # 14 LD-CONG hybrid classes
+  num_heads: 8          # must match pretrained checkpoint
+  proj_dim: 96          # must match pretrained checkpoint
+
+training:
+  epochs: 60
+  batch_size: 128
+  # Stage B learning rate (full-model fine-tuning).
+  # Stage A (head-only) uses lr=1e-3 and is run inline in finetune_lstm.
+  learning_rate: 0.00003   # 3e-5 — conservative for fine-tuning
+  weight_decay: 0.0005
+  grad_clip_norm: 1.0
+  early_stopping_patience: 12
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.05
+  seed: 42
+  num_workers: 2
+  class_weighting: false    # max_samples_per_class cap handles balance
+  # Per-class cap — LD-CONG class sizes vary widely (click: ~2,120 to
+  # shift_right: ~32,277 estimated windows at W16).  Cap at 3,000 so
+  # common classes (shift_right, thumb_up) don't dominate rare ones (click).
+  max_samples_per_class: 3000
+
+splits:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 8
+  min_lr: 0.000001
+
+export:
+  onnx: false
+  torchscript: false

@@ -74,6 +74,8 @@ class EnhancedTwoStreamLSTM(nn.Module):
         num_classes: int,
         num_heads: int = 4,
         proj_dim: int = 64,
+        motion_temporal_conv: bool = False,
+        motion_attn_pool: bool = False,
     ) -> None:
         """Initialise the enhanced two-stream LSTM.
 
@@ -91,6 +93,16 @@ class EnhancedTwoStreamLSTM(nn.Module):
                 evenly.  Default: 4 (use 8 for hidden_size ≥ 96).
             proj_dim: Output dimension of the per-stream feature projection.
                 Should equal ``hidden_size``.  Recommended: 96.
+            motion_temporal_conv: When ``True``, insert a one-layer depthwise
+                Conv1d (kernel=3) + GELU + LayerNorm on the motion branch
+                *after* feature projection and *before* the BiLSTM.  Captures
+                short-range temporal structure in velocity/spread features
+                without adding many parameters (~27 K for proj_dim=96).
+            motion_attn_pool: When ``True``, replace the mean+max temporal
+                pooling on the motion branch with a learnable single-head
+                additive attention pool (linear score → softmax over T →
+                weighted sum).  Lets the model learn *which* frames matter
+                most, at the cost of one Linear(2H, 1) layer (~385 params).
         """
         super().__init__()
 
@@ -101,6 +113,8 @@ class EnhancedTwoStreamLSTM(nn.Module):
         self.num_classes = num_classes
         self.num_heads = num_heads
         self.proj_dim = proj_dim
+        self.motion_temporal_conv = motion_temporal_conv
+        self.motion_attn_pool = motion_attn_pool
 
         bilstm_out = hidden_size * 2  # bidirectional doubles hidden width
 
@@ -180,6 +194,22 @@ class EnhancedTwoStreamLSTM(nn.Module):
         self.ln_cross_a = nn.LayerNorm(bilstm_out)
         self.ln_cross_b = nn.LayerNorm(bilstm_out)
 
+        # ── Optional: temporal conv front-end for motion branch ───────────────
+        # Depthwise Conv1d(kernel=3, padding=1) keeps T unchanged and adds
+        # local temporal context before the BiLSTM.  Operates on (B, C, T);
+        # the forward pass handles the transpose internally.
+        if motion_temporal_conv:
+            self.tcn_b = nn.Conv1d(proj_dim, proj_dim, kernel_size=3, padding=1)
+            self.tcn_b_act = nn.GELU()
+            self.tcn_b_ln = nn.LayerNorm(proj_dim)
+
+        # ── Optional: learned attention pooling for motion branch ─────────────
+        # Single linear layer scores each time step; softmax over T gives
+        # convex combination weights → weighted sum collapses (B, T, 2H) to
+        # (B, 2H).  Replaces mean+max pooling.
+        if motion_attn_pool:
+            self.attn_pool_b = nn.Linear(bilstm_out, 1)
+
         # ── Classification head ───────────────────────────────────────────────
         fused_dim = bilstm_out * 2
         self.head = nn.Sequential(
@@ -217,6 +247,12 @@ class EnhancedTwoStreamLSTM(nn.Module):
         pose = self.proj_a(pose)  # (B, T, proj_dim)
         motion = self.proj_b(motion)  # (B, T, proj_dim)
 
+        # ── Optional: temporal conv front-end on motion branch ────────────────
+        if self.motion_temporal_conv:
+            m = motion.transpose(1, 2)  # (B, proj_dim, T)
+            m = self.tcn_b_act(self.tcn_b(m))  # (B, proj_dim, T)
+            motion = self.tcn_b_ln(m.transpose(1, 2))  # (B, T, proj_dim)
+
         # ── BiLSTM encoding ───────────────────────────────────────────────────
         # flatten_parameters() compacts LSTM weights into a single contiguous
         # memory block, which is required for cuDNN efficiency and suppresses
@@ -237,12 +273,17 @@ class EnhancedTwoStreamLSTM(nn.Module):
         sa_b, _ = self.mha_b(out_b, out_b, out_b)  # (B, T, 2H)
         out_b = self.ln_post_b(out_b + sa_b)  # residual + LN
 
-        # ── Temporal pooling: mean + max ──────────────────────────────────────
-        # Element-wise sum of temporal mean and temporal max:
-        #   mean → captures sustained gesture shape (e.g. swipe direction)
-        #   max  → captures peak activity (e.g. brief click / tap event)
+        # ── Temporal pooling ─────────────────────────────────────────────────
+        # Pose branch: mean + max (unchanged).
         ctx_a = self.pool_ln_a(out_a.mean(dim=1) + out_a.max(dim=1).values)  # (B, 2H)
-        ctx_b = self.pool_ln_b(out_b.mean(dim=1) + out_b.max(dim=1).values)  # (B, 2H)
+
+        # Motion branch: learned attention pool (optional) or mean + max.
+        if self.motion_attn_pool:
+            scores_b = self.attn_pool_b(out_b)  # (B, T, 1)
+            weights_b = torch.softmax(scores_b, dim=1)  # (B, T, 1)
+            ctx_b = self.pool_ln_b((weights_b * out_b).sum(dim=1))  # (B, 2H)
+        else:
+            ctx_b = self.pool_ln_b(out_b.mean(dim=1) + out_b.max(dim=1).values)  # (B, 2H)
 
         # ── Cross-stream MLP gating ───────────────────────────────────────────
         # gate_a reads ctx_b and computes element-wise gates for ctx_a.
@@ -275,6 +316,10 @@ class EnhancedTwoStreamLSTM(nn.Module):
         pose, motion = self._split(x)
         pose = self.proj_a(pose)
         motion = self.proj_b(motion)
+        if self.motion_temporal_conv:
+            m = motion.transpose(1, 2)
+            m = self.tcn_b_act(self.tcn_b(m))
+            motion = self.tcn_b_ln(m.transpose(1, 2))
         self.lstm_a.flatten_parameters()
         self.lstm_b.flatten_parameters()
         out_a, _ = self.lstm_a(pose)
@@ -286,7 +331,12 @@ class EnhancedTwoStreamLSTM(nn.Module):
         sa_b, _ = self.mha_b(out_b, out_b, out_b)
         out_b = self.ln_post_b(out_b + sa_b)
         ctx_a = self.pool_ln_a(out_a.mean(dim=1) + out_a.max(dim=1).values)
-        ctx_b = self.pool_ln_b(out_b.mean(dim=1) + out_b.max(dim=1).values)
+        if self.motion_attn_pool:
+            scores_b = self.attn_pool_b(out_b)
+            weights_b = torch.softmax(scores_b, dim=1)
+            ctx_b = self.pool_ln_b((weights_b * out_b).sum(dim=1))
+        else:
+            ctx_b = self.pool_ln_b(out_b.mean(dim=1) + out_b.max(dim=1).values)
         gate_a = self.gate_a(ctx_b)
         ctx_a = self.ln_cross_a(ctx_a * gate_a + ctx_a)
         gate_b = self.gate_b(ctx_a)
