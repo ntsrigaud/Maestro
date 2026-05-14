@@ -1,5 +1,7 @@
 # LD-CONG Hybrid Vocabulary
-# Merges LD-CONG, Jester, and IPN datasets into a unified 12-class vocabulary.
+# Full 14-class base vocabulary. At training time, 4 classes are excluded via
+# `exclude_classes` in the model config: `fist`, `thumb_up`, `pinch`, `click`.
+# Active vocabulary (10 classes) used for fine-tuning:
 #
 # LD-CONG classes:
 #   - Unique gestures kept as-is: palm, pinch, click

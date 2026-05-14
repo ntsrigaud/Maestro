@@ -1,11 +1,10 @@
 version: presentation_v2
 # Presentation controller gesture-to-command mapping.
-# Vocabulary: ld_cong_hybrid_v2 (12 classes — vocabulary_ld_cong_hybrid.yaml)
-#
-# Commands route to PresentationAdapter → KeyboardAdapter → pyautogui.
-# Continuous gestures (point_one, point_two) bypass GestureActivationController
-# entirely — point_one is handled by LaserPointerTracker, point_two by
-# AnnotationPenTracker.
+# Vocabulary: ld_cong_hybrid_v2 (base 14 classes — vocabulary_ld_cong_hybrid.yaml)
+# Active model classes (10): palm, swiping_right/left/down/up, zooming_in/out_full_hand,
+#   point_one, point_two, unknown.
+# NOTE: fist, thumb_up, pinch, click are excluded from the model — those entries
+# below will never trigger in production.
 
 gesture_commands:
   # ── Navigation (LD-CONG directional, pooled with Jester swipes) ────────────
