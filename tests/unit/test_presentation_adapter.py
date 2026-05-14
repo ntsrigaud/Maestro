@@ -224,6 +224,8 @@ class TestPresentationAdapterNoOp:
             "erase_annotations",
             "mouse_pointer",
             "no_action",
+            # LD-CONG gesture set
+            "mouse_click",
             # Legacy / extended commands (kept for backward compat)
             "scroll_forward",
             "scroll_back",
@@ -261,3 +263,20 @@ class TestPresentationAdapterLaserPointer:
         assert result.success is True
         assert result.command_id == "deactivate_laser_pointer"
         assert result.target_app == "presentation"
+
+
+# ---------------------------------------------------------------------------
+# Tests: screen blanking and slide jump commands (LD-CONG gesture set)
+# ---------------------------------------------------------------------------
+
+
+class TestPresentationAdapterScreenAndNavigation:
+    def test_mouse_click_calls_mouse_click(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("mouse_click")
+        kb.mouse_click.assert_called_once_with()
+        assert result.success is True
+        assert result.command_id == "mouse_click"
+        assert result.target_app == "presentation"
+
