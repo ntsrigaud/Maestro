@@ -1,8 +1,9 @@
 # LD-CONG Hybrid Vocabulary
-# Merges LD-CONG, Jester, and IPN datasets into a unified 13-class vocabulary.
+# Merges LD-CONG, Jester, and IPN datasets into a unified 12-class vocabulary.
 #
 # LD-CONG classes:
-#   - Unique gestures kept as-is: palm, fist, thumb_up, pinch, click
+#   - Unique gestures kept as-is: palm, pinch, click
+#     (fist and thumb_up removed — not used in production vocabulary)
 #   - Directional gestures renamed to match Jester swipe names:
 #       right    → swiping_right
 #       left     → swiping_left
@@ -28,8 +29,6 @@ version: ld_cong_hybrid_v2
 
 gestures:
   - palm
-  - fist
-  - thumb_up
   - pinch
   - click
   - swiping_right
@@ -49,8 +48,6 @@ gestures:
 #   both     — pooled from LD-CONG + Jester
 sources:
   palm: ld_cong
-  fist: ld_cong
-  thumb_up: ld_cong
   pinch: ld_cong
   click: ld_cong
   swiping_right: both
