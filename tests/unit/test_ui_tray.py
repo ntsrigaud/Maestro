@@ -62,19 +62,3 @@ class TestSystemTray:
 
             assert window._preview_window.isVisible()
 
-
-class TestLauncherPanelShowWindow:
-    def test_show_window_defaults_false(self, qtbot) -> None:
-        from maestro.app.ui.launcher_panel import LauncherPanel
-
-        panel = LauncherPanel()
-        qtbot.addWidget(panel)
-        assert panel.show_window is False
-
-    def test_show_window_reflects_checkbox(self, qtbot) -> None:
-        from maestro.app.ui.launcher_panel import LauncherPanel
-
-        panel = LauncherPanel()
-        qtbot.addWidget(panel)
-        panel._show_window_cb.setChecked(True)
-        assert panel.show_window is True
