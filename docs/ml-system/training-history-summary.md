@@ -539,12 +539,11 @@ This is the Jester-pretrained backbone used as the starting point for all LD-CON
 ## LD-CONG Hybrid Fine-tuning Series (May 2026)
 
 All runs below fine-tune from `two_stream_attn_v1_20260513T155730Z` on the LD-CONG hybrid dataset
-(W=16 frames, 14-class vocabulary built from LD-CONG + Jester + IPN sources). Anti-forgetting uses
-EWC with `EWC_WEIGHT=2000.0`.
+(W=16 frames, 14-class vocabulary built from LD-CONG + Jester + IPN sources).
 
 **Fine-tuning stages:**
 - Stage A (head warm-up): 10 epochs, backbone frozen, lr=1e-3
-- Stage B (full fine-tune): 60 epochs, all layers + EWC penalty, lr=3e-5, backbone_lr_multiplier=0.1
+- Stage B (full fine-tune): 60 epochs, all layers + backbone LR warmup, lr=3e-5, backbone_lr_multiplier=0.1
 
 **Dataset**: `data/processed/ld_cong_hybrid_dataset.npz` · train=27,053 · val=5,242  
 **Classes (14)**: `palm`, `fist`, `thumb_up`, `pinch`, `click`, `swiping_right`, `swiping_left`,

@@ -851,7 +851,6 @@ def _build_training_strategy_section(
     replay_ce_weight = metrics.get("replay_ce_weight", "N/A")
     replay_max_samples = metrics.get("replay_max_samples_per_class", "N/A")
     backbone_lr_multiplier = metrics.get("backbone_lr_multiplier", "N/A")
-    ewc_weight = metrics.get("ewc_weight", "N/A")
     gpm_components = metrics.get("gpm_components", "N/A")
     forgetting_penalty_weight = metrics.get("forgetting_penalty_weight", "N/A")
 
@@ -868,7 +867,6 @@ def _build_training_strategy_section(
         f"distillation_weight={distillation_weight}, "
         f"replay_ce_weight={replay_ce_weight}, "
         f"backbone_lr_multiplier={backbone_lr_multiplier}, "
-        f"ewc_weight={ewc_weight}, "
         f"gpm_components={gpm_components}, "
         f"forgetting_penalty_weight={forgetting_penalty_weight}."
     )
