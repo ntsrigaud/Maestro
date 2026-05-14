@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QLabel, QSizePolicy
+from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from maestro.domain.entities import RuntimeState
 
@@ -41,7 +41,7 @@ class PreviewWidget(QLabel):
 
     def __init__(
         self,
-        parent: QLabel | None = None,
+        parent: QWidget | None = None,
         *,
         max_display_width: int = _MAX_DISPLAY_WIDTH,
         max_display_height: int | None = None,

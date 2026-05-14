@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 from PySide6.QtCore import QPoint, Qt, QTimer, Slot
 from PySide6.QtGui import QGuiApplication, QMouseEvent
@@ -184,7 +185,7 @@ class FloatingPreviewWindow(QWidget):
         ns_window.orderFrontRegardless()
         self._native_level_applied = True
 
-    def _find_native_window(self) -> object | None:
+    def _find_native_window(self) -> Any:
         ns_app = getattr(AppKit, "NSApp", None)
         if ns_app is None:
             try:
