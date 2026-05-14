@@ -9,38 +9,44 @@ version: ld_cong_v1
 
 gesture_commands:
   # ── Navigation (LD-CONG directional, pooled with Jester swipes) ────────────
-  swiping_up:    start_presentation
-  swiping_down:  stop_presentation
+  swiping_up: start_presentation
+  swiping_down: stop_presentation
   swiping_right: next_slide
-  swiping_left:  previous_slide
+  swiping_left: previous_slide
 
   # ── Zoom (Jester source) ───────────────────────────────────────────────────
-  zooming_in_full_hand:  zoom_in_view
+  zooming_in_full_hand: zoom_in_view
   zooming_out_full_hand: zoom_out_view
 
   # ── LD-CONG unique gestures ────────────────────────────────────────────────
-  palm:     erase_annotations   # open palm ≈ erase / blank screen
-  fist:     no_action           # closed fist — reserved, not yet mapped
-  thumb_up: no_action           # thumb-up — reserved, not yet mapped
-  pinch:    no_action           # pinch — reserved, not yet mapped
-  click:    no_action           # single click — reserved, not yet mapped
+  palm: erase_annotations # open palm ≈ erase / blank screen
+  pinch: no_action # pinch — reserved, not yet mapped
+  click: no_action # single click — reserved, not yet mapped
 
   # ── IPN classes ────────────────────────────────────────────────────────────
   unknown: no_action
 
+# Model output → display/dispatch label remapping.
+# Applied after prediction stabilization, before command dispatch and UI display.
+# The model was trained on raw camera frames where a natural right-swipe (palm
+# facing the camera at end of stroke) appears as swiping_left from the camera's
+# perspective.  Swapping here makes the gesture feel correct to the user without
+# any retraining.
+label_remap:
+  swiping_left: swiping_right
+  swiping_right: swiping_left
+
 gesture_modes:
   # Discrete (one-shot, edge-triggered via GestureActivationController)
-  swiping_up:           discrete
-  swiping_down:         discrete
-  swiping_right:        discrete
-  swiping_left:         discrete
+  swiping_up: discrete
+  swiping_down: discrete
+  swiping_right: discrete
+  swiping_left: discrete
   zooming_in_full_hand: discrete
   zooming_out_full_hand: discrete
-  palm:                 discrete
-  fist:                 discrete
-  thumb_up:             discrete
-  pinch:                discrete
-  click:                discrete
+  palm: discrete
+  pinch: discrete
+  click: discrete
   # Continuous (bypass dispatcher — handled by pointer trackers)
   point_one: continuous
   point_two: continuous
