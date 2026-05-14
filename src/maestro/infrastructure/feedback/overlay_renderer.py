@@ -58,6 +58,7 @@ class OverlayRenderer:
         mirror_display: bool = False,
         command_map: dict[str, str] | None = None,
         output_rgb: bool = False,
+        minimal_preview: bool = False,
     ) -> None:
         self._font = cv2.FONT_HERSHEY_SIMPLEX
         self._mirror_display = mirror_display
@@ -69,6 +70,7 @@ class OverlayRenderer:
         # is a Qt widget (QImage.Format_RGB888) so the channel reversal is
         # done once here rather than on every display update.
         self._output_rgb = output_rgb
+        self._minimal_preview = minimal_preview
 
     def render(self, frame: FramePacket, state: RuntimeState) -> FramePacket:
         # Flip the canvas for the display if mirror mode is active.  The flip
@@ -79,51 +81,53 @@ class OverlayRenderer:
         else:
             canvas = frame.frame.copy()
 
-        self._draw_gaze_border(canvas, state)
-
         info = state.info
 
-        self._draw_landmarks(canvas, info.get("landmarks"), mirror=self._mirror_display)
-
-        # --- Mode badge -------------------------------------------------
-        # Render "[active_mode]" at the very top of the frame when a mode has
-        # been set (i.e. it is not the default sentinel "unknown").
-        y_offset = 0
-        if state.active_mode != "unknown":
-            badge_text = f"[{state.active_mode}]"
-            self._put(canvas, badge_text, 12, 18, color=_TEXT_BADGE)
-            y_offset = 24  # push HUD lines down to avoid overlapping the badge
-
-        # --- Prediction line with logical command preview ---------------
-        logical_cmd = self._command_map.get(state.last_label, "")
-        if logical_cmd and logical_cmd != "no_action":
-            line2 = f"pred={state.last_label}  → {logical_cmd}  conf={state.last_confidence:.2f}"
+        if self._minimal_preview:
+            self._draw_minimal_gesture_label(canvas, state.last_label)
         else:
-            line2 = f"pred={state.last_label} conf={state.last_confidence:.2f}"
+            self._draw_gaze_border(canvas, state)
+            self._draw_landmarks(canvas, info.get("landmarks"), mirror=self._mirror_display)
 
-        # Draw a coloured background rectangle (the "hue ring") behind the
-        # prediction line so the mode-state colour is immediately visible
-        # without obscuring the rest of the frame content.
-        pred_y = 48 + y_offset
-        self._draw_pred_ring(canvas, state.mode, y=pred_y)
+            # --- Mode badge -------------------------------------------------
+            # Render "[active_mode]" at the very top of the frame when a mode has
+            # been set (i.e. it is not the default sentinel "unknown").
+            y_offset = 0
+            if state.active_mode != "unknown":
+                badge_text = f"[{state.active_mode}]"
+                self._put(canvas, badge_text, 12, 18, color=_TEXT_BADGE)
+                y_offset = 24  # push HUD lines down to avoid overlapping the badge
 
-        line1 = f"mode={state.mode}"
-        line3 = (
-            "window="
-            f"{info.get('window_ready', False)} "
-            f"ratio={float(info.get('valid_ratio', 0.0)):.2f}"
-        )
-        line4 = (
-            f"latency_ms e2e={float(info.get('latency_e2e_ms', 0.0)):.1f} "
-            f"infer={float(info.get('latency_infer_ms', 0.0)):.1f}"
-        )
-        line5 = f"fps={float(info.get('fps', 0.0)):.1f}"
+            # --- Prediction line with logical command preview ---------------
+            logical_cmd = self._command_map.get(state.last_label, "")
+            if logical_cmd and logical_cmd != "no_action":
+                line2 = f"pred={state.last_label}  → {logical_cmd}  conf={state.last_confidence:.2f}"
+            else:
+                line2 = f"pred={state.last_label} conf={state.last_confidence:.2f}"
 
-        self._put(canvas, line1, 12, 24 + y_offset)
-        self._put(canvas, line2, 12, pred_y)
-        self._put(canvas, line3, 12, 72 + y_offset)
-        self._put(canvas, line4, 12, 96 + y_offset)
-        self._put(canvas, line5, 12, 120 + y_offset)
+            # Draw a coloured background rectangle (the "hue ring") behind the
+            # prediction line so the mode-state colour is immediately visible
+            # without obscuring the rest of the frame content.
+            pred_y = 48 + y_offset
+            self._draw_pred_ring(canvas, state.mode, y=pred_y)
+
+            line1 = f"mode={state.mode}"
+            line3 = (
+                "window="
+                f"{info.get('window_ready', False)} "
+                f"ratio={float(info.get('valid_ratio', 0.0)):.2f}"
+            )
+            line4 = (
+                f"latency_ms e2e={float(info.get('latency_e2e_ms', 0.0)):.1f} "
+                f"infer={float(info.get('latency_infer_ms', 0.0)):.1f}"
+            )
+            line5 = f"fps={float(info.get('fps', 0.0)):.1f}"
+
+            self._put(canvas, line1, 12, 24 + y_offset)
+            self._put(canvas, line2, 12, pred_y)
+            self._put(canvas, line3, 12, 72 + y_offset)
+            self._put(canvas, line4, 12, 96 + y_offset)
+            self._put(canvas, line5, 12, 120 + y_offset)
 
         if self._output_rgb:
             canvas = canvas[..., ::-1]
@@ -147,6 +151,41 @@ class OverlayRenderer:
         # Left and right bars
         image[:, :t] = colour
         image[:, w - t :] = colour
+
+    def _draw_minimal_gesture_label(self, image: Any, label: str) -> None:
+        """Draw only the current gesture label for the floating self preview."""
+        if not label or label == "unknown":
+            return
+
+        text = label.replace('_', ' ').upper()
+        height, width = image.shape[:2]
+
+        # Scale font so the text looks large at the *displayed* size after the
+        # frame is downscaled for the preview widget.  Target ~18 % of height.
+        font_scale = max(1.8, (height * 0.18) / 28.0)
+        thickness = max(3, int(font_scale * 2))
+
+        # Measure text to set footer height and baseline position accurately.
+        (text_w, text_h), baseline = cv2.getTextSize(
+            text, self._font, font_scale, thickness
+        )
+        footer_height = text_h + baseline + 20
+        y0 = max(0, height - footer_height)
+        image[y0:height, 0:width] = (20, 20, 20)
+
+        # Centre the label horizontally; keep a safe bottom margin.
+        x = max(8, (width - text_w) // 2)
+        y = height - baseline - 8
+        cv2.putText(
+            image,
+            text,
+            (x, y),
+            self._font,
+            font_scale,
+            _TEXT_BADGE,
+            thickness,
+            cv2.LINE_AA,
+        )
 
     def _draw_pred_ring(self, image: Any, mode: str, *, y: int) -> None:
         """Draw a coloured background rectangle behind the prediction text line."""
