@@ -94,3 +94,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["huggingface_hub", "huggingface_hub.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["AppKit", "AppKit.*"]
+ignore_missing_imports = true
