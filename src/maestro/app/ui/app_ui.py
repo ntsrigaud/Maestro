@@ -17,5 +17,5 @@ def run_ui(config_path: str | None = None) -> int:
     icon_path = get_app_icon()
     if icon_path is not None:
         app.setWindowIcon(QIcon(str(icon_path)))
-    window = MainWindow(config_path=effective_path)
+    window = MainWindow(config_path=effective_path)  # noqa: F841  kept to prevent GC
     return app.exec()

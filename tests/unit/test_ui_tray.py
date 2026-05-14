@@ -9,6 +9,12 @@ class _RunningThread:
     def isRunning(self) -> bool:
         return True
 
+    def stop(self) -> None:
+        pass
+
+    def wait(self, _timeout: int = 0) -> bool:
+        return True
+
 
 class TestSystemTray:
     def test_tray_created_and_visible(self, qtbot) -> None:
