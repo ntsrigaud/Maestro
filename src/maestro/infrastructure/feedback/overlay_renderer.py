@@ -101,7 +101,9 @@ class OverlayRenderer:
             # --- Prediction line with logical command preview ---------------
             logical_cmd = self._command_map.get(state.last_label, "")
             if logical_cmd and logical_cmd != "no_action":
-                line2 = f"pred={state.last_label}  → {logical_cmd}  conf={state.last_confidence:.2f}"
+                line2 = (
+                    f"pred={state.last_label}  → {logical_cmd}  conf={state.last_confidence:.2f}"
+                )
             else:
                 line2 = f"pred={state.last_label} conf={state.last_confidence:.2f}"
 
@@ -157,7 +159,7 @@ class OverlayRenderer:
         if not label or label == "unknown":
             return
 
-        text = label.replace('_', ' ').upper()
+        text = label.replace("_", " ").upper()
         height, width = image.shape[:2]
 
         # Scale font so the text looks large at the *displayed* size after the
@@ -166,9 +168,7 @@ class OverlayRenderer:
         thickness = max(3, int(font_scale * 2))
 
         # Measure text to set footer height and baseline position accurately.
-        (text_w, text_h), baseline = cv2.getTextSize(
-            text, self._font, font_scale, thickness
-        )
+        (text_w, text_h), baseline = cv2.getTextSize(text, self._font, font_scale, thickness)
         footer_height = text_h + baseline + 20
         y0 = max(0, height - footer_height)
         image[y0:height, 0:width] = (20, 20, 20)
