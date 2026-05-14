@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 
 
@@ -250,8 +249,8 @@ class EnhancedTwoStreamLSTM(nn.Module):
 
         # ── Optional: temporal conv front-end on motion branch ────────────────
         if self.motion_temporal_conv:
-            m = motion.transpose(1, 2)               # (B, proj_dim, T)
-            m = self.tcn_b_act(self.tcn_b(m))        # (B, proj_dim, T)
+            m = motion.transpose(1, 2)  # (B, proj_dim, T)
+            m = self.tcn_b_act(self.tcn_b(m))  # (B, proj_dim, T)
             motion = self.tcn_b_ln(m.transpose(1, 2))  # (B, T, proj_dim)
 
         # ── BiLSTM encoding ───────────────────────────────────────────────────
@@ -280,8 +279,8 @@ class EnhancedTwoStreamLSTM(nn.Module):
 
         # Motion branch: learned attention pool (optional) or mean + max.
         if self.motion_attn_pool:
-            scores_b = self.attn_pool_b(out_b)                      # (B, T, 1)
-            weights_b = torch.softmax(scores_b, dim=1)              # (B, T, 1)
+            scores_b = self.attn_pool_b(out_b)  # (B, T, 1)
+            weights_b = torch.softmax(scores_b, dim=1)  # (B, T, 1)
             ctx_b = self.pool_ln_b((weights_b * out_b).sum(dim=1))  # (B, 2H)
         else:
             ctx_b = self.pool_ln_b(out_b.mean(dim=1) + out_b.max(dim=1).values)  # (B, 2H)

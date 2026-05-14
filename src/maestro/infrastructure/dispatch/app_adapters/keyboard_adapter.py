@@ -51,6 +51,7 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "backspace",
         # Letter keys used in presentation/meeting shortcuts
         "a",
+        "b",  # B → toggle black screen (PowerPoint/Keynote/Slides/Impress slideshow)
         "e",  # E → erase all annotations (PowerPoint slideshow)
         "f",
         "k",
@@ -65,6 +66,9 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
         "equal",  # Cmd/Ctrl+= to zoom in (pyautogui key name for the = key)
         "minus",  # Cmd/Ctrl+- to zoom out
         "command",  # macOS modifier for zoom and slideshow start/stop
+        # Slide navigation jump keys
+        "home",  # Home → go to first slide (universal)
+        "end",  # End  → go to last slide  (universal)
         # Retained for completeness (workspace navigation removed but keys kept safe)
         "win",
         "super",
@@ -210,6 +214,20 @@ class KeyboardAdapter:
             return
         pyautogui.mouseUp(button="left")
         LOGGER.debug("Mouse up")
+
+    def mouse_click(self) -> None:
+        """Perform a left-click at the current cursor position.
+
+        Used to activate hyperlinks and trigger animations in presentation
+        slides without moving the cursor.  The click is delivered at whatever
+        position the OS cursor currently occupies, which is set by
+        :meth:`move_mouse` (e.g. from the laser-pointer or annotation tracker).
+        """
+        if pyautogui is None:  # pragma: no cover
+            LOGGER.warning("pyautogui is not installed — mouse_click skipped.")
+            return
+        pyautogui.click()
+        LOGGER.debug("Mouse clicked")
 
     def screen_size(self) -> tuple[int, int]:
         """Return the primary monitor dimensions as *(width, height)* in pixels.
