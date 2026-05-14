@@ -38,6 +38,7 @@ class _RuntimeThread(QThread):
         artifact_path: str | None,
         hf_revision_override: str | None,
         show_window: bool,
+        minimal_preview: bool,
         emit_every: int,
         parent: QObject | None = None,
     ) -> None:
@@ -46,6 +47,7 @@ class _RuntimeThread(QThread):
         self._artifact_path = artifact_path
         self._hf_revision_override = hf_revision_override
         self._show_window = show_window
+        self._minimal_preview = minimal_preview
         self._emit_every = emit_every
         self._frame_counter = 0
         self._runtime: Runtime | None = None
@@ -63,6 +65,7 @@ class _RuntimeThread(QThread):
                 model_artifact_path=self._artifact_path,
                 hf_revision_override=self._hf_revision_override,
                 show_window=self._show_window,
+                minimal_preview=self._minimal_preview,
             )
             self._runtime = Runtime(container, on_state=self._handle_state)
             self.build_succeeded.emit()
@@ -131,6 +134,7 @@ class RuntimeController(QObject):
         artifact_path: str | None = None,
         hf_revision_override: str | None = None,
         show_window: bool = False,
+        minimal_preview: bool = False,
         emit_every: int = _EMIT_EVERY_DEFAULT,
     ) -> None:
         """Spawn the worker thread. No-op if already running."""
@@ -143,6 +147,7 @@ class RuntimeController(QObject):
             artifact_path=artifact_path,
             hf_revision_override=hf_revision_override,
             show_window=show_window,
+            minimal_preview=minimal_preview,
             emit_every=emit_every,
         )
         # Qt delivers cross-thread signals via the event queue automatically.
