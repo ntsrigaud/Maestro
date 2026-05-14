@@ -74,6 +74,8 @@ class PresentationAdapter:
     zoom_in         → zoom_in_view
     zoom_out        → zoom_out_view
     open_palm_hold  → erase_annotations
+    pinch           → activate_laser_pointer
+    click           → mouse_click
     point_one       → mouse_pointer (handled by LaserPointerTracker)
     point_two       → mouse_pointer (handled by AnnotationPenTracker)
     unknown         → no_action
@@ -121,6 +123,10 @@ class PresentationAdapter:
                 # Erase all pen / laser annotations on the current slide.
                 # PowerPoint slideshow shortcut: E key (Windows and macOS).
                 self._keyboard.press_hotkey("e")
+            case "mouse_click":
+                # Perform a left-click at the current cursor position.
+                # Used to activate hyperlinks and trigger animations on slides.
+                self._keyboard.mouse_click()
             case "mouse_pointer":
                 # Revert cursor to the default arrow pointer (Ctrl+A in
                 # PowerPoint slideshow; no-op on apps without a laser mode).
