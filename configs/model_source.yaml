@@ -1,8 +1,9 @@
 # Model source configuration.
 #
 # Artifacts are loaded exclusively from Hugging Face Hub (cached after first use).
+# Update filename after running the HF publish cell in 08_model_training_ld_cong.ipynb.
 backend: huggingface
-repo_id: ntsrigaud/maestro-lstm-hybrid
+repo_id: ntsrigaud/maestro-lstm-ld-cong
 revision: main
-filename: two_stream_attn_v1_finetune_20260513T093937Z_inference.pt
+filename: two_stream_attn_v1_finetune_20260513T160347Z_inference.pt
 cache_dir: null # null = HF default (~/.cache/huggingface/hub)
