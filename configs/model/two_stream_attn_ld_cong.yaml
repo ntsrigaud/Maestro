@@ -21,14 +21,12 @@
 # pretrained weights can be loaded directly via finetune_lstm().  Only the
 # classification head (num_classes) changes from 27 → 14.
 #
-# Fine-tuning strategy (production — EWC-only, identical to notebook 03):
+# Fine-tuning strategy:
 #   Stage A — Head-only warm-up (freeze_epochs, default 10):
-#     Only the 11-class classification head is trained.  Backbone frozen.
+#     Only the classification head is trained.  Backbone frozen.
 #   Stage B — Full model (backbone_lr_multiplier×lr):
-#     Joint optimisation with EWC (weight=2000) to limit Jester forgetting.
-#     Distillation, replay-CE, and GPM are disabled — EWC-only is the
-#     production choice from catastrophic-forgetting experiments (−0.9 pp
-#     Jester drop vs −13.1 pp for LLRD).
+#     All layers fine-tuned with backbone LR warmup (stage_b_warmup_epochs).
+#     Distillation, replay-CE, and GPM are disabled.
 #
 # Dataset: built by scripts/build_ld_cong_dataset.py
 #   --vocab-config configs/gestures/vocabulary_ld_cong_hybrid.yaml

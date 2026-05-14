@@ -1,29 +1,23 @@
-version: presentation_v2
+version: hybrid_v1
 # Presentation controller gesture-to-command mapping.
-# Vocabulary: ld_cong_hybrid_v2 (12 classes — vocabulary_ld_cong_hybrid.yaml)
-#
 # Commands route to PresentationAdapter → KeyboardAdapter → pyautogui.
+#
+# Discrete gestures are routed through GestureActivationController and
+# CommandDispatcher (one-shot, edge-triggered).
 # Continuous gestures (point_one, point_two) bypass GestureActivationController
 # entirely — point_one is handled by LaserPointerTracker, point_two by
 # AnnotationPenTracker.
+#
+# Vocabulary: hybrid Jester+IPN (vocabulary_hybrid.yaml)
 
 gesture_commands:
-  # ── Navigation (LD-CONG directional, pooled with Jester swipes) ────────────
   swiping_up: start_presentation
   swiping_down: stop_presentation
   swiping_right: next_slide
   swiping_left: previous_slide
-
-  # ── Zoom (Jester source) ───────────────────────────────────────────────────
   zooming_in_full_hand: zoom_in_view
   zooming_out_full_hand: zoom_out_view
-
-  # ── LD-CONG unique gestures ────────────────────────────────────────────────
-  palm: erase_annotations # open palm      → erase all slide annotations (E)
-  pinch: activate_laser_pointer # precision pinch → enable laser-pointer mode (Ctrl+L)
-  click: mouse_click # finger click    → left-click at cursor (links / animations)
-
-  # ── IPN classes ────────────────────────────────────────────────────────────
+  stop_sign: erase_annotations
   unknown: no_action
 
 # Model output → display/dispatch label remapping.
@@ -37,16 +31,12 @@ label_remap:
   swiping_right: swiping_left
 
 gesture_modes:
-  # Discrete (one-shot, edge-triggered via GestureActivationController)
   swiping_up: discrete
   swiping_down: discrete
   swiping_right: discrete
   swiping_left: discrete
   zooming_in_full_hand: discrete
   zooming_out_full_hand: discrete
-  palm: discrete
-  pinch: discrete
-  click: discrete
-  # Continuous (bypass dispatcher — handled by pointer trackers)
+  stop_sign: discrete
   point_one: continuous
   point_two: continuous
