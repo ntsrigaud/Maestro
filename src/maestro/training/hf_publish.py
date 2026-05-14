@@ -69,8 +69,6 @@ _CLASS_DESCRIPTIONS: dict[str, str] = {
     "stop_sign": "Static open palm facing camera (Jester class)",
     # ── LD-CONG unique gestures ───────────────────────────────────────────────
     "palm": "Open palm held flat toward camera (static hand shape)",
-    "fist": "Closed fist (all fingers curled, thumb tucked)",
-    "thumb_up": "Thumbs-up — thumb extended upward, other fingers closed",
     "pinch": "Thumb and index finger brought together (pinch grip)",
     "click": "Brief tap / click gesture — index finger snaps toward thumb",
 }
@@ -725,30 +723,17 @@ def _build_per_class_table(per_class_recall: dict[str, float]) -> str:
 def _load_command_mapping(
     class_labels: list[str] | None = None,
 ) -> tuple[dict[str, str], dict[str, str]]:
-    """Load command and mode mappings used by the production controller.
-
-    Prefers ``command_map_ld_cong.yaml`` when the class set contains LD-CONG
-    unique gestures (palm, fist, thumb_up, pinch, click); falls back to
-    ``command_map_presentation.yaml`` otherwise.
-    """
+    """Load command and mode mappings from the production controller configuration."""
     gestures_dir = Path(__file__).resolve().parents[3] / "configs" / "gestures"
+    mapping_path = gestures_dir / "command_map_presentation.yaml"
 
-    ld_cong_classes = {"palm", "fist", "thumb_up", "pinch", "click"}
-    use_ld_cong_map = bool(class_labels and ld_cong_classes.intersection(class_labels))
-
-    candidates = []
-    if use_ld_cong_map:
-        candidates.append(gestures_dir / "command_map_ld_cong.yaml")
-    candidates.append(gestures_dir / "command_map_presentation.yaml")
-
-    for mapping_path in candidates:
-        if mapping_path.exists():
-            payload = yaml.safe_load(mapping_path.read_text(encoding="utf-8")) or {}
-            commands = payload.get("gesture_commands", {}) or {}
-            modes = payload.get("gesture_modes", {}) or {}
-            return {str(k): str(v) for k, v in commands.items()}, {
-                str(k): str(v) for k, v in modes.items()
-            }
+    if mapping_path.exists():
+        payload = yaml.safe_load(mapping_path.read_text(encoding="utf-8")) or {}
+        commands = payload.get("gesture_commands", {}) or {}
+        modes = payload.get("gesture_modes", {}) or {}
+        return {str(k): str(v) for k, v in commands.items()}, {
+            str(k): str(v) for k, v in modes.items()
+        }
 
     return {}, {}
 
@@ -836,7 +821,7 @@ def _build_training_strategy_section(
         source_desc = f"external checkpoint `{Path(pretrained_checkpoint).name}`"
 
     class_set = set(result.class_labels)
-    _ld_cong_unique = {"palm", "fist", "thumb_up", "pinch", "click"}
+    _ld_cong_unique = {"palm", "pinch", "click"}
     is_ld_cong_hybrid = _ld_cong_unique.issubset(class_set) and {
         "zooming_in_full_hand",
         "zooming_out_full_hand",
@@ -914,7 +899,7 @@ def _build_model_card(
     gesture_usage_table = _build_gesture_usage_table(result.class_labels)
     training_strategy_section = _build_training_strategy_section(result=result, config=config)
     class_set = set(result.class_labels)
-    _ld_cong_unique = {"palm", "fist", "thumb_up", "pinch", "click"}
+    _ld_cong_unique = {"palm", "pinch", "click"}
     is_ld_cong_hybrid = _ld_cong_unique.issubset(class_set) and {
         "zooming_in_full_hand",
         "zooming_out_full_hand",
@@ -934,7 +919,7 @@ def _build_model_card(
             "+ IPN pointing, W=16 frames)"
         )
         dataset_source_desc = (
-            "Three-source hybrid: **LD-CONG** provides palm/fist/thumb_up/pinch/click and "
+            "Three-source hybrid: **LD-CONG** provides palm/pinch/click and "
             "directional swipes (right/left/upward/downward → renamed); "
             "**Jester** provides zooming_in/out_full_hand and additional swipe data "
             "(center-cropped W32→16); "
