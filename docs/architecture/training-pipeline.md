@@ -238,6 +238,78 @@ flowchart TD
 
 ---
 
+## LD-CONG Hybrid Fine-tuning Pipeline (Phase 2 — May 2026)
+
+This pipeline extends the IPN fine-tuned model to the LD-CONG hybrid vocabulary
+via Jester pretraining followed by LD-CONG fine-tuning. It runs **after** the IPN pipeline
+above and reuses the same pretrained backbone.
+
+```mermaid
+flowchart TD
+    classDef rawNode    fill:#1a237e,color:#fff,stroke:#283593,stroke-width:2px
+    classDef procNode   fill:#004d40,color:#fff,stroke:#00695c,stroke-width:2px
+    classDef trainNode  fill:#4a148c,color:#fff,stroke:#6a1b9a,stroke-width:2px
+    classDef exportNode fill:#880e4f,color:#fff,stroke:#560027,stroke-width:2px
+    classDef fileNode   fill:#37474f,color:#fff,stroke:#546e7a,stroke-width:1px,stroke-dasharray:4 2
+    classDef configNode fill:#f9a825,color:#000,stroke:#f57f17,stroke-width:1px,stroke-dasharray:4 2
+
+    JESTER_CKPT["Jester Pretrained Checkpoint<br/>two_stream_attn_v1_&lt;ts&gt;.pt<br/>27-class · W=32 · feature-schema-v5"]
+    LDCONG_RAW["LD-CONG Raw Recordings<br/>data/ld-cong/ · CSV annotations"]
+    JESTER_CLIPS["Jester W16 Clips<br/>center-cropped W32→16 from Jester dataset"]
+    IPN_CLIPS["IPN W16 Clips<br/>center-cropped W32→16<br/>point_one · point_two · unknown"]
+
+    BUILD["build_ld_cong_dataset.py<br/>Merges three sources:<br/>LD-CONG + Jester (W16) + IPN (W16)<br/>→ max_samples_per_class balancing<br/>→ mirror augmentation<br/>→ 12-class exclusion via exclude_classes"]
+    NPZ["ld_cong_hybrid_dataset.npz<br/>train / val / test split<br/>classes: 12 (fist + thumb_up excluded)"]
+
+    STAGE_A["Stage A — Head warm-up<br/>backbone frozen · 10 epochs<br/>lr = 1e-3 · new head only"]
+    STAGE_B["Stage B — Full fine-tune<br/>all layers + EWC penalty<br/>60 epochs · lr = 3e-5<br/>backbone_lr_multiplier = 0.1<br/>EWC_WEIGHT = 2000.0"]
+
+    CKPT_LD["two_stream_attn_v1_finetune_&lt;ts&gt;.pt"]
+
+    JESTER_CKPT --> STAGE_A
+    LDCONG_RAW --> BUILD
+    JESTER_CLIPS --> BUILD
+    IPN_CLIPS --> BUILD
+    BUILD --> NPZ
+    NPZ --> STAGE_A --> STAGE_B --> CKPT_LD
+
+    class JESTER_CKPT fileNode
+    class LDCONG_RAW rawNode
+    class JESTER_CLIPS rawNode
+    class IPN_CLIPS rawNode
+    class BUILD procNode
+    class NPZ fileNode
+    class STAGE_A trainNode
+    class STAGE_B trainNode
+    class CKPT_LD exportNode
+```
+
+### Phase Summary — LD-CONG Hybrid
+
+| Phase | Script / Notebook | Key Output |
+| ----- | ----------------- | ---------- |
+| 1 — Dataset build | `scripts/build_ld_cong_dataset.py` | `data/processed/ld_cong_hybrid_dataset.npz` |
+| 2 — Head warm-up (Stage A) | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | Warm-started head weights |
+| 3 — Full fine-tune (Stage B) | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | `two_stream_attn_v1_finetune_<ts>.pt` |
+| 4 — Evaluation | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | Test metrics, confusion matrix |
+
+### Key Design Decisions — LD-CONG Hybrid
+
+**Window length mismatch**: Jester was pretrained at W=32; LD-CONG uses W=16.
+`EnhancedTwoStreamLSTM` is sequence-length-agnostic (BiLSTM + temporal pooling),
+so the pretrained backbone loads and runs cleanly on shorter sequences.
+
+**Class exclusion**: `fist` and `thumb_up` are excluded from training via
+`training.exclude_classes` in `configs/model/two_stream_attn_ld_cong_12class.yaml`.
+The hybrid dataset NPZ still contains all 14 source classes; exclusion happens at
+dataloader construction time inside `finetune_lstm()`.
+
+**Anti-forgetting**: EWC (Elastic Weight Consolidation) with `EWC_WEIGHT=2000.0`
+limits catastrophic forgetting of Jester representations during fine-tuning.
+This achieves only −0.9 pp Jester drop after fine-tuning (vs −13.1 pp for LLRD).
+
+---
+
 ## Key Design Decisions in the Data Pipeline
 
 ### Orientation Normalisation: Disabled

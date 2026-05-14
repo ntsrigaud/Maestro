@@ -224,6 +224,12 @@ class TestPresentationAdapterNoOp:
             "erase_annotations",
             "mouse_pointer",
             "no_action",
+            # LD-CONG gesture set
+            "mouse_click",
+            "toggle_black_screen",
+            "toggle_white_screen",
+            "go_to_last_slide",
+            "go_to_first_slide",
             # Legacy / extended commands (kept for backward compat)
             "scroll_forward",
             "scroll_back",
@@ -260,4 +266,56 @@ class TestPresentationAdapterLaserPointer:
         kb.press_hotkey.assert_called_once_with("ctrl", "a")
         assert result.success is True
         assert result.command_id == "deactivate_laser_pointer"
+        assert result.target_app == "presentation"
+
+
+# ---------------------------------------------------------------------------
+# Tests: screen blanking and slide jump commands (LD-CONG gesture set)
+# ---------------------------------------------------------------------------
+
+
+class TestPresentationAdapterScreenAndNavigation:
+    def test_mouse_click_calls_mouse_click(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("mouse_click")
+        kb.mouse_click.assert_called_once_with()
+        assert result.success is True
+        assert result.command_id == "mouse_click"
+        assert result.target_app == "presentation"
+
+    def test_toggle_black_screen_presses_b(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("toggle_black_screen")
+        kb.press_hotkey.assert_called_once_with("b")
+        assert result.success is True
+        assert result.command_id == "toggle_black_screen"
+        assert result.target_app == "presentation"
+
+    def test_toggle_white_screen_presses_w(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("toggle_white_screen")
+        kb.press_hotkey.assert_called_once_with("w")
+        assert result.success is True
+        assert result.command_id == "toggle_white_screen"
+        assert result.target_app == "presentation"
+
+    def test_go_to_last_slide_presses_end(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("go_to_last_slide")
+        kb.press_hotkey.assert_called_once_with("end")
+        assert result.success is True
+        assert result.command_id == "go_to_last_slide"
+        assert result.target_app == "presentation"
+
+    def test_go_to_first_slide_presses_home(self):
+        kb = _mock_keyboard()
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("go_to_first_slide")
+        kb.press_hotkey.assert_called_once_with("home")
+        assert result.success is True
+        assert result.command_id == "go_to_first_slide"
         assert result.target_app == "presentation"

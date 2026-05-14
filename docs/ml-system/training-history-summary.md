@@ -520,9 +520,73 @@ Calibration ECE (val): N/A (not present in source JSON) · Mean confidence: 0.85
 
 ---
 
+---
+
+## Jester Pretraining Series (May 2026)
+
+### Run: `two_stream_attn_v1_20260513T155730Z` ← **Jester pretrained backbone (production)**
+
+**Model**: `two_stream_attn_v1` · input 147 · hidden 96 · layers 4 · num_heads 8 · proj_dim 96 · dropout 0.35 · classes 27  
+**Config**: `configs/model/two_stream_attn_jester.yaml`  
+**Training**: 80 epochs, batch 256, lr 1e-4, weight decay 5e-4, label smoothing 0.05  
+**Notebook**: `notebooks/07_model_training_jester_pretrain_ipn_finetune.ipynb`  
+**Dataset**: 20BN-Jester-v1 (27 classes, W=32, feature-schema-v5)
+
+This is the Jester-pretrained backbone used as the starting point for all LD-CONG hybrid fine-tuning runs.
+
+---
+
+## LD-CONG Hybrid Fine-tuning Series (May 2026)
+
+All runs below fine-tune from `two_stream_attn_v1_20260513T155730Z` on the LD-CONG hybrid dataset
+(W=16 frames, 14-class vocabulary built from LD-CONG + Jester + IPN sources). Anti-forgetting uses
+EWC with `EWC_WEIGHT=2000.0`.
+
+**Fine-tuning stages:**
+- Stage A (head warm-up): 10 epochs, backbone frozen, lr=1e-3
+- Stage B (full fine-tune): 60 epochs, all layers + EWC penalty, lr=3e-5, backbone_lr_multiplier=0.1
+
+**Dataset**: `data/processed/ld_cong_hybrid_dataset.npz` · train=27,053 · val=5,242  
+**Classes (14)**: `palm`, `fist`, `thumb_up`, `pinch`, `click`, `swiping_right`, `swiping_left`,
+`swiping_down`, `swiping_up`, `zooming_in_full_hand`, `zooming_out_full_hand`, `point_one`, `point_two`, `unknown`  
+**Config**: `configs/model/two_stream_attn_ld_cong.yaml`  
+**Notebook**: `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb`
+
+### Run: `two_stream_attn_v1_finetune_20260513T160347Z` ← **LD-CONG 14-class baseline**
+
+| Split      | Loss   | Accuracy | Macro F1 | ECE    |
+| ---------- | ------ | -------- | -------- | ------ |
+| Test       | 0.4185 | 96.5 %   | 96.6 %   | 0.0336 |
+
+Best val F1 (Stage B): **96.5 %**  
+Params: 2,100,206 · `motion_temporal_conv=False` · `motion_attn_pool=False`
+
+---
+
+## Motion Branch Ablation Study (May 2026 — notebook 09)
+
+All four experiments fine-tune from `two_stream_attn_v1_20260513T155730Z` on the same 14-class hybrid
+dataset. The ablation tests two optional motion-branch modifications:
+
+- `motion_temporal_conv`: Conv1d(192,192,k=3)+GELU+LayerNorm on the motion stream (+27,936 params)
+- `motion_attn_pool`: learned temporal attention pooling Linear(192→1) on the motion stream (+193 params)
+
+| Experiment | tcn | attn_pool | Params    | Best val F1 | Test acc | Test macro F1 | Test loss | ECE    |
+| ---------- | --- | --------- | --------- | ----------- | -------- | ------------- | --------- | ------ |
+| A_baseline | ✗   | ✗         | 2,100,206 | 96.5 %      | 96.5 %   | **96.6 %**    | 0.4185    | 0.0336 |
+| B_tcn      | ✓   | ✗         | 2,128,142 | 96.2 %      | 96.1 %   | 96.3 %        | 0.4319    | 0.0335 |
+| C_attn     | ✗   | ✓         | 2,100,399 | 96.4 %      | 96.4 %   | 96.5 %        | 0.4198    | 0.0340 |
+| D_both     | ✓   | ✓         | 2,128,335 | 96.1 %      | 96.2 %   | 96.3 %        | 0.4299    | 0.0329 |
+
+**Deltas vs A_baseline:** B_tcn ΔF1=−0.36 pp · C_attn ΔF1=−0.11 pp · D_both ΔF1=−0.32 pp — all within noise (< 0.5 pp threshold).
+
+**Conclusion**: Neither motion-branch modification produces a meaningful improvement. The bottleneck is data volume, regularisation, or feature quality — not branch architecture. Production model keeps both flags `False` (baseline A).
+
+---
+
 ## Comparative Analysis
 
-- Best performing model (by validation Macro F1): `two_stream_attn_v1_20260503T064347Z` (**80.82%**).
+- Best performing model (by validation Macro F1): `two_stream_attn_v1_20260503T064347Z` (**80.82%** on IPN 8-class).
 - Most stable model family (among audited multi-run families): `two_stream_attn` in the selected set (population std of selected validation Macro F1 ≈ **0.0442**), with the near-final subgroup (`061857Z`, `064347Z`, `065204Z`) showing tighter stability (std ≈ **0.0087**).
 - Most improved classes across selected runs (core gesture subset in this report, min-to-max recall spread): `zoom_out` (+0.3009), `zoom_in` (+0.2848), `swipe_down` (+0.2713).
 - Persistent failure cases: click-family classes (`click_one`, `click_two`) in extended-vocabulary setups; `zoom_in`/`zoom_out` remain recurrent weak points in several runs.

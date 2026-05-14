@@ -44,6 +44,8 @@ class ModelConfig:
     # EnhancedTwoStreamLSTM-specific fields (only used for "two_stream_attn_*").
     num_heads: int = 4
     proj_dim: int = 64
+    motion_temporal_conv: bool = False
+    motion_attn_pool: bool = False
 
 
 @dataclass(slots=True)
@@ -143,6 +145,8 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             phono_conv_channels=int(model_data.get("phono_conv_channels", 256)),
             num_heads=int(model_data.get("num_heads", 4)),
             proj_dim=int(model_data.get("proj_dim", 64)),
+            motion_temporal_conv=bool(model_data.get("motion_temporal_conv", False)),
+            motion_attn_pool=bool(model_data.get("motion_attn_pool", False)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
@@ -248,6 +252,8 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
             num_classes=config.num_classes,
             num_heads=config.num_heads,
             proj_dim=config.proj_dim,
+            motion_temporal_conv=config.motion_temporal_conv,
+            motion_attn_pool=config.motion_attn_pool,
         ).to(device)
 
     if config.model_name.startswith("two_stream"):
@@ -307,6 +313,11 @@ def _model_config_from_checkpoint(
         phono_conv_channels=int(payload.get("phono_conv_channels", fallback.phono_conv_channels)),
         num_heads=int(payload.get("num_heads", fallback.num_heads)),
         proj_dim=int(payload.get("proj_dim", fallback.proj_dim)),
+        # Default to False — old checkpoints were trained without these flags.
+        # The variant architecture is applied below in finetune_lstm after
+        # the pretrained weights are loaded into the baseline model.
+        motion_temporal_conv=bool(payload.get("motion_temporal_conv", False)),
+        motion_attn_pool=bool(payload.get("motion_attn_pool", False)),
     )
 
 
@@ -1048,6 +1059,31 @@ def finetune_lstm(
     )
     model = _build_model(pretrained_mc, device)
     model.load_state_dict(ckpt["model_state_dict"])
+
+    # ── Apply motion-branch variant flags if they differ from the pretrained checkpoint ──
+    # Old checkpoints don't store these flags (they default to False above).  If the
+    # target config requests a variant, build a new model with those flags and copy
+    # all matching weights (strict=False).  New layers (tcn_b, attn_pool_b) are
+    # randomly initialised — they will be trained from scratch during fine-tuning.
+    if (
+        config.model.motion_temporal_conv != pretrained_mc.motion_temporal_conv
+        or config.model.motion_attn_pool != pretrained_mc.motion_attn_pool
+    ):
+        from dataclasses import replace as _dc_replace
+
+        _variant_mc = _dc_replace(
+            pretrained_mc,
+            motion_temporal_conv=config.model.motion_temporal_conv,
+            motion_attn_pool=config.model.motion_attn_pool,
+        )
+        _variant_model = _build_model(_variant_mc, device)
+        _incompatible = _variant_model.load_state_dict(model.state_dict(), strict=False)
+        if _incompatible.unexpected_keys:
+            raise RuntimeError(
+                f"Unexpected keys when building variant model: {_incompatible.unexpected_keys}"
+            )
+        model = _variant_model
+        del _variant_mc, _variant_model, _incompatible
 
     teacher_model = copy.deepcopy(model)
     teacher_model.eval()
