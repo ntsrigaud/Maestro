@@ -494,9 +494,7 @@ def _train_one_epoch_with_retention(
         replay_ce_loss = F.cross_entropy(replay_logits, replay_y)
 
         loss = (
-            target_loss
-            + (distillation_weight * distill_loss)
-            + (replay_ce_weight * replay_ce_loss)
+            target_loss + (distillation_weight * distill_loss) + (replay_ce_weight * replay_ce_loss)
         )
         loss.backward()
 
