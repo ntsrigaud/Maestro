@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from PySide6.QtCore import QSignalBlocker, QTimer
+from PySide6.QtCore import QCoreApplication, QSignalBlocker, QTimer
 from PySide6.QtGui import QAction, QColor, QIcon, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon, QWidget
 
@@ -200,3 +200,4 @@ class MainWindow(QWidget):
         self._preview_window.close()
         self._tray.hide()
         super().closeEvent(event)
+        QCoreApplication.quit()
