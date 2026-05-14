@@ -97,9 +97,7 @@ def _extract_class_subset(
     indices = np.where(mask)[0]
 
     if len(indices) == 0:
-        logger.warning(
-            "No samples found for classes %s in source '%s'.", classes, source_prefix
-        )
+        logger.warning("No samples found for classes %s in source '%s'.", classes, source_prefix)
         return {}
 
     found = Counter(labels[indices].tolist())
@@ -136,9 +134,7 @@ def _extract_class_subset(
     )
 
     after = Counter(result["labels"].tolist())
-    logger.info(
-        "  %s — after cap: %s  (total %d)", source_prefix, dict(after), n
-    )
+    logger.info("  %s — after cap: %s  (total %d)", source_prefix, dict(after), n)
     return result
 
 
@@ -201,7 +197,10 @@ def _center_crop_sequences(
     end = start + target_length
     logger.info(
         "  Center-cropping sequences: W=%d → W=%d  (frames %d:%d)",
-        current_len, target_length, start, end,
+        current_len,
+        target_length,
+        start,
+        end,
     )
     result = dict(data)
     result["sequences"] = seqs[:, start:end, :].copy()
@@ -407,15 +406,9 @@ def main() -> None:
     ld_cong_only_classes = [
         cls for cls in vocabulary if sources_map.get(cls, "ld_cong") == "ld_cong"
     ]
-    jester_only_classes = [
-        cls for cls in vocabulary if sources_map.get(cls, "ld_cong") == "jester"
-    ]
-    ipn_only_classes = [
-        cls for cls in vocabulary if sources_map.get(cls, "ld_cong") == "ipn"
-    ]
-    both_classes = [
-        cls for cls in vocabulary if sources_map.get(cls, "ld_cong") == "both"
-    ]
+    jester_only_classes = [cls for cls in vocabulary if sources_map.get(cls, "ld_cong") == "jester"]
+    ipn_only_classes = [cls for cls in vocabulary if sources_map.get(cls, "ld_cong") == "ipn"]
+    both_classes = [cls for cls in vocabulary if sources_map.get(cls, "ld_cong") == "both"]
 
     logger.info("Hybrid vocabulary: %d classes", len(vocabulary))
     logger.info("  LD-CONG only : %s", ld_cong_only_classes)
@@ -481,7 +474,8 @@ def main() -> None:
             logger.error(
                 "Feature dimension mismatch: LD-CONG F=%d vs Jester F=%d. "
                 "Both must be built with the same feature schema.",
-                feature_dim, jester_feature_dim,
+                feature_dim,
+                jester_feature_dim,
             )
             sys.exit(1)
 
@@ -505,8 +499,7 @@ def main() -> None:
     if ipn_only_classes:
         if not args.ipn_npz.exists():
             logger.error(
-                "IPN NPZ not found: %s\n"
-                "  Build it first with: python scripts/build_ipn_dataset.py",
+                "IPN NPZ not found: %s\n  Build it first with: python scripts/build_ipn_dataset.py",
                 args.ipn_npz,
             )
             sys.exit(1)
@@ -519,7 +512,8 @@ def main() -> None:
             logger.error(
                 "Feature dimension mismatch: LD-CONG F=%d vs IPN F=%d. "
                 "Both must be built with the same feature schema.",
-                feature_dim, ipn_feature_dim,
+                feature_dim,
+                ipn_feature_dim,
             )
             sys.exit(1)
 
