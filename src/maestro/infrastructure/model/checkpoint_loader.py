@@ -35,6 +35,8 @@ def _build_model_from_artifact(
             num_classes=int(model_config["num_classes"]),
             num_heads=int(model_config.get("num_heads", 4)),
             proj_dim=int(model_config.get("proj_dim", 64)),
+            motion_temporal_conv=bool(model_config.get("motion_temporal_conv", False)),
+            motion_attn_pool=bool(model_config.get("motion_attn_pool", False)),
         ).to(device)
 
     raise ValueError(

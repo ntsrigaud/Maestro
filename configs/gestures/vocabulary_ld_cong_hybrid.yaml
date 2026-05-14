@@ -1,0 +1,69 @@
+# LD-CONG Hybrid Vocabulary
+# Merges LD-CONG, Jester, and IPN datasets into a unified 12-class vocabulary.
+#
+# LD-CONG classes:
+#   - Unique gestures kept as-is: palm, pinch, click
+#     (fist and thumb_up removed — not used in production vocabulary)
+#   - Directional gestures renamed to match Jester swipe names:
+#       right    → swiping_right
+#       left     → swiping_left
+#       downward → swiping_down
+#       upward   → swiping_up
+#   - shift_right DROPPED (not in this vocabulary)
+#
+# Jester classes added (zoom — LD-CONG has no equivalent):
+#   - zooming_in_full_hand, zooming_out_full_hand
+#
+# IPN classes added (pointing + unknown — LD-CONG has no equivalent):
+#   - point_one, point_two, unknown
+#
+# Swipe classes are pooled from BOTH sources (same concept, different subjects):
+#   swiping_right  ← LD-CONG "right"     + Jester "swiping_right"
+#   swiping_left   ← LD-CONG "left"      + Jester "swiping_left"
+#   swiping_down   ← LD-CONG "downward"  + Jester "swiping_down"
+#   swiping_up     ← LD-CONG "upward"    + Jester "swiping_up"
+#
+# Window length: 16 frames (Jester and IPN data truncated from W=32 via center-crop)
+
+version: ld_cong_hybrid_v2
+
+gestures:
+  - palm
+  - pinch
+  - click
+  - swiping_right
+  - swiping_left
+  - swiping_down
+  - swiping_up
+  - zooming_in_full_hand
+  - zooming_out_full_hand
+  - point_one
+  - point_two
+  - unknown
+
+# Source for each class:
+#   ld_cong  — from LD-CONG NPZ only
+#   jester   — from Jester NPZ only
+#   ipn      — from IPN NPZ only
+#   both     — pooled from LD-CONG + Jester
+sources:
+  palm: ld_cong
+  pinch: ld_cong
+  click: ld_cong
+  swiping_right: both
+  swiping_left: both
+  swiping_down: both
+  swiping_up: both
+  zooming_in_full_hand: jester
+  zooming_out_full_hand: jester
+  point_one: ipn
+  point_two: ipn
+  unknown: ipn
+
+# Rename LD-CONG labels before merging (applied to the LD-CONG NPZ).
+label_remap:
+  ld_cong:
+    right: swiping_right
+    left: swiping_left
+    downward: swiping_down
+    upward: swiping_up

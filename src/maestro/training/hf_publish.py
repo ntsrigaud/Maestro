@@ -52,16 +52,25 @@ _FEATURE_SCHEMA_DESCRIPTION = """\
 """
 
 _CLASS_DESCRIPTIONS: dict[str, str] = {
+    # ── Background ────────────────────────────────────────────────────────────
     "unknown": "Background / transition / no gesture",
+    # ── Pointing (IPN) ────────────────────────────────────────────────────────
     "point_one": "Single-finger pointing gesture (continuous laser-pointer control)",
     "point_two": "Two-finger pointing gesture (continuous annotation-pen control)",
+    # ── Swipes (LD-CONG + Jester pooled) ─────────────────────────────────────
+    "swiping_down": "Vertical swipe downward",
+    "swiping_left": "Horizontal swipe from right to left",
+    "swiping_right": "Horizontal swipe from left to right",
+    "swiping_up": "Vertical swipe upward",
+    # ── Zoom (Jester) ─────────────────────────────────────────────────────────
+    "zooming_in_full_hand": "Pinch-open / spread fingers away from each other",
+    "zooming_out_full_hand": "Pinch-close / bring fingers together",
+    # ── Jester-only classes ───────────────────────────────────────────────────
     "stop_sign": "Static open palm facing camera (Jester class)",
-    "swiping_down": "Vertical swipe downward (Jester class)",
-    "swiping_left": "Horizontal swipe from right to left (Jester class)",
-    "swiping_right": "Horizontal swipe from left to right (Jester class)",
-    "swiping_up": "Vertical swipe upward (Jester class)",
-    "zooming_in_full_hand": "Pinch-open / spread fingers away from each other (Jester class)",
-    "zooming_out_full_hand": "Pinch-close / bring fingers together (Jester class)",
+    # ── LD-CONG unique gestures ───────────────────────────────────────────────
+    "palm": "Open palm held flat toward camera (static hand shape)",
+    "pinch": "Thumb and index finger brought together (pinch grip)",
+    "click": "Brief tap / click gesture — index finger snaps toward thumb",
 }
 
 _GRAPH_SCHEMA_DESCRIPTION = """\
@@ -711,26 +720,27 @@ def _build_per_class_table(per_class_recall: dict[str, float]) -> str:
     return "\n".join(rows)
 
 
-def _load_command_mapping() -> tuple[dict[str, str], dict[str, str]]:
-    """Load command and mode mappings used by the production controller."""
-    mapping_path = (
-        Path(__file__).resolve().parents[3]
-        / "configs"
-        / "gestures"
-        / "command_map_presentation.yaml"
-    )
-    if not mapping_path.exists():
-        return {}, {}
+def _load_command_mapping(
+    class_labels: list[str] | None = None,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Load command and mode mappings from the production controller configuration."""
+    gestures_dir = Path(__file__).resolve().parents[3] / "configs" / "gestures"
+    mapping_path = gestures_dir / "command_map_presentation.yaml"
 
-    payload = yaml.safe_load(mapping_path.read_text(encoding="utf-8")) or {}
-    commands = payload.get("gesture_commands", {}) or {}
-    modes = payload.get("gesture_modes", {}) or {}
-    return {str(k): str(v) for k, v in commands.items()}, {str(k): str(v) for k, v in modes.items()}
+    if mapping_path.exists():
+        payload = yaml.safe_load(mapping_path.read_text(encoding="utf-8")) or {}
+        commands = payload.get("gesture_commands", {}) or {}
+        modes = payload.get("gesture_modes", {}) or {}
+        return {str(k): str(v) for k, v in commands.items()}, {
+            str(k): str(v) for k, v in modes.items()
+        }
+
+    return {}, {}
 
 
 def _build_gesture_usage_table(class_labels: list[str]) -> str:
     """Render how each gesture is routed in the runtime control pipeline."""
-    commands, modes = _load_command_mapping()
+    commands, modes = _load_command_mapping(class_labels)
 
     rows = []
     for cls in class_labels:
@@ -752,7 +762,7 @@ def _build_gesture_usage_table(class_labels: list[str]) -> str:
         elif command != "—":
             usage = "Discrete command via GestureActivationController → CommandDispatcher"
         else:
-            usage = "Not mapped in command_map_presentation.yaml"
+            usage = "Not mapped in active command map"
 
         rows.append(f"| `{cls}` | `{mode}` | `{command}` | {usage} |")
 
@@ -811,7 +821,12 @@ def _build_training_strategy_section(
         source_desc = f"external checkpoint `{Path(pretrained_checkpoint).name}`"
 
     class_set = set(result.class_labels)
-    is_hybrid = {
+    _ld_cong_unique = {"palm", "pinch", "click"}
+    is_ld_cong_hybrid = _ld_cong_unique.issubset(class_set) and {
+        "zooming_in_full_hand",
+        "zooming_out_full_hand",
+    }.issubset(class_set)
+    is_hybrid = is_ld_cong_hybrid or {
         "point_one",
         "point_two",
         "swiping_left",
@@ -820,15 +835,17 @@ def _build_training_strategy_section(
         "zooming_out_full_hand",
     }.issubset(class_set)
 
-    target_desc = (
-        "Hybrid Jester+IPN 10-gesture vocabulary"
-        if is_hybrid
-        else (
-            "IPN 10-gesture production subset"
-            if config.model.num_classes == 10
-            else "target IPN subset"
+    if is_ld_cong_hybrid:
+        target_desc = (
+            f"LD-CONG Hybrid {config.model.num_classes}-class vocabulary "
+            "(LD-CONG unique + Jester zooms + pooled swipes + IPN pointing, W=16)"
         )
-    )
+    elif is_hybrid:
+        target_desc = "Hybrid Jester+IPN 10-gesture vocabulary"
+    elif config.model.num_classes == 10:
+        target_desc = "IPN 10-gesture production subset"
+    else:
+        target_desc = "target gesture subset"
 
     distillation_weight = metrics.get("distillation_weight", "N/A")
     replay_ce_weight = metrics.get("replay_ce_weight", "N/A")
@@ -882,7 +899,12 @@ def _build_model_card(
     gesture_usage_table = _build_gesture_usage_table(result.class_labels)
     training_strategy_section = _build_training_strategy_section(result=result, config=config)
     class_set = set(result.class_labels)
-    is_hybrid = {
+    _ld_cong_unique = {"palm", "pinch", "click"}
+    is_ld_cong_hybrid = _ld_cong_unique.issubset(class_set) and {
+        "zooming_in_full_hand",
+        "zooming_out_full_hand",
+    }.issubset(class_set)
+    is_hybrid = is_ld_cong_hybrid or {
         "point_one",
         "point_two",
         "swiping_left",
@@ -891,7 +913,20 @@ def _build_model_card(
         "zooming_out_full_hand",
     }.issubset(class_set)
 
-    if is_hybrid:
+    if is_ld_cong_hybrid:
+        dataset_name_markdown = (
+            "an LD-CONG Hybrid gesture dataset (LD-CONG unique gestures + Jester zooms "
+            "+ IPN pointing, W=16 frames)"
+        )
+        dataset_source_desc = (
+            "Three-source hybrid: **LD-CONG** provides palm/pinch/click and "
+            "directional swipes (right/left/upward/downward → renamed); "
+            "**Jester** provides zooming_in/out_full_hand and additional swipe data "
+            "(center-cropped W32→16); "
+            "**IPN-Hand** provides point_one/point_two/unknown "
+            "(center-cropped W32→16). Up to 3,000 windows per class, seed=42."
+        )
+    elif is_hybrid:
         dataset_name_markdown = (
             "a Hybrid Jester+IPN gesture dataset (Jester dynamic classes + IPN pointing classes)"
         )
@@ -1225,7 +1260,7 @@ def publish_to_huggingface(
         "created_at": datetime.now(UTC).isoformat(),
     }
 
-    command_mapping_commands, command_mapping_modes = _load_command_mapping()
+    command_mapping_commands, command_mapping_modes = _load_command_mapping(result.class_labels)
     config_snapshot["gesture_command_mapping"] = {
         "commands": command_mapping_commands,
         "modes": command_mapping_modes,
