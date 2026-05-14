@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import yaml
 from PySide6.QtCore import QSignalBlocker, QTimer
 from PySide6.QtGui import QAction, QColor, QIcon, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon, QWidget
@@ -25,6 +28,8 @@ class MainWindow(QWidget):
         self._config_path = config_path or str(get_config_dir())
         self._preview_window = FloatingPreviewWindow()
         self._controller = RuntimeController(parent=self)
+        # Gaze setting written to YAML when the runtime stops (if changed while running).
+        self._pending_gaze: bool | None = None
 
         self.setWindowTitle("Maestro")
         self.hide()
@@ -41,9 +46,19 @@ class MainWindow(QWidget):
         self._preview_action.setCheckable(True)
         self._preview_action.toggled.connect(self._on_preview_toggled)
 
+        self._gaze_action = QAction("Gaze detection", self)
+        self._gaze_action.setCheckable(True)
+        self._gaze_action.setChecked(self._read_gaze_enabled())
+        self._gaze_action.setToolTip(
+            "When enabled, gesture commands are only dispatched while the user\n"
+            "is looking at the camera. Takes effect on the next session start."
+        )
+        self._gaze_action.toggled.connect(self._on_gaze_toggled)
+
         tray_menu = QMenu()
         tray_menu.addAction(self._active_action)
         tray_menu.addAction(self._preview_action)
+        tray_menu.addAction(self._gaze_action)
         tray_menu.addSeparator()
         tray_menu.addAction("Quit", self.close)
         self._tray.setContextMenu(tray_menu)
@@ -51,7 +66,9 @@ class MainWindow(QWidget):
 
         self._controller.runtime_started.connect(self._on_runtime_started)
         self._controller.runtime_stopped.connect(self._on_runtime_stopped)
-        self._controller.runtime_stopped.connect(lambda: self._tray.setIcon(_make_tray_icon("#6B7280")))
+        self._controller.runtime_stopped.connect(
+            lambda: self._tray.setIcon(_make_tray_icon("#6B7280"))
+        )
         self._controller.error_occurred.connect(self._on_error)
         self._controller.state_updated.connect(self._preview_window.on_state)
         self._controller.state_updated.connect(self._on_tray_update)
@@ -76,8 +93,24 @@ class MainWindow(QWidget):
     def _on_preview_toggled(self, _enabled: bool) -> None:
         self._sync_preview_visibility()
 
+    def _on_gaze_toggled(self, enabled: bool) -> None:
+        """Persist the gaze-detection setting or defer if a session is running."""
+        if self._controller.is_running:
+            # Cannot safely change the running container; defer to session stop.
+            self._pending_gaze = enabled
+            label = "enabled" if enabled else "disabled"
+            self._tray.showMessage(
+                "Maestro",
+                f"Gaze detection {label} — takes effect on next session.",
+                QSystemTrayIcon.MessageIcon.Information,
+                2500,
+            )
+        else:
+            self._write_gaze_enabled(enabled)
+
     def _on_runtime_started(self) -> None:
         self._tray.setToolTip("Maestro: active")
+        self._preview_window.reset()
         self._sync_preview_visibility()
 
     def _on_runtime_stopped(self) -> None:
@@ -85,6 +118,10 @@ class MainWindow(QWidget):
         self._preview_window.hide()
         with QSignalBlocker(self._active_action):
             self._active_action.setChecked(False)
+        # Flush any gaze setting that was toggled while the session was running.
+        if self._pending_gaze is not None:
+            self._write_gaze_enabled(self._pending_gaze)
+            self._pending_gaze = None
 
     def _on_error(self, message: str) -> None:
         self._tray.setIcon(_make_tray_icon("#DC2626"))
@@ -120,6 +157,42 @@ class MainWindow(QWidget):
             self._preview_window.show_preview()
             return
         self._preview_window.hide()
+
+    def _inference_yaml_path(self) -> Path:
+        return Path(self._config_path) / "inference.yaml"
+
+    def _read_gaze_enabled(self) -> bool:
+        """Read ``gaze.enabled`` from inference.yaml; defaults to False."""
+        path = self._inference_yaml_path()
+        if not path.exists():
+            return False
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            return bool(data.get("gaze", {}).get("enabled", False))
+        except Exception:
+            return False
+
+    def _write_gaze_enabled(self, value: bool) -> None:
+        """Persist ``gaze.enabled`` to inference.yaml."""
+        path = self._inference_yaml_path()
+        if not path.exists():
+            return
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            if not isinstance(data.get("gaze"), dict):
+                data["gaze"] = {}
+            data["gaze"]["enabled"] = value
+            path.write_text(
+                yaml.dump(
+                    data,
+                    default_flow_style=False,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass  # Non-fatal: worst case the setting reverts on next launch
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         self._controller.stop()
