@@ -1,11 +1,11 @@
 # ── EnhancedTwoStreamLSTM — LD-CONG Hybrid 10-class fine-tuning configuration ─
 #
-# Same as two_stream_attn_ld_cong.yaml (14-class) but with `fist`, `thumb_up`,
+# Same as two_stream_attn_ld_cong.yaml (14-class) but with `palm`, `thumb_up`,
 # `pinch`, and `click` excluded.  The exclude_classes filter is applied at dataset-load
 # time so the ld_cong_hybrid_dataset.npz does NOT need to be rebuilt.
 #
 # Resulting vocabulary (10 classes):
-#   palm,
+#   fist,
 #   swiping_right, swiping_left, swiping_down, swiping_up,
 #   zooming_in_full_hand, zooming_out_full_hand,
 #   point_one, point_two, unknown
@@ -17,7 +17,7 @@ model:
   hidden_size: 96       # must match pretrained checkpoint
   num_layers: 4         # must match pretrained checkpoint
   dropout: 0.35
-  num_classes: 10       # 14 - 4 excluded (fist, thumb_up, pinch, click)
+  num_classes: 10       # 14 - 4 excluded (palm, thumb_up, pinch, click)
   num_heads: 8          # must match pretrained checkpoint
   proj_dim: 96          # must match pretrained checkpoint
 
@@ -35,7 +35,7 @@ training:
   class_weighting: false
   max_samples_per_class: 3000
   exclude_classes:
-    - fist
+    - palm
     - thumb_up
     - pinch
     - click
