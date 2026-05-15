@@ -15,7 +15,7 @@ model:
   model_name: two_stream_attn_v1
   input_size: 147       # feature-schema-v5 (must match pretrained backbone)
   hidden_size: 96       # must match pretrained checkpoint
-  num_layers: 4         # must match pretrained checkpoint
+  num_layers: 2         # experiment: shallower BiLSTM depth for fine-tuning
   dropout: 0.40         # increased from 0.35 to reduce overfitting
   num_classes: 10       # 14 - 4 excluded (fist, thumb_up, pinch, click)
   num_heads: 8          # must match pretrained checkpoint

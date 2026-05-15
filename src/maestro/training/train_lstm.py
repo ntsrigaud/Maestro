@@ -973,8 +973,29 @@ def finetune_lstm(
         config.model,
         num_classes=int(pretrained_model_config_dict.get("num_classes", 27)),
     )
-    model = _build_model(pretrained_mc, device)
-    model.load_state_dict(ckpt["model_state_dict"])
+    from dataclasses import replace as _dc_replace
+
+    # Allow depth adaptation (e.g., 4-layer pretrained -> 2-layer fine-tune)
+    # while keeping all other checkpoint-defined backbone dimensions intact.
+    target_num_layers = int(config.model.num_layers)
+    loaded_mc = (
+        _dc_replace(pretrained_mc, num_layers=target_num_layers)
+        if target_num_layers != pretrained_mc.num_layers
+        else pretrained_mc
+    )
+
+    model = _build_model(loaded_mc, device)
+    if target_num_layers == pretrained_mc.num_layers:
+        model.load_state_dict(ckpt["model_state_dict"])
+    else:
+        incompatible = model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        missing = len(incompatible.missing_keys)
+        unexpected = len(incompatible.unexpected_keys)
+        print(
+            "  Depth adapt : "
+            f"checkpoint num_layers={pretrained_mc.num_layers} -> target num_layers={target_num_layers}"
+        )
+        print(f"  Partial load: missing_keys={missing}, unexpected_keys={unexpected}")
 
     # ── Apply motion-branch variant flags if they differ from the pretrained checkpoint ──
     # Old checkpoints don't store these flags (they default to False above).  If the
@@ -982,13 +1003,11 @@ def finetune_lstm(
     # all matching weights (strict=False).  New layers (tcn_b, attn_pool_b) are
     # randomly initialised — they will be trained from scratch during fine-tuning.
     if (
-        config.model.motion_temporal_conv != pretrained_mc.motion_temporal_conv
-        or config.model.motion_attn_pool != pretrained_mc.motion_attn_pool
+        config.model.motion_temporal_conv != loaded_mc.motion_temporal_conv
+        or config.model.motion_attn_pool != loaded_mc.motion_attn_pool
     ):
-        from dataclasses import replace as _dc_replace
-
         _variant_mc = _dc_replace(
-            pretrained_mc,
+            loaded_mc,
             motion_temporal_conv=config.model.motion_temporal_conv,
             motion_attn_pool=config.model.motion_attn_pool,
         )
