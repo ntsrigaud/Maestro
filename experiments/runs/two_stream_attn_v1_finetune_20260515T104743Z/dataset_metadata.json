@@ -4,11 +4,7 @@
   "window_length": 16,
   "label_strategy": "ld_cong_hybrid_merge",
   "vocabulary": [
-    "palm",
     "fist",
-    "thumb_up",
-    "pinch",
-    "click",
     "swiping_right",
     "swiping_left",
     "swiping_down",
