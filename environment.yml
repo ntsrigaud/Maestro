@@ -1,0 +1,53 @@
+name: maestro
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Python pinned to the version required by pyproject.toml.
+  - python=3.11
+
+  # pip is used to install the Maestro package and ALL Python dependencies
+  # (torch, mediapipe, opencv, PySide6, etc.) so that every package uses the
+  # same OpenMP runtime — the one bundled inside PyTorch (libomp.dylib with
+  # install name /opt/homebrew/opt/libomp/lib/libomp.dylib on macOS).
+  #
+  # Do NOT add llvm-openmp, mkl, or blas packages here:
+  #   - llvm-openmp from conda-forge uses @rpath/libomp.dylib as its dylib ID,
+  #     which differs from PyTorch's bundled libomp ID.  When both are loaded in
+  #     the same process (conda env active + pip torch) macOS dyld treats them as
+  #     two separate libraries → OMP: Error #15 → Abort trap: 6.
+  #   - mkl pulls in Intel's libiomp5 (a third OpenMP variant) causing the same
+  #     conflict.
+  # Keeping ALL numerical/ML packages under pip avoids this mismatch entirely.
+  - pip
+
+  - pip:
+      # Install the project in editable mode with the UI + dev extras.
+      # opencv-python (full display backend) comes from the ui extra.
+      # opencv-python-headless must NOT be installed alongside it — they both
+      # provide the cv2 namespace and conflict.  Use 'make install-ci' for
+      # headless / server environments.
+      - -e ".[ui,dev,training]"
+# ── Troubleshooting ────────────────────────────────────────────────────────────
+#
+# If you already have a maestro conda environment and see "OMP: Error #15":
+#
+#   conda activate maestro
+#   make fix-omp
+#
+# This patches the conda llvm-openmp dylib's install name to match PyTorch's so
+# the dynamic linker sees a single library identity and initialises OpenMP once.
+#
+# ── Creating the environment from scratch ─────────────────────────────────────
+#
+#   conda env create -f environment.yml
+#   conda activate maestro
+#
+# For macOS users coming from a pyenv-based setup (where pyenv shims shadow
+# conda's Python), remove pyenv's intercept for the maestro environment:
+#
+#   pyenv local system    # run from the repo root
+#
+# This ensures `python` inside the repo resolves to conda's Python, not pyenv's,
+# avoiding library-path mismatches between the two package managers.
