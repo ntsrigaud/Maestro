@@ -84,6 +84,7 @@ class OverlayRenderer:
         info = state.info
 
         if self._minimal_preview:
+            self._draw_gaze_border(canvas, state)
             self._draw_minimal_gesture_label(canvas, state.last_label)
         else:
             self._draw_gaze_border(canvas, state)
