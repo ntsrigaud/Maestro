@@ -151,6 +151,29 @@ def test_render_does_not_mutate_original_frame() -> None:
         assert original.sum() == 0, f"Original frame must not be mutated (mirror={mirror})"
 
 
+def test_minimal_preview_shows_border_hides_landmarks() -> None:
+    """Minimal preview draws the gaze border but NOT landmarks."""
+    renderer = OverlayRenderer(mirror_display=False, minimal_preview=True)
+    state = RuntimeState(
+        mode="armed",
+        last_label="swipe_left",
+        last_confidence=0.95,
+        gaze_permitted=True,
+        info={"landmarks": [[0.5, 0.5, 0.0]]},
+    )
+
+    result = renderer.render(_make_frame(width=160, height=240), state)
+
+    # Gaze border IS drawn in minimal_preview mode (armed+gaze_permitted → green).
+    assert tuple(int(v) for v in result.frame[1, 1]) != (0, 0, 0), (
+        "expected gaze border pixel to be coloured, got black"
+    )
+    # Landmarks are NOT drawn — centre pixel stays dark.
+    assert tuple(int(v) for v in result.frame[120, 80]) == (0, 0, 0)
+    # Label footer has content.
+    assert result.frame[-20:].sum() > 0
+
+
 # ---------------------------------------------------------------------------
 # Invalid / edge-case landmarks are silently ignored
 # ---------------------------------------------------------------------------

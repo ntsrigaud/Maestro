@@ -5,6 +5,17 @@ from unittest.mock import patch
 from maestro.app.ui.main_window import MainWindow
 
 
+class _RunningThread:
+    def isRunning(self) -> bool:
+        return True
+
+    def stop(self) -> None:
+        pass
+
+    def wait(self, _timeout: int = 0) -> bool:
+        return True
+
+
 class TestSystemTray:
     def test_tray_created_and_visible(self, qtbot) -> None:
         with (
@@ -25,19 +36,29 @@ class TestSystemTray:
             icon = window._tray.icon()
             assert not icon.isNull()
 
+    def test_tray_menu_exposes_active_and_preview_actions(self, qtbot) -> None:
+        with (
+            patch("maestro.app.ui.controller.build_container"),
+            patch("maestro.app.ui.controller.Runtime"),
+        ):
+            window = MainWindow(config_path="configs")
+            qtbot.addWidget(window)
 
-class TestLauncherPanelShowWindow:
-    def test_show_window_defaults_false(self, qtbot) -> None:
-        from maestro.app.ui.launcher_panel import LauncherPanel
+            actions = window._tray.contextMenu().actions()
+            assert actions[0].text() == "Active"
+            assert actions[1].text() == "Preview"
 
-        panel = LauncherPanel()
-        qtbot.addWidget(panel)
-        assert panel.show_window is False
+    def test_preview_toggle_shows_overlay_when_runtime_running(self, qtbot) -> None:
+        with (
+            patch("maestro.app.ui.controller.build_container"),
+            patch("maestro.app.ui.controller.Runtime"),
+        ):
+            window = MainWindow(config_path="configs")
+            qtbot.addWidget(window)
 
-    def test_show_window_reflects_checkbox(self, qtbot) -> None:
-        from maestro.app.ui.launcher_panel import LauncherPanel
+            window._controller._thread = _RunningThread()
+            window._controller.runtime_started.emit()
+            window._preview_action.setChecked(True)
 
-        panel = LauncherPanel()
-        qtbot.addWidget(panel)
-        panel._show_window_cb.setChecked(True)
-        assert panel.show_window is True
+            assert window._preview_window.isVisible()
+

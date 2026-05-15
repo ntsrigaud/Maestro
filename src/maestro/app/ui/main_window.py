@@ -1,292 +1,16 @@
 from __future__ import annotations
 
-import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QPixmap
-from PySide6.QtWidgets import (
-    QGroupBox,
-    QLabel,
-    QMainWindow,
-    QMenu,
-    QSplitter,
-    QSystemTrayIcon,
-    QTabWidget,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
-)
+import yaml
+from PySide6.QtCore import QCoreApplication, QSignalBlocker, QTimer
+from PySide6.QtGui import QAction, QColor, QIcon, QPixmap
+from PySide6.QtWidgets import QMenu, QSystemTrayIcon, QWidget
 
-from maestro.app._paths import get_config_dir
-from maestro.app.ui.config_panel import ConfigPanel
+from maestro.app._paths import get_app_icon, get_config_dir
 from maestro.app.ui.controller import RuntimeController
-from maestro.app.ui.launcher_panel import LauncherPanel
-from maestro.app.ui.model_panel import ModelPanel
-from maestro.app.ui.preview_widget import PreviewWidget
-from maestro.app.ui.status_monitor import StatusMonitor
+from maestro.app.ui.floating_preview import FloatingPreviewWindow
 from maestro.domain.entities import RuntimeState
-
-_DEFAULT_CONFIG_PATH: str = ""  # resolved lazily via get_config_dir()
-
-# ---------------------------------------------------------------------------
-# Application stylesheet
-# ---------------------------------------------------------------------------
-# Colours follow an 8-shade neutral scale + accent (indigo) + semantic colours.
-# Spacing is on a 4 px grid; font sizes on a 3-step scale (12 / 13 / 15 px).
-# ---------------------------------------------------------------------------
-_STYLESHEET = """
-/* ── Globals ─────────────────────────────────────────────────────────── */
-QWidget {
-    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    font-size: 13px;
-    color: #E2E8F0;
-    background-color: #0F172A;
-}
-
-/* ── Main window / panels ────────────────────────────────────────────── */
-QMainWindow {
-    background-color: #0F172A;
-}
-
-/* Sidebar has a slightly lighter surface */
-#sidebar {
-    background-color: #1E293B;
-    border-right: 1px solid #334155;
-}
-
-/* Content area */
-#contentArea {
-    background-color: #0F172A;
-}
-
-/* ── Group boxes ─────────────────────────────────────────────────────── */
-QGroupBox {
-    font-size: 12px;
-    font-weight: 600;
-    color: #94A3B8;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    margin-top: 10px;
-    padding: 12px 12px 8px 12px;
-}
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 10px;
-    padding: 0 4px;
-    top: -1px;
-}
-
-/* ── Buttons ─────────────────────────────────────────────────────────── */
-QPushButton {
-    background-color: #334155;
-    color: #E2E8F0;
-    border: 1px solid #475569;
-    border-radius: 6px;
-    padding: 6px 14px;
-    font-size: 13px;
-}
-QPushButton:hover {
-    background-color: #3D5068;
-    border-color: #64748B;
-}
-QPushButton:pressed {
-    background-color: #1E3A5F;
-}
-QPushButton:disabled {
-    background-color: #1E293B;
-    color: #475569;
-    border-color: #334155;
-}
-
-/* Primary action button (Start/Stop) */
-QPushButton#primaryButton {
-    background-color: #4F46E5;
-    color: #FFFFFF;
-    border: none;
-    font-size: 14px;
-    font-weight: 600;
-    border-radius: 8px;
-    padding: 8px 16px;
-}
-QPushButton#primaryButton:hover {
-    background-color: #4338CA;
-}
-QPushButton#primaryButton:pressed {
-    background-color: #3730A3;
-}
-QPushButton#primaryButton:disabled {
-    background-color: #312E81;
-    color: #818CF8;
-}
-
-/* ── Text inputs ─────────────────────────────────────────────────────── */
-QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
-    background-color: #1E293B;
-    color: #E2E8F0;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 4px 8px;
-    selection-background-color: #4F46E5;
-}
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
-    border-color: #6366F1;
-    outline: none;
-}
-QComboBox::drop-down {
-    border: none;
-    width: 20px;
-}
-QComboBox QAbstractItemView {
-    background-color: #1E293B;
-    border: 1px solid #334155;
-    selection-background-color: #4F46E5;
-}
-QSpinBox::up-button, QSpinBox::down-button,
-QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
-    background-color: #334155;
-    border: none;
-    width: 16px;
-}
-
-/* ── Check boxes ─────────────────────────────────────────────────────── */
-QCheckBox {
-    spacing: 6px;
-    color: #CBD5E1;
-}
-QCheckBox::indicator {
-    width: 16px;
-    height: 16px;
-    border-radius: 4px;
-    border: 1px solid #475569;
-    background-color: #1E293B;
-}
-QCheckBox::indicator:checked {
-    background-color: #4F46E5;
-    border-color: #4F46E5;
-}
-
-/* ── Progress bar ────────────────────────────────────────────────────── */
-QProgressBar {
-    background-color: #1E293B;
-    border: 1px solid #334155;
-    border-radius: 4px;
-    text-align: center;
-    color: #94A3B8;
-    font-size: 11px;
-}
-QProgressBar::chunk {
-    background-color: #4F46E5;
-    border-radius: 3px;
-}
-QProgressBar#confidenceBar::chunk {
-    background-color: #059669;
-}
-
-/* ── Scroll areas ────────────────────────────────────────────────────── */
-QScrollArea {
-    background-color: transparent;
-    border: none;
-}
-QScrollBar:vertical {
-    background: #1E293B;
-    width: 8px;
-    border-radius: 4px;
-}
-QScrollBar::handle:vertical {
-    background: #475569;
-    border-radius: 4px;
-    min-height: 30px;
-}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-    height: 0;
-}
-
-/* ── Tabs (Settings panel) ───────────────────────────────────────────── */
-QTabWidget::pane {
-    background-color: #1E293B;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 8px;
-}
-QTabBar::tab {
-    background-color: #0F172A;
-    color: #94A3B8;
-    border: 1px solid #334155;
-    border-bottom: none;
-    border-radius: 6px 6px 0 0;
-    padding: 6px 16px;
-    margin-right: 2px;
-    font-size: 12px;
-    font-weight: 500;
-}
-QTabBar::tab:selected {
-    background-color: #1E293B;
-    color: #E2E8F0;
-    border-color: #334155;
-}
-QTabBar::tab:hover:!selected {
-    background-color: #1E293B;
-    color: #CBD5E1;
-}
-
-/* ── Session log ─────────────────────────────────────────────────────── */
-QTextEdit#sessionLog {
-    background-color: #0D1117;
-    color: #94A3B8;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-    font-size: 11px;
-    padding: 4px;
-}
-
-/* ── Stat labels ─────────────────────────────────────────────────────── */
-QLabel#statKey {
-    color: #64748B;
-    font-size: 12px;
-}
-QLabel#statValue {
-    color: #CBD5E1;
-    font-weight: 500;
-}
-QLabel#gazeActive {
-    color: #10B981;
-    font-weight: 600;
-}
-QLabel#gazeAbsent {
-    color: #64748B;
-}
-QLabel#statusChipLabel {
-    font-size: 12px;
-    font-weight: 600;
-}
-
-/* ── Splitter ────────────────────────────────────────────────────────── */
-QSplitter::handle {
-    background-color: #334155;
-    width: 1px;
-}
-
-/* ── Horizontal divider ─────────────────────────────────────────────── */
-QFrame#divider {
-    color: #334155;
-}
-
-/* ── App title label ─────────────────────────────────────────────────── */
-QLabel#appTitle {
-    font-size: 15px;
-    font-weight: 700;
-    color: #E2E8F0;
-    letter-spacing: 0.02em;
-}
-QLabel#appSubtitle {
-    font-size: 11px;
-    color: #64748B;
-}
-"""
 
 
 def _make_tray_icon(colour: str) -> QIcon:
@@ -296,226 +20,195 @@ def _make_tray_icon(colour: str) -> QIcon:
     return QIcon(px)
 
 
-def _section_label(text: str) -> QLabel:
-    """Return a small all-caps section header label."""
-    lbl = QLabel(text.upper())
-    lbl.setObjectName("statKey")
-    lbl.setContentsMargins(0, 8, 0, 2)
-    return lbl
-
-
-class MainWindow(QMainWindow):
-    """
-    Root window — two-pane layout.
-
-    ┌─────────────────────────────────────────────────────────┐
-    │  Sidebar (fixed ~240 px)  │  Content area               │
-    │  ─────────────────────    │  ────────────────────────── │
-    │  Maestro                  │  ┌── Camera Preview ──────┐ │
-    │                           │  │  PreviewWidget         │ │
-    │  ● Status                 │  └────────────────────────┘ │
-    │  [  Start Session  ]      │                             │
-    │  ☐ Show camera preview    │  ┌── Settings ────────────┐ │
-    │                           │  │  [Config] [Model]  tab │ │
-    │  Runtime ─────────────    │  └────────────────────────┘ │
-    │  Mode  GESTURE            │                             │
-    │  Gaze  ✓ Active           │  Session Log                │
-    │  ...                      │                             │
-    │                           │                             │
-    │  Performance ─────────    │                             │
-    │  FPS   29 Hz              │                             │
-    └─────────────────────────────────────────────────────────┘
-
-    Dependency rule: MainWindow → RuntimeController → (bootstrap, runtime).
-    No panel talks to RuntimeController directly.
-    """
+class MainWindow(QWidget):
+    """Tray-only runtime manager with a floating preview overlay."""
 
     def __init__(self, config_path: str | None = None) -> None:
         super().__init__()
         self._config_path = config_path or str(get_config_dir())
-        self._last_mode = ""
-        self.setWindowTitle("Maestro — Gesture Control")
-        self.setMinimumSize(760, 540)
-        self.resize(980, 660)
-
-        # Apply stylesheet
-        self.setStyleSheet(_STYLESHEET)
-
-        # ── Subcomponents ──────────────────────────────────────────────
+        self._preview_window = FloatingPreviewWindow()
         self._controller = RuntimeController(parent=self)
-        self._launcher = LauncherPanel()
-        self._preview = PreviewWidget()
-        self._monitor = StatusMonitor()
-        self._config_panel = ConfigPanel(config_path=self._config_path)
+        # Gaze setting written to YAML when the runtime stops (if changed while running).
+        self._pending_gaze: bool | None = None
 
-        try:
-            from maestro.utils.config_loader import load_runtime_config
+        self.setWindowTitle("Maestro")
+        self.hide()
 
-            _cfg = load_runtime_config(Path(self._config_path))
-            _model_src = _cfg.model_source
-        except Exception:
-            _model_src = None
-        self._model_panel = ModelPanel(default_source=_model_src)
+        # Inactive tray icon — the real app icon when available, grey dot otherwise.
+        icon_path = get_app_icon()
+        self._inactive_icon = QIcon(str(icon_path)) if icon_path else _make_tray_icon("#6B7280")
 
-        # ── Sidebar ────────────────────────────────────────────────────
-        sidebar = QWidget()
-        sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(240)
-        sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(16, 16, 16, 16)
-        sidebar_layout.setSpacing(12)
-
-        # App identity
-        title = QLabel("Maestro")
-        title.setObjectName("appTitle")
-        subtitle = QLabel("Gesture Control System")
-        subtitle.setObjectName("appSubtitle")
-        sidebar_layout.addWidget(title)
-        sidebar_layout.addWidget(subtitle)
-
-        # Control
-        ctrl_box = QGroupBox("Control")
-        ctrl_box_layout = QVBoxLayout(ctrl_box)
-        ctrl_box_layout.setSpacing(8)
-        ctrl_box_layout.addWidget(self._launcher)
-        sidebar_layout.addWidget(ctrl_box)
-
-        # Status monitor
-        sidebar_layout.addWidget(self._monitor)
-
-        sidebar_layout.addStretch()
-
-        # ── Content area ───────────────────────────────────────────────
-        content = QWidget()
-        content.setObjectName("contentArea")
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(16, 16, 16, 16)
-        content_layout.setSpacing(12)
-
-        # Preview (collapses when hidden)
-        preview_box = QGroupBox("Camera Preview")
-        preview_box_layout = QVBoxLayout(preview_box)
-        preview_box_layout.setContentsMargins(8, 8, 8, 8)
-        preview_box_layout.addWidget(self._preview)
-        content_layout.addWidget(preview_box)
-
-        # Settings tabs: Config + Model
-        settings_tabs = QTabWidget()
-        settings_tabs.addTab(self._config_panel, "Configuration")
-        settings_tabs.addTab(self._model_panel, "Model Source")
-        content_layout.addWidget(settings_tabs)
-
-        # Session log
-        self._log = QTextEdit()
-        self._log.setObjectName("sessionLog")
-        self._log.setReadOnly(True)
-        self._log.setFixedHeight(110)
-        self._log.setPlaceholderText("Session events will appear here…")
-        content_layout.addWidget(self._log)
-
-        # ── Splitter: sidebar | content ────────────────────────────────
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(sidebar)
-        splitter.addWidget(content)
-        splitter.setChildrenCollapsible(False)
-        splitter.setStretchFactor(0, 0)  # sidebar: fixed
-        splitter.setStretchFactor(1, 1)  # content: expands
-        self.setCentralWidget(splitter)
-
-        # ── System tray ────────────────────────────────────────────────
         self._tray = QSystemTrayIcon(self)
-        self._tray.setIcon(_make_tray_icon("#6B7280"))
+        self._tray.setIcon(self._inactive_icon)
+        self._tray.setToolTip("Maestro: inactive")
+
+        self._active_action = QAction("Active", self)
+        self._active_action.setCheckable(True)
+        self._active_action.toggled.connect(self._on_active_toggled)
+
+        self._preview_action = QAction("Preview", self)
+        self._preview_action.setCheckable(True)
+        self._preview_action.toggled.connect(self._on_preview_toggled)
+
+        self._gaze_action = QAction("Gaze detection", self)
+        self._gaze_action.setCheckable(True)
+        self._gaze_action.setChecked(self._read_gaze_enabled())
+        self._gaze_action.setToolTip(
+            "When enabled, gesture commands are only dispatched while the user\n"
+            "is looking at the camera. Takes effect on the next session start."
+        )
+        self._gaze_action.toggled.connect(self._on_gaze_toggled)
+
         tray_menu = QMenu()
-        tray_menu.addAction("Show", self.show)
+        tray_menu.addAction(self._active_action)
+        tray_menu.addAction(self._preview_action)
+        tray_menu.addAction(self._gaze_action)
+        tray_menu.addSeparator()
         tray_menu.addAction("Quit", self.close)
         self._tray.setContextMenu(tray_menu)
-        self._tray.activated.connect(self._on_tray_activated)
         self._tray.show()
 
-        # ── Signal wiring ──────────────────────────────────────────────
-        self._launcher.start_requested.connect(self._on_start_requested)
-        self._launcher.stop_requested.connect(self._controller.stop)
-
-        self._controller.runtime_started.connect(self._launcher.on_runtime_started)
-        self._controller.runtime_started.connect(
-            lambda: self._config_panel.set_runtime_active(True)
-        )
-        self._controller.runtime_stopped.connect(self._launcher.on_runtime_stopped)
-        self._controller.runtime_stopped.connect(
-            lambda: self._config_panel.set_runtime_active(False)
-        )
-        self._controller.runtime_stopped.connect(
-            lambda: self._tray.setIcon(_make_tray_icon("#6B7280"))
-        )
-        self._controller.error_occurred.connect(self._launcher.on_error)
-        self._controller.state_updated.connect(self._monitor.on_state)
-        self._controller.state_updated.connect(self._preview.on_state)
+        self._controller.runtime_started.connect(self._on_runtime_started)
+        self._controller.runtime_stopped.connect(self._on_runtime_stopped)
+        self._controller.error_occurred.connect(self._on_error)
+        self._controller.state_updated.connect(self._preview_window.on_state)
         self._controller.state_updated.connect(self._on_tray_update)
-        self._controller.state_updated.connect(self._on_log_event)
-        self._controller.runtime_stopped.connect(self._preview.hide)
 
-        self._config_panel.apply_requested.connect(self._on_apply_requested)
+    def _on_active_toggled(self, active: bool) -> None:
+        if active:
+            if self._controller.is_running:
+                return
+            self._tray.setToolTip("Maestro: starting")
+            self._controller.start(
+                self._config_path,
+                show_window=True,
+                minimal_preview=True,
+            )
+            return
 
-    # ------------------------------------------------------------------
-    # Internal slots
-    # ------------------------------------------------------------------
+        if self._controller.is_running:
+            self._tray.setToolTip("Maestro: stopping")
+            self._controller.stop()
+        self._sync_preview_visibility()
 
-    def _on_start_requested(self) -> None:
-        self._launcher.on_start_clicked()
-        self._controller.start(
-            self._config_path,
-            artifact_path=self._model_panel.artifact_path(),
-            hf_revision_override=self._model_panel.hf_revision_override(),
-            show_window=self._launcher.show_window,
+    def _on_preview_toggled(self, _enabled: bool) -> None:
+        self._sync_preview_visibility()
+
+    def _on_gaze_toggled(self, enabled: bool) -> None:
+        """Persist the gaze-detection setting or defer if a session is running."""
+        if self._controller.is_running:
+            # Cannot safely change the running container; defer to session stop.
+            self._pending_gaze = enabled
+            label = "enabled" if enabled else "disabled"
+            self._tray.showMessage(
+                "Maestro",
+                f"Gaze detection {label} — takes effect on next session.",
+                QSystemTrayIcon.MessageIcon.Information,
+                2500,
+            )
+        else:
+            self._write_gaze_enabled(enabled)
+
+    def _on_runtime_started(self) -> None:
+        self._tray.setToolTip("Maestro: active")
+        self._preview_window.reset()
+        self._sync_preview_visibility()
+
+    def _on_runtime_stopped(self) -> None:
+        self._tray.setToolTip("Maestro: inactive")
+        self._tray.setIcon(self._inactive_icon)
+        self._preview_window.hide()
+        with QSignalBlocker(self._active_action):
+            self._active_action.setChecked(False)
+        # Flush any gaze setting that was toggled while the session was running.
+        if self._pending_gaze is not None:
+            self._write_gaze_enabled(self._pending_gaze)
+            self._pending_gaze = None
+
+    def _on_error(self, message: str) -> None:
+        self._tray.setIcon(_make_tray_icon("#DC2626"))
+        self._tray.setToolTip("Maestro: error")
+        self._preview_window.hide()
+        with QSignalBlocker(self._active_action):
+            self._active_action.setChecked(False)
+        self._tray.showMessage(
+            "Maestro",
+            message,
+            QSystemTrayIcon.MessageIcon.Critical,
+            2000,
         )
-
-    def _on_apply_requested(self) -> None:
-        """YAML written; restart runtime with the new config."""
-        self._controller.stop()
-        self._controller.wait(timeout_ms=3_000)
-        self._on_start_requested()
 
     def _on_tray_update(self, state: RuntimeState) -> None:
+        # Mirror the overlay_renderer colour convention:
+        #   grey  — gaze absent (system paused)
+        #   amber — gaze present, system idle (awaiting activation gesture)
+        #   green — system armed (accepting command gestures)
         if not state.gaze_permitted:
-            self._tray.setIcon(_make_tray_icon("#6B7280"))
-            return
+            steady = "#6B7280"  # grey — gaze gate closed
+        elif state.mode == "armed":
+            steady = "#059669"  # green — armed and accepting gestures
+        else:
+            steady = "#D97706"  # amber — idle / awaiting activation
+
         if state.info.get("accepted"):
-            self._tray.setIcon(_make_tray_icon("#D97706"))
+            # Brief white-hot flash to signal a dispatched command, then restore.
+            self._tray.setIcon(_make_tray_icon("#F9FAFB"))
             self._tray.showMessage(
                 "Gesture",
-                state.last_label,
+                str(state.last_label),
                 QSystemTrayIcon.MessageIcon.Information,
                 800,
             )
-            QTimer.singleShot(300, lambda: self._tray.setIcon(_make_tray_icon("#059669")))
+            QTimer.singleShot(300, lambda _c=steady: self._tray.setIcon(_make_tray_icon(_c)))
         else:
-            self._tray.setIcon(_make_tray_icon("#059669"))
+            self._tray.setIcon(_make_tray_icon(steady))
 
-    def _on_log_event(self, state: RuntimeState) -> None:
-        if state.mode != self._last_mode:
-            ts = datetime.datetime.now().strftime("%H:%M:%S")
-            self._log.append(f"[{ts}] Mode → {state.mode.upper()}")
-            self._last_mode = state.mode
-        if state.info.get("accepted"):
-            ts = datetime.datetime.now().strftime("%H:%M:%S")
-            self._log.append(f"[{ts}] Dispatched: {state.last_label} ({state.last_confidence:.0%})")
-
-    def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
-        if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            self.show()
-            self.raise_()
-            self.activateWindow()
-
-    def changeEvent(self, event: QEvent) -> None:  # type: ignore[override]
-        if event.type() == QEvent.Type.WindowStateChange and self.isMinimized():
-            event.ignore()
-            self.hide()
+    def _sync_preview_visibility(self) -> None:
+        if self._preview_action.isChecked() and self._controller.is_running:
+            self._preview_window.show_preview()
             return
-        super().changeEvent(event)
+        self._preview_window.hide()
+
+    def _inference_yaml_path(self) -> Path:
+        return Path(self._config_path) / "inference.yaml"
+
+    def _read_gaze_enabled(self) -> bool:
+        """Read ``gaze.enabled`` from inference.yaml; defaults to False."""
+        path = self._inference_yaml_path()
+        if not path.exists():
+            return False
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            return bool(data.get("gaze", {}).get("enabled", False))
+        except Exception:
+            return False
+
+    def _write_gaze_enabled(self, value: bool) -> None:
+        """Persist ``gaze.enabled`` to inference.yaml."""
+        path = self._inference_yaml_path()
+        if not path.exists():
+            return
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            if not isinstance(data.get("gaze"), dict):
+                data["gaze"] = {}
+            data["gaze"]["enabled"] = value
+            path.write_text(
+                yaml.dump(
+                    data,
+                    default_flow_style=False,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass  # Non-fatal: worst case the setting reverts on next launch
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
-        """Graceful shutdown: stop the runtime before closing."""
         self._controller.stop()
         self._controller.wait(timeout_ms=3_000)
+        self._preview_window.close()
         self._tray.hide()
         super().closeEvent(event)
+        QCoreApplication.quit()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QLabel, QSizePolicy
+from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from maestro.domain.entities import RuntimeState
 
@@ -39,8 +39,16 @@ class PreviewWidget(QLabel):
     it when the runtime stops.
     """
 
-    def __init__(self, parent: QLabel | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        max_display_width: int = _MAX_DISPLAY_WIDTH,
+        max_display_height: int | None = None,
+    ) -> None:
         super().__init__(parent)
+        self._max_display_width = max_display_width
+        self._max_display_height = max_display_height
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -66,10 +74,13 @@ class PreviewWidget(QLabel):
         image = QImage(rgb_bytes, w, h, stride, QImage.Format.Format_RGB888)
         pixmap = QPixmap.fromImage(image)
 
-        display_width = min(w, _MAX_DISPLAY_WIDTH)
-        if display_width < w:
-            pixmap = pixmap.scaledToWidth(
+        display_width = min(w, self._max_display_width)
+        display_height = self._max_display_height or h
+        if display_width < w or display_height < h:
+            pixmap = pixmap.scaled(
                 display_width,
+                display_height,
+                Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
 
