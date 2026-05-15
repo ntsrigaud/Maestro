@@ -105,7 +105,7 @@ def _mock_artifact() -> InferenceArtifact:
             "swiping_down",
             "swiping_left",
             "swiping_right",
-            "stop_sign",
+            "fist",
             "zooming_in_full_hand",
             "zooming_out_full_hand",
         ],
@@ -209,7 +209,7 @@ def test_non_swipe_labels_not_affected_by_remap() -> None:
     command_map = {
         "swiping_right": "next_slide",
         "swiping_left": "previous_slide",
-        "stop_sign": "erase_annotations",
+        "fist": "erase_annotations",
     }
     ctrl = GestureActivationController(
         command_map=command_map,
@@ -218,9 +218,9 @@ def test_non_swipe_labels_not_affected_by_remap() -> None:
     )
     ctrl.rearm()
 
-    raw_pred = _pred("stop_sign")
+    raw_pred = _pred("fist")
     remapped_label = label_remap.get(raw_pred.label, raw_pred.label)
-    assert remapped_label == "stop_sign", "stop_sign must not be affected by swipe remap"
+    assert remapped_label == "fist", "fist must not be affected by swipe remap"
 
     routed_pred = StabilizedPrediction(
         label=remapped_label,
@@ -231,4 +231,4 @@ def test_non_swipe_labels_not_affected_by_remap() -> None:
     cmd = ctrl.route(routed_pred)
     assert cmd is not None
     assert cmd.command_id == "erase_annotations"
-    assert cmd.source_gesture == "stop_sign"
+    assert cmd.source_gesture == "fist"

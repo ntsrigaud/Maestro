@@ -37,7 +37,7 @@ _COMMAND_MAP: dict[str, str] = {
     "swiping_left": "previous_slide",
     "zooming_in_full_hand": "zoom_in_view",
     "zooming_out_full_hand": "zoom_out_view",
-    "stop_sign": "erase_annotations",
+    "fist": "erase_annotations",
     "point_one": "mouse_pointer",
     "point_two": "mouse_pointer",
     "unknown": "no_action",
