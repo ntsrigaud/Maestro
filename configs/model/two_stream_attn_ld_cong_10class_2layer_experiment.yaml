@@ -12,7 +12,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 model:
-  model_name: two_stream_attn_v1_2layer_finetune
+  model_name: two_stream_attn_v1_2layer_ld_cong
   input_size: 147       # feature-schema-v5 (must match pretrained backbone)
   hidden_size: 96       # must match pretrained checkpoint
   num_layers: 2         # experiment: shallower BiLSTM depth for fine-tuning
