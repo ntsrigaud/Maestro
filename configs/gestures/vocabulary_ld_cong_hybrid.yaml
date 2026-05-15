@@ -1,11 +1,11 @@
 # LD-CONG Hybrid Vocabulary
 # Full 14-class base vocabulary. At training time, 4 classes are excluded via
-# `exclude_classes` in the model config: `fist`, `thumb_up`, `pinch`, `click`.
+# `exclude_classes` in the model config: `palm`, `thumb_up`, `pinch`, `click`.
 # Active vocabulary (10 classes) used for fine-tuning:
 #
 # LD-CONG classes:
-#   - Unique gestures kept as-is: palm, pinch, click
-#     (fist and thumb_up removed — not used in production vocabulary)
+#   - Unique gestures kept as-is: fist, pinch, click
+#     (palm and thumb_up removed — not used in production vocabulary)
 #   - Directional gestures renamed to match Jester swipe names:
 #       right    → swiping_right
 #       left     → swiping_left
@@ -30,7 +30,7 @@
 version: ld_cong_hybrid_v2
 
 gestures:
-  - palm
+  - fist
   - pinch
   - click
   - swiping_right
@@ -49,7 +49,7 @@ gestures:
 #   ipn      — from IPN NPZ only
 #   both     — pooled from LD-CONG + Jester
 sources:
-  palm: ld_cong
+  fist: ld_cong
   pinch: ld_cong
   click: ld_cong
   swiping_right: both
