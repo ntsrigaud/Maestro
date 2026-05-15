@@ -48,8 +48,8 @@ Model card for the Jester→LD-CONG hybrid fine-tuned model.
   1. LD-CONG laboratory recordings (CSV-annotated RGB video)
   2. 20BN-Jester-v1 clips center-cropped to W=16
   3. IPN Hand clips center-cropped to W=16 (`point_one`, `point_two`, `unknown`)
-- Labels (10 active classes; `fist`, `thumb_up`, `pinch`, and `click` excluded):
-  - `palm`
+- Labels (10 active classes; `palm`, `thumb_up`, `pinch`, and `click` excluded):
+  - `fist`
   - `swiping_right`, `swiping_left`, `swiping_down`, `swiping_up`
   - `zooming_in_full_hand`, `zooming_out_full_hand`
   - `point_one`, `point_two`
