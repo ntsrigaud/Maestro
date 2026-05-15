@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-build test test-all lint typecheck format run-cli run-ui build build-onefile generate-icon clean
+.PHONY: help install install-dev install-ci install-build test test-all lint typecheck format run-cli run-ui build build-onefile generate-icon clean
 
 help: ## Show this help message
 	@echo "Maestro — available targets:"
@@ -10,11 +10,13 @@ help: ## Show this help message
 install: ## Install UI extras for end-user use (editable)
 	pip install -e ".[ui]"
 
-install-dev: ## Install dev + training extras (editable)
-	pip install -e ".[dev,training]"
+install-dev: ## Install UI + dev + training extras (editable)
+	pip install -e ".[ui,dev,training]"
 
-install-build: ## Install UI + PyInstaller extras (replaces opencv-headless)
-	pip uninstall -y opencv-python-headless 2>/dev/null || true
+install-ci: ## Install headless + dev + training extras for CI (no display)
+	pip install -e ".[headless,dev,training]"
+
+install-build: ## Install UI + PyInstaller extras (editable)
 	pip install -e ".[ui,build]"
 
 test: ## Run the non-training test suite
