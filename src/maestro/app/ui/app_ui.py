@@ -13,9 +13,9 @@ def run_ui(config_path: str | None = None) -> int:
     """Bootstrap the QApplication and enter the event loop."""
     effective_path = config_path or str(get_config_dir())
     app: QApplication = QApplication.instance() or QApplication(sys.argv)  # type: ignore[assignment]
+    app.setQuitOnLastWindowClosed(False)
     icon_path = get_app_icon()
     if icon_path is not None:
         app.setWindowIcon(QIcon(str(icon_path)))
-    window = MainWindow(config_path=effective_path)
-    window.show()
+    window = MainWindow(config_path=effective_path)  # noqa: F841  kept to prevent GC
     return app.exec()

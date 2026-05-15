@@ -77,6 +77,7 @@ def build_container(
     model_artifact_path: str | None = None,
     hf_revision_override: str | None = None,
     show_window: bool = False,
+    minimal_preview: bool = False,
 ) -> AppContainer:
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
@@ -145,6 +146,7 @@ def build_container(
         # (QImage.Format_RGB888) receive frames in the correct channel order
         # without an additional per-frame copy.
         output_rgb=show_window,
+        minimal_preview=minimal_preview,
     )
     benchmark = LatencyBenchmark()
 

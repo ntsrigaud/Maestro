@@ -1,5 +1,5 @@
 pydantic>=2.6.0
 PyYAML>=6.0.1
 numpy>=1.26.0
-opencv-python-headless>=4.10.0
+# opencv is provided via extras only (headless= or ui=) to prevent conflicts.
 mediapipe==0.10.14
