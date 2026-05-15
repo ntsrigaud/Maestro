@@ -18,7 +18,7 @@ class_thresholds:
   swiping_right: 0.70        # was swipe_right: 0.70
   swiping_left: 0.70         # was swipe_left: 0.70
   swiping_up: 0.70           # was swipe_up: 0.70
-  swiping_down: 0.70         # was swipe_down: 0.70
+  swiping_down: 0.82 # was swipe_down: 0.70 — raised: drastic action (Escape/stop), must not fire on static-palm confusion
   zooming_in_full_hand: 0.70 # was zoom_in: 0.70
   zooming_out_full_hand: 0.70 # was zoom_out: 0.70
   unknown: 1.00              # IPN D0X background class
