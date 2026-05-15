@@ -19,8 +19,6 @@ gesture_commands:
 
   # ── LD-CONG unique gestures ────────────────────────────────────────────────
   fist: erase_annotations # closed fist    → erase all slide annotations (E)
-  pinch: activate_laser_pointer # precision pinch → enable laser-pointer mode (Ctrl+L)
-  click: mouse_click # finger click    → left-click at cursor (links / animations)
 
   # ── IPN classes ────────────────────────────────────────────────────────────
   unknown: no_action
