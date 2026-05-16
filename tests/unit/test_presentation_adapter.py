@@ -136,6 +136,15 @@ class TestPresentationAdapterEraseAnnotations:
         kb.press_hotkey.assert_called_once_with("e")
         assert result.success is True
 
+    def test_erase_annotations_blocked_outside_presentation_scope(self):
+        kb = _mock_keyboard()
+        kb.press_hotkey.return_value = False
+        adapter = PresentationAdapter(keyboard=kb)
+        result = adapter.execute("erase_annotations")
+        kb.press_hotkey.assert_called_once_with("e")
+        assert result.success is False
+        assert result.detail == "blocked_outside_presentation_scope"
+
 
 # ---------------------------------------------------------------------------
 # Tests: start/stop presentation
