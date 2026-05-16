@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from PySide6.QtCore import QCoreApplication, QSignalBlocker, QTimer
-from PySide6.QtGui import QAction, QColor, QIcon, QPixmap
+from PySide6.QtCore import QCoreApplication, QSignalBlocker, Qt
+from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon, QWidget
 
 from maestro.app._paths import get_app_icon, get_config_dir
@@ -18,6 +18,39 @@ def _make_tray_icon(colour: str) -> QIcon:
     px = QPixmap(16, 16)
     px.fill(QColor(colour))
     return QIcon(px)
+
+
+def _make_state_tray_icon(base_icon: QIcon | None, colour: str) -> QIcon:
+    """Create a tray icon that preserves the app glyph with a state-colour accent."""
+    if base_icon is None or base_icon.isNull():
+        return _make_tray_icon(colour)
+
+    size = 16
+    composed = QPixmap(size, size)
+    composed.fill(Qt.GlobalColor.transparent)
+
+    painter = QPainter(composed)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+    # Draw a coloured ring to communicate runtime state while keeping the
+    # original app icon visible in the tray.
+    pen = QPen(QColor(colour))
+    pen.setWidth(2)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawEllipse(1, 1, size - 3, size - 3)
+
+    inner = base_icon.pixmap(12, 12)
+    if not inner.isNull():
+        painter.drawPixmap((size - 12) // 2, (size - 12) // 2, inner)
+
+    # Small state dot improves visibility on macOS menu bar where icons are tiny.
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor(colour))
+    painter.drawEllipse(size - 6, size - 6, 4, 4)
+    painter.end()
+
+    return QIcon(composed)
 
 
 class MainWindow(QWidget):
@@ -36,7 +69,9 @@ class MainWindow(QWidget):
 
         # Inactive tray icon — the real app icon when available, grey dot otherwise.
         icon_path = get_app_icon()
-        self._inactive_icon = QIcon(str(icon_path)) if icon_path else _make_tray_icon("#6B7280")
+        self._base_icon = QIcon(str(icon_path)) if icon_path else None
+        self._tray_icons_cache: dict[str, QIcon] = {}
+        self._inactive_icon = self._tray_icon_for_colour("#6B7280")
 
         self._tray = QSystemTrayIcon(self)
         self._tray.setIcon(self._inactive_icon)
@@ -126,7 +161,7 @@ class MainWindow(QWidget):
             self._pending_gaze = None
 
     def _on_error(self, message: str) -> None:
-        self._tray.setIcon(_make_tray_icon("#DC2626"))
+        self._tray.setIcon(self._tray_icon_for_colour("#DC2626"))
         self._tray.setToolTip("Maestro: error")
         self._preview_window.hide()
         with QSignalBlocker(self._active_action):
@@ -139,29 +174,42 @@ class MainWindow(QWidget):
         )
 
     def _on_tray_update(self, state: RuntimeState) -> None:
-        # Mirror the overlay_renderer colour convention:
-        #   grey  — gaze absent (system paused)
-        #   amber — gaze present, system idle (awaiting activation gesture)
-        #   green — system armed (accepting command gestures)
-        if not state.gaze_permitted:
-            steady = "#6B7280"  # grey — gaze gate closed
-        elif state.mode == "armed":
-            steady = "#059669"  # green — armed and accepting gestures
-        else:
-            steady = "#D97706"  # amber — idle / awaiting activation
+        colour = self._tray_colour_for_state(state)
+        self._tray.setIcon(self._tray_icon_for_colour(colour))
 
         if state.info.get("accepted"):
-            # Brief white-hot flash to signal a dispatched command, then restore.
-            self._tray.setIcon(_make_tray_icon("#F9FAFB"))
             self._tray.showMessage(
                 "Gesture",
                 str(state.last_label),
                 QSystemTrayIcon.MessageIcon.Information,
                 800,
             )
-            QTimer.singleShot(300, lambda _c=steady: self._tray.setIcon(_make_tray_icon(_c)))
-        else:
-            self._tray.setIcon(_make_tray_icon(steady))
+
+    def _tray_colour_for_state(self, state: RuntimeState) -> str:
+        """Map runtime state to the same colour theme used by floating preview badge."""
+        gaze_enabled = bool(state.info.get("gaze_enabled", True))
+        laser_active = bool(state.info.get("laser_active", False))
+        pen_active = bool(state.info.get("pen_active", False))
+
+        if not gaze_enabled:
+            return "#1E293B"  # dark slate — gaze detection disabled
+        if not state.gaze_permitted:
+            return "#4B5563"  # grey — gaze absent
+        if laser_active:
+            return "#2563EB"  # blue — laser pointer active
+        if pen_active:
+            return "#7C3AED"  # violet — annotation pen active
+        if state.mode == "armed":
+            return "#059669"  # green — armed
+        return "#D97706"  # amber — idle/cooldown with gaze present
+
+    def _tray_icon_for_colour(self, colour: str) -> QIcon:
+        cached = self._tray_icons_cache.get(colour)
+        if cached is not None:
+            return cached
+        icon = _make_state_tray_icon(self._base_icon, colour)
+        self._tray_icons_cache[colour] = icon
+        return icon
 
     def _sync_preview_visibility(self) -> None:
         if self._preview_action.isChecked() and self._controller.is_running:

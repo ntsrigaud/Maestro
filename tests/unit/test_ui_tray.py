@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from maestro.app.ui.main_window import MainWindow
+from maestro.domain.entities import RuntimeState
 
 
 class _RunningThread:
@@ -61,3 +62,41 @@ class TestSystemTray:
             window._preview_action.setChecked(True)
 
             assert window._preview_window.isVisible()
+
+    def test_tray_colour_mapping_matches_preview_badge_priority(self, qtbot) -> None:
+        with (
+            patch("maestro.app.ui.controller.build_container"),
+            patch("maestro.app.ui.controller.Runtime"),
+        ):
+            window = MainWindow(config_path="configs")
+            qtbot.addWidget(window)
+
+            state_gaze_off = RuntimeState(mode="idle", info={"gaze_enabled": False})
+            assert window._tray_colour_for_state(state_gaze_off) == "#1E293B"
+
+            state_absent = RuntimeState(
+                mode="armed", gaze_permitted=False, info={"gaze_enabled": True}
+            )
+            assert window._tray_colour_for_state(state_absent) == "#4B5563"
+
+            state_laser = RuntimeState(
+                mode="armed",
+                gaze_permitted=True,
+                info={"gaze_enabled": True, "laser_active": True, "pen_active": False},
+            )
+            assert window._tray_colour_for_state(state_laser) == "#2563EB"
+
+            state_pen = RuntimeState(
+                mode="armed",
+                gaze_permitted=True,
+                info={"gaze_enabled": True, "laser_active": False, "pen_active": True},
+            )
+            assert window._tray_colour_for_state(state_pen) == "#7C3AED"
+
+            state_armed = RuntimeState(
+                mode="armed", gaze_permitted=True, info={"gaze_enabled": True}
+            )
+            assert window._tray_colour_for_state(state_armed) == "#059669"
+
+            state_idle = RuntimeState(mode="idle", gaze_permitted=True, info={"gaze_enabled": True})
+            assert window._tray_colour_for_state(state_idle) == "#D97706"
