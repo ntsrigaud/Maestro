@@ -1,7 +1,3 @@
-# DEPRECATED: retired in STGCN migration. This module is superseded by
-# HolisticLandmarkExtractor + GraphSequenceBuffer. Do not use in new code.
-# Scheduled for deletion after Phase 5 validation.
-
 """Hand-preference selection step.
 
 ``HandSelector`` sits between the landmark extractor and the feature

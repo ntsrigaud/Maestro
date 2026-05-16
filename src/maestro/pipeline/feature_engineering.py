@@ -1,7 +1,3 @@
-# DEPRECATED: retired in STGCN migration. This module is superseded by
-# graph_schema.normalise_graph_frame() + GraphSequenceBuffer. Do not use in new code.
-# Scheduled for deletion after Phase 5 validation.
-
 from __future__ import annotations
 
 import math
