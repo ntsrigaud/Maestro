@@ -100,3 +100,18 @@ class TestSystemTray:
 
             state_idle = RuntimeState(mode="idle", gaze_permitted=True, info={"gaze_enabled": True})
             assert window._tray_colour_for_state(state_idle) == "#D97706"
+
+    def test_window_controls_remain_available_without_system_tray(self, qtbot) -> None:
+        with (
+            patch("maestro.app.ui.main_window.QSystemTrayIcon.isSystemTrayAvailable", return_value=False),
+            patch("maestro.app.ui.controller.build_container"),
+            patch("maestro.app.ui.controller.Runtime"),
+        ):
+            window = MainWindow(config_path="configs")
+            qtbot.addWidget(window)
+
+            assert window.isVisible()
+            assert window._tray is None
+            assert window.windowIcon().isNull() is False
+            assert window._menu_button.menu() is not None
+            assert window._controls_menu.actions()[0].text() == "Active"
