@@ -5,7 +5,15 @@ from pathlib import Path
 import yaml
 from PySide6.QtCore import QCoreApplication, QSignalBlocker, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QMenu, QSystemTrayIcon, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QSystemTrayIcon,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from maestro.app._paths import get_app_icon, get_config_dir
 from maestro.app.ui.controller import RuntimeController
@@ -54,7 +62,7 @@ def _make_state_tray_icon(base_icon: QIcon | None, colour: str) -> QIcon:
 
 
 class MainWindow(QWidget):
-    """Tray-only runtime manager with a floating preview overlay."""
+    """Cross-platform runtime manager with tray and taskbar-accessible controls."""
 
     def __init__(self, config_path: str | None = None) -> None:
         super().__init__()
@@ -65,7 +73,7 @@ class MainWindow(QWidget):
         self._pending_gaze: bool | None = None
 
         self.setWindowTitle("Maestro")
-        self.hide()
+        self.setMinimumSize(380, 180)
 
         # Inactive tray icon — the real app icon when available, grey dot otherwise.
         icon_path = get_app_icon()
@@ -73,9 +81,11 @@ class MainWindow(QWidget):
         self._tray_icons_cache: dict[str, QIcon] = {}
         self._inactive_icon = self._tray_icon_for_colour("#6B7280")
 
-        self._tray = QSystemTrayIcon(self)
-        self._tray.setIcon(self._inactive_icon)
-        self._tray.setToolTip("Maestro: inactive")
+        self._status_label = QLabel("Ready", self)
+        self._status_label.setWordWrap(True)
+        self._status_label.setObjectName("statusLabel")
+
+        self._controls_menu = QMenu(self)
 
         self._active_action = QAction("Active", self)
         self._active_action.setCheckable(True)
@@ -94,14 +104,48 @@ class MainWindow(QWidget):
         )
         self._gaze_action.toggled.connect(self._on_gaze_toggled)
 
-        tray_menu = QMenu()
-        tray_menu.addAction(self._active_action)
-        tray_menu.addAction(self._preview_action)
-        tray_menu.addAction(self._gaze_action)
-        tray_menu.addSeparator()
-        tray_menu.addAction("Quit", self.close)
-        self._tray.setContextMenu(tray_menu)
-        self._tray.show()
+        self._controls_menu.addAction(self._active_action)
+        self._controls_menu.addAction(self._preview_action)
+        self._controls_menu.addAction(self._gaze_action)
+        self._controls_menu.addSeparator()
+        self._controls_menu.addAction("Quit", self.close)
+
+        self._menu_button = QToolButton(self)
+        self._menu_button.setText("Maestro")
+        self._menu_button.setIcon(self._inactive_icon)
+        self._menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._menu_button.setMenu(self._controls_menu)
+
+        self._tray_available = QSystemTrayIcon.isSystemTrayAvailable()
+        self._tray: QSystemTrayIcon | None = None
+        if self._tray_available:
+            self._tray = QSystemTrayIcon(self)
+            self._tray.setIcon(self._inactive_icon)
+            self._tray.setToolTip("Maestro: inactive")
+            self._tray.setContextMenu(self._controls_menu)
+            self._tray.show()
+
+        header = QHBoxLayout()
+        header.addWidget(self._menu_button, 0)
+        header.addWidget(self._status_label, 1)
+
+        hint = QLabel(
+            "Use the menu button or tray icon to start/stop the runtime, "
+            "toggle preview, and change gaze detection.",
+            self,
+        )
+        hint.setWordWrap(True)
+        hint.setObjectName("hintLabel")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+        layout.addLayout(header)
+        layout.addWidget(hint)
+
+        self.setWindowIcon(self._inactive_icon)
+        self.show()
 
         self._controller.runtime_started.connect(self._on_runtime_started)
         self._controller.runtime_stopped.connect(self._on_runtime_stopped)
@@ -113,7 +157,7 @@ class MainWindow(QWidget):
         if active:
             if self._controller.is_running:
                 return
-            self._tray.setToolTip("Maestro: starting")
+            self._set_runtime_message("Maestro: starting")
             self._controller.start(
                 self._config_path,
                 show_window=True,
@@ -122,7 +166,7 @@ class MainWindow(QWidget):
             return
 
         if self._controller.is_running:
-            self._tray.setToolTip("Maestro: stopping")
+            self._set_runtime_message("Maestro: stopping")
             self._controller.stop()
         self._sync_preview_visibility()
 
@@ -135,7 +179,7 @@ class MainWindow(QWidget):
             # Cannot safely change the running container; defer to session stop.
             self._pending_gaze = enabled
             label = "enabled" if enabled else "disabled"
-            self._tray.showMessage(
+            self._show_notification(
                 "Maestro",
                 f"Gaze detection {label} — takes effect on next session.",
                 QSystemTrayIcon.MessageIcon.Information,
@@ -145,13 +189,13 @@ class MainWindow(QWidget):
             self._write_gaze_enabled(enabled)
 
     def _on_runtime_started(self) -> None:
-        self._tray.setToolTip("Maestro: active")
+        self._set_runtime_message("Maestro: active")
         self._preview_window.reset()
         self._sync_preview_visibility()
 
     def _on_runtime_stopped(self) -> None:
-        self._tray.setToolTip("Maestro: inactive")
-        self._tray.setIcon(self._inactive_icon)
+        self._set_runtime_message("Maestro: inactive")
+        self._apply_state_icon(self._inactive_icon)
         self._preview_window.hide()
         with QSignalBlocker(self._active_action):
             self._active_action.setChecked(False)
@@ -161,28 +205,21 @@ class MainWindow(QWidget):
             self._pending_gaze = None
 
     def _on_error(self, message: str) -> None:
-        self._tray.setIcon(self._tray_icon_for_colour("#DC2626"))
-        self._tray.setToolTip("Maestro: error")
+        self._apply_state_icon(self._tray_icon_for_colour("#DC2626"))
+        self._set_runtime_message("Maestro: error")
         self._preview_window.hide()
         with QSignalBlocker(self._active_action):
             self._active_action.setChecked(False)
-        self._tray.showMessage(
-            "Maestro",
-            message,
-            QSystemTrayIcon.MessageIcon.Critical,
-            2000,
-        )
+        self._show_notification("Maestro", message, QSystemTrayIcon.MessageIcon.Critical, 2000)
 
     def _on_tray_update(self, state: RuntimeState) -> None:
         colour = self._tray_colour_for_state(state)
-        self._tray.setIcon(self._tray_icon_for_colour(colour))
+        self._apply_state_icon(self._tray_icon_for_colour(colour))
+        self._status_label.setText(self._state_text_for_state(state))
 
         if state.info.get("accepted"):
-            self._tray.showMessage(
-                "Gesture",
-                str(state.last_label),
-                QSystemTrayIcon.MessageIcon.Information,
-                800,
+            self._show_notification(
+                "Gesture", str(state.last_label), QSystemTrayIcon.MessageIcon.Information, 800
             )
 
     def _tray_colour_for_state(self, state: RuntimeState) -> str:
@@ -210,6 +247,53 @@ class MainWindow(QWidget):
         icon = _make_state_tray_icon(self._base_icon, colour)
         self._tray_icons_cache[colour] = icon
         return icon
+
+    def _apply_state_icon(self, icon: QIcon) -> None:
+        self.setWindowIcon(icon)
+        self._menu_button.setIcon(icon)
+        if self._tray is not None:
+            self._tray.setIcon(icon)
+
+    def _set_runtime_message(self, text: str) -> None:
+        self._status_label.setText(text)
+        if self._tray is not None:
+            self._tray.setToolTip(text)
+        self.setToolTip(text)
+
+    def _show_notification(
+        self,
+        title: str,
+        message: str,
+        icon: QSystemTrayIcon.MessageIcon,
+        timeout_ms: int,
+    ) -> None:
+        if self._tray is not None:
+            self._tray.showMessage(title, message, icon, timeout_ms)
+        else:
+            self._status_label.setText(message)
+
+    def _state_text_for_state(self, state: RuntimeState) -> str:
+        if not state.gaze_permitted:
+            return "Gaze absent"
+        if not bool(state.info.get("gaze_enabled", True)):
+            return "Gaze detection disabled"
+        if bool(state.info.get("laser_active", False)):
+            return "Laser pointer active"
+        if bool(state.info.get("pen_active", False)):
+            return "Annotation pen active"
+        if state.mode == "armed":
+            return (
+                f"Armed: {state.last_label.replace('_', ' ').upper()}"
+                if state.last_label != "unknown"
+                else "Armed"
+            )
+        if state.mode == "cooldown":
+            return (
+                f"Cooldown: {state.last_label.replace('_', ' ').upper()}"
+                if state.last_label != "unknown"
+                else "Cooldown"
+            )
+        return "Idle"
 
     def _sync_preview_visibility(self) -> None:
         if self._preview_action.isChecked() and self._controller.is_running:
@@ -257,6 +341,7 @@ class MainWindow(QWidget):
         self._controller.stop()
         self._controller.wait(timeout_ms=3_000)
         self._preview_window.close()
-        self._tray.hide()
+        if self._tray is not None:
+            self._tray.hide()
         super().closeEvent(event)
         QCoreApplication.quit()
