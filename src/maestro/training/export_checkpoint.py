@@ -44,56 +44,26 @@ def export_inference_artifact(
     config: TrainingPipelineConfig,
     export_dir: str | Path,
 ) -> Path:
-    """Export production inference artifact with model + schema metadata.
-
-    For ``two_stream_*`` models the artifact contains a ``feature_schema`` dict
-    (backward-compatible).  For ``dual_stgcn_*`` models it contains a ``graph_schema``
-    dict with the adjacency matrix and node/coord counts.
-    """
+    """Export production inference artifact with model + feature schema metadata."""
     path = Path(export_dir)
     path.mkdir(parents=True, exist_ok=True)
 
     artifact_path = path / f"{result.model_version}_inference.pt"
 
-    is_dual_stgcn = config.model.model_name.startswith("dual_stgcn")
-    is_graph_model = is_dual_stgcn
     is_two_stream_attn = config.model.model_name.startswith("two_stream_attn")
 
-    if is_dual_stgcn:
-        artifact_type = "dual_stgcn_lstm_inference"
-    elif is_two_stream_attn:
+    if is_two_stream_attn:
         artifact_type = "two_stream_attn_inference"
     else:
-        artifact_type = "two_stream_lstm_inference"
+        raise ValueError(
+            f"Unsupported model_name {config.model.model_name!r} for inference export. "
+            "Supported prefix: 'two_stream_attn_'."
+        )
 
-    model_config_dict: dict[str, Any]
-    if is_dual_stgcn:
-        model_config_dict = {
-            "model_name": config.model.model_name,
-            "num_nodes": config.model.num_nodes,
-            "num_coords": config.model.num_coords,
-            "phono_conv_channels": config.model.phono_conv_channels,
-            "lstm_hidden": config.model.lstm_hidden,
-            "lstm_layers": config.model.lstm_layers,
-            "stgcn_channels": list(config.model.stgcn_channels),
-            "dropout": config.model.dropout,
-            "num_classes": config.model.num_classes,
-        }
-    else:
-        if is_two_stream_attn:
-            model_config_dict = _two_stream_attn_model_config(
-                model=result.model,
-                config=config,
-            )
-        else:
-            model_config_dict = {
-                "model_name": config.model.model_name,
-                "input_size": config.model.input_size,
-                "hidden_size": config.model.hidden_size,
-                "num_layers": config.model.num_layers,
-                "dropout": config.model.dropout,
-                "num_classes": config.model.num_classes,
-            }
+    model_config_dict: dict[str, Any] = _two_stream_attn_model_config(
+        model=result.model,
+        config=config,
+    )
     payload: dict[str, Any] = {
         "artifact_type": artifact_type,
         "artifact_version": result.model_version,
@@ -112,25 +82,13 @@ def export_inference_artifact(
         val = result.dataset_metadata.get(key)
         return bool(val) if val is not None else default
 
-    if is_graph_model:
-        # Include adjacency from model buffer for self-contained inference.
-        adjacency_tensor = result.model.adjacency  # type: ignore[attr-defined]
-        payload["graph_schema"] = {
-            "graph_schema_version": config.export.graph_schema_version,
-            "num_nodes": config.model.num_nodes,
-            "num_coords": config.model.num_coords,
-            "window_length": _meta_int("window_length", 24),
-            "window_step": _meta_int("window_step", 3),
-            "adjacency": adjacency_tensor,
-        }
-    else:
-        payload["feature_schema"] = {
-            "feature_schema_version": config.export.feature_schema_version,
-            "feature_dim": _meta_int("feature_dim", 126),
-            "window_length": _meta_int("window_length", 24),
-            "window_step": _meta_int("window_step", 3),
-            "orientation_normalization": _meta_bool("enable_orientation_normalization"),
-        }
+    payload["feature_schema"] = {
+        "feature_schema_version": config.export.feature_schema_version,
+        "feature_dim": _meta_int("feature_dim", 126),
+        "window_length": _meta_int("window_length", 24),
+        "window_step": _meta_int("window_step", 3),
+        "orientation_normalization": _meta_bool("enable_orientation_normalization"),
+    }
 
     torch.save(payload, artifact_path)
     return artifact_path
@@ -145,14 +103,11 @@ def update_model_registry(
     class_labels: list[str],
     dataset_metadata: dict[str, Any],
     feature_schema_version: str = "",
-    graph_schema_version: str = "",
     training_data_version: str = "unknown",
 ) -> None:
     """Append a new model entry to the JSON registry file.
 
-    Supports both flat-feature (two_stream) and graph-schema (stgcn) models.
-    Pass *graph_schema_version* for STGCN models, *feature_schema_version* for
-    two-stream models.
+    Supports feature-schema based two-stream attention models.
     """
     path = Path(registry_path)
     if path.exists():
@@ -172,13 +127,8 @@ def update_model_registry(
         "window_step": int(dataset_metadata.get("window_step", 3)),
     }
 
-    if graph_schema_version:
-        entry["graph_schema_version"] = graph_schema_version
-        entry["num_nodes"] = int(dataset_metadata.get("num_nodes", 67))
-        entry["num_coords"] = int(dataset_metadata.get("num_coords", 3))
-    else:
-        entry["feature_schema_version"] = feature_schema_version
-        entry["feature_dim"] = int(dataset_metadata.get("feature_dim", 0))
+    entry["feature_schema_version"] = feature_schema_version
+    entry["feature_dim"] = int(dataset_metadata.get("feature_dim", 0))
 
     registry.setdefault("models", []).append(entry)
     path.write_text(json.dumps(registry, indent=2, default=str), encoding="utf-8")
