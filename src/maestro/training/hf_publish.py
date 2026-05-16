@@ -889,7 +889,7 @@ def _build_model_card(
     num_params = _count_parameters(result.model)
     num_classes_active = len(result.class_labels) - 1  # subtract unknown background
     created_at = datetime.now(UTC).strftime("%Y-%m-%d")
-    window_length = int(result.dataset_metadata.get("window_length", 32))
+    window_length = int(result.dataset_metadata.get("window_length", 16))
     window_duration_ms = int(round(window_length * (1000.0 / 30.0)))
     class_weighting = (
         "enabled (inverse-frequency)"
@@ -1227,7 +1227,7 @@ def publish_to_huggingface(
                 "feature_schema_version": config.export.feature_schema_version,
                 "feature_dim": config.model.input_size,
                 "orientation_normalization": False,
-                "window_length": result.dataset_metadata.get("window_length", 32),
+                "window_length": result.dataset_metadata.get("window_length", 16),
                 "window_step": result.dataset_metadata.get("window_step", 3),
             }
         }
