@@ -2,198 +2,103 @@
 
 ## 1. Overview
 
-The development view describes the system's source code organization, module decomposition, and dependency structure from a developer's perspective. The codebase follows a layered package architecture with dependency inversion enforced through Protocol interfaces.
+This development view describes the current source layout after STGCN/legacy cleanup.
+The system uses a layered package design with Protocol interfaces and a runtime/training split.
 
 ## 2. Repository Structure
 
-```
+```text
 Maestro/
-├── configs/                          # Runtime and model configuration (YAML)
-│   ├── app.yaml                      # Camera, FPS, active application
-│   ├── inference.yaml                # Window geometry, activation timing, thresholds
-│   ├── model_source.yaml             # Model backend: huggingface or local
+├── configs/
+│   ├── app.yaml
+│   ├── inference.yaml
+│   ├── model_source.yaml
 │   ├── gestures/
-│   │   ├── vocabulary_ipn.yaml       # Full IPN baseline vocabulary (14 classes, legacy)
-│   │   ├── vocabulary_hybrid.yaml    # Production hybrid Jester+IPN vocabulary (10 classes)
-│   │   └── command_map_presentation.yaml  # Gesture-to-command mapping (presentation vocabulary)
+│   │   ├── command_map_presentation.yaml
+│   │   ├── vocabulary_ld_cong_hybrid.yaml
+│   │   ├── vocabulary_jester.yaml
+│   │   └── vocabulary_ipn_10class.yaml
 │   ├── model/
-│   │   ├── two_stream_attn.yaml      # EnhancedTwoStreamLSTM (authoritative default)
-│   │   ├── two_stream_lstm.yaml      # Legacy two-stream LSTM (experimental reference)
-│   │   └── feature_pipeline.yaml     # Feature normalization toggles
+│   │   ├── two_stream_attn_ld_cong_10class_2layer_experiment.yaml
+│   │   ├── two_stream_attn_jester_2layer_experiment.yaml
+│   │   ├── feature_pipeline.yaml
+│   │   └── archive/
 │   └── thresholds/
-│       └── production_hybrid.yaml    # Per-class confidence thresholds and vote windows (hybrid)
-├── src/maestro/              # Main application package
-│   ├── app/                          # Application layer
-│   ├── domain/                       # Domain entities and interfaces
-│   ├── interfaces/                   # Protocol definitions
-│   ├── infrastructure/               # External library adapters
-│   ├── pipeline/                     # Inference pipeline components
-│   ├── training/                     # Offline training pipeline
-│   ├── evaluation/                   # Benchmarking utilities
-│   └── utils/                        # Shared utilities
-├── scripts/                          # CLI entry points
-├── tests/                            # Test suite
-│   ├── unit/                         # Isolated component tests
-│   ├── integration/                  # Multi-component pipeline tests
-│   ├── system/                       # End-to-end system tests
-│   └── fixtures/                     # Test data and configurations
-├── models/                           # Local training artifacts (excluded from VCS)
-│   └── checkpoints/                  # Training checkpoints (.pt, .gitignored)
-├── data/                             # Dataset files
-│   ├── raw/                          # JSONL landmark recordings
-│   └── processed/                    # NPZ sequence datasets
-├── experiments/
-│   └── runs/                         # Training run logs
-├── notebooks/                        # Jupyter ML workflow notebooks
-│   ├── 04_dataset_preparation_jester_ipn.ipynb
-│   └── 07_model_training_jester_pretrain_ipn_finetune.ipynb
-├── docs/                             # Project documentation
-│   ├── architecture/                 # Architecture documentation suite
-│   ├── ml-system/                    # ML-specific reference (feature schema, etc.)
-│   ├── development/                  # Engineering plans and refactoring notes
-│   ├── IPN_INTEGRATION_GUIDE.md      # IPN Hand dataset pipeline guide
-│   └── archive/
-│       └── work-logs/                # Development session logs (authoritative history)
-├── tools/                            # Development scripts (lint, test, profile)
-├── requirements/                     # Dependency specifications
-└── pyproject.toml                    # Project metadata and build configuration
+│       └── production_hybrid.yaml
+├── src/maestro/
+│   ├── app/
+│   ├── domain/
+│   ├── interfaces/
+│   ├── infrastructure/
+│   ├── pipeline/
+│   ├── training/
+│   ├── evaluation/
+│   └── utils/
+├── scripts/
+├── tests/
+├── docs/
+└── notebooks/
 ```
 
 ## 3. Package Decomposition
 
-### 3.1 `src/maestro/domain/`
+### 3.1 Domain (`src/maestro/domain/`)
 
-**Purpose**: Pure business concepts with no external dependencies.
+Core dataclasses and enums used by pipeline and runtime:
+- `entities.py`: frame/landmark/feature/prediction/runtime state contracts
+- `enums.py`: runtime mode vocabulary
+- `events.py`: telemetry events
+- `contracts.py`: lifecycle contracts
 
-| Module         | Contents                                                                                                                                                                                           | Responsibility                                                                  |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `entities.py`  | `FramePacket`, `HandLandmarks`, `MultiHandPacket`, `LandmarkPacket`, `FeatureFrame`, `SequenceWindow`, `Prediction`, `StabilizedPrediction`, `ExecutableCommand`, `DispatchResult`, `RuntimeState` | Dataclasses (`slots=True`) representing pipeline state at each processing stage |
-| `enums.py`     | `RuntimeMode`                                                                                                                                                                                      | Finite state vocabulary as `StrEnum` type                                       |
-| `events.py`    | `DomainEvent`                                                                                                                                                                                      | Structured event type for telemetry and logging                                 |
-| `contracts.py` | `IRunnable`, `IClosable`                                                                                                                                                                           | Minimal lifecycle protocols                                                     |
+### 3.2 Interfaces (`src/maestro/interfaces/`)
 
-**Dependency rule**: This package avoids application/infrastructure dependencies. It may import foundational libraries such as `numpy` for typed arrays used in domain entities.
+Protocol-based abstractions for frame source, feature extraction, model inference, stabilization,
+activation, dispatch, and feedback rendering.
 
-### 3.2 `src/maestro/interfaces/`
+### 3.3 Infrastructure (`src/maestro/infrastructure/`)
 
-**Purpose**: Protocol definitions for all pipeline services.
+Concrete adapters for OpenCV, MediaPipe, model artifact loading, dispatch targets,
+overlay rendering, and gaze detectors.
 
-| Interface                | Method Signature                                                    | Consumed By                   |
-| ------------------------ | ------------------------------------------------------------------- | ----------------------------- |
-| `IFrameSource`           | `read() → FramePacket`                                              | Runtime loop                  |
-| `IHandLandmarkExtractor` | `extract(FramePacket) → MultiHandPacket`                            | Runtime loop                  |
-| `IFeatureTransformer`    | `transform(LandmarkPacket) → FeatureFrame`                          | Runtime loop, dataset builder |
-| `ISequenceBuffer`        | `push(FeatureFrame)`, `ready() → bool`, `window() → SequenceWindow` | Runtime loop, dataset builder |
-| `IGestureModel`          | `predict(SequenceWindow) → Prediction`                              | Runtime loop                  |
-| `IPredictionStabilizer`  | `update(Prediction) → StabilizedPrediction`                         | Runtime loop                  |
-| `IActivationController`  | `route(StabilizedPrediction) → ExecutableCommand \| None`           | Runtime loop                  |
-| `ICommandDispatcher`     | `dispatch(ExecutableCommand) → DispatchResult`                      | Runtime loop                  |
-| `IFeedbackRenderer`      | `render(FramePacket, RuntimeState) → FramePacket`                   | Runtime loop                  |
-| `IGazeIntentDetector`    | `update(FramePacket) → bool`, `close() → None`                      | Runtime loop, bootstrap       |
+### 3.4 Pipeline (`src/maestro/pipeline/`)
 
-**Dependency rule**: Imports only domain entities. Uses `typing.Protocol` for structural subtyping.
+Active runtime pipeline modules:
+- `hand_selection.py` (`HandSelector`)
+- `feature_engineering.py` (`LandmarkFeatureTransformer`)
+- `buffering.py` (`SlidingWindowSequenceBuffer`)
+- `stabilization.py` (`PredictionStabilizer`)
+- `activation.py` (`GestureActivationController`)
+- `laser_pointer.py`, `annotation_pen.py`
 
-### 3.3 `src/maestro/infrastructure/`
+### 3.5 Training (`src/maestro/training/`)
 
-**Purpose**: Concrete implementations wrapping external libraries.
+Current production training stack is feature-sequence based (no graph/STGCN modules):
+- `dataset_builder.py`: `SequenceDatasetBuilder`, `LabeledLandmarkFrame`
+- `datamodule.py`: `GestureDataModule`, tensor datasets, split logic
+- `augmentation.py`: data augmentation config + augmenter
+- `train_lstm.py`: training loop and config parsing for `EnhancedTwoStreamLSTM`
+- `evaluate.py`: evaluation metrics and reporting
+- `export_checkpoint.py`: inference artifact export and registry update
+- `hf_publish.py`: Hugging Face publishing and model card generation
 
-| Subpackage               | Module                    | Class                                                      | External Dependency      |
-| ------------------------ | ------------------------- | ---------------------------------------------------------- | ------------------------ |
-| `camera/`                | `opencv_source.py`        | `OpenCVFrameSource`                                        | OpenCV                   |
-| `mediapipe/`             | `hands_extractor.py`      | `MediaPipeHandsExtractor`                                  | MediaPipe                |
-| `model/`                 | `checkpoint_loader.py`    | `InferenceArtifact`, loader functions                      | PyTorch                  |
-| `dispatch/`              | `command_dispatcher.py`   | `CommandDispatcher`                                        | —                        |
-| `dispatch/app_adapters/` | `keyboard_adapter.py`     | `KeyboardAdapter`                                          | pyautogui                |
-| `dispatch/app_adapters/` | `presentation_adapter.py` | `PresentationAdapter` (slide navigation, zoom, start/stop) | —                        |
-| `feedback/`              | `overlay_renderer.py`     | `OverlayRenderer`                                          | OpenCV                   |
-| `gaze/`                  | `head_pose_detector.py`   | `HeadPoseGazeDetector`                                     | MediaPipe, OpenCV, NumPy |
-| `gaze/`                  | `null_detector.py`        | `NullGazeDetector`                                         | —                        |
+### 3.6 Application (`src/maestro/app/`)
 
-**Dependency rule**: May import domain entities, interfaces, and external libraries. Must not import from pipeline, training, or app packages.
+- `bootstrap.py`: dependency container wiring
+- `runtime.py`: frame-by-frame runtime loop
+- `main.py`: CLI entrypoint
+- `ui/`: PySide6 UI modules
 
-### 3.4 `src/maestro/pipeline/`
+### 3.7 App UI (`src/maestro/app/ui/`)
 
-**Purpose**: Stateful inference pipeline components.
+The UI package currently contains:
+- `app_ui.py`: Qt app bootstrap
+- `controller.py`: runtime worker-thread orchestration
+- `main_window.py`: primary control window
+- `floating_preview.py`: detached preview window
+- `preview_widget.py`: frame rendering widget
+- `cli_preview.py`: lightweight preview for CLI mode
 
-| Module                   | Class                         | State                                                                |
-| ------------------------ | ----------------------------- | -------------------------------------------------------------------- |
-| `hand_selection.py`      | `HandSelector`                | Stateless; reads `hand_preference` config at construction            |
-| `feature_engineering.py` | `LandmarkFeatureTransformer`  | Previous frame landmarks (for velocity)                              |
-| `buffering.py`           | `SlidingWindowSequenceBuffer` | Deque of recent feature frames, step counter                         |
-| `stabilization.py`       | `PredictionStabilizer`        | EMA-smoothed probabilities, vote history deque                       |
-| `activation.py`          | `GestureActivationController` | Current `RuntimeMode`, activation timer, dispatch edge state         |
-| `laser_pointer.py`       | `LaserPointerTracker`         | Continuous pointer lifecycle (`point_one`), per-frame cursor mapping |
-| `annotation_pen.py`      | `AnnotationPenTracker`        | Continuous annotation lifecycle (`point_two`), drag-stroke state     |
-
-**Dependency rule**: May import domain entities and interfaces. Must not import from infrastructure or app packages. The `LandmarkFeatureTransformer` and `SlidingWindowSequenceBuffer` are shared with the training package to enforce feature parity.
-
-### 3.5 `src/maestro/training/`
-
-**Purpose**: Offline dataset construction, model training, evaluation, and export.
-
-| Module                 | Key Classes                                              | Responsibility                                                                                                                                                                   |
-| ---------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dataset_builder.py`   | `SequenceDatasetBuilder`, `LabeledLandmarkFrame`         | Converts JSONL landmark recordings to NPZ sequence datasets                                                                                                                      |
-| `datamodule.py`        | `GestureDataModule`, `SequenceTensorDataset`             | PyTorch dataset wrappers with recording-level group splits and optional augmentation                                                                                             |
-| `augmentation.py`      | `GestureAugmenter`, `AugmentationConfig`                 | Temporal scaling and spatial jitter for training regularization                                                                                                                  |
-| `train_lstm.py`        | `train_lstm()`, `TrainingPipelineConfig`                 | Training loop with early stopping and LR scheduling; instantiates model architecture from config (`EnhancedTwoStreamLSTM` default, legacy variants retained for experimentation) |
-| `evaluate.py`          | `evaluate_model()`, `EvaluationReport`                   | Per-class precision, recall, F1; confusion matrix                                                                                                                                |
-| `export_checkpoint.py` | `export_inference_artifact()`, `update_model_registry()` | Checkpoint serialization and local registry update                                                                                                                               |
-| `hf_publish.py`        | `publish_to_huggingface()`, `build_model_card()`         | Publish trained artifacts to Hugging Face Hub with auto-generated model card                                                                                                     |
-
-**Dependency rule**: Imports pipeline components (`LandmarkFeatureTransformer`, `SlidingWindowSequenceBuffer`) for training–inference parity. Imports PyTorch and scikit-learn. Not imported by the runtime inference path.
-
-### 3.6 `src/maestro/app/`
-
-**Purpose**: Application entry points and dependency wiring.
-
-| Module         | Key Components                      | Responsibility                                                                                                                                                                                                                        |
-| -------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bootstrap.py` | `AppContainer`, `build_container()` | Composition root; reads configs, loads model, instantiates all components. `AppContainer` holds a `hand_selector: HandSelector` field between `landmark_extractor` and `feature_transformer`.                                         |
-| `runtime.py`   | `Runtime`                           | Main event loop; sequential frame processing and optional UI callback. The extraction step now calls `landmark_extractor.extract()` → `MultiHandPacket`, then `hand_selector.select()` → `LandmarkPacket` before feature engineering. |
-| `main.py`      | `main()`, `parse_args()`            | CLI argument parsing and launch orchestration. Supports headless runtime and Qt preview mode (`--no-display` toggles headless).                                                                                                       |
-
-**Dependency rule**: May import from all other packages. This is the only package that performs concrete instantiation.
-
-#### 3.6.1 `src/maestro/app/ui/`
-
-**Purpose**: PySide6 graphical control surface for runtime lifecycle, configuration editing, and state observation.
-
-| Module              | Key Components                        | Responsibility                                                           |
-| ------------------- | ------------------------------------- | ------------------------------------------------------------------------ |
-| `app_ui.py`         | `run_ui()`                            | `QApplication` bootstrap; UI entry point called from `scripts/run_ui.py` |
-| `controller.py`     | `RuntimeController`, `_RuntimeThread` | Worker `QThread` wrapper; bridges `Runtime` lifecycle to Qt signals      |
-| `main_window.py`    | `MainWindow`                          | Root window; owns controller; wires signals between all panels           |
-| `launcher_panel.py` | `LauncherPanel`                       | Start/Stop button, status pill, preview-window checkbox                  |
-| `status_monitor.py` | `StatusMonitor`                       | Per-frame telemetry display driven entirely by `state_updated` signal    |
-| `config_panel.py`   | `ConfigPanel`                         | Pydantic-driven form editor; atomic YAML write on Apply & Restart        |
-| `model_panel.py`    | `ModelPanel`                          | Hugging Face / Local model source selector                               |
-
-**Dependency rule**: `app/ui/` may import from `app/` (bootstrap, runtime), `domain/`, and `utils/`. No file outside `app/ui/` imports from `app/ui/`. `app/runtime.py` and `app/main.py` contain no PySide6 imports — the inference CLI path is fully isolated from the UI layer.
-
-See [ui-view.md](ui-view.md) for the complete UI architecture documentation.
-
-### 3.7 `src/maestro/utils/`
-
-**Purpose**: Shared utilities used across training and inference.
-
-| Module                  | Responsibility                                                                             |
-| ----------------------- | ------------------------------------------------------------------------------------------ |
-| `config_loader.py`      | Reads and validates YAML configuration files                                               |
-| `schema_validation.py`  | Pydantic models (`AppConfig`, `InferenceConfig`, `FeaturePipelineConfig`, `RuntimeConfig`) |
-| `feature_validation.py` | Dataset–runtime feature schema compatibility checking                                      |
-| `time_utils.py`         | Timestamp utilities                                                                        |
-| `reproducibility.py`    | Random seed management for NumPy, PyTorch, and Python `random`                             |
-
-### 3.8 `src/maestro/evaluation/`
-
-**Purpose**: Runtime performance measurement.
-
-| Module                 | Responsibility                                                                     |
-| ---------------------- | ---------------------------------------------------------------------------------- |
-| `benchmark_latency.py` | Per-stage latency recording with percentile aggregation and JSON report generation |
-
-## 4. Module Dependency Graph
+## 4. Dependency Direction
 
 ```mermaid
 graph TD
@@ -202,9 +107,11 @@ graph TD
     App --> Utils["utils/"]
     App --> Domain["domain/"]
     App --> Interfaces["interfaces/"]
+
     UI["app/ui/"] --> App
     UI --> Domain
     UI --> Utils
+
     Pipeline --> Domain
     Pipeline --> Interfaces
 
@@ -215,89 +122,23 @@ graph TD
 
     Infra --> Domain
     Infra --> Interfaces
-
-    Evaluation["evaluation/"] --> Domain
-
-    Utils --> Domain
-
     Interfaces --> Domain
 ```
 
-**Key constraint**: All arrows point downward or laterally. No circular dependencies exist. The domain layer is at the bottom of the dependency hierarchy.
+## 5. Active Configuration Set
 
-## 5. Configuration Organization
-
-Configuration files are organized by concern:
-
-| Category         | Files                                    | Schema                                                                                                                            |
-| ---------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Application**  | `app.yaml`                               | `AppConfig` — camera index, resolution, FPS                                                                                       |
-| **Inference**    | `inference.yaml`                         | `InferenceConfig` — window length/step, activation timing, cooldown                                                               |
-| **Model source** | `model_source.yaml`                      | `ModelSourceConfig` — backend (`huggingface`/`local`), HF repo/revision/filename                                                  |
-| **Model**        | `model/two_stream_attn.yaml`             | Authoritative training defaults for `EnhancedTwoStreamLSTM`; legacy model configs remain for experimental comparisons             |
-| **Features**     | `model/feature_pipeline.yaml`            | `FeaturePipelineConfig` — normalization and velocity toggles                                                                      |
-| **Vocabulary**   | `gestures/vocabulary_hybrid.yaml`        | Hybrid Jester+IPN production gesture class list (10 classes)                                                                      |
-| **Commands**     | `gestures/command_map_presentation.yaml` | Gesture command routing: `gesture_commands` (discrete → dispatcher) and `gesture_modes` (continuous gestures handled by trackers) |
-| **Thresholds**   | `thresholds/production_hybrid.yaml`      | Per-class confidence thresholds and temporal vote window sizes                                                                    |
-
-All configuration is validated at startup via Pydantic schemas. Invalid configurations cause immediate failure with descriptive error messages.
+- `configs/model_source.yaml`: production model source (`ntsrigaud/maestro-lstm-hybrid`)
+- `configs/gestures/vocabulary_ld_cong_hybrid.yaml`: production vocabulary
+- `configs/gestures/command_map_presentation.yaml`: command/mode mapping
+- `configs/thresholds/production_hybrid.yaml`: production thresholds
+- `configs/model/two_stream_attn_ld_cong_10class_2layer_experiment.yaml`: production training config
+- `configs/model/two_stream_attn_jester_2layer_experiment.yaml`: backbone pretraining config
 
 ## 6. Script Entry Points
 
-| Script                         | Purpose                                         | Primary Dependencies                   |
-| ------------------------------ | ----------------------------------------------- | -------------------------------------- |
-| `scripts/run_ui.py`            | Launch PySide6 GUI (control panel + monitoring) | `app/ui/`, `app/`, `domain/`           |
-| `scripts/run_realtime.py`      | Launch CLI-only real-time gesture recognition   | `app/`, `pipeline/`, `infrastructure/` |
-| `scripts/train_model.py`       | Train LSTM from NPZ dataset                     | `training/`, `utils/`                  |
-| `scripts/build_ipn_dataset.py` | Convert IPN Hand dataset to NPZ                 | `training/`, `pipeline/`               |
-| `scripts/benchmark_system.py`  | Latency profiling                               | `evaluation/`                          |
-
-## 7. Testing Organization
-
-```
-tests/
-├── conftest.py                              # Shared fixtures; skips test_ui_* when PySide6 absent
-├── unit/                                    # Unit test modules
-│   ├── test_opencv_source.py
-│   ├── test_mediapipe_extractor.py
-│   ├── test_feature_engineering.py
-│   ├── test_sequence_buffer.py
-│   ├── test_prediction_stabilization.py
-│   ├── test_activation_controller.py
-│   ├── test_adapters.py
-│   ├── test_dataset_builder.py
-│   ├── test_augmentation.py
-│   ├── test_training_datamodule.py
-│   ├── test_training_export.py
-│   ├── test_checkpoint_loader.py
-│   ├── test_config_loader.py
-│   ├── test_feature_validation.py
-│   ├── test_latency_benchmark.py
-│   ├── test_overlay_renderer.py
-│   ├── test_runtime.py
-│   ├── test_hf_loader.py
-│   ├── test_head_pose_gaze_detector.py
-│   ├── test_ui_runtime_on_state.py          # UI: on_state callback integration
-│   ├── test_ui_runtime_controller.py        # UI: RuntimeController signals + lifecycle
-│   ├── test_ui_launcher_panel.py            # UI: LauncherPanel state machine
-│   ├── test_ui_status_monitor.py            # UI: StatusMonitor field rendering
-│   ├── test_ui_config_panel.py              # UI: form validation, atomic write
-│   ├── test_ui_model_panel.py               # UI: HF / Local tab switching
-│   └── test_ui_tray.py                      # UI: system tray + show_window checkbox
-├── integration/                             # Integration test modules
-│   ├── test_phase2_pipeline.py
-│   ├── test_phase3_feature_pipeline.py
-│   ├── test_dataset_generation_pipeline.py
-│   ├── test_training_pipeline_smoke.py
-│   └── test_gesture_dispatch_pipeline.py
-├── system/                                  # End-to-end tests
-└── fixtures/                                # Test data and configs
-```
-
-**Testing strategy**: Unit tests mock external dependencies (OpenCV, MediaPipe, pyautogui). Integration tests exercise multi-component pipelines with synthetic data. UI tests (`test_ui_*`) require PySide6 and `pytest-qt`; `conftest.py` skips them automatically when PySide6 is absent. All tests run without GPU or camera hardware.
-
----
-
-**Document**: Development View  
-**Suite**: Architecture Documentation (`docs/architecture/`)  
-**Last Updated**: May 2026
+- `scripts/run_ui.py`: launch PySide6 UI
+- `scripts/run_realtime.py`: launch runtime without full UI
+- `scripts/train_model.py`: training
+- `scripts/build_ld_cong_dataset.py`: LD-CONG dataset builder
+- `scripts/build_jester_dataset.py`, `scripts/build_ipn_dataset.py`: dataset prep utilities
+- `scripts/benchmark_system.py`: runtime benchmark
