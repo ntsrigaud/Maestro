@@ -172,7 +172,7 @@ The PySide6 UI (`src/maestro/app/ui/`) is a non-blocking control surface:
 - `Runtime` receives an optional `on_state` callback; the worker thread throttles callback emissions to ~10 Hz and forwards them as Qt signals to the main thread.
 - `MainWindow` mediates all signal routing between panels and the controller; no panel communicates with the controller directly.
 - Configuration changes are validated in-memory by Pydantic; YAML files are written only after the runtime stops and only on explicit user action.
-- A `QSystemTrayIcon` provides ambient gesture feedback (colour-coded: grey / green / amber) when the window is minimised.
+- The main UI window is the cross-platform control surface, and a `QSystemTrayIcon` supplements it with ambient gesture feedback (colour-coded: grey / green / amber) when available.
 
 See [docs/architecture/ui-view.md](docs/architecture/ui-view.md) for the complete UI architecture documentation.
 

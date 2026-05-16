@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 from unittest.mock import patch
+
+import pytest
 
 from maestro.app.ui.main_window import MainWindow
 from maestro.domain.entities import RuntimeState
@@ -17,27 +20,28 @@ class _RunningThread:
         return True
 
 
+@pytest.mark.skipif(bool(os.getenv("CI")), reason="UI tray/window tests are skipped in CI")
 class TestSystemTray:
-    def test_tray_created_and_visible(self, qtbot) -> None:
+    def test_control_surface_window_is_created(self, qtbot) -> None:
         with (
             patch("maestro.app.ui.controller.build_container"),
             patch("maestro.app.ui.controller.Runtime"),
         ):
             window = MainWindow(config_path="configs")
             qtbot.addWidget(window)
-            assert window._tray.isVisible()
+            assert window.isVisible()
 
-    def test_tray_icon_is_qicon(self, qtbot) -> None:
+    def test_window_icon_is_qicon(self, qtbot) -> None:
         with (
             patch("maestro.app.ui.controller.build_container"),
             patch("maestro.app.ui.controller.Runtime"),
         ):
             window = MainWindow(config_path="configs")
             qtbot.addWidget(window)
-            icon = window._tray.icon()
+            icon = window.windowIcon()
             assert not icon.isNull()
 
-    def test_tray_menu_exposes_active_and_preview_actions(self, qtbot) -> None:
+    def test_controls_menu_exposes_active_and_preview_actions(self, qtbot) -> None:
         with (
             patch("maestro.app.ui.controller.build_container"),
             patch("maestro.app.ui.controller.Runtime"),
@@ -45,7 +49,7 @@ class TestSystemTray:
             window = MainWindow(config_path="configs")
             qtbot.addWidget(window)
 
-            actions = window._tray.contextMenu().actions()
+            actions = window._controls_menu.actions()
             assert actions[0].text() == "Active"
             assert actions[1].text() == "Preview"
 
@@ -100,3 +104,21 @@ class TestSystemTray:
 
             state_idle = RuntimeState(mode="idle", gaze_permitted=True, info={"gaze_enabled": True})
             assert window._tray_colour_for_state(state_idle) == "#D97706"
+
+    def test_window_controls_remain_available_without_system_tray(self, qtbot) -> None:
+        with (
+            patch(
+                "maestro.app.ui.main_window.QSystemTrayIcon.isSystemTrayAvailable",
+                return_value=False,
+            ),
+            patch("maestro.app.ui.controller.build_container"),
+            patch("maestro.app.ui.controller.Runtime"),
+        ):
+            window = MainWindow(config_path="configs")
+            qtbot.addWidget(window)
+
+            assert window.isVisible()
+            assert window._tray is None
+            assert window.windowIcon().isNull() is False
+            assert window._menu_button.menu() is not None
+            assert window._controls_menu.actions()[0].text() == "Active"
