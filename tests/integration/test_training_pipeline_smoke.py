@@ -61,7 +61,7 @@ def test_training_pipeline_smoke(tmp_path: Path) -> None:
     cfg_path.write_text(
         """
 model:
-  model_name: two_stream_smoke
+  model_name: two_stream_attn_smoke
   input_size: 147
   hidden_size: 32
   num_layers: 2
