@@ -212,8 +212,7 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
         ).to(device)
 
     raise ValueError(
-        f"Unsupported model_name {config.model_name!r}. "
-        "Supported prefix: 'two_stream_attn_'."
+        f"Unsupported model_name {config.model_name!r}. Supported prefix: 'two_stream_attn_'."
     )
 
 
@@ -291,9 +290,7 @@ def _build_criterion(
     return nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
 
-def _build_class_weights(
-    datamodule: GestureDataModule, device: torch.device
-) -> torch.Tensor:
+def _build_class_weights(datamodule: GestureDataModule, device: torch.device) -> torch.Tensor:
     # Use training-split-only counts so that any per-class downsampling is
     # reflected in the weights.  Without this, the weights would be computed
     # from the full dataset distribution, which still shows the 145x imbalance

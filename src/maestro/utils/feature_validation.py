@@ -156,5 +156,3 @@ def validate_dataset_compatibility(
     """
     metadata = load_dataset_metadata(dataset_path)
     return validate_feature_schema_parity(metadata, runtime_feature_config)
-
-

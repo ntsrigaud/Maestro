@@ -290,5 +290,3 @@ class SequenceDatasetBuilder:
             min_valid_ratio=self._min_valid_ratio,
         )
         self._labels.clear()
-
-
