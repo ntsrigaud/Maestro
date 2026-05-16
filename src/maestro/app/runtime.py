@@ -158,6 +158,10 @@ class Runtime:
         self._running = False
         self._on_state = on_state
         self._inference_worker: _InferenceWorker | None = None
+        cfg = getattr(container, "config", None)
+        infer_cfg = getattr(cfg, "inference", None)
+        gaze_cfg = getattr(infer_cfg, "gaze", None)
+        self._gaze_enabled = bool(getattr(gaze_cfg, "enabled", True))
         # Pre-compute the active mode display string from config.  This never
         # changes at runtime; storing it once avoids repeated attribute lookups
         # and getattr fallbacks in the hot loop.
@@ -237,6 +241,9 @@ class Runtime:
                         mode=str(self._container.activation_controller.mode),
                         gaze_permitted=False,
                         active_mode=self._active_mode,
+                        info={
+                            "gaze_enabled": self._gaze_enabled,
+                        },
                     )
                     overlay_frame = self._container.overlay_renderer.render(frame, absent_state)
                     # Attach the rendered frame so the caller (GUI widget or
@@ -361,6 +368,7 @@ class Runtime:
                         "latency_infer_ms": inference_ms,
                         "latency_e2e_ms": loop_e2e_ms,
                         "fps": fps,
+                        "gaze_enabled": self._gaze_enabled,
                         "accepted": (
                             bool(stabilized_prediction.accepted) if stabilized_prediction else False
                         ),
