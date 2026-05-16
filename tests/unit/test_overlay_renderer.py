@@ -247,6 +247,8 @@ def test_mirror_symmetry_of_two_landmarks() -> None:
 _GREY = (128, 128, 128)
 _AMBER = (0, 165, 255)
 _GREEN = (0, 200, 0)
+_LASER = (255, 140, 0)
+_PEN = (180, 0, 200)
 _THICKNESS = 4
 
 
@@ -279,6 +281,17 @@ class TestGazeBorder:
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=100, height=100)
         state = _make_state_with_gaze(mode, gaze_permitted)
+        return renderer.render(frame, state).frame
+
+    def _render_with_info(self, mode: str, gaze_permitted: bool, info: dict) -> object:
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=100, height=100)
+        state = RuntimeState(
+            mode=mode,
+            last_label="unknown",
+            gaze_permitted=gaze_permitted,
+            info=info,
+        )
         return renderer.render(frame, state).frame
 
     # --- Absent state ---------------------------------------------------------
@@ -349,6 +362,46 @@ class TestGazeBorder:
         state = RuntimeState(mode="idle", last_label="unknown", last_confidence=0.0)
         result = renderer.render(frame, state).frame
         assert _border_pixel(result, corner="top-left") == _AMBER
+
+    # --- Continuous gesture states (laser/pen) --------------------------------
+
+    def test_laser_active_renders_sky_blue_border(self) -> None:
+        """laser_active=True in info → sky blue border overrides mode."""
+        frame = self._render_with_info("idle", gaze_permitted=True, info={"laser_active": True})
+        assert _border_pixel(frame, corner="top-left") == _LASER
+
+    def test_laser_active_overrides_armed_mode(self) -> None:
+        """laser_active=True must override even armed mode → sky blue."""
+        frame = self._render_with_info("armed", gaze_permitted=True, info={"laser_active": True})
+        assert _border_pixel(frame, corner="top-left") == _LASER
+
+    def test_pen_active_renders_violet_border(self) -> None:
+        """pen_active=True in info → violet border overrides mode."""
+        frame = self._render_with_info("idle", gaze_permitted=True, info={"pen_active": True})
+        assert _border_pixel(frame, corner="top-left") == _PEN
+
+    def test_pen_active_overrides_armed_mode(self) -> None:
+        """pen_active=True must override even armed mode → violet."""
+        frame = self._render_with_info("armed", gaze_permitted=True, info={"pen_active": True})
+        assert _border_pixel(frame, corner="top-left") == _PEN
+
+    def test_gaze_absent_overrides_laser_active(self) -> None:
+        """gaze_permitted=False takes priority over laser_active."""
+        frame = self._render_with_info(
+            "armed",
+            gaze_permitted=False,
+            info={"laser_active": True},
+        )
+        assert _border_pixel(frame, corner="top-left") == _GREY
+
+    def test_gaze_absent_overrides_pen_active(self) -> None:
+        """gaze_permitted=False takes priority over pen_active."""
+        frame = self._render_with_info(
+            "armed",
+            gaze_permitted=False,
+            info={"pen_active": True},
+        )
+        assert _border_pixel(frame, corner="top-left") == _GREY
 
 
 # ---------------------------------------------------------------------------
