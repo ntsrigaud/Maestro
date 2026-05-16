@@ -14,7 +14,7 @@ acceptance:
 # Empirical calibration against the trained hybrid model validation split
 # is required before final production deployment.
 class_thresholds:
-  stop_sign: 0.70            # was open_palm_hold: 0.75
+  fist: 0.70                 # closed fist; static held gesture replacing stop_sign
   swiping_right: 0.70        # was swipe_right: 0.70
   swiping_left: 0.70         # was swipe_left: 0.70
   swiping_up: 0.70           # was swipe_up: 0.70
@@ -29,7 +29,7 @@ class_thresholds:
 # Dynamic gestures use a window of 1 so they are dispatched immediately.
 # Held gestures use 3 for false-trigger protection.
 class_vote_windows:
-  stop_sign: 3               # was open_palm_hold: 3
+  fist: 2                    # held gesture; needs temporal stability
   swiping_right: 1           # was swipe_right: 1
   swiping_left: 1            # was swipe_left: 1
   swiping_up: 1              # was swipe_up: 1
