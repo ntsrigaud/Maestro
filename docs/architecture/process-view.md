@@ -196,16 +196,16 @@ graph TD
     JSONL["JSONL Landmark Files"] --> Load["Load Labeled Frames"]
     Load --> FeatTrain["Feature Transform<br/>(same as inference)"]
     FeatTrain --> Window["Sliding Window<br/>(same as inference)"]
-    Window --> NPZ["NPZ Dataset<br/>(N × 32 × 147)"]
+    Window --> NPZ["NPZ Dataset<br/>(N × T × 147)"]
     NPZ --> Split["Recording-level Group Split<br/>(70/15/15)"]
     Split --> Augment["On-the-Fly Augmentation<br/>(temporal scale, spatial jitter)"]
     Augment --> Train["EnhancedTwoStreamLSTM Training Loop<br/>(AdamW, class-weighted CE)"]
     Train --> Eval["Evaluation<br/>(precision, recall, F1)"]
     Eval --> Export["Export Artifact<br/>(.pt + metadata)"]
-    Export --> HFHub["Publish to HF Hub<br/>(ntsrigaud/maestro-lstm)"]
+    Export --> HFHub["Publish to HF Hub<br/>(ntsrigaud/maestro-lstm-hybrid)"]
 ```
 
-The training pipeline reuses `LandmarkFeatureTransformer` and `SlidingWindowSequenceBuffer` from the inference pipeline to guarantee feature parity. The `GestureDataModule` manages dataset loading, group-aware recording-level splits, and on-the-fly augmentation for the training partition. Trained artifacts are published to the Hugging Face Hub (`ntsrigaud/maestro-lstm`) via `training/hf_publish.py` and are not tracked in VCS. At runtime, the artifact is downloaded on first use via `hf_hub_download()` and served from the local HF cache.
+The training pipeline reuses `LandmarkFeatureTransformer` and `SlidingWindowSequenceBuffer` from the inference pipeline to guarantee feature parity. The `GestureDataModule` manages dataset loading, group-aware recording-level splits, and on-the-fly augmentation for the training partition. Trained artifacts are published to the Hugging Face Hub (`ntsrigaud/maestro-lstm-hybrid`) via `training/hf_publish.py` and are not tracked in VCS. At runtime, the artifact is downloaded on first use via `hf_hub_download()` and served from the local HF cache.
 
 ## 8. Graceful Shutdown
 
