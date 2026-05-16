@@ -37,6 +37,11 @@ def _command(command_id: str = "next_slide", gesture: str = "swipe_right") -> Ex
 
 
 class TestKeyboardAdapter:
+    @pytest.fixture(autouse=True)
+    def _force_presentation_scope(self):
+        with patch.object(KeyboardAdapter, "_ensure_presentation_scope", return_value=True):
+            yield
+
     def test_valid_keys_call_pyautogui(self):
         adapter = KeyboardAdapter()
         with patch(
@@ -164,6 +169,30 @@ class TestKeyboardAdapter:
         ) as mock_pya:
             adapter.press_hotkey("ctrl", "l")
             mock_pya.hotkey.assert_called_once_with("ctrl", "l")
+
+    def test_scope_guard_blocks_hotkey_outside_presentation(self):
+        adapter = KeyboardAdapter()
+        with (
+            patch(
+                "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            ) as mock_pya,
+            patch.object(adapter, "_ensure_presentation_scope", return_value=False),
+        ):
+            ok = adapter.press_hotkey("ctrl", "right")
+            assert ok is False
+            mock_pya.hotkey.assert_not_called()
+
+    def test_scope_guard_blocks_mouse_click_outside_presentation(self):
+        adapter = KeyboardAdapter()
+        with (
+            patch(
+                "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            ) as mock_pya,
+            patch.object(adapter, "_ensure_presentation_scope", return_value=False),
+        ):
+            ok = adapter.mouse_click()
+            assert ok is False
+            mock_pya.click.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
