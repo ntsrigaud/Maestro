@@ -141,7 +141,7 @@ The system reads from and writes to the local file system:
 | `experiments/runs/`         | Write      | Training run logs and metrics                                            |
 | `~/.cache/huggingface/hub/` | Read/Write | Hugging Face Hub download cache (first-use download of production model) |
 
-Trained inference artifacts are **not tracked in VCS**. The runtime default model source points to an EnhancedTwoStreamLSTM artifact (`two_stream_attn_v1_20260503T065204Z_inference.pt`) on Hugging Face Hub (`ntsrigaud/maestro-lstm`), downloaded on first use by `hf_hub_download()`. The backend is controlled by `configs/model_source.yaml`.
+Trained inference artifacts are **not tracked in VCS**. The runtime default model source points to an EnhancedTwoStreamLSTM artifact (`two_stream_attn_v1_2layer_ld_cong_finetune_20260515T134706Z_inference.pt`) on Hugging Face Hub (`ntsrigaud/maestro-lstm-hybrid`), downloaded on first use by `hf_hub_download()`. The backend is controlled by `configs/model_source.yaml`.
 
 ## 7. Deployment Procedure
 
