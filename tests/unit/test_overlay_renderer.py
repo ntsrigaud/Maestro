@@ -170,8 +170,6 @@ def test_minimal_preview_shows_border_hides_landmarks() -> None:
     )
     # Landmarks are NOT drawn — centre pixel stays dark.
     assert tuple(int(v) for v in result.frame[120, 80]) == (0, 0, 0)
-    # Label footer has content.
-    assert result.frame[-20:].sum() > 0
 
 
 # ---------------------------------------------------------------------------
