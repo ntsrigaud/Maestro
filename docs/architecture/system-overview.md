@@ -16,16 +16,18 @@ Runtime recognition uses a 10-class vocabulary (9 active gestures + `unknown`). 
 
 The production runtime vocabulary (discrete command path) is:
 
-| Gesture       | Type            | Mapped Command     |
-| ------------- | --------------- | ------------------ |
-| `fist`        | Static          | Erase annotations  |
-| `swipe_right` | Dynamic         | Next slide         |
-| `swipe_left`  | Dynamic         | Previous slide     |
-| `swipe_up`    | Dynamic         | Start presentation |
-| `swipe_down`  | Dynamic         | Stop presentation  |
-| `zoom_in`     | Dynamic         | Zoom in view       |
-| `zoom_out`    | Dynamic         | Zoom out view      |
-| `unknown`     | Rejection class | No action          |
+| Gesture                 | Type            | Mapped Command     |
+| ----------------------- | --------------- | ------------------ |
+| `fist`                  | Static          | Erase annotations  |
+| `swiping_right`         | Dynamic         | Next slide         |
+| `swiping_left`          | Dynamic         | Previous slide     |
+| `swiping_up`            | Dynamic         | Start presentation |
+| `swiping_down`          | Dynamic         | Stop presentation  |
+| `zooming_in_full_hand`  | Dynamic         | Zoom in view       |
+| `zooming_out_full_hand` | Dynamic         | Zoom out view      |
+| `unknown`               | Rejection class | No action          |
+
+`command_map_presentation.yaml` also applies `label_remap` for directional swipes (`swiping_left` ↔ `swiping_right`) before dispatch/display so user-facing direction matches mirrored-camera ergonomics.
 
 The activation gate is controlled by gaze detection plus the activation controller state machine: the controller starts in IDLE and moves to ARMED on gaze-permitted rising edge via `rearm()`. Losing gaze beyond grace transitions back to IDLE through `force_idle()`. Command semantics are configured in `configs/gestures/command_map_presentation.yaml`.
 
