@@ -400,7 +400,7 @@ class GestureDataModule:
         #   New approach (streaming → compact 6.22 GB result):
         #     peak ≈ 6.3 GB  → fits in available RAM
         meta = metadata
-        T = int(meta.get("window_length", 32))
+        T = int(meta.get("window_length", 16))
         F = int(meta.get("feature_dim", 147))
 
         sequences = np.empty((N_kept, T, F), dtype=np.float32)

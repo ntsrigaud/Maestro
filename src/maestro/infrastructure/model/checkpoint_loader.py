@@ -54,7 +54,7 @@ class InferenceArtifact:
     # Flat-feature schema fields (two_stream_* models).
     feature_schema_version: str = "unknown"
     feature_dim: int = 0
-    window_length: int = 32
+    window_length: int = 16
     window_step: int = 3
     orientation_normalization: bool = False
 
@@ -102,7 +102,7 @@ def load_inference_artifact(
         raise ValueError(f"Artifact missing feature_schema: {path}")
     base.feature_schema_version = str(fs.get("feature_schema_version", "unknown"))
     base.feature_dim = int(fs.get("feature_dim") or model_config.get("input_size", 0))
-    base.window_length = int(fs.get("window_length", 32))
+    base.window_length = int(fs.get("window_length", 16))
     base.window_step = int(fs.get("window_step", 3))
     base.orientation_normalization = bool(fs.get("orientation_normalization", False))
 
