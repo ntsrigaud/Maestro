@@ -34,6 +34,7 @@ def _force_presentation_scope_for_existing_pipeline_tests():
     with patch.object(KeyboardAdapter, "_ensure_presentation_scope", return_value=True):
         yield
 
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
