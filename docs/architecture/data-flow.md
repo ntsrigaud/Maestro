@@ -14,7 +14,7 @@ graph TD
     Gz -->|true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
     C -->|MultiHandPacket| Cs["Hand Selection<br/>(HandSelector)"]
     Cs -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
-    D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 32x147)"]
+    D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 16x147)"]
     E --> Wr{"window_ready?"}
     Wr -->|false| O
     Wr -->|true| F["Enhanced Two-Stream<br/>(BiLSTM + MHA + Cross-Stream Gate)"]
@@ -46,6 +46,7 @@ graph TD
 | `frame`        | `numpy.ndarray` (H×W×3, uint8) | BGR color image                        |
 | `timestamp_ms` | `int`                          | Capture timestamp in milliseconds      |
 | `frame_id`     | `int`                          | Monotonically increasing frame counter |
+| `rgb_frame`    | `numpy.ndarray \| None`        | Pre-converted RGB frame for MediaPipe  |
 
 The frame source reads from `cv2.VideoCapture` with a buffer size of 1 to minimize latency. Frame timing is enforced to match the configured target FPS (default 30). Each frame is assigned a monotonic timestamp for pipeline synchronization.
 
@@ -88,7 +89,7 @@ Each `HandLandmarks` entry contains:
 | `detect_conf` | `float`             | MediaPipe handedness classification score [0, 1]   |
 | `track_conf`  | `float`             | Ratio of finite (non-NaN) landmark points [0, 1]   |
 
-The BGR frame is converted to RGB using `cv2.cvtColor` (producing a C-contiguous array required by MediaPipe's C extensions) and processed by `mediapipe.solutions.hands.Hands`. If no hands are detected, `hands` is an empty list.
+The extractor prefers `FramePacket.rgb_frame` (prepared in Stage 1) and falls back to `cv2.cvtColor` when needed; this preserves C-contiguous memory for MediaPipe's C extensions. If no hands are detected, `hands` is an empty list.
 
 > **Note on handedness labels**: MediaPipe assumes a mirrored (selfie-view) frame. In a standard non-mirrored webcam feed the user's physical right hand is labelled `"Left"` and vice versa. Hand-preference resolution is delegated to `HandSelector` in Stage 4.
 
@@ -129,11 +130,11 @@ A packet is marked `valid=True` only if the selected hand's `detect_conf ≥ min
 **Input**: `LandmarkPacket`  
 **Output**: `FeatureFrame`
 
-| Field          | Type                       | Description                                        |
-| -------------- | -------------------------- | -------------------------------------------------- |
-| `vector`       | `list[float]` (length 147) | Normalized position + velocity features            |
-| `timestamp_ms` | `int`                      | Inherited from input                               |
-| `valid`        | `bool`                     | `False` if input was invalid (zero vector emitted) |
+| Field          | Type                                  | Description                                        |
+| -------------- | ------------------------------------- | -------------------------------------------------- |
+| `vector`       | `numpy.ndarray` (length 147, float32) | Normalized position + velocity features            |
+| `timestamp_ms` | `int`                                 | Inherited from input                               |
+| `valid`        | `bool`                                | `False` if input was invalid (zero vector emitted) |
 
 The transformation pipeline applies four sequential operations:
 
@@ -166,20 +167,20 @@ If the input `LandmarkPacket` is invalid, a zero vector with `valid=False` is em
 **Input**: `FeatureFrame`  
 **Output**: `SequenceWindow` (when ready) or no output (buffer accumulating)
 
-| Field                | Type                | Description                                  |
-| -------------------- | ------------------- | -------------------------------------------- |
-| `features`           | `list[list[float]]` | Ordered feature vectors in the active window |
-| `start_timestamp_ms` | `int`               | Timestamp of the oldest frame in the window  |
-| `end_timestamp_ms`   | `int`               | Timestamp of the newest frame in the window  |
-| `valid_ratio`        | `float`             | Fraction of frames with `valid=True`         |
+| Field                | Type                              | Description                                  |
+| -------------------- | --------------------------------- | -------------------------------------------- |
+| `features`           | `numpy.ndarray` (16×147, float32) | Ordered feature vectors in the active window |
+| `start_timestamp_ms` | `int`                             | Timestamp of the oldest frame in the window  |
+| `end_timestamp_ms`   | `int`                             | Timestamp of the newest frame in the window  |
+| `valid_ratio`        | `float`                           | Fraction of frames with `valid=True`         |
 
-The buffer is a fixed-length deque (default length 32). Feature frames are pushed on every iteration. A window is emitted when three conditions are met:
+The buffer is a fixed-length deque (default length 16 in runtime config). Feature frames are pushed on every iteration. A window is emitted when three conditions are met:
 
-1. The deque is full (32 frames accumulated).
+1. The deque is full (16 frames accumulated).
 2. At least `window_step` frames (default 3) have been pushed since the last emission.
 3. The valid-frame ratio meets or exceeds `min_valid_ratio` (default 0.8).
 
-At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 32-frame window spans approximately 1067 ms of hand motion, capturing sufficient temporal context for dynamic gesture recognition.
+At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The 16-frame window spans approximately 533 ms of hand motion.
 
 ### Stage 7: Enhanced Two-Stream Inference
 
@@ -193,18 +194,19 @@ At 30 FPS with step=3, the buffer emits a window approximately every 100 ms. The
 | `top_class`   | `str`              | Class label with highest probability |
 | `confidence`  | `float`            | Probability of the top class         |
 
-The runtime uses `two_stream_attn_v1` as the authoritative architecture:
+The runtime supports only `two_stream_attn_inference` artifacts and reconstructs `EnhancedTwoStreamLSTM` from artifact metadata (`input_size`, `hidden_size`, `num_layers`, `dropout`, `num_classes`, `num_heads`, `proj_dim`, optional motion toggles).
 
 - Feature partition remains deterministic: pose stream (73 dims) + motion stream (74 dims).
 - Each stream is projected, encoded with BiLSTM, then refined by multi-head self-attention.
 - Mean+max pooled stream contexts are recalibrated through cross-stream MLP gates.
 - A LayerNorm/GELU MLP head produces final class logits.
+- Optional motion-branch enhancements can be enabled by artifact config: temporal conv front-end (`motion_temporal_conv`) and attention pooling (`motion_attn_pool`).
 
 See also: `enhanced-two-stream-lstm-architecture.md` for the full component-level model design.
 
 The two-stream architecture addresses the directional signal dilution identified in the model improvement plan (Tier 4-A): the 6 critical directional dims (`wrist_traj` + `wrist_vel_raw`) previously competed for gradient weight with 141 pose and velocity dims in a single LSTM. Stream B gives motion features a fully independent representational pathway, eliminating within-timestep feature competition that Bahdanau attention alone cannot resolve (attention operates over time, not over feature dimensions).
 
-The model runs in `torch.no_grad()` evaluation mode. `checkpoint_loader.py` validates that `artifact_type` equals `two_stream_attn_inference` before reconstructing the model; any other artifact type raises `ValueError` to prevent silent failure.
+The model runs in `torch.no_grad()` evaluation mode. `checkpoint_loader.py` rejects non-`two_stream_attn_inference` artifacts and also validates `window_length`, `window_step`, and orientation-normalization compatibility against runtime config.
 
 ### Stage 8: Prediction Stabilization
 
@@ -227,21 +229,21 @@ Three sequential filtering stages:
 smoothed[c] = 0.4 × current[c] + 0.6 × previous[c]  for each class c
 ```
 
-**Confidence Thresholding** (per-class from `production_ipn.yaml`):
+**Confidence Thresholding** (per-class from `configs/thresholds/production_hybrid.yaml`):
 
 ```
 if smoothed[top_class] < class_thresholds[top_class]:
     label ← "unknown", reason ← "below_threshold_or_unknown"
 ```
 
-**Temporal Voting** (per-class window from `production_ipn.yaml`):
+**Temporal Voting** (per-class window from `configs/thresholds/production_hybrid.yaml`):
 
 ```
 if not all(recent_N == candidate):
     accepted ← False, reason ← "temporal_inconsistency"
 ```
 
-Dynamic gestures use vote_window=1 (immediate response). Static holds use vote_window=3 (require 3 consecutive agreements).
+For classes configured with `vote_window=1`, stabilizer comparison bypasses EMA (raw probability is thresholded) to avoid suppressing short-lived peaks; EMA state is still maintained for other classes.
 
 ### Stage 9: Activation Control
 
@@ -252,7 +254,7 @@ Dynamic gestures use vote_window=1 (immediate response). Static holds use vote_w
 | Field            | Type  | Description                                      |
 | ---------------- | ----- | ------------------------------------------------ |
 | `command_id`     | `str` | Mapped command identifier (e.g., `"next_slide"`) |
-| `source_gesture` | `str` | Original gesture label (e.g., `"swipe_right"`)   |
+| `source_gesture` | `str` | Original gesture label (e.g., `"swiping_right"`) |
 | `issued_at_ms`   | `int` | Timestamp of command issuance                    |
 
 The activation controller state machine (IDLE → ARMED → COOLDOWN) determines whether a stabilized prediction results in a command. See the Process View for detailed state machine behavior.
@@ -386,19 +388,19 @@ from its pre-UI implementation.
 
 ## 5. Data Volume Summary
 
-| Pipeline Point    | Data Size                      | Frequency             |
-| ----------------- | ------------------------------ | --------------------- |
-| Raw frame         | ~2.7 MB (1280×720×3)           | 30 Hz                 |
-| Multi-hand packet | 0–504 bytes (0–2 × 21×3×4)     | 30 Hz                 |
-| Landmark packet   | 252 bytes (21×3×4)             | 30 Hz                 |
-| Feature vector    | 588 bytes (147×4)              | 30 Hz                 |
-| Sequence window   | 18,816 bytes (32×147×4)        | ~10 Hz                |
-| Prediction        | ~200 bytes (8 floats + labels) | ~10 Hz                |
-| Command           | ~100 bytes                     | ~0.1 Hz (per gesture) |
+| Pipeline Point    | Data Size                            | Frequency             |
+| ----------------- | ------------------------------------ | --------------------- |
+| Raw frame         | ~2.7 MB (1280×720×3)                 | 30 Hz                 |
+| Multi-hand packet | 0–504 bytes (0–2 × 21×3×4)           | 30 Hz                 |
+| Landmark packet   | 252 bytes (21×3×4)                   | 30 Hz                 |
+| Feature vector    | 588 bytes (147×4)                    | 30 Hz                 |
+| Sequence window   | 9,408 bytes (16×147×4)               | ~10 Hz                |
+| Prediction        | ~250 bytes (10-class probs + labels) | ~10 Hz                |
+| Command           | ~100 bytes                           | ~0.1 Hz (per gesture) |
 
 The pipeline progressively reduces data volume by approximately four orders of magnitude, from ~2.7 MB raw frames to ~100-byte commands.
 
-## 5. Training Data Flow
+## 6. Training Data Flow
 
 The offline training pipeline transforms raw labeled data into a trained model artifact:
 
@@ -413,8 +415,8 @@ graph LR
         Extract["Landmark Extraction<br/>(MediaPipe)"]
         JSONL["JSONL Output<br/>(labeled landmarks)"]
         Feature["Feature Transform<br/>(147-dim vectors)"]
-        Window["Sliding Window<br/>(32×147 sequences)"]
-        NPZ["NPZ Dataset<br/>(N × 32 × 147)"]
+        Window["Sliding Window<br/>(production path: 16×147 sequences)"]
+        NPZ["NPZ Dataset<br/>(N × T × 147, production T=16)"]
     end
 
     subgraph Training ["Model Training"]
