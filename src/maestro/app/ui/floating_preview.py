@@ -5,7 +5,7 @@ from typing import Any
 
 from PySide6.QtCore import QPoint, Qt, QTimer, Slot
 from PySide6.QtGui import QGuiApplication, QMouseEvent
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from maestro.app.ui.preview_widget import PreviewWidget
 from maestro.domain.entities import RuntimeState
@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover - only unavailable off macOS/PyObjC envs
 
 _CORNER_MARGIN = 24
 _MAX_PREVIEW_WIDTH = 280
+_STATUS_BADGE_MARGIN = 8
 # Delay (ms) after show() before resolving the NSWindow handle.
 # Qt requires a brief moment to register the OS-level window with NSApp.
 _NATIVE_LEVEL_DELAY_MS = 300
@@ -64,6 +65,24 @@ class FloatingPreviewWindow(QWidget):
         self._preview = PreviewWidget(self, max_display_width=_MAX_PREVIEW_WIDTH)
         self._preview.setStyleSheet("background: transparent; border: none;")
 
+        self._state_badge = QLabel("STATE: STARTING", self)
+        self._state_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._state_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._state_badge.setStyleSheet(
+            ""
+            "QLabel {"
+            " color: #F9FAFB;"
+            " background-color: rgba(17, 24, 39, 190);"
+            " border: 1px solid rgba(249, 250, 251, 120);"
+            " border-radius: 10px;"
+            " padding: 4px 8px;"
+            " font-size: 11px;"
+            " font-weight: 700;"
+            " letter-spacing: 0.4px;"
+            "}"
+        )
+        self._state_badge.hide()
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -102,6 +121,7 @@ class FloatingPreviewWindow(QWidget):
         # Skip expensive QImage construction while hidden — saves ~0.5 ms/frame.
         if not self.isVisible():
             return
+        self._update_state_badge(state)
         first_frame = not self._has_frame and state.preview_frame is not None
         if first_frame:
             self._has_frame = True
@@ -112,6 +132,7 @@ class FloatingPreviewWindow(QWidget):
             self.setFixedSize(self.sizeHint())
             if not self._user_moved:
                 self._move_to_default_corner()
+            self._reposition_state_badge()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         if event.button() == Qt.MouseButton.LeftButton:
@@ -154,6 +175,55 @@ class FloatingPreviewWindow(QWidget):
         x = geometry.right() - self.width() - _CORNER_MARGIN
         y = geometry.top() + _CORNER_MARGIN
         self.move(max(geometry.left() + _CORNER_MARGIN, x), y)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._reposition_state_badge()
+
+    def _reposition_state_badge(self) -> None:
+        if not self._state_badge.isVisible():
+            return
+        self._state_badge.adjustSize()
+        badge_w = self._state_badge.width()
+        x = max(_STATUS_BADGE_MARGIN, self.width() - badge_w - _STATUS_BADGE_MARGIN)
+        y = _STATUS_BADGE_MARGIN
+        self._state_badge.move(x, y)
+
+    def _update_state_badge(self, state: RuntimeState) -> None:
+        gaze_enabled = bool(state.info.get("gaze_enabled", True))
+        if not gaze_enabled:
+            text = f"STATE: {state.mode.upper()} | GAZE OFF"
+            color = "rgba(30, 41, 59, 210)"
+        elif not state.gaze_permitted:
+            text = "STATE: IDLE | GAZE ABSENT"
+            color = "rgba(75, 85, 99, 215)"
+        elif state.mode == "armed":
+            text = "STATE: ARMED | GAZE ACTIVE"
+            color = "rgba(5, 150, 105, 215)"
+        elif state.mode == "cooldown":
+            text = "STATE: COOLDOWN | GAZE ACTIVE"
+            color = "rgba(217, 119, 6, 220)"
+        else:
+            text = "STATE: IDLE | GAZE ACTIVE"
+            color = "rgba(217, 119, 6, 220)"
+
+        self._state_badge.setText(text)
+        self._state_badge.setStyleSheet(
+            ""
+            "QLabel {"
+            " color: #F9FAFB;"
+            f" background-color: {color};"
+            " border: 1px solid rgba(249, 250, 251, 120);"
+            " border-radius: 10px;"
+            " padding: 4px 8px;"
+            " font-size: 11px;"
+            " font-weight: 700;"
+            " letter-spacing: 0.4px;"
+            "}"
+        )
+        if not self._state_badge.isVisible():
+            self._state_badge.show()
+        self._reposition_state_badge()
 
     def _apply_native_overlay_level(self) -> None:
         """Apply macOS NSWindow overlay level once after the window is shown.
