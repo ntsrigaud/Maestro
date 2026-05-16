@@ -207,7 +207,7 @@ flowchart TD
     subgraph PH11["Phase 11 — Hugging Face Hub Publishing"]
         direction TB
         HF_UP["publish_to_huggingface()<br/>Uploads .pt inference artefact<br/>Generates model card with:<br/>  architecture description<br/>  test accuracy · macro F1 · per-class metrics<br/>  feature schema version<br/>  dataset provenance (IPN Hand)<br/>  class label list"]
-        HF_REPO["Hugging Face Hub<br/>ntsrigaud/maestro-lstm<br/>────────────────────────────<br/>Artefact: two_stream_attn_v1_*_inference.pt<br/>Access: public<br/>Cached locally on first load by runtime"]
+        HF_REPO["Hugging Face Hub<br/>ntsrigaud/maestro-lstm-hybrid<br/>────────────────────────────<br/>Artefact: two_stream_attn_*_inference.pt<br/>Access: public<br/>Cached locally on first load by runtime"]
         HF_CFG["model_source.yaml updated<br/>Runtime HFModelSource reads this<br/>to locate + download the published artefact<br/>Falls back to local cache if offline"]
     end
 
@@ -234,7 +234,7 @@ flowchart TD
 | 8 — Training loop                       | `notebooks/02_model_training_two-stream-lstm.ipynb` → `train_lstm()`                  | Per-epoch checkpoints; best saved by `val_loss`                         |
 | 9 — Evaluation                          | `notebooks/02_model_training_two-stream-lstm.ipynb`                                   | Test metrics, confusion matrix, per-class report                        |
 | 10 — Export                             | `training/export_checkpoint.py`                                                       | `two_stream_attn_v1_*_inference.pt` (no training state)                 |
-| 11 — Publish                            | `training/hf_publish.py`                                                              | `ntsrigaud/maestro-lstm` on Hugging Face Hub                            |
+| 11 — Publish                            | `training/hf_publish.py`                                                              | `ntsrigaud/maestro-lstm-hybrid` on Hugging Face Hub                     |
 
 ---
 
@@ -286,12 +286,12 @@ flowchart TD
 
 ### Phase Summary — LD-CONG Hybrid
 
-| Phase | Script / Notebook | Key Output |
-| ----- | ----------------- | ---------- |
-| 1 — Dataset build | `scripts/build_ld_cong_dataset.py` | `data/processed/ld_cong_hybrid_dataset.npz` |
-| 2 — Head warm-up (Stage A) | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | Warm-started head weights |
-| 3 — Full fine-tune (Stage B) | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | `two_stream_attn_v1_finetune_<ts>.pt` |
-| 4 — Evaluation | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | Test metrics, confusion matrix |
+| Phase                        | Script / Notebook                                                | Key Output                                  |
+| ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------- |
+| 1 — Dataset build            | `scripts/build_ld_cong_dataset.py`                               | `data/processed/ld_cong_hybrid_dataset.npz` |
+| 2 — Head warm-up (Stage A)   | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | Warm-started head weights                   |
+| 3 — Full fine-tune (Stage B) | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | `two_stream_attn_v1_finetune_<ts>.pt`       |
+| 4 — Evaluation               | `notebooks/08_model_training_jester_ldcong_hybrid_12class.ipynb` | Test metrics, confusion matrix              |
 
 ### Key Design Decisions — LD-CONG Hybrid
 
@@ -337,7 +337,7 @@ imbalance is controlled by training configuration (for example,
 During **dataset build**, the sliding window uses the CLI-configured `window_step`
 (default `3`) and `window_length` (default `32`).
 During **inference**, the runtime uses `configs/inference.yaml` values (currently
-`window_step=3`, `window_length=32`). These are independent parameter sources.
+`window_step=3`, `window_length=16`). These are independent parameter sources.
 
 ---
 
