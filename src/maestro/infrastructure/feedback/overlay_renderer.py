@@ -17,15 +17,15 @@ _BORDER_ABSENT: tuple[int, int, int] = (128, 128, 128)
 _BORDER_ACQUIRING: tuple[int, int, int] = (0, 165, 255)
 _BORDER_ARMED: tuple[int, int, int] = (0, 200, 0)
 _BORDER_LASER: tuple[int, int, int] = (255, 140, 0)  # sky blue (BGR)
-_BORDER_PEN: tuple[int, int, int] = (180, 0, 200)   # violet (BGR)
+_BORDER_PEN: tuple[int, int, int] = (180, 0, 200)  # violet (BGR)
 _BORDER_THICKNESS = 4
 
 # Prediction ring — a coloured background rectangle drawn behind the
 # gesture prediction line to give immediate mode-state feedback.
-_RING_ARMED: tuple[int, int, int] = (0, 60, 0)    # dark green background
+_RING_ARMED: tuple[int, int, int] = (0, 60, 0)  # dark green background
 _RING_COOLDOWN: tuple[int, int, int] = (0, 55, 90)  # dark amber background
-_RING_LASER: tuple[int, int, int] = (60, 30, 0)   # dark blue background
-_RING_PEN: tuple[int, int, int] = (55, 0, 60)     # dark violet background
+_RING_LASER: tuple[int, int, int] = (60, 30, 0)  # dark blue background
+_RING_PEN: tuple[int, int, int] = (55, 0, 60)  # dark violet background
 _RING_DEFAULT: tuple[int, int, int] = (30, 30, 30)  # dark grey background
 
 # Text colours (BGR).
