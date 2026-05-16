@@ -2,7 +2,7 @@ command_cooldown_ms: 1500
 edge_trigger_enabled: true
 gaze:
   arm_ms: 500
-  enabled: false
+  enabled: true
   grace_ms: 5000
   min_detection_score: 0.5
   pitch_threshold_deg: 25.0
