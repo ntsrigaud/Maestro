@@ -103,7 +103,10 @@ class TestSystemTray:
 
     def test_window_controls_remain_available_without_system_tray(self, qtbot) -> None:
         with (
-            patch("maestro.app.ui.main_window.QSystemTrayIcon.isSystemTrayAvailable", return_value=False),
+            patch(
+                "maestro.app.ui.main_window.QSystemTrayIcon.isSystemTrayAvailable",
+                return_value=False,
+            ),
             patch("maestro.app.ui.controller.build_container"),
             patch("maestro.app.ui.controller.Runtime"),
         ):

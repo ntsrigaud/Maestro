@@ -5,7 +5,15 @@ from pathlib import Path
 import yaml
 from PySide6.QtCore import QCoreApplication, QSignalBlocker, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QMenu, QSystemTrayIcon, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QSystemTrayIcon,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from maestro.app._paths import get_app_icon, get_config_dir
 from maestro.app.ui.controller import RuntimeController
@@ -123,7 +131,8 @@ class MainWindow(QWidget):
         header.addWidget(self._status_label, 1)
 
         hint = QLabel(
-            "Use the menu button or tray icon to start/stop the runtime, toggle preview, and change gaze detection.",
+            "Use the menu button or tray icon to start/stop the runtime, "
+            "toggle preview, and change gaze detection.",
             self,
         )
         hint.setWordWrap(True)
@@ -209,7 +218,9 @@ class MainWindow(QWidget):
         self._status_label.setText(self._state_text_for_state(state))
 
         if state.info.get("accepted"):
-            self._show_notification("Gesture", str(state.last_label), QSystemTrayIcon.MessageIcon.Information, 800)
+            self._show_notification(
+                "Gesture", str(state.last_label), QSystemTrayIcon.MessageIcon.Information, 800
+            )
 
     def _tray_colour_for_state(self, state: RuntimeState) -> str:
         """Map runtime state to the same colour theme used by floating preview badge."""
@@ -271,9 +282,17 @@ class MainWindow(QWidget):
         if bool(state.info.get("pen_active", False)):
             return "Annotation pen active"
         if state.mode == "armed":
-            return f"Armed: {state.last_label.replace('_', ' ').upper()}" if state.last_label != "unknown" else "Armed"
+            return (
+                f"Armed: {state.last_label.replace('_', ' ').upper()}"
+                if state.last_label != "unknown"
+                else "Armed"
+            )
         if state.mode == "cooldown":
-            return f"Cooldown: {state.last_label.replace('_', ' ').upper()}" if state.last_label != "unknown" else "Cooldown"
+            return (
+                f"Cooldown: {state.last_label.replace('_', ' ').upper()}"
+                if state.last_label != "unknown"
+                else "Cooldown"
+            )
         return "Idle"
 
     def _sync_preview_visibility(self) -> None:
