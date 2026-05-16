@@ -372,6 +372,8 @@ class Runtime:
                         "accepted": (
                             bool(stabilized_prediction.accepted) if stabilized_prediction else False
                         ),
+                        "laser_active": self._laser_tracker.active,
+                        "pen_active": self._pen_tracker.active,
                     },
                 )
 
