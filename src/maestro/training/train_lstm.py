@@ -993,7 +993,8 @@ def finetune_lstm(
         unexpected = len(incompatible.unexpected_keys)
         print(
             "  Depth adapt : "
-            f"checkpoint num_layers={pretrained_mc.num_layers} -> target num_layers={target_num_layers}"
+            f"checkpoint num_layers={pretrained_mc.num_layers} -> "
+            f"target num_layers={target_num_layers}"
         )
         print(f"  Partial load: missing_keys={missing}, unexpected_keys={unexpected}")
 
