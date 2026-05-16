@@ -16,16 +16,16 @@ Runtime recognition uses a 10-class vocabulary (9 active gestures + `unknown`). 
 
 The production runtime vocabulary (discrete command path) is:
 
-| Gesture          | Type            | Mapped Command     |
-| ---------------- | --------------- | ------------------ |
-| `open_palm_hold` | Static          | Erase annotations  |
-| `swipe_right`    | Dynamic         | Next slide         |
-| `swipe_left`     | Dynamic         | Previous slide     |
-| `swipe_up`       | Dynamic         | Start presentation |
-| `swipe_down`     | Dynamic         | Stop presentation  |
-| `zoom_in`        | Dynamic         | Zoom in view       |
-| `zoom_out`       | Dynamic         | Zoom out view      |
-| `unknown`        | Rejection class | No action          |
+| Gesture       | Type            | Mapped Command     |
+| ------------- | --------------- | ------------------ |
+| `fist`        | Static          | Erase annotations  |
+| `swipe_right` | Dynamic         | Next slide         |
+| `swipe_left`  | Dynamic         | Previous slide     |
+| `swipe_up`    | Dynamic         | Start presentation |
+| `swipe_down`  | Dynamic         | Stop presentation  |
+| `zoom_in`     | Dynamic         | Zoom in view       |
+| `zoom_out`    | Dynamic         | Zoom out view      |
+| `unknown`     | Rejection class | No action          |
 
 The activation gate is controlled by gaze detection plus the activation controller state machine: the controller starts in IDLE and moves to ARMED on gaze-permitted rising edge via `rearm()`. Losing gaze beyond grace transitions back to IDLE through `force_idle()`. Command semantics are configured in `configs/gestures/command_map_presentation.yaml`.
 
