@@ -12,6 +12,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 
 from maestro.domain.entities import ExecutableCommand, StabilizedPrediction
 from maestro.domain.enums import RuntimeMode
@@ -25,6 +26,14 @@ from maestro.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 from maestro.pipeline.activation import GestureActivationController
+
+
+@pytest.fixture(autouse=True)
+def _force_presentation_scope_for_existing_pipeline_tests():
+    """Existing pipeline tests validate mapping/routing, not foreground app detection."""
+    with patch.object(KeyboardAdapter, "_ensure_presentation_scope", return_value=True):
+        yield
+
 
 # ---------------------------------------------------------------------------
 # Helpers
