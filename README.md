@@ -27,18 +27,18 @@ For developers who prefer script-based invocation, `scripts/run_ui.py` and `scri
 
 **Gesture vocabulary** (hybrid Jester+IPN, 10 classes):
 
-| Gesture                 | Command                   | Source |
-| ----------------------- | ------------------------- | ------ |
-| `stop_sign`             | Erase annotations         | Jester |
-| `swiping_right`         | Next slide                | Jester |
-| `swiping_left`          | Previous slide            | Jester |
-| `swiping_up`            | Start presentation        | Jester |
-| `swiping_down`          | Stop presentation         | Jester |
-| `zooming_in_full_hand`  | Zoom in view              | Jester |
-| `zooming_out_full_hand` | Zoom out view             | Jester |
-| `point_one`             | Continuous laser pointer  | IPN    |
-| `point_two`             | Continuous annotation pen | IPN    |
-| `unknown`               | No action (noise class)   | IPN    |
+| Gesture                 | Command                   | Source  |
+| ----------------------- | ------------------------- | ------- |
+| `fist`                  | Erase annotations         | LD-CONG |
+| `swiping_right`         | Next slide                | Jester  |
+| `swiping_left`          | Previous slide            | Jester  |
+| `swiping_up`            | Start presentation        | Jester  |
+| `swiping_down`          | Stop presentation         | Jester  |
+| `zooming_in_full_hand`  | Zoom in view              | Jester  |
+| `zooming_out_full_hand` | Zoom out view             | Jester  |
+| `point_one`             | Continuous laser pointer  | IPN     |
+| `point_two`             | Continuous annotation pen | IPN     |
+| `unknown`               | No action (noise class)   | IPN     |
 
 Discrete commands are routed through `GestureActivationController` + `CommandDispatcher`.
 `point_one` and `point_two` are continuous gestures handled directly by runtime trackers.

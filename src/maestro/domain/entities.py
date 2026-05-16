@@ -86,31 +86,6 @@ class ExecutableCommand:
 
 
 @dataclass(slots=True)
-class GraphFrame:
-    """A single graph-structured gesture frame ready for buffering.
-
-    ``nodes`` contains ``(N, C)`` normalised keypoint coordinates.
-    ``valid`` reflects whether the frame meets the minimum valid-node threshold.
-    """
-
-    nodes: np.ndarray  # shape (N, C) — normalised keypoint coordinates
-    valid_mask: np.ndarray  # shape (N,)   — bool per-node detection validity
-    timestamp_ms: int
-    valid: bool  # True if min_valid_ratio threshold is satisfied
-
-
-@dataclass(slots=True)
-class LabeledGraphFrame:
-    """A graph frame paired with its annotation label for dataset construction."""
-
-    keypoints: np.ndarray  # (67, 3) — raw (pre-normalisation) MediaPipe coordinates
-    valid_mask: np.ndarray  # (67,)   — bool per-node detection validity
-    label: str
-    recording_id: str
-    timestamp_ms: int
-
-
-@dataclass(slots=True)
 class DispatchResult:
     success: bool
     command_id: str
