@@ -93,7 +93,6 @@ class OverlayRenderer:
 
         if self._minimal_preview:
             self._draw_gaze_border(canvas, state)
-            self._draw_minimal_gesture_label(canvas, state.last_label)
         else:
             self._draw_gaze_border(canvas, state)
             self._draw_landmarks(canvas, info.get("landmarks"), mirror=self._mirror_display)
@@ -168,39 +167,6 @@ class OverlayRenderer:
         # Left and right bars
         image[:, :t] = colour
         image[:, w - t :] = colour
-
-    def _draw_minimal_gesture_label(self, image: Any, label: str) -> None:
-        """Draw only the current gesture label for the floating self preview."""
-        if not label or label == "unknown":
-            return
-
-        text = label.replace("_", " ").upper()
-        height, width = image.shape[:2]
-
-        # Scale font so the text looks large at the *displayed* size after the
-        # frame is downscaled for the preview widget.  Target ~18 % of height.
-        font_scale = max(1.8, (height * 0.18) / 28.0)
-        thickness = max(3, int(font_scale * 2))
-
-        # Measure text to set footer height and baseline position accurately.
-        (text_w, text_h), baseline = cv2.getTextSize(text, self._font, font_scale, thickness)
-        footer_height = text_h + baseline + 20
-        y0 = max(0, height - footer_height)
-        image[y0:height, 0:width] = (20, 20, 20)
-
-        # Centre the label horizontally; keep a safe bottom margin.
-        x = max(8, (width - text_w) // 2)
-        y = height - baseline - 8
-        cv2.putText(
-            image,
-            text,
-            (x, y),
-            self._font,
-            font_scale,
-            _TEXT_BADGE,
-            thickness,
-            cv2.LINE_AA,
-        )
 
     def _draw_pred_ring(
         self,
