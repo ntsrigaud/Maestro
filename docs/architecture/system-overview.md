@@ -16,16 +16,18 @@ Runtime recognition uses a 10-class vocabulary (9 active gestures + `unknown`). 
 
 The production runtime vocabulary (discrete command path) is:
 
-| Gesture          | Type            | Mapped Command     |
-| ---------------- | --------------- | ------------------ |
-| `open_palm_hold` | Static          | Erase annotations  |
-| `swipe_right`    | Dynamic         | Next slide         |
-| `swipe_left`     | Dynamic         | Previous slide     |
-| `swipe_up`       | Dynamic         | Start presentation |
-| `swipe_down`     | Dynamic         | Stop presentation  |
-| `zoom_in`        | Dynamic         | Zoom in view       |
-| `zoom_out`       | Dynamic         | Zoom out view      |
-| `unknown`        | Rejection class | No action          |
+| Gesture                 | Type            | Mapped Command     |
+| ----------------------- | --------------- | ------------------ |
+| `fist`                  | Static          | Erase annotations  |
+| `swiping_right`         | Dynamic         | Next slide         |
+| `swiping_left`          | Dynamic         | Previous slide     |
+| `swiping_up`            | Dynamic         | Start presentation |
+| `swiping_down`          | Dynamic         | Stop presentation  |
+| `zooming_in_full_hand`  | Dynamic         | Zoom in view       |
+| `zooming_out_full_hand` | Dynamic         | Zoom out view      |
+| `unknown`               | Rejection class | No action          |
+
+`command_map_presentation.yaml` also applies `label_remap` for directional swipes (`swiping_left` ↔ `swiping_right`) before dispatch/display so user-facing direction matches mirrored-camera ergonomics.
 
 The activation gate is controlled by gaze detection plus the activation controller state machine: the controller starts in IDLE and moves to ARMED on gaze-permitted rising edge via `rearm()`. Losing gaze beyond grace transitions back to IDLE through `force_idle()`. Command semantics are configured in `configs/gestures/command_map_presentation.yaml`.
 
@@ -96,8 +98,8 @@ graph LR
 3. **Landmark Extraction**: MediaPipe Hands detects all visible hands (up to 2) and returns a `MultiHandPacket` containing each hand's 21 landmarks, handedness label, detection confidence, and tracking confidence.
 4. **Hand Selection**: `HandSelector` applies the user's `hand_preference` configuration to pick one hand from the `MultiHandPacket`, producing a `LandmarkPacket`. Encodes the selfie-view inversion (`"right"` → MP `"Left"`, `"left"` → MP `"Right"`); marks the packet `valid=False` if the preferred hand is absent or below confidence thresholds.
 5. **Feature Engineering**: Landmarks are wrist-centered, scale-normalized, and augmented with velocity, joint angles, fingertip spread, and wrist trajectory features to produce a 147-dimensional feature vector (feature-schema-v5).
-6. **Temporal Buffering**: A sliding window buffer accumulates 32 consecutive feature vectors with a step size of 3 frames.
-7. **Enhanced Two-Stream Inference**: The buffered sequence (32×147) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory). `EnhancedTwoStreamLSTM` applies per-stream projection, bidirectional LSTM encoding, multi-head self-attention, cross-stream gating, and an MLP head to produce the final class probabilities.
+6. **Temporal Buffering**: A sliding window buffer accumulates 16 consecutive feature vectors with a step size of 3 frames (runtime-configurable; validated against artifact metadata at load time).
+7. **Enhanced Two-Stream Inference**: The buffered sequence (16×147 in production runtime) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory). `EnhancedTwoStreamLSTM` applies per-stream projection, bidirectional LSTM encoding, multi-head self-attention, cross-stream gating, and an MLP head to produce the final class probabilities.
 8. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
 9. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in IDLE; gaze restoration calls `rearm()` to enter ARMED; gaze-loss expiry calls `force_idle()` to return to IDLE. Edge-triggered dispatch is enforced throughout.
 10. **Command Dispatch**: The discrete gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
@@ -151,7 +153,7 @@ The offline training pipeline converts labeled video data into a trained LSTM ch
 
 1. **Data Collection**: The IPN Hand dataset is the canonical training corpus. `scripts/build_ipn_dataset.py` extracts landmarks and emits NPZ sequence datasets (default graph format; flat `feature-schema-v5` output via `--format flat` for two-stream LSTM training).
 2. **Model Training**: `scripts/train_model.py` defaults to `configs/model/two_stream_attn.yaml`, training `EnhancedTwoStreamLSTM` with AdamW, learning-rate scheduling, and early stopping (plus optional balancing controls such as class capping/weighting). Legacy model configs are retained for experimental reference only.
-3. **Model Export**: Trained checkpoints are exported as inference artifacts containing state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/maestro-lstm`). Runtime loading is pinned to the enhanced artifact type (`two_stream_attn_inference`).
+3. **Model Export**: Trained checkpoints are exported as inference artifacts containing state dictionary, class labels, and feature schema metadata, then published to the Hugging Face Hub (`ntsrigaud/maestro-lstm-hybrid`). Runtime loading is pinned to the enhanced artifact type (`two_stream_attn_inference`).
 
 For detailed model internals, see `enhanced-two-stream-lstm-architecture.md`.
 

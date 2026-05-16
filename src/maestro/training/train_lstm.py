@@ -18,7 +18,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from maestro.training.augmentation import AugmentationConfig
-from maestro.training.datamodule import DataSplitConfig, GestureDataModule, GraphGestureDataModule
+from maestro.training.datamodule import DataSplitConfig, GestureDataModule
 from maestro.training.evaluate import EvaluationReport, evaluate_model
 from maestro.utils.reproducibility import seed_everything
 
@@ -31,16 +31,6 @@ class ModelConfig:
     num_layers: int
     dropout: float
     num_classes: int
-    # STGCN-specific fields (only used when model_name starts with "stgcn").
-    num_nodes: int = 67
-    num_coords: int = 3
-    stgcn_channels: tuple[int, ...] = (64, 128)
-    num_stgcn_layers: int = 2
-    lstm_hidden: int = 128
-    lstm_layers: int = 2
-    # Dual-branch STGCN phonological branch fields (only used for "dual_stgcn_*").
-    phono_proj_dim: int = 128
-    phono_conv_channels: int = 256
     # EnhancedTwoStreamLSTM-specific fields (only used for "two_stream_attn_*").
     num_heads: int = 4
     proj_dim: int = 64
@@ -78,7 +68,6 @@ class ExportConfig:
     checkpoint_dir: str
     exported_dir: str
     feature_schema_version: str
-    graph_schema_version: str = "graph-schema-v1"
 
 
 @dataclass(slots=True)
@@ -134,15 +123,6 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             num_layers=int(model_data.get("num_layers", 2)),
             dropout=float(model_data.get("dropout", 0.3)),
             num_classes=int(model_data.get("num_classes", 10)),
-            # STGCN fields — ignored for two_stream models.
-            num_nodes=int(model_data.get("num_nodes", 67)),
-            num_coords=int(model_data.get("num_coords", 3)),
-            stgcn_channels=tuple(int(c) for c in model_data.get("stgcn_channels", [64, 128])),
-            num_stgcn_layers=int(model_data.get("num_stgcn_layers", 2)),
-            lstm_hidden=int(model_data.get("lstm_hidden", 128)),
-            lstm_layers=int(model_data.get("lstm_layers", 2)),
-            phono_proj_dim=int(model_data.get("phono_proj_dim", 128)),
-            phono_conv_channels=int(model_data.get("phono_conv_channels", 256)),
             num_heads=int(model_data.get("num_heads", 4)),
             proj_dim=int(model_data.get("proj_dim", 64)),
             motion_temporal_conv=bool(model_data.get("motion_temporal_conv", False)),
@@ -189,12 +169,6 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             feature_schema_version=str(
                 export_data.get("feature_schema_version", "feature-schema-v1")
             ),
-            graph_schema_version=str(
-                export_data.get(
-                    "graph_schema_version",
-                    train_data.get("graph_schema_version", "graph-schema-v1"),
-                )
-            ),
         ),
         augmentation=_parse_augmentation_config(payload.get("augmentation")),
     )
@@ -220,27 +194,8 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
     """Instantiate the appropriate model from *config*.
 
     Dispatches based on ``config.model_name``:
-    * ``dual_stgcn_*``      → :class:`DualBranchSTGCN_LSTM`
     * ``two_stream_attn_*`` → :class:`EnhancedTwoStreamLSTM`
-    * ``two_stream_*``      → :class:`TwoStreamGestureLSTM`
-
-    Note: ``two_stream_attn_*`` is checked *before* ``two_stream_*`` because it
-    is a more specific prefix.
     """
-    if config.model_name.startswith("dual_stgcn"):
-        from maestro.infrastructure.model.dual_branch_stgcn_lstm import DualBranchSTGCN_LSTM
-
-        return DualBranchSTGCN_LSTM(
-            num_nodes=config.num_nodes,
-            num_coords=config.num_coords,
-            phono_conv_channels=config.phono_conv_channels,
-            phono_lstm_hidden=config.lstm_hidden,
-            phono_lstm_layers=config.lstm_layers,
-            stgcn_channels=config.stgcn_channels,
-            dropout=config.dropout,
-            num_classes=config.num_classes,
-        ).to(device)
-
     if config.model_name.startswith("two_stream_attn"):
         from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
 
@@ -256,20 +211,8 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
             motion_attn_pool=config.motion_attn_pool,
         ).to(device)
 
-    if config.model_name.startswith("two_stream"):
-        from maestro.infrastructure.model.two_stream_lstm import TwoStreamGestureLSTM
-
-        return TwoStreamGestureLSTM(
-            input_size=config.input_size,
-            hidden_size=config.hidden_size,
-            num_layers=config.num_layers,
-            dropout=config.dropout,
-            num_classes=config.num_classes,
-        ).to(device)
-
     raise ValueError(
-        f"Unsupported model_name {config.model_name!r}. "
-        "Supported prefixes: 'dual_stgcn_', 'two_stream_attn_', 'two_stream_'."
+        f"Unsupported model_name {config.model_name!r}. Supported prefix: 'two_stream_attn_'."
     )
 
 
@@ -301,16 +244,6 @@ def _model_config_from_checkpoint(
         num_layers=int(payload.get("num_layers", fallback.num_layers)),
         dropout=float(payload.get("dropout", fallback.dropout)),
         num_classes=resolved_num_classes,
-        num_nodes=int(payload.get("num_nodes", fallback.num_nodes)),
-        num_coords=int(payload.get("num_coords", fallback.num_coords)),
-        stgcn_channels=tuple(
-            int(c) for c in payload.get("stgcn_channels", fallback.stgcn_channels)
-        ),
-        num_stgcn_layers=int(payload.get("num_stgcn_layers", fallback.num_stgcn_layers)),
-        lstm_hidden=int(payload.get("lstm_hidden", fallback.lstm_hidden)),
-        lstm_layers=int(payload.get("lstm_layers", fallback.lstm_layers)),
-        phono_proj_dim=int(payload.get("phono_proj_dim", fallback.phono_proj_dim)),
-        phono_conv_channels=int(payload.get("phono_conv_channels", fallback.phono_conv_channels)),
         num_heads=int(payload.get("num_heads", fallback.num_heads)),
         proj_dim=int(payload.get("proj_dim", fallback.proj_dim)),
         # Default to False — old checkpoints were trained without these flags.
@@ -325,41 +258,9 @@ def create_datamodule(
     *,
     dataset_path: str | Path,
     config: TrainingPipelineConfig,
-) -> GestureDataModule | GraphGestureDataModule:
-    """Create and set up the appropriate data module for *config.model.model_name*.
-
-    * ``dual_stgcn_*`` models → :class:`GraphGestureDataModule`
-    * ``two_stream_*``         → :class:`GestureDataModule`
-    """
-    is_graph_model = config.model.model_name.startswith("dual_stgcn")
-    if is_graph_model:
-        from maestro.training.augmentation import (  # noqa: F401
-            GraphAugmentationConfig,
-            GraphGestureAugmenter,
-        )
-
-        graph_aug: Any = None
-        if config.augmentation is not None:
-            graph_aug = GraphAugmentationConfig(
-                temporal_scale_range=config.augmentation.temporal_scale_range,
-                spatial_jitter_sigma=config.augmentation.spatial_jitter_sigma,
-                apply_prob=config.augmentation.apply_prob,
-                mirror_flip_prob=config.augmentation.mirror_flip_prob,
-            )
-
-        dm: GraphGestureDataModule = GraphGestureDataModule(
-            dataset_path=dataset_path,
-            batch_size=config.training.batch_size,
-            split=config.split,
-            seed=config.training.seed,
-            num_workers=config.training.num_workers,
-            pin_memory=False,
-            graph_augmentation=graph_aug,
-        )
-        dm.setup()
-        return dm
-
-    flat_dm: GestureDataModule = GestureDataModule(
+) -> GestureDataModule:
+    """Create and set up the feature-based GestureDataModule."""
+    dm = GestureDataModule(
         dataset_path=dataset_path,
         batch_size=config.training.batch_size,
         split=config.split,
@@ -370,8 +271,8 @@ def create_datamodule(
         max_samples_per_class=config.training.max_samples_per_class,
         exclude_classes=config.training.exclude_classes,
     )
-    flat_dm.setup()
-    return flat_dm
+    dm.setup()
+    return dm
 
 
 def _build_criterion(
@@ -389,17 +290,12 @@ def _build_criterion(
     return nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
 
-def _build_class_weights(
-    datamodule: GestureDataModule | GraphGestureDataModule, device: torch.device
-) -> torch.Tensor:
+def _build_class_weights(datamodule: GestureDataModule, device: torch.device) -> torch.Tensor:
     # Use training-split-only counts so that any per-class downsampling is
     # reflected in the weights.  Without this, the weights would be computed
     # from the full dataset distribution, which still shows the 145x imbalance
     # even after downsampling has been applied to the training split.
-    if isinstance(datamodule, GestureDataModule):
-        distribution = datamodule.training_label_distribution()
-    else:
-        distribution = datamodule.label_distribution()
+    distribution = datamodule.training_label_distribution()
     labels = datamodule.class_labels
     counts = torch.tensor([distribution[label] for label in labels], dtype=torch.float32)
     weights = torch.sum(counts) / (counts * len(labels))
@@ -673,13 +569,11 @@ def train_lstm(
     seed_everything(config.training.seed)
     datamodule = create_datamodule(dataset_path=dataset_path, config=config)
 
-    # For flat-feature models, verify input_size matches the dataset.
-    if not config.model.model_name.startswith("stgcn") and hasattr(datamodule, "feature_dim"):
-        if datamodule.feature_dim != config.model.input_size:  # type: ignore[union-attr]
-            raise ValueError(
-                "Model input_size does not match dataset feature_dim: "
-                f"input_size={config.model.input_size}, feature_dim={datamodule.feature_dim}"  # type: ignore[union-attr]
-            )
+    if datamodule.feature_dim != config.model.input_size:
+        raise ValueError(
+            "Model input_size does not match dataset feature_dim: "
+            f"input_size={config.model.input_size}, feature_dim={datamodule.feature_dim}"
+        )
 
     if datamodule.num_classes != config.model.num_classes:
         raise ValueError(
