@@ -1,18 +1,16 @@
-version: hybrid_v1
+version: presentation_v2
 # Presentation controller gesture-to-command mapping.
 # Commands route to PresentationAdapter → KeyboardAdapter → pyautogui.
 #  swiping_up -> Start Presentation
 #  swiping_down -> Stop Presentation
 #  swiping_left -> Previous Slide
 #  swiping_right -> Next Slide
-#  point_one -> Mouse pointer
-#  point_two -> Mouse pointer
+#  fist -> Erase annotations
 #  zooming_in_full_hand -> Zoom In View
 #  zooming_out_full_hand -> Zoom Out View
-#  stop_sign -> Erase annotations
-#  no_gesture -> No Action (background class)
+#  unknown -> No Action (background class)
 #
-# Vocabulary: hybrid Jester+IPN (vocabulary_hybrid.yaml)
+# Vocabulary: LD-CONG hybrid (vocabulary_ld_cong_hybrid.yaml)
 gesture_commands:
   swiping_up: start_presentation
   swiping_down: stop_presentation
@@ -20,10 +18,20 @@ gesture_commands:
   swiping_left: previous_slide
   zooming_in_full_hand: zoom_in_view
   zooming_out_full_hand: zoom_out_view
-  stop_sign: erase_annotations
-  point_one: mouse_pointer
-  point_two: mouse_pointer
+  fist: erase_annotations
   unknown: no_action
+
+# Gesture dispatch mode classification.
+# "discrete": single edge-triggered command per activation (default for all).
+# "continuous": routed to trackers every frame (laser pointer, annotation pen).
+gesture_modes:
+  swiping_up: discrete
+  swiping_down: discrete
+  swiping_right: discrete
+  swiping_left: discrete
+  zooming_in_full_hand: discrete
+  zooming_out_full_hand: discrete
+  fist: discrete
 
 # Model output → display/dispatch label remapping.
 # Applied after prediction stabilization, before command dispatch and UI display.
