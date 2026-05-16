@@ -74,7 +74,9 @@ class TestSystemTray:
             state_gaze_off = RuntimeState(mode="idle", info={"gaze_enabled": False})
             assert window._tray_colour_for_state(state_gaze_off) == "#1E293B"
 
-            state_absent = RuntimeState(mode="armed", gaze_permitted=False, info={"gaze_enabled": True})
+            state_absent = RuntimeState(
+                mode="armed", gaze_permitted=False, info={"gaze_enabled": True}
+            )
             assert window._tray_colour_for_state(state_absent) == "#4B5563"
 
             state_laser = RuntimeState(
@@ -91,7 +93,9 @@ class TestSystemTray:
             )
             assert window._tray_colour_for_state(state_pen) == "#7C3AED"
 
-            state_armed = RuntimeState(mode="armed", gaze_permitted=True, info={"gaze_enabled": True})
+            state_armed = RuntimeState(
+                mode="armed", gaze_permitted=True, info={"gaze_enabled": True}
+            )
             assert window._tray_colour_for_state(state_armed) == "#059669"
 
             state_idle = RuntimeState(mode="idle", gaze_permitted=True, info={"gaze_enabled": True})
