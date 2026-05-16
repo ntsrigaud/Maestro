@@ -168,7 +168,7 @@ class RuntimeController(QObject):
 
         Returns True if the thread exited within timeout_ms, False otherwise.
         Use this in teardown / test fixtures only — never from a UI slot.
-        
+
         After the thread exits, calls deleteLater() to signal Qt to clean up the
         C++ QThread object, preventing abort() during application shutdown.
         """
@@ -176,7 +176,7 @@ class RuntimeController(QObject):
             exited = self._thread.wait(timeout_ms)
         else:
             exited = True
-        
+
         # Always call deleteLater() after the thread is no longer running, even if
         # wait() timed out or the thread was never started. This ensures Qt properly
         # cleans up the QThread object instead of trying to destroy it in a destructor,
@@ -184,7 +184,7 @@ class RuntimeController(QObject):
         if self._thread is not None:
             self._thread.deleteLater()
             self._thread = None
-        
+
         return exited
 
     def reset(self) -> None:
