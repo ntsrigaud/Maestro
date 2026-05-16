@@ -9,5 +9,5 @@ gaze:
   yaw_threshold_deg: 30.0
 idle_timeout_ms: 100000
 min_valid_ratio: 0.8
-window_length: 32
+window_length: 16
 window_step: 3

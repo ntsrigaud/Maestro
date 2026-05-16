@@ -46,7 +46,7 @@ class SequenceDatasetBuilder:
         self,
         *,
         vocabulary: list[str],
-        window_length: int = 32,
+        window_length: int = 16,
         window_step: int = 3,
         min_valid_ratio: float = 0.8,
         label_strategy: str = "last",

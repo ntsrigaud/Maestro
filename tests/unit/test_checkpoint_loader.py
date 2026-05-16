@@ -12,7 +12,7 @@ from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamL
 from maestro.utils.schema_validation import RuntimeConfig
 
 
-def _write_artifact(path: Path, *, window_length: int = 32, num_classes: int = 10) -> None:
+def _write_artifact(path: Path, *, window_length: int = 16, num_classes: int = 10) -> None:
     _labels_10 = [
         "unknown",
         "point_one",
@@ -82,7 +82,7 @@ def test_load_inference_artifact(tmp_path: Path) -> None:
 
     assert artifact.model_version == "two_stream_attn_test_v1"
     assert artifact.feature_dim == 147
-    assert artifact.window_length == 32
+    assert artifact.window_length == 16
     assert artifact.window_step == 3
     assert artifact.orientation_normalization is True
     assert len(artifact.class_labels) == 10
@@ -131,7 +131,7 @@ def test_validate_runtime_compatibility_passes(tmp_path: Path) -> None:
                 "target_fps": 30,
             },
             "inference": {
-                "window_length": 32,
+                "window_length": 16,
                 "window_step": 3,
                 "min_valid_ratio": 0.8,
                 "idle_timeout_ms": 3000,
@@ -156,7 +156,7 @@ def test_validate_runtime_compatibility_passes(tmp_path: Path) -> None:
 
 
 def test_validate_runtime_compatibility_rejects_window_mismatch(tmp_path: Path) -> None:
-    """A legacy 24-frame artifact must fail validation against a 32-frame runtime."""
+    """A legacy 24-frame artifact must fail validation against a 16-frame runtime."""
     import pytest
 
     runtime = RuntimeConfig.model_validate(
@@ -169,7 +169,7 @@ def test_validate_runtime_compatibility_rejects_window_mismatch(tmp_path: Path) 
                 "target_fps": 30,
             },
             "inference": {
-                "window_length": 32,
+                "window_length": 16,
                 "window_step": 3,
                 "min_valid_ratio": 0.8,
                 "idle_timeout_ms": 3000,
