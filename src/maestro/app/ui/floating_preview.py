@@ -191,20 +191,32 @@ class FloatingPreviewWindow(QWidget):
 
     def _update_state_badge(self, state: RuntimeState) -> None:
         gaze_enabled = bool(state.info.get("gaze_enabled", True))
+        laser_active = bool(state.info.get("laser_active", False))
+        pen_active = bool(state.info.get("pen_active", False))
+        label = state.last_label or "unknown"
+        label_display = label.replace("_", " ").upper() if label != "unknown" else ""
+
         if not gaze_enabled:
             text = f"STATE: {state.mode.upper()} | GAZE OFF"
             color = "rgba(30, 41, 59, 210)"
         elif not state.gaze_permitted:
-            text = "STATE: IDLE | GAZE ABSENT"
+            text = "IDLE | GAZE ABSENT"
             color = "rgba(75, 85, 99, 215)"
-        elif state.mode == "armed":
-            text = "STATE: ARMED | GAZE ACTIVE"
-            color = "rgba(5, 150, 105, 215)"
+        elif laser_active:
+            text = "LASER POINTER ACTIVE"
+            color = "rgba(37, 99, 235, 225)"
+        elif pen_active:
+            text = "ANNOTATION PEN ACTIVE"
+            color = "rgba(124, 58, 237, 225)"
         elif state.mode == "cooldown":
-            text = "STATE: COOLDOWN | GAZE ACTIVE"
+            suffix = f": {label_display}" if label_display else ""
+            text = f"DISPATCHED{suffix}"
             color = "rgba(217, 119, 6, 220)"
+        elif state.mode == "armed":
+            text = f"ARMED | {label_display}" if label_display else "ARMED | READY"
+            color = "rgba(5, 150, 105, 215)"
         else:
-            text = "STATE: IDLE | GAZE ACTIVE"
+            text = "IDLE | GAZE ACTIVE"
             color = "rgba(217, 119, 6, 220)"
 
         self._state_badge.setText(text)
@@ -223,6 +235,7 @@ class FloatingPreviewWindow(QWidget):
         )
         if not self._state_badge.isVisible():
             self._state_badge.show()
+        self._state_badge.raise_()
         self._reposition_state_badge()
 
     def _apply_native_overlay_level(self) -> None:
