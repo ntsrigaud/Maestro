@@ -147,7 +147,9 @@ class OverlayRenderer:
             colour = _BORDER_ACQUIRING
 
         h, w = image.shape[:2]
-        t = _BORDER_THICKNESS
+        # Scale thickness with source-frame size so the border remains clearly
+        # visible after the frame is downscaled for the floating preview.
+        t = max(_BORDER_THICKNESS, int(round(min(h, w) * 0.012)))
         # Top and bottom bars
         image[:t, :] = colour
         image[h - t :, :] = colour
