@@ -507,17 +507,6 @@ with torch.no_grad():
 |-------|--------|
 {per_class_table}
 
-## Comparison with Previous Architecture
-
-| Feature | TwoStreamGestureLSTM | EnhancedTwoStreamLSTM |
-|---------|---------------------|-----------------------|
-| LSTM direction | Unidirectional | **Bidirectional** |
-| Attention | Bahdanau (scalar) | **MHA Q/K/V ({num_heads} heads)** |
-| Feature projection | No | **Yes (→{proj_dim})** |
-| Temporal pooling | Mean only | **Mean + Max** |
-| Cross-stream fusion | Concat only | **2-layer MLP gate** |
-| Parameters | ~182 K | ~{num_params:,} |
-
 ## Limitations and Risks
 
 - Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
