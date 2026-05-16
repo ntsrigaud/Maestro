@@ -61,4 +61,3 @@ class TestSystemTray:
             window._preview_action.setChecked(True)
 
             assert window._preview_window.isVisible()
-

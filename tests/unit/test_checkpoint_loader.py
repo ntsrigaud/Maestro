@@ -17,7 +17,7 @@ def _write_artifact(path: Path, *, window_length: int = 32, num_classes: int = 1
         "unknown",
         "point_one",
         "point_two",
-        "stop_sign",
+        "fist",
         "swiping_down",
         "swiping_left",
         "swiping_right",
