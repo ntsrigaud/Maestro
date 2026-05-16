@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import ctypes
 import logging
 import os
 import shutil
 import subprocess
 import sys
-import ctypes
 
 LOGGER = logging.getLogger(__name__)
 
@@ -158,18 +158,10 @@ def _foreground_identity_linux() -> str | None:
     if shutil.which("xdotool") is None:
         return None
     try:
-        wid = (
-            subprocess.check_output(["xdotool", "getactivewindow"], text=True).strip()
-        )
-        pid = (
-            subprocess.check_output(["xdotool", "getwindowpid", wid], text=True).strip()
-        )
-        comm = (
-            subprocess.check_output(["ps", "-p", pid, "-o", "comm="], text=True).strip()
-        )
-        title = (
-            subprocess.check_output(["xdotool", "getwindowname", wid], text=True).strip()
-        )
+        wid = subprocess.check_output(["xdotool", "getactivewindow"], text=True).strip()
+        pid = subprocess.check_output(["xdotool", "getwindowpid", wid], text=True).strip()
+        comm = subprocess.check_output(["ps", "-p", pid, "-o", "comm="], text=True).strip()
+        title = subprocess.check_output(["xdotool", "getwindowname", wid], text=True).strip()
         return f"{comm} {title}".strip().lower()
     except Exception:
         return None
