@@ -174,13 +174,20 @@ class Runtime:
         #   point_one  → laser pointer (⌘+L / Ctrl+L)
         #   point_two  → annotation pen (⌘+P / Ctrl+P)
         mirror_x = getattr(app_cfg, "mirror_display", True)
+        pointer_cfg = getattr(infer_cfg, "pointer", None)
+        pointer_gain_x = getattr(pointer_cfg, "gain_x", 2.4)
+        pointer_gain_y = getattr(pointer_cfg, "gain_y", 2.2)
         self._laser_tracker = LaserPointerTracker(
             keyboard=KeyboardAdapter(),
             mirror_x=mirror_x,
+            pointer_gain_x=pointer_gain_x,
+            pointer_gain_y=pointer_gain_y,
         )
         self._pen_tracker = AnnotationPenTracker(
             keyboard=KeyboardAdapter(),
             mirror_x=mirror_x,
+            pointer_gain_x=pointer_gain_x,
+            pointer_gain_y=pointer_gain_y,
         )
 
     def stop(self) -> None:
