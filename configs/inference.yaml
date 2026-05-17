@@ -3,14 +3,6 @@ edge_trigger_enabled: true
 pointer:
   gain_x: 2.4
   gain_y: 2.2
-gaze:
-  arm_ms: 500
-  enabled: false
-  grace_ms: 5000
-  min_detection_score: 0.5
-  pitch_threshold_deg: 25.0
-  sample_interval_frames: 3
-  yaw_threshold_deg: 30.0
 idle_timeout_ms: 100000
 min_valid_ratio: 0.8
 window_length: 16
