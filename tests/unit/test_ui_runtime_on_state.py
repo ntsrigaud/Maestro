@@ -8,6 +8,7 @@ import numpy as np
 from maestro.app.runtime import Runtime
 from maestro.domain.entities import RuntimeState
 
+
 def _make_container() -> SimpleNamespace:
     """Container whose sequence buffer is never ready — no inference path."""
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -69,6 +70,7 @@ def _make_container() -> SimpleNamespace:
         show_window=False,
         label_remap={},
     )
+
 
 class TestOnStateCallback:
     def test_on_state_called_per_frame(self) -> None:
