@@ -130,16 +130,12 @@ class TestActivationStateMachine:
         assert cmd is not None
         assert cmd.command_id == "previous_slide"
 
-
-
     def test_unmapped_gesture_does_not_dispatch(self):
         controller = _make_controller()
         with patch.object(type(controller), "_now_ms", staticmethod(lambda: 0)):
             cmd = controller.route(_pred("unknown_gesture_xyz"))
         assert cmd is None
         assert controller.mode is RuntimeMode.ARMED
-
-
 
 
 # ---------------------------------------------------------------------------
