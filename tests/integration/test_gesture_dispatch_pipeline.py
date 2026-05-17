@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
 
 from maestro.domain.entities import ExecutableCommand, StabilizedPrediction
@@ -615,5 +614,3 @@ class TestEdgeTriggerSingleDispatch:
         assert _route("swiping_right", accepted=False) is None
         cmd3 = _route("swiping_right", accepted=True)
         assert cmd3 is not None and cmd3.command_id == "next_slide"
-
-

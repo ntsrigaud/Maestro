@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import maestro.infrastructure.dispatch.app_adapters.presentation_adapter as presentation_module
 from maestro.domain.entities import DispatchResult
 from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
@@ -15,7 +16,6 @@ from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
 from maestro.infrastructure.dispatch.app_adapters.presentation_adapter import (
     PresentationAdapter,
 )
-import maestro.infrastructure.dispatch.app_adapters.presentation_adapter as presentation_module
 
 # ---------------------------------------------------------------------------
 # Helpers

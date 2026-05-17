@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from PySide6.QtCore import QCoreApplication, QSignalBlocker, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
@@ -115,8 +116,7 @@ class MainWindow(QWidget):
         header.addWidget(self._status_label, 1)
 
         hint = QLabel(
-            "Use the menu button or tray icon to start/stop the runtime "
-            "and toggle preview.",
+            "Use the menu button or tray icon to start/stop the runtime and toggle preview.",
             self,
         )
         hint.setWordWrap(True)
