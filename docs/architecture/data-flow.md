@@ -16,7 +16,7 @@ graph TD
     Wr -->|false| O
     Wr -->|true| F["Enhanced Two-Stream<br/>(BiLSTM + MHA + Cross-Stream Gate)"]
     F -->|Prediction| G["Prediction Stabilizer<br/>(EMA + Threshold + Voting)"]
-    G -->|StabilizedPrediction| H["Activation Controller<br/>(IDLE / ARMED / COOLDOWN)"]
+    G -->|StabilizedPrediction| H["Activation Controller<br/>(ARMED / COOLDOWN)"]
     H --> Cm{"command emitted?"}
     Cm -->|no| O
     Cm -->|yes| I["Command Dispatcher<br/>(Allowlist + Rate Limit)"]
@@ -237,9 +237,7 @@ For classes configured with `vote_window=1`, stabilizer comparison bypasses EMA 
 | `source_gesture` | `str` | Original gesture label (e.g., `"swiping_right"`) |
 | `issued_at_ms`   | `int` | Timestamp of command issuance                    |
 
-The activation controller state machine (IDLE → ARMED → COOLDOWN) determines whether a stabilized prediction results in a command. See the Process View for detailed state machine behavior.
-
-The runtime bootstrap sets `auto_idle_enabled=False` for continuous session control, so prolonged inactivity does not force the controller back to IDLE.
+The activation controller state machine (ARMED → COOLDOWN → ARMED) determines whether a stabilized prediction results in a command. See the Process View for detailed state machine behavior.
 
 A command is emitted only when:
 

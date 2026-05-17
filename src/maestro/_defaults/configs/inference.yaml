@@ -1,6 +1,5 @@
 command_cooldown_ms: 1000
 edge_trigger_enabled: true
-idle_timeout_ms: 100000
 min_valid_ratio: 0.8
 window_length: 16
 window_step: 3

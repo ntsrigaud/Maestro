@@ -210,10 +210,8 @@ class FloatingPreviewWindow(QWidget):
         elif state.mode == "cooldown":
             suffix = f": {label_display}" if label_display else ""
             text = f"DISPATCHED{suffix}"
-        elif state.mode == "armed":
+        else:  # armed
             text = f"ARMED | {label_display}" if label_display else "ARMED | READY"
-        else:
-            text = "IDLE"
 
         self._state_badge.setText(text)
         self._state_badge.setStyleSheet(
