@@ -28,7 +28,7 @@ Lifecycle
   The OS mouse cursor is moved to the screen position of the index fingertip
   (landmark 8 in the MediaPipe 21-point hand model).  PowerPoint’s laser dot
   follows the cursor in real-time.
-- **Exit** (gesture returns to ``unknown`` or gaze is lost):
+- **Exit** (gesture returns to ``unknown`` or runtime stops):
   The laser-off hotkey (``⌘+A`` or ``Ctrl+A``) is pressed once to revert the
   cursor to the default arrow pointer.
 
@@ -190,7 +190,7 @@ class LaserPointerTracker:
 
         Sends ``Ctrl+A`` to restore the arrow cursor if the pointer is
         currently active.  Safe to call from the runtime ``finally`` block or
-        on gaze loss.
+        during control-state transitions.
         """
         if self._active:
             self._deactivate("shutdown")

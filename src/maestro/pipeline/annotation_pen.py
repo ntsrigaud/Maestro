@@ -29,7 +29,7 @@ Lifecycle
   The OS mouse cursor is dragged (button held) to the screen position of the
   index fingertip each frame.  PowerPoint draws the annotation path in
   real-time while the button is held.
-- **Exit** (gesture returns to ``unknown`` or gaze is lost):
+- **Exit** (gesture returns to ``unknown`` or runtime stops):
   The primary mouse button is released first (ending the current stroke), then
   the pen-off hotkey (``⌘+A`` or ``Ctrl+A``) is sent to revert the cursor to
   the default arrow pointer.
@@ -192,7 +192,7 @@ class AnnotationPenTracker:
 
         Sends the pen-off hotkey to restore the arrow cursor if the pen is
         currently active.  Safe to call from the runtime ``finally`` block or
-        on gaze loss.
+        during control-state transitions.
         """
         if self._active:
             self._deactivate("shutdown")

@@ -18,15 +18,12 @@ class GestureActivationController:
     ARMED    -> IDLE     : no recognised gesture for *idle_timeout_ms* when
                            ``auto_idle_enabled=True``.
     COOLDOWN -> ARMED    : cooldown window expires.
-    IDLE     -> ARMED    : explicit ``rearm()`` call (gaze re-established).
+    IDLE     -> ARMED    : explicit ``rearm()`` call from runtime control flow.
 
     Activation gate
     ---------------
     The controller starts in IDLE state.  It transitions to ARMED only when
-    ``rearm()`` is called, which the runtime loop invokes on the gaze-permitted
-    rising edge (i.e. the first frame where ``gaze_permitted`` becomes ``True``
-    after having been ``False``).  When the gaze grace period expires, the
-    runtime calls ``force_idle()`` to transition the controller back to IDLE.
+    ``rearm()`` is called from runtime control flow.
 
     Armed-state persistence
     -----------------------
@@ -202,26 +199,26 @@ class GestureActivationController:
     def rearm(self) -> None:
         """Transition from IDLE to ARMED.
 
-        Called by the runtime when gaze is re-established after a
-        ``force_idle()`` call.  Clears dispatch memory so that re-arming
+        Called by the runtime when command dispatch should be enabled again.
+        Clears dispatch memory so that re-arming
         always starts fresh.
         """
         if self._mode is RuntimeMode.IDLE:
             self._mode = RuntimeMode.ARMED
             self._last_dispatched_label = self._unknown_label
             self._last_active_ms = self._now_ms()
-            LOGGER.info("activation: IDLE -> ARMED  (gaze restored)")
+            LOGGER.info("activation: IDLE -> ARMED")
 
     def force_idle(self) -> None:
         """Reset the controller to IDLE unconditionally.
 
-        Called by the runtime loop when the gaze grace period expires while
-        the controller is not already in IDLE state.  Clears all in-progress
+        Called by the runtime loop when command dispatch must be paused.
+        Clears all in-progress
         timers so that the next activation cycle starts from a clean state.
         """
         self._mode = RuntimeMode.IDLE
         self._cooldown_started_ms = None
-        LOGGER.info("activation: forced -> IDLE  (gaze lost)")
+        LOGGER.info("activation: forced -> IDLE")
 
     @staticmethod
     def _now_ms() -> int:
