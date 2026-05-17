@@ -135,6 +135,7 @@ def build_container(
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
         continuous_labels=continuous_labels,
         unknown_label="unknown",
+        auto_idle_enabled=bool(config.inference.gaze.enabled),
     )
     dispatcher = _build_dispatcher(
         allowed_commands=frozenset(command_map.values()),
