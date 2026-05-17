@@ -87,7 +87,7 @@ class TestRuntimeControllerLifecycle:
     def test_state_updated_signal_delivered(self, qtbot) -> None:
         """state_updated signal delivers RuntimeState to the main thread."""
         controller = RuntimeController()
-        fake_state = RuntimeState(mode="idle", gaze_permitted=True, active_mode="test")
+        fake_state = RuntimeState(mode="idle", active_mode="test")
 
         def fake_runtime_init(container, on_state=None):
             instance = MagicMock()
