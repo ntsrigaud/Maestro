@@ -17,6 +17,7 @@ def _make_controller(
     command_cooldown_ms: int = 50,
     edge_trigger_enabled: bool = True,
     continuous_labels: frozenset[str] = frozenset(),
+    auto_idle_enabled: bool = True,
 ) -> GestureActivationController:
     return GestureActivationController(
         command_map=command_map or {"swiping_right": "next_slide"},
@@ -24,6 +25,7 @@ def _make_controller(
         command_cooldown_ms=command_cooldown_ms,
         edge_trigger_enabled=edge_trigger_enabled,
         continuous_labels=continuous_labels,
+        auto_idle_enabled=auto_idle_enabled,
     )
 
 
@@ -33,6 +35,7 @@ def _make_armed_controller(
     command_cooldown_ms: int = 50,
     edge_trigger_enabled: bool = True,
     continuous_labels: frozenset[str] = frozenset(),
+    auto_idle_enabled: bool = True,
 ) -> GestureActivationController:
     ctrl = _make_controller(
         command_map=command_map,
@@ -40,6 +43,7 @@ def _make_armed_controller(
         command_cooldown_ms=command_cooldown_ms,
         edge_trigger_enabled=edge_trigger_enabled,
         continuous_labels=continuous_labels,
+        auto_idle_enabled=auto_idle_enabled,
     )
     ctrl.rearm()
     return ctrl
@@ -130,6 +134,16 @@ def test_idle_timeout_transitions_to_idle() -> None:
         cmd = ctrl.route(_pred("unknown", accepted=False))
     assert cmd is None
     assert ctrl.mode is RuntimeMode.IDLE
+
+
+def test_auto_idle_disabled_never_transitions_to_idle_on_timeout() -> None:
+    with patch.object(GestureActivationController, "_now_ms", staticmethod(lambda: 0)):
+        ctrl = _make_controller(idle_timeout_ms=1000, auto_idle_enabled=False)
+        ctrl.rearm()
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 2000)):
+        cmd = ctrl.route(_pred("unknown", accepted=False))
+    assert cmd is None
+    assert ctrl.mode is RuntimeMode.ARMED
 
 
 # ---------------------------------------------------------------------------

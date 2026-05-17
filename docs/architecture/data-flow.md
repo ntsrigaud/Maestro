@@ -63,6 +63,8 @@ The frame source reads from `cv2.VideoCapture` with a buffer size of 1 to minimi
 
 The detector maintains a four-state machine (ABSENT → ACQUIRING → ACTIVE → LOSING). BlazeFace is sampled every `sample_interval_frames` frames (default 3) at approximately 10 Hz; the cached result is returned on intervening frames at negligible cost. When the LOSING→ABSENT transition fires, `GestureActivationController.force_idle()` is invoked to reset any in-progress gesture hold, preventing an armed system from persisting unattended.
 
+When `gaze.enabled: false`, bootstrap injects `NullGazeDetector` (always returns `True`) and also disables the activation controller's automatic idle timeout. In that configuration the system remains ARMED until an explicit stop/shutdown path resets it; it never depends on gaze to recover from IDLE.
+
 The BGR frame is converted to RGB and processed by MediaPipe BlazeFace face detection (`mediapipe.solutions.face_detection.FaceDetection`). BlazeFace provides 6 face keypoints directly — right eye, left eye, nose tip, mouth center, and ear tragions — eliminating the 468 unused landmarks computed by the previous Face Mesh model. Head orientation is computed by fitting a Perspective-n-Point (PnP) pose from these 6 keypoints and resolving Euler angles from the resulting rotation matrix.
 
 This stage does not produce a domain entity. `gaze_permitted` flows directly into the runtime loop control path and is stored in `RuntimeState` for overlay rendering.
@@ -258,6 +260,8 @@ For classes configured with `vote_window=1`, stabilizer comparison bypasses EMA 
 | `issued_at_ms`   | `int` | Timestamp of command issuance                    |
 
 The activation controller state machine (IDLE → ARMED → COOLDOWN) determines whether a stabilized prediction results in a command. See the Process View for detailed state machine behavior.
+
+Auto-idle is configuration-dependent: with gaze enabled, prolonged inactivity can transition ARMED → IDLE and the next gaze-permitted rising edge rearms the system. With gaze disabled, bootstrap sets `auto_idle_enabled=False`, so prolonged inactivity does not force the controller back to IDLE.
 
 A command is emitted only when:
 

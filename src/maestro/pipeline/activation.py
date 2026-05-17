@@ -15,7 +15,8 @@ class GestureActivationController:
     State machine
     -------------
     ARMED    -> COOLDOWN : command gesture recognised -> ExecutableCommand emitted.
-    ARMED    -> IDLE     : no recognised gesture for *idle_timeout_ms*.
+    ARMED    -> IDLE     : no recognised gesture for *idle_timeout_ms* when
+                           ``auto_idle_enabled=True``.
     COOLDOWN -> ARMED    : cooldown window expires.
     IDLE     -> ARMED    : explicit ``rearm()`` call (gaze re-established).
 
@@ -72,6 +73,7 @@ class GestureActivationController:
         edge_trigger_enabled: bool = True,
         continuous_labels: frozenset[str] = frozenset(),
         unknown_label: str = "unknown",
+        auto_idle_enabled: bool = True,
     ) -> None:
         self._command_map = dict(command_map)
         self._idle_timeout_ms = idle_timeout_ms
@@ -79,6 +81,7 @@ class GestureActivationController:
         self._edge_trigger_enabled = edge_trigger_enabled
         self._continuous_labels = continuous_labels
         self._unknown_label = unknown_label
+        self._auto_idle_enabled = auto_idle_enabled
 
         self._mode: RuntimeMode = RuntimeMode.IDLE
         self._last_active_ms: int = self._now_ms()
@@ -144,7 +147,7 @@ class GestureActivationController:
         # ARMED -- check idle timeout, then dispatch command gestures.
         # ------------------------------------------------------------------
         if self._mode is RuntimeMode.ARMED:
-            if now - self._last_active_ms > self._idle_timeout_ms:
+            if self._auto_idle_enabled and now - self._last_active_ms > self._idle_timeout_ms:
                 self._mode = RuntimeMode.IDLE
                 LOGGER.info(
                     "activation: ARMED -> IDLE  (no gesture for %d ms)",
