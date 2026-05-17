@@ -76,13 +76,34 @@ except ImportError:  # graceful degradation if tqdm is not installed
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from maestro.domain.entities import LabeledGraphFrame  # noqa: E402
-from maestro.pipeline import graph_schema  # noqa: E402
-from maestro.training.dataset_builder import (  # noqa: E402
-    GraphSequenceDatasetBuilder,
-    LabeledLandmarkFrame,
-    SequenceDatasetBuilder,
-)
+from maestro.training.dataset_builder import LabeledLandmarkFrame, SequenceDatasetBuilder  # noqa: E402
+
+try:  # noqa: E402
+    from maestro.domain.entities import LabeledGraphFrame  # type: ignore
+except ImportError:  # graph-mode legacy type is optional in this repo state
+    LabeledGraphFrame = None  # type: ignore[assignment]
+
+try:  # noqa: E402
+    from maestro.training.dataset_builder import GraphSequenceDatasetBuilder  # type: ignore
+except ImportError:  # graph-mode builder may not exist; flat mode remains supported
+    GraphSequenceDatasetBuilder = None  # type: ignore[assignment]
+
+
+class _GraphSchemaCompat:
+    GRAPH_SCHEMA_VERSION = "graph-schema-v1"
+    NUM_NODES = 67
+    NUM_COORDS = 3
+    NODE_INDEX_MAP = {
+        "right_hand": (0, 21),
+        "left_hand": (21, 42),
+        "pose": (42, 53),
+        "face": (53, 67),
+    }
+    POSE_LANDMARK_INDICES = list(range(11))
+    FACE_LANDMARK_INDICES = list(range(14))
+
+
+graph_schema = _GraphSchemaCompat()
 
 # Default model cache path (mirrors the constant formerly in holistic_extractor).
 _DEFAULT_MODEL_CACHE = Path.home() / ".cache" / "maestro" / "holistic_landmarker.task"
@@ -547,6 +568,12 @@ def assemble_dataset(
     the form ``{video}:{seg_index}`` so the builder resets its buffer state
     at every segment boundary.
     """
+    if GraphSequenceDatasetBuilder is None or LabeledGraphFrame is None:
+        raise RuntimeError(
+            "Graph dataset format is not available in this codebase state. "
+            "Use '--format flat' (recommended for current training pipeline)."
+        )
+
     effective_mapping = label_mapping if label_mapping is not None else IPN_TO_VOCAB
     # For binary mode the "background" class may be called 'no_gesture' not 'unknown'.
     # Determine the background label name so unknown-subsampling logic can be skipped.
@@ -699,6 +726,7 @@ def assemble_flat_dataset(
         window_step=window_step,
         min_valid_ratio=min_valid_ratio,
         label_strategy=label_strategy,
+        spill_sequences_to_disk=True,
     )
 
     all_mapped: list[tuple[str, AnnotationRow]] = []
@@ -1008,6 +1036,12 @@ def main() -> None:
     parser = _build_arg_parser()
     args = parser.parse_args()
 
+    if args.format == "graph" and (GraphSequenceDatasetBuilder is None or LabeledGraphFrame is None):
+        parser.error(
+            "--format graph is unavailable because legacy graph classes are missing. "
+            "Use '--format flat'."
+        )
+
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -1161,6 +1195,7 @@ def main() -> None:
         assert isinstance(builder, SequenceDatasetBuilder)
         builder.save_npz(output_npz, feature_schema_version="feature-schema-v5")
     else:
+        assert GraphSequenceDatasetBuilder is not None
         assert isinstance(builder, GraphSequenceDatasetBuilder)
         builder.save_npz(output_npz, graph_schema_version=args.graph_schema_version)
     logger.info("Dataset saved → %s  (%d samples)", output_npz, len(builder.samples))
