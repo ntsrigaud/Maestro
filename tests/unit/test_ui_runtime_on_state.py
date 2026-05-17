@@ -39,7 +39,7 @@ def _make_container() -> SimpleNamespace:
     sequence_buffer.current_valid_ratio.return_value = 1.0
 
     activation_controller = MagicMock()
-    activation_controller.mode = "idle"
+    activation_controller.mode = "armed"
 
     overlay_frame = MagicMock()
     overlay_frame.frame = frame

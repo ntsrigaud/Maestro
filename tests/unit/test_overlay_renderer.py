@@ -18,7 +18,7 @@ def _make_frame(width: int = 100, height: int = 100) -> FramePacket:
 
 def _make_state(**info_overrides: object) -> RuntimeState:
     return RuntimeState(
-        mode="idle",
+        mode="armed",
         last_label="unknown",
         last_confidence=0.0,
         info={"landmarks": [], **info_overrides},
@@ -288,10 +288,6 @@ class TestBorderColours:
         )
         return renderer.render(frame, state).frame
 
-    def test_idle_mode_renders_amber_border(self) -> None:
-        frame = self._render("idle")
-        assert _border_pixel(frame, corner="top-left") == _AMBER
-
     def test_cooldown_mode_renders_amber_border(self) -> None:
         frame = self._render("cooldown")
         assert _border_pixel(frame, corner="top-left") == _AMBER
@@ -318,17 +314,17 @@ class TestBorderColours:
 
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=400, height=200)
-        state = _make_border_state("idle")
+        state = _make_border_state("cooldown")
         rendered = renderer.render(frame, state).frame
         # Rows just inside the top border, columns far to the right of all text.
         patch = np.asarray(rendered)[_THICKNESS + 2 : _THICKNESS + 12, 350:390]
         assert patch.sum() == 0, "Interior region far from text must remain unmodified"
 
     def test_default_state_renders_amber_border(self) -> None:
-        """RuntimeState with mode='idle' renders amber border."""
+        """RuntimeState with mode='cooldown' renders amber border."""
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=100, height=100)
-        state = RuntimeState(mode="idle", last_label="unknown", last_confidence=0.0)
+        state = RuntimeState(mode="cooldown", last_label="unknown", last_confidence=0.0)
         result = renderer.render(frame, state).frame
         assert _border_pixel(result, corner="top-left") == _AMBER
 
@@ -336,7 +332,7 @@ class TestBorderColours:
 
     def test_laser_active_renders_sky_blue_border(self) -> None:
         """laser_active=True in info → sky blue border overrides mode."""
-        frame = self._render_with_info("idle", info={"laser_active": True})
+        frame = self._render_with_info("armed", info={"laser_active": True})
         assert _border_pixel(frame, corner="top-left") == _LASER
 
     def test_laser_active_overrides_armed_mode(self) -> None:
@@ -346,7 +342,7 @@ class TestBorderColours:
 
     def test_pen_active_renders_violet_border(self) -> None:
         """pen_active=True in info → violet border overrides mode."""
-        frame = self._render_with_info("idle", info={"pen_active": True})
+        frame = self._render_with_info("armed", info={"pen_active": True})
         assert _border_pixel(frame, corner="top-left") == _PEN
 
     def test_pen_active_overrides_armed_mode(self) -> None:
@@ -403,7 +399,7 @@ class TestModeBadge:
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=self.WIDTH, height=self.HEIGHT)
         state = RuntimeState(
-            mode="idle",
+            mode="armed",
             last_label="unknown",
             last_confidence=0.0,
             active_mode="unknown",
@@ -494,6 +490,6 @@ class TestPredRingColours:
         assert patch[:, :, 1].max() > 0, "Armed pred ring must have G channel > 0"
 
     def test_ring_renders_without_error_for_all_known_modes(self) -> None:
-        for mode in ("idle", "armed", "cooldown"):
+        for mode in ("armed", "cooldown"):
             frame = self._render_ring(mode)
             assert frame.shape == (self.HEIGHT, self.WIDTH, 3)
