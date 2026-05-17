@@ -1,5 +1,8 @@
 command_cooldown_ms: 1500
 edge_trigger_enabled: true
+pointer:
+  gain_x: 2.4
+  gain_y: 2.2
 gaze:
   arm_ms: 500
   enabled: false
