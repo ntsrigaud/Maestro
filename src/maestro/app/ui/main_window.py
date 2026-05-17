@@ -198,7 +198,7 @@ class MainWindow(QWidget):
             return "#7C3AED"  # violet — annotation pen active
         if state.mode == "armed":
             return "#059669"  # green — armed
-        return "#D97706"  # amber — idle/cooldown
+        return "#D97706"  # amber — cooldown
 
     def _tray_icon_for_colour(self, colour: str) -> QIcon:
         cached = self._tray_icons_cache.get(colour)
@@ -243,13 +243,12 @@ class MainWindow(QWidget):
                 if state.last_label != "unknown"
                 else "Armed"
             )
-        if state.mode == "cooldown":
+        else:  # cooldown
             return (
                 f"Cooldown: {state.last_label.replace('_', ' ').upper()}"
                 if state.last_label != "unknown"
                 else "Cooldown"
             )
-        return "Idle"
 
     def _sync_preview_visibility(self) -> None:
         if self._preview_action.isChecked() and self._controller.is_running:

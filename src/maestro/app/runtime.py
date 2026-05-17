@@ -214,10 +214,6 @@ class Runtime:
         latest_label = "unknown"
         latest_conf = 0.0
 
-        # Without gaze gating, start each session in ARMED state so command
-        # dispatch is available immediately.
-        self._container.activation_controller.rearm()
-
         try:
             while self._running:
                 loop_start = time.perf_counter()

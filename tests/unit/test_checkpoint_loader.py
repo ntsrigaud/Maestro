@@ -134,7 +134,6 @@ def test_validate_runtime_compatibility_passes(tmp_path: Path) -> None:
                 "window_length": 16,
                 "window_step": 3,
                 "min_valid_ratio": 0.8,
-                "idle_timeout_ms": 3000,
                 "command_cooldown_ms": 500,
             },
             "feature_pipeline": {
@@ -172,7 +171,6 @@ def test_validate_runtime_compatibility_rejects_window_mismatch(tmp_path: Path) 
                 "window_length": 16,
                 "window_step": 3,
                 "min_valid_ratio": 0.8,
-                "idle_timeout_ms": 3000,
                 "command_cooldown_ms": 500,
             },
             "feature_pipeline": {
