@@ -28,7 +28,7 @@ Lifecycle
   The OS mouse cursor is moved to the screen position of the index fingertip
   (landmark 8 in the MediaPipe 21-point hand model).  PowerPoint’s laser dot
   follows the cursor in real-time.
-- **Exit** (gesture returns to ``unknown`` or gaze is lost):
+- **Exit** (gesture returns to ``unknown`` or runtime stops):
   The laser-off hotkey (``⌘+A`` or ``Ctrl+A``) is pressed once to revert the
   cursor to the default arrow pointer.
 
@@ -41,6 +41,12 @@ typically mirrored for user comfort (``mirror_display: true`` in
 x value in the raw image.  When ``mirror_x=True`` (the default), the tracker
 applies ``screen_x = (1 - x_norm) * screen_width`` so that the laser dot
 appears at the visually correct position on the presentation display.
+
+Because users typically point within a narrower central region of the camera
+frame rather than sweeping fingertip landmarks across the full ``[0, 1]``
+range, the tracker applies a centre-relative gain before converting to screen
+pixels. This expands on-screen displacement for a given hand movement while
+keeping the centre point stable and clamping safely at the screen edges.
 """
 
 from __future__ import annotations
@@ -76,6 +82,9 @@ _LASER_OFF_KEYS: dict[str, tuple[str, ...]] = {
     "linux": ("ctrl", "a"),
 }
 
+_DEFAULT_POINTER_GAIN_X: float = 2.4
+_DEFAULT_POINTER_GAIN_Y: float = 2.2
+
 
 def _platform_key() -> str:
     """Return a normalised platform key for the _LASER_* dicts."""
@@ -104,6 +113,12 @@ class LaserPointerTracker:
     laser_off_keys:
         Hotkey tuple sent to deactivate the laser (e.g. ``("command", "a")`` on
         macOS or ``("ctrl", "a")`` on Windows).  Defaults to the current platform.
+    pointer_gain_x:
+        Centre-relative horizontal gain applied to fingertip movement before
+        mapping to the screen. Values > 1 expand cursor travel.
+    pointer_gain_y:
+        Centre-relative vertical gain applied to fingertip movement before
+        mapping to the screen. Values > 1 expand cursor travel.
     """
 
     def __init__(
@@ -114,11 +129,15 @@ class LaserPointerTracker:
         mirror_x: bool = True,
         laser_on_keys: tuple[str, ...] | None = None,
         laser_off_keys: tuple[str, ...] | None = None,
+        pointer_gain_x: float = _DEFAULT_POINTER_GAIN_X,
+        pointer_gain_y: float = _DEFAULT_POINTER_GAIN_Y,
     ) -> None:
         self._keyboard = keyboard
         self._pointing_labels = pointing_labels
         self._mirror_x = mirror_x
         self._active: bool = False
+        self._pointer_gain_x = max(1.0, float(pointer_gain_x))
+        self._pointer_gain_y = max(1.0, float(pointer_gain_y))
         _p = _platform_key()
         self._laser_on_keys: tuple[str, ...] = (
             laser_on_keys if laser_on_keys is not None else _LASER_ON_KEYS[_p]
@@ -171,7 +190,7 @@ class LaserPointerTracker:
 
         Sends ``Ctrl+A`` to restore the arrow cursor if the pointer is
         currently active.  Safe to call from the runtime ``finally`` block or
-        on gaze loss.
+        during control-state transitions.
         """
         if self._active:
             self._deactivate("shutdown")
@@ -210,6 +229,9 @@ class LaserPointerTracker:
         x_norm: float = landmarks[_INDEX_FINGERTIP][0]
         y_norm: float = landmarks[_INDEX_FINGERTIP][1]
 
+        x_norm = self._apply_pointer_gain(x_norm, self._pointer_gain_x)
+        y_norm = self._apply_pointer_gain(y_norm, self._pointer_gain_y)
+
         screen_w, screen_h = self._keyboard.screen_size()
         screen_x = int((1.0 - x_norm if self._mirror_x else x_norm) * screen_w)
         screen_y = int(y_norm * screen_h)
@@ -218,3 +240,9 @@ class LaserPointerTracker:
         screen_y = max(0, min(screen_h - 1, screen_y))
 
         self._keyboard.move_mouse(screen_x, screen_y)
+
+    @staticmethod
+    def _apply_pointer_gain(value: float, gain: float) -> float:
+        """Expand movement around the frame centre, then clamp to [0, 1]."""
+        centered = 0.5 + ((value - 0.5) * gain)
+        return max(0.0, min(1.0, centered))

@@ -5,30 +5,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class GazeConfig(BaseModel):
+class PointerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # Master enable.  When False, a NullGazeDetector (always returns True) is
-    # substituted, restoring the pre-gaze behaviour without code changes.
-    enabled: bool = True
-    # Head-pose acceptance cone.  A face is considered camera-directed when
-    # both the absolute yaw and absolute pitch remain within these limits.
-    yaw_threshold_deg: float = Field(default=30.0, gt=0, le=90)
-    pitch_threshold_deg: float = Field(default=25.0, gt=0, le=90)
-    # Duration (ms) the head pose must remain within the acceptance cone
-    # continuously before the detector transitions to GAZE_ACTIVE.
-    arm_ms: int = Field(default=500, ge=100, le=5000)
-    # Grace period (ms) after the head pose leaves the acceptance cone before
-    # the system forces the activation controller back to IDLE.  Prevents
-    # false disarming during natural head movements.
-    grace_ms: int = Field(default=5000, ge=1000, le=60_000)
-    # Face Mesh is called every N frames; the cached result is returned for
-    # intermediate frames.  At 30 FPS and N=3, Face Mesh runs at ~10 Hz.
-    sample_interval_frames: int = Field(default=3, ge=1, le=30)
-    # Minimum BlazeFace detection confidence score [0, 1] required before a
-    # keypoint-based head-pose check is attempted.  Lower values accept more
-    # detections at range but increase false-positive cone membership.
-    min_detection_score: float = Field(default=0.5, gt=0.0, le=1.0)
+    gain_x: float = Field(default=2.4, ge=1.0, le=5.0)
+    gain_y: float = Field(default=2.2, ge=1.0, le=5.0)
 
 
 class AppConfig(BaseModel):
@@ -63,18 +44,15 @@ class InferenceConfig(BaseModel):
     window_length: int = Field(ge=4, le=256)
     window_step: int = Field(ge=1, le=64)
     min_valid_ratio: float = Field(ge=0.0, le=1.0)
-    # How long the system stays ARMED with no recognised gesture before
-    # dropping back to IDLE.  Default 300 000 ms (5 min) suits presentation
-    # use where users pause between interactions for extended periods.
-    idle_timeout_ms: int = Field(ge=500, le=600_000)
     command_cooldown_ms: int = Field(ge=100, le=5000)
     # When True (default), a command gesture is only dispatched on its rising
     # edge — the first frame where the label *changes* from the previous label.
     # This prevents repeated commands from a single slow gesture that produces
     # many consecutive accepted predictions across overlapping inference windows.
     edge_trigger_enabled: bool = True
-    # Gaze-aware activation.  See GazeConfig for field documentation.
-    gaze: GazeConfig = GazeConfig()
+    # Shared pointer sensitivity used by both the laser pointer and the
+    # annotation pen continuous trackers.
+    pointer: PointerConfig = PointerConfig()
 
 
 class FeaturePipelineConfig(BaseModel):

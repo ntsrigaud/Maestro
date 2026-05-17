@@ -75,35 +75,23 @@ class TestSystemTray:
             window = MainWindow(config_path="configs")
             qtbot.addWidget(window)
 
-            state_gaze_off = RuntimeState(mode="idle", info={"gaze_enabled": False})
-            assert window._tray_colour_for_state(state_gaze_off) == "#1E293B"
-
-            state_absent = RuntimeState(
-                mode="armed", gaze_permitted=False, info={"gaze_enabled": True}
-            )
-            assert window._tray_colour_for_state(state_absent) == "#4B5563"
-
             state_laser = RuntimeState(
                 mode="armed",
-                gaze_permitted=True,
-                info={"gaze_enabled": True, "laser_active": True, "pen_active": False},
+                info={"laser_active": True, "pen_active": False},
             )
             assert window._tray_colour_for_state(state_laser) == "#2563EB"
 
             state_pen = RuntimeState(
                 mode="armed",
-                gaze_permitted=True,
-                info={"gaze_enabled": True, "laser_active": False, "pen_active": True},
+                info={"laser_active": False, "pen_active": True},
             )
             assert window._tray_colour_for_state(state_pen) == "#7C3AED"
 
-            state_armed = RuntimeState(
-                mode="armed", gaze_permitted=True, info={"gaze_enabled": True}
-            )
+            state_armed = RuntimeState(mode="armed")
             assert window._tray_colour_for_state(state_armed) == "#059669"
 
-            state_idle = RuntimeState(mode="idle", gaze_permitted=True, info={"gaze_enabled": True})
-            assert window._tray_colour_for_state(state_idle) == "#D97706"
+            state_cooldown = RuntimeState(mode="cooldown")
+            assert window._tray_colour_for_state(state_cooldown) == "#D97706"
 
     def test_window_controls_remain_available_without_system_tray(self, qtbot) -> None:
         with (

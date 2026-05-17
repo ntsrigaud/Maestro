@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import yaml
 from PySide6.QtCore import QCoreApplication, QSignalBlocker, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
@@ -69,8 +66,6 @@ class MainWindow(QWidget):
         self._config_path = config_path or str(get_config_dir())
         self._preview_window = FloatingPreviewWindow()
         self._controller = RuntimeController(parent=self)
-        # Gaze setting written to YAML when the runtime stops (if changed while running).
-        self._pending_gaze: bool | None = None
 
         self.setWindowTitle("Maestro")
         self.setMinimumSize(380, 180)
@@ -95,18 +90,8 @@ class MainWindow(QWidget):
         self._preview_action.setCheckable(True)
         self._preview_action.toggled.connect(self._on_preview_toggled)
 
-        self._gaze_action = QAction("Gaze detection", self)
-        self._gaze_action.setCheckable(True)
-        self._gaze_action.setChecked(self._read_gaze_enabled())
-        self._gaze_action.setToolTip(
-            "When enabled, gesture commands are only dispatched while the user\n"
-            "is looking at the camera. Takes effect on the next session start."
-        )
-        self._gaze_action.toggled.connect(self._on_gaze_toggled)
-
         self._controls_menu.addAction(self._active_action)
         self._controls_menu.addAction(self._preview_action)
-        self._controls_menu.addAction(self._gaze_action)
         self._controls_menu.addSeparator()
         self._controls_menu.addAction("Quit", self.close)
 
@@ -131,8 +116,7 @@ class MainWindow(QWidget):
         header.addWidget(self._status_label, 1)
 
         hint = QLabel(
-            "Use the menu button or tray icon to start/stop the runtime, "
-            "toggle preview, and change gaze detection.",
+            "Use the menu button or tray icon to start/stop the runtime and toggle preview.",
             self,
         )
         hint.setWordWrap(True)
@@ -173,21 +157,6 @@ class MainWindow(QWidget):
     def _on_preview_toggled(self, _enabled: bool) -> None:
         self._sync_preview_visibility()
 
-    def _on_gaze_toggled(self, enabled: bool) -> None:
-        """Persist the gaze-detection setting or defer if a session is running."""
-        if self._controller.is_running:
-            # Cannot safely change the running container; defer to session stop.
-            self._pending_gaze = enabled
-            label = "enabled" if enabled else "disabled"
-            self._show_notification(
-                "Maestro",
-                f"Gaze detection {label} — takes effect on next session.",
-                QSystemTrayIcon.MessageIcon.Information,
-                2500,
-            )
-        else:
-            self._write_gaze_enabled(enabled)
-
     def _on_runtime_started(self) -> None:
         self._set_runtime_message("Maestro: active")
         self._preview_window.reset()
@@ -199,10 +168,6 @@ class MainWindow(QWidget):
         self._preview_window.hide()
         with QSignalBlocker(self._active_action):
             self._active_action.setChecked(False)
-        # Flush any gaze setting that was toggled while the session was running.
-        if self._pending_gaze is not None:
-            self._write_gaze_enabled(self._pending_gaze)
-            self._pending_gaze = None
 
     def _on_error(self, message: str) -> None:
         self._apply_state_icon(self._tray_icon_for_colour("#DC2626"))
@@ -224,21 +189,16 @@ class MainWindow(QWidget):
 
     def _tray_colour_for_state(self, state: RuntimeState) -> str:
         """Map runtime state to the same colour theme used by floating preview badge."""
-        gaze_enabled = bool(state.info.get("gaze_enabled", True))
         laser_active = bool(state.info.get("laser_active", False))
         pen_active = bool(state.info.get("pen_active", False))
 
-        if not gaze_enabled:
-            return "#1E293B"  # dark slate — gaze detection disabled
-        if not state.gaze_permitted:
-            return "#4B5563"  # grey — gaze absent
         if laser_active:
             return "#2563EB"  # blue — laser pointer active
         if pen_active:
             return "#7C3AED"  # violet — annotation pen active
         if state.mode == "armed":
             return "#059669"  # green — armed
-        return "#D97706"  # amber — idle/cooldown with gaze present
+        return "#D97706"  # amber — cooldown
 
     def _tray_icon_for_colour(self, colour: str) -> QIcon:
         cached = self._tray_icons_cache.get(colour)
@@ -273,10 +233,6 @@ class MainWindow(QWidget):
             self._status_label.setText(message)
 
     def _state_text_for_state(self, state: RuntimeState) -> str:
-        if not state.gaze_permitted:
-            return "Gaze absent"
-        if not bool(state.info.get("gaze_enabled", True)):
-            return "Gaze detection disabled"
         if bool(state.info.get("laser_active", False)):
             return "Laser pointer active"
         if bool(state.info.get("pen_active", False)):
@@ -287,55 +243,18 @@ class MainWindow(QWidget):
                 if state.last_label != "unknown"
                 else "Armed"
             )
-        if state.mode == "cooldown":
+        else:  # cooldown
             return (
                 f"Cooldown: {state.last_label.replace('_', ' ').upper()}"
                 if state.last_label != "unknown"
                 else "Cooldown"
             )
-        return "Idle"
 
     def _sync_preview_visibility(self) -> None:
         if self._preview_action.isChecked() and self._controller.is_running:
             self._preview_window.show_preview()
             return
         self._preview_window.hide()
-
-    def _inference_yaml_path(self) -> Path:
-        return Path(self._config_path) / "inference.yaml"
-
-    def _read_gaze_enabled(self) -> bool:
-        """Read ``gaze.enabled`` from inference.yaml; defaults to False."""
-        path = self._inference_yaml_path()
-        if not path.exists():
-            return False
-        try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            return bool(data.get("gaze", {}).get("enabled", False))
-        except Exception:
-            return False
-
-    def _write_gaze_enabled(self, value: bool) -> None:
-        """Persist ``gaze.enabled`` to inference.yaml."""
-        path = self._inference_yaml_path()
-        if not path.exists():
-            return
-        try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            if not isinstance(data.get("gaze"), dict):
-                data["gaze"] = {}
-            data["gaze"]["enabled"] = value
-            path.write_text(
-                yaml.dump(
-                    data,
-                    default_flow_style=False,
-                    sort_keys=False,
-                    allow_unicode=True,
-                ),
-                encoding="utf-8",
-            )
-        except Exception:
-            pass  # Non-fatal: worst case the setting reverts on next launch
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         self._controller.stop()

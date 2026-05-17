@@ -34,6 +34,7 @@ import sys
 from maestro.domain.entities import DispatchResult
 from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
+    _foreground_identity,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -47,15 +48,29 @@ _ZOOM_MODIFIER: dict[str, str] = {
     "linux": "ctrl",
 }
 
-# Slideshow start / stop shortcut per platform.
-# PowerPoint macOS: Cmd+Return; Keynote: Cmd+Return; Google Slides: Ctrl+F5.
-# LibreOffice / PowerPoint Win/Linux: F5.
-# Using F5 universally on Win/Linux covers the majority of software.
-_SLIDESHOW_KEYS: dict[str, tuple[str, ...]] = {
+# Slideshow start shortcut per platform for browser-hosted presentations.
+# macOS uses Cmd+Shift+Return so Google Slides starts from beginning in
+# slideshow mode (not presenter view).
+_SLIDESHOW_KEYS_BROWSER: dict[str, tuple[str, ...]] = {
+    "darwin": ("command", "shift", "enter"),
+    "win32": ("ctrl", "f5"),
+    "linux": ("ctrl", "f5"),
+}
+
+# Slideshow start shortcut per platform for native presentation applications.
+_SLIDESHOW_KEYS_NATIVE: dict[str, tuple[str, ...]] = {
     "darwin": ("command", "enter"),
     "win32": ("f5",),
     "linux": ("f5",),
 }
+
+_BROWSER_IDENTITY_TOKENS: tuple[str, ...] = (
+    "chrome",
+    "firefox",
+    "safari",
+    "edge",
+    "brave",
+)
 
 
 class PresentationAdapter:
@@ -88,8 +103,18 @@ class PresentationAdapter:
     def __init__(self, keyboard: KeyboardAdapter | None = None) -> None:
         self._keyboard = keyboard or KeyboardAdapter()
         platform = sys.platform if sys.platform in ("darwin", "win32") else "linux"
+        self._platform = platform
         self._zoom_modifier = _ZOOM_MODIFIER[platform]
-        self._slideshow_keys = _SLIDESHOW_KEYS[platform]
+        self._slideshow_keys_browser = _SLIDESHOW_KEYS_BROWSER[platform]
+        self._slideshow_keys_native = _SLIDESHOW_KEYS_NATIVE[platform]
+
+    def _start_slideshow_keys(self) -> tuple[str, ...]:
+        """Choose slideshow start keys by active app family (browser vs native)."""
+        identity = _foreground_identity() or ""
+        is_browser = any(token in identity for token in _BROWSER_IDENTITY_TOKENS)
+        if is_browser:
+            return self._slideshow_keys_browser
+        return self._slideshow_keys_native
 
     def execute(self, command_id: str) -> DispatchResult:
         """Translate *command_id* into an OS-level keyboard action.
@@ -104,8 +129,10 @@ class PresentationAdapter:
         executed = False
         match command_id:
             case "start_presentation":
-                # Start the slideshow: Cmd+Return (macOS) / F5 (Win/Linux).
-                executed = self._keyboard.press_hotkey(*self._slideshow_keys)
+                # Start slideshow with context-aware shortcuts:
+                # - Browser (Google Slides): Cmd+Shift+Return (macOS) / Ctrl+F5 (Win/Linux)
+                # - Native apps (PowerPoint/Keynote/Impress): Cmd+Return (macOS) / F5
+                executed = self._keyboard.press_hotkey(*self._start_slideshow_keys())
             case "stop_presentation":
                 # Stop / exit the slideshow universally.
                 executed = self._keyboard.press_hotkey("escape")
@@ -156,7 +183,7 @@ class PresentationAdapter:
             case "scroll_back":
                 executed = self._keyboard.press_hotkey("up")
             case "start_stop_presentation":
-                executed = self._keyboard.press_hotkey(*self._slideshow_keys)
+                executed = self._keyboard.press_hotkey(*self._start_slideshow_keys())
             case "activate_laser_pointer":
                 # Ctrl+L toggles the laser pointer on during a running slideshow.
                 # Universal across PowerPoint (Windows / macOS).

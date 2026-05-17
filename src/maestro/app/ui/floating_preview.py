@@ -20,7 +20,6 @@ _MAX_PREVIEW_WIDTH = 280
 _STATUS_BADGE_MARGIN = 8
 
 # Keep badge theme aligned with overlay border state priority.
-_BADGE_ABSENT = "rgba(75, 85, 99, 215)"
 _BADGE_ACQUIRING = "rgba(217, 119, 6, 220)"
 _BADGE_ARMED = "rgba(5, 150, 105, 215)"
 _BADGE_LASER = "rgba(37, 99, 235, 225)"
@@ -198,28 +197,21 @@ class FloatingPreviewWindow(QWidget):
         self._state_badge.move(x, y)
 
     def _update_state_badge(self, state: RuntimeState) -> None:
-        gaze_enabled = bool(state.info.get("gaze_enabled", True))
         laser_active = bool(state.info.get("laser_active", False))
         pen_active = bool(state.info.get("pen_active", False))
         label = state.last_label or "unknown"
         label_display = label.replace("_", " ").upper() if label != "unknown" else ""
         color = self._badge_theme_color(state)
 
-        if not gaze_enabled:
-            text = f"STATE: {state.mode.upper()}"
-        elif not state.gaze_permitted:
-            text = "IDLE | GAZE ABSENT"
-        elif laser_active:
+        if laser_active:
             text = "LASER POINTER ACTIVE"
         elif pen_active:
             text = "ANNOTATION PEN ACTIVE"
         elif state.mode == "cooldown":
             suffix = f": {label_display}" if label_display else ""
             text = f"DISPATCHED{suffix}"
-        elif state.mode == "armed":
+        else:  # armed
             text = f"ARMED | {label_display}" if label_display else "ARMED | READY"
-        else:
-            text = "IDLE | GAZE ACTIVE"
 
         self._state_badge.setText(text)
         self._state_badge.setStyleSheet(
@@ -242,8 +234,6 @@ class FloatingPreviewWindow(QWidget):
 
     def _badge_theme_color(self, state: RuntimeState) -> str:
         """Return a badge background color matching overlay border state priority."""
-        if not state.gaze_permitted:
-            return _BADGE_ABSENT
         if state.info.get("laser_active"):
             return _BADGE_LASER
         if state.info.get("pen_active"):
