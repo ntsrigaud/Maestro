@@ -8,10 +8,7 @@ This document describes the complete data flow through the real-time inference p
 
 ```mermaid
 graph TD
-    A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| B["Gaze Estimation<br/>(BlazeFace + Head Pose)"]
-    B --> Gz{"gaze_permitted?"}
-    Gz -->|false| O["Overlay Render + RuntimeState Emit"]
-    Gz -->|true| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
+    A["Frame Capture<br/>(1280x720 BGR)"] -->|FramePacket| C["Landmark Extraction<br/>(MediaPipe Hands, 21x3)"]
     C -->|MultiHandPacket| Cs["Hand Selection<br/>(HandSelector)"]
     Cs -->|LandmarkPacket| D["Feature Engineering<br/>(Normalize + Velocity, 147-d)"]
     D -->|FeatureFrame| E["Temporal Buffer<br/>(Sliding Window, 16x147)"]
@@ -19,7 +16,7 @@ graph TD
     Wr -->|false| O
     Wr -->|true| F["Enhanced Two-Stream<br/>(BiLSTM + MHA + Cross-Stream Gate)"]
     F -->|Prediction| G["Prediction Stabilizer<br/>(EMA + Threshold + Voting)"]
-    G -->|StabilizedPrediction| H["Activation Controller<br/>(IDLE / ARMED / COOLDOWN)"]
+    G -->|StabilizedPrediction| H["Activation Controller<br/>(ARMED / COOLDOWN)"]
     H --> Cm{"command emitted?"}
     Cm -->|no| O
     Cm -->|yes| I["Command Dispatcher<br/>(Allowlist + Rate Limit)"]
@@ -50,24 +47,7 @@ graph TD
 
 The frame source reads from `cv2.VideoCapture` with a buffer size of 1 to minimize latency. Frame timing is enforced to match the configured target FPS (default 30). Each frame is assigned a monotonic timestamp for pipeline synchronization.
 
-### Stage 2: Gaze Estimation
-
-**Component**: `HeadPoseGazeDetector` (or `NullGazeDetector` when `gaze.enabled: false`)
-**Input**: `FramePacket`
-**Output**: `gaze_permitted: bool`
-
-| Output Value | Condition                                                                                           | Pipeline Effect                              |
-| ------------ | --------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `True`       | User head pose within ±30° yaw and ±25° pitch; gaze state is ACTIVE or LOSING (within grace period) | Downstream stages proceed normally           |
-| `False`      | No face detected, head pose outside thresholds, or gaze state is ABSENT or ACQUIRING                | All downstream stages skipped for this frame |
-
-The detector maintains a four-state machine (ABSENT → ACQUIRING → ACTIVE → LOSING). BlazeFace is sampled every `sample_interval_frames` frames (default 3) at approximately 10 Hz; the cached result is returned on intervening frames at negligible cost. When the LOSING→ABSENT transition fires, `GestureActivationController.force_idle()` is invoked to reset any in-progress gesture hold, preventing an armed system from persisting unattended.
-
-The BGR frame is converted to RGB and processed by MediaPipe BlazeFace face detection (`mediapipe.solutions.face_detection.FaceDetection`). BlazeFace provides 6 face keypoints directly — right eye, left eye, nose tip, mouth center, and ear tragions — eliminating the 468 unused landmarks computed by the previous Face Mesh model. Head orientation is computed by fitting a Perspective-n-Point (PnP) pose from these 6 keypoints and resolving Euler angles from the resulting rotation matrix.
-
-This stage does not produce a domain entity. `gaze_permitted` flows directly into the runtime loop control path and is stored in `RuntimeState` for overlay rendering.
-
-### Stage 3: Landmark Extraction
+### Stage 2: Landmark Extraction
 
 **Component**: `MediaPipeHandsExtractor`  
 **Input**: `FramePacket`  
@@ -102,7 +82,7 @@ The extractor prefers `FramePacket.rgb_frame` (prepared in Stage 1) and falls ba
 - 13–16: Ring finger
 - 17–20: Pinky finger
 
-### Stage 4: Hand Selection
+### Stage 3: Hand Selection
 
 **Component**: `HandSelector`  
 **Input**: `MultiHandPacket`  
@@ -257,7 +237,7 @@ For classes configured with `vote_window=1`, stabilizer comparison bypasses EMA 
 | `source_gesture` | `str` | Original gesture label (e.g., `"swiping_right"`) |
 | `issued_at_ms`   | `int` | Timestamp of command issuance                    |
 
-The activation controller state machine (IDLE → ARMED → COOLDOWN) determines whether a stabilized prediction results in a command. See the Process View for detailed state machine behavior.
+The activation controller state machine (ARMED → COOLDOWN → ARMED) determines whether a stabilized prediction results in a command. See the Process View for detailed state machine behavior.
 
 A command is emitted only when:
 
@@ -377,7 +357,7 @@ the main (Qt event loop) thread via Qt's event queue. `RuntimeState` is a
 | Consumer            | Connected Signal                  | Fields Read                                                 |
 | ------------------- | --------------------------------- | ----------------------------------------------------------- |
 | `StatusMonitor`     | `RuntimeController.state_updated` | All fields                                                  |
-| `MainWindow` (tray) | `RuntimeController.state_updated` | `gaze_permitted`, `info["accepted"]`, `last_label`          |
+| `MainWindow` (tray) | `RuntimeController.state_updated` | `info["accepted"]`, `last_label`                            |
 | `MainWindow` (log)  | `RuntimeController.state_updated` | `mode`, `info["accepted"]`, `last_label`, `last_confidence` |
 
 ### CLI Path

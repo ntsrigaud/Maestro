@@ -1,13 +1,5 @@
 command_cooldown_ms: 1000
 edge_trigger_enabled: true
-gaze:
-  arm_ms: 500
-  enabled: true
-  grace_ms: 5000
-  pitch_threshold_deg: 25.0
-  sample_interval_frames: 3
-  yaw_threshold_deg: 30.0
-idle_timeout_ms: 100000
 min_valid_ratio: 0.8
 window_length: 16
 window_step: 3

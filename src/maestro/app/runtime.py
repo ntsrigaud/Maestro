@@ -23,7 +23,6 @@ from maestro.interfaces.command_dispatcher import ICommandDispatcher
 from maestro.interfaces.feature_transformer import IFeatureTransformer
 from maestro.interfaces.feedback_renderer import IFeedbackRenderer
 from maestro.interfaces.frame_source import IFrameSource
-from maestro.interfaces.gaze_detector import IGazeIntentDetector
 from maestro.interfaces.landmark_extractor import IHandLandmarkExtractor
 from maestro.interfaces.sequence_buffer import ISequenceBuffer
 from maestro.pipeline.activation import GestureActivationController
@@ -133,7 +132,6 @@ class _InferenceWorker:
 class RuntimeDependencies(Protocol):
     config: RuntimeConfig
     frame_source: IFrameSource
-    gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
     hand_selector: HandSelector
     feature_transformer: IFeatureTransformer
@@ -160,8 +158,6 @@ class Runtime:
         self._inference_worker: _InferenceWorker | None = None
         cfg = getattr(container, "config", None)
         infer_cfg = getattr(cfg, "inference", None)
-        gaze_cfg = getattr(infer_cfg, "gaze", None)
-        self._gaze_enabled = bool(getattr(gaze_cfg, "enabled", True))
         # Pre-compute the active mode display string from config.  This never
         # changes at runtime; storing it once avoids repeated attribute lookups
         # and getattr fallbacks in the hot loop.
@@ -174,13 +170,20 @@ class Runtime:
         #   point_one  → laser pointer (⌘+L / Ctrl+L)
         #   point_two  → annotation pen (⌘+P / Ctrl+P)
         mirror_x = getattr(app_cfg, "mirror_display", True)
+        pointer_cfg = getattr(infer_cfg, "pointer", None)
+        pointer_gain_x = getattr(pointer_cfg, "gain_x", 2.4)
+        pointer_gain_y = getattr(pointer_cfg, "gain_y", 2.2)
         self._laser_tracker = LaserPointerTracker(
             keyboard=KeyboardAdapter(),
             mirror_x=mirror_x,
+            pointer_gain_x=pointer_gain_x,
+            pointer_gain_y=pointer_gain_y,
         )
         self._pen_tracker = AnnotationPenTracker(
             keyboard=KeyboardAdapter(),
             mirror_x=mirror_x,
+            pointer_gain_x=pointer_gain_x,
+            pointer_gain_y=pointer_gain_y,
         )
 
     def stop(self) -> None:
@@ -210,7 +213,6 @@ class Runtime:
         inference_ms = 0.0
         latest_label = "unknown"
         latest_conf = 0.0
-        _prev_gaze_permitted: bool = False
 
         try:
             while self._running:
@@ -220,45 +222,6 @@ class Runtime:
                 frame = self._container.frame_source.read()
                 if benchmark is not None:
                     benchmark.record_capture((time.perf_counter() - t0) * 1000.0)
-
-                # Stage 2 — gaze gate: bypass the downstream pipeline when
-                # the user is not directing attention toward the camera.
-                gaze_permitted = self._container.gaze_detector.update(frame)
-
-                # Rising edge: gaze just became permitted → transition IDLE → ARMED.
-                if gaze_permitted and not _prev_gaze_permitted:
-                    self._container.activation_controller.rearm()
-                # Falling edge: gaze lost → deactivate continuous trackers immediately.
-                if not gaze_permitted and _prev_gaze_permitted:
-                    self._laser_tracker.deactivate()
-                    self._pen_tracker.deactivate()
-                    if self._inference_worker is not None:
-                        self._inference_worker.clear()
-                _prev_gaze_permitted = gaze_permitted
-
-                if not gaze_permitted:
-                    absent_state = RuntimeState(
-                        mode=str(self._container.activation_controller.mode),
-                        gaze_permitted=False,
-                        active_mode=self._active_mode,
-                        info={
-                            "gaze_enabled": self._gaze_enabled,
-                        },
-                    )
-                    overlay_frame = self._container.overlay_renderer.render(frame, absent_state)
-                    # Attach the rendered frame so the caller (GUI widget or
-                    # CLI on_state callback) can display it in its own
-                    # thread-safe context.  overlay_frame.frame is a fresh
-                    # canvas copy produced by OverlayRenderer, so no
-                    # additional copy is needed.
-                    if self._container.show_window:
-                        absent_state.preview_frame = overlay_frame.frame
-                    processed_frames += 1
-                    if self._on_state is not None:
-                        self._on_state(absent_state)
-                    if max_frames > 0 and processed_frames >= max_frames:
-                        self.stop()
-                    continue
 
                 t1 = time.perf_counter()
                 multi_packet = self._container.landmark_extractor.extract(frame)
@@ -359,7 +322,6 @@ class Runtime:
                     mode=mode,
                     last_label=latest_label,
                     last_confidence=latest_conf,
-                    gaze_permitted=gaze_permitted,
                     active_mode=self._active_mode,
                     info={
                         "landmarks": landmarks_info,
@@ -368,7 +330,6 @@ class Runtime:
                         "latency_infer_ms": inference_ms,
                         "latency_e2e_ms": loop_e2e_ms,
                         "fps": fps,
-                        "gaze_enabled": self._gaze_enabled,
                         "accepted": (
                             bool(stabilized_prediction.accepted) if stabilized_prediction else False
                         ),
@@ -412,7 +373,6 @@ class Runtime:
                     LOGGER.info("Wrote latency benchmark report to %s", output_path)
 
             self._container.frame_source.close()
-            self._container.gaze_detector.close()
             self._container.landmark_extractor.close()
             if self._inference_worker is not None:
                 self._inference_worker.stop()

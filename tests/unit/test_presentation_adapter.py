@@ -6,8 +6,9 @@ in headless / CI environments.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+import maestro.infrastructure.dispatch.app_adapters.presentation_adapter as presentation_module
 from maestro.domain.entities import DispatchResult
 from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
@@ -156,8 +157,56 @@ class TestPresentationAdapterSlideshow:
         kb = _mock_keyboard()
         adapter = PresentationAdapter(keyboard=kb)
         result = adapter.execute("start_presentation")
-        # Platform-specific: Cmd+Return on macOS, F5 on Win/Linux.
+        # Platform-specific: Cmd+Shift+Return on macOS, F5 on Win/Linux.
         kb.press_hotkey.assert_called_once()
+        assert result.success is True
+
+    def test_start_presentation_uses_cmd_shift_enter_on_macos_browser(self):
+        kb = _mock_keyboard()
+        with (
+            patch.object(presentation_module.sys, "platform", "darwin"),
+            patch.object(
+                presentation_module,
+                "_foreground_identity",
+                return_value="org.mozilla.firefox firefox my deck - google slides",
+            ),
+        ):
+            adapter = PresentationAdapter(keyboard=kb)
+            result = adapter.execute("start_presentation")
+
+        kb.press_hotkey.assert_called_once_with("command", "shift", "enter")
+        assert result.success is True
+
+    def test_start_presentation_uses_cmd_enter_on_macos_native_apps(self):
+        kb = _mock_keyboard()
+        with (
+            patch.object(presentation_module.sys, "platform", "darwin"),
+            patch.object(
+                presentation_module,
+                "_foreground_identity",
+                return_value="com.microsoft.powerpoint microsoft powerpoint",
+            ),
+        ):
+            adapter = PresentationAdapter(keyboard=kb)
+            result = adapter.execute("start_presentation")
+
+        kb.press_hotkey.assert_called_once_with("command", "enter")
+        assert result.success is True
+
+    def test_start_presentation_uses_ctrl_f5_on_windows_browser(self):
+        kb = _mock_keyboard()
+        with (
+            patch.object(presentation_module.sys, "platform", "win32"),
+            patch.object(
+                presentation_module,
+                "_foreground_identity",
+                return_value="chrome.exe google slides",
+            ),
+        ):
+            adapter = PresentationAdapter(keyboard=kb)
+            result = adapter.execute("start_presentation")
+
+        kb.press_hotkey.assert_called_once_with("ctrl", "f5")
         assert result.success is True
 
     def test_stop_presentation_sends_escape(self):

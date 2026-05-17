@@ -29,7 +29,7 @@ The production runtime vocabulary (discrete command path) is:
 
 `command_map_presentation.yaml` also applies `label_remap` for directional swipes (`swiping_left` ↔ `swiping_right`) before dispatch/display so user-facing direction matches mirrored-camera ergonomics.
 
-The activation gate is controlled by gaze detection plus the activation controller state machine: the controller starts in IDLE and moves to ARMED on gaze-permitted rising edge via `rearm()`. Losing gaze beyond grace transitions back to IDLE through `force_idle()`. Command semantics are configured in `configs/gestures/command_map_presentation.yaml`.
+The activation gate is controlled by the activation controller state machine: the controller starts in ARMED at session startup and remains ready to dispatch throughout the session. Command semantics are configured in `configs/gestures/command_map_presentation.yaml`.
 
 Continuous gestures are configured separately in `gesture_modes`: `point_one` drives the laser pointer tracker and `point_two` drives the annotation pen tracker. These continuous paths bypass command dispatch so cursor/pen updates can run at frame rate.
 
@@ -101,7 +101,7 @@ graph LR
 6. **Temporal Buffering**: A sliding window buffer accumulates 16 consecutive feature vectors with a step size of 3 frames (runtime-configurable; validated against artifact metadata at load time).
 7. **Enhanced Two-Stream Inference**: The buffered sequence (16×147 in production runtime) is partitioned into a pose stream (73 dims: positions + joint angles) and a motion stream (74 dims: velocity + spread + wrist trajectory). `EnhancedTwoStreamLSTM` applies per-stream projection, bidirectional LSTM encoding, multi-head self-attention, cross-stream gating, and an MLP head to produce the final class probabilities.
 8. **Prediction Stabilization**: EMA smoothing, per-class confidence thresholding, and temporal majority voting filter transient predictions.
-9. **Activation Control**: A three-state machine (IDLE / ARMED / COOLDOWN) gates command emission. The system starts in IDLE; gaze restoration calls `rearm()` to enter ARMED; gaze-loss expiry calls `force_idle()` to return to IDLE. Edge-triggered dispatch is enforced throughout.
+9. **Activation Control**: A two-state machine (ARMED / COOLDOWN) gates command emission. The system starts in ARMED; commands are only dispatched when ARMED; after dispatch, a brief COOLDOWN period prevents re-triggering. Edge-triggered dispatch is enforced throughout.
 10. **Command Dispatch**: The discrete gesture-to-command mapping is resolved, validated against an allowlist, rate-limited, and routed to the appropriate application adapter.
 11. **Keyboard/Pointer Execution**: Discrete commands are translated into validated keyboard/zoom actions; continuous `point_one`/`point_two` gestures are executed by runtime trackers as cursor movement and drag-based annotation strokes.
 

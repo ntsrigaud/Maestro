@@ -29,7 +29,7 @@ Lifecycle
   The OS mouse cursor is dragged (button held) to the screen position of the
   index fingertip each frame.  PowerPoint draws the annotation path in
   real-time while the button is held.
-- **Exit** (gesture returns to ``unknown`` or gaze is lost):
+- **Exit** (gesture returns to ``unknown`` or runtime stops):
   The primary mouse button is released first (ending the current stroke), then
   the pen-off hotkey (``⌘+A`` or ``Ctrl+A``) is sent to revert the cursor to
   the default arrow pointer.
@@ -43,6 +43,11 @@ typically mirrored for user comfort (``mirror_display: true`` in
 x value in the raw image.  When ``mirror_x=True`` (the default), the tracker
 applies ``screen_x = (1 - x_norm) * screen_width`` so that the pen tip
 appears at the visually correct position on the presentation display.
+
+As with the laser pointer, users usually operate inside a narrower central
+region of the camera frame. The tracker therefore applies a centre-relative
+gain before mapping to screen pixels so smaller hand motions produce larger
+on-screen pen displacement while keeping the midpoint stable.
 """
 
 from __future__ import annotations
@@ -78,6 +83,9 @@ _PEN_OFF_KEYS: dict[str, tuple[str, ...]] = {
     "linux": ("ctrl", "a"),
 }
 
+_DEFAULT_POINTER_GAIN_X: float = 2.4
+_DEFAULT_POINTER_GAIN_Y: float = 2.2
+
 
 def _platform_key() -> str:
     """Return a normalised platform key for the _PEN_* dicts."""
@@ -106,6 +114,12 @@ class AnnotationPenTracker:
     pen_off_keys:
         Hotkey tuple sent to deactivate the pen (e.g. ``("command", "a")`` on
         macOS or ``("ctrl", "a")`` on Windows).  Defaults to the current platform.
+    pointer_gain_x:
+        Centre-relative horizontal gain applied to fingertip movement before
+        mapping to the screen. Values > 1 expand cursor travel.
+    pointer_gain_y:
+        Centre-relative vertical gain applied to fingertip movement before
+        mapping to the screen. Values > 1 expand cursor travel.
     """
 
     def __init__(
@@ -116,12 +130,16 @@ class AnnotationPenTracker:
         mirror_x: bool = True,
         pen_on_keys: tuple[str, ...] | None = None,
         pen_off_keys: tuple[str, ...] | None = None,
+        pointer_gain_x: float = _DEFAULT_POINTER_GAIN_X,
+        pointer_gain_y: float = _DEFAULT_POINTER_GAIN_Y,
     ) -> None:
         self._keyboard = keyboard
         self._pointing_labels = pointing_labels
         self._mirror_x = mirror_x
         self._active: bool = False
         self._mouse_pressed: bool = False  # True while the primary button is held for drawing
+        self._pointer_gain_x = max(1.0, float(pointer_gain_x))
+        self._pointer_gain_y = max(1.0, float(pointer_gain_y))
         _p = _platform_key()
         self._pen_on_keys: tuple[str, ...] = (
             pen_on_keys if pen_on_keys is not None else _PEN_ON_KEYS[_p]
@@ -174,7 +192,7 @@ class AnnotationPenTracker:
 
         Sends the pen-off hotkey to restore the arrow cursor if the pen is
         currently active.  Safe to call from the runtime ``finally`` block or
-        on gaze loss.
+        during control-state transitions.
         """
         if self._active:
             self._deactivate("shutdown")
@@ -219,6 +237,9 @@ class AnnotationPenTracker:
         x_norm: float = landmarks[_INDEX_FINGERTIP][0]
         y_norm: float = landmarks[_INDEX_FINGERTIP][1]
 
+        x_norm = self._apply_pointer_gain(x_norm, self._pointer_gain_x)
+        y_norm = self._apply_pointer_gain(y_norm, self._pointer_gain_y)
+
         screen_w, screen_h = self._keyboard.screen_size()
         screen_x = int((1.0 - x_norm if self._mirror_x else x_norm) * screen_w)
         screen_y = int(y_norm * screen_h)
@@ -241,3 +262,9 @@ class AnnotationPenTracker:
             # mode silently ignores — the reason plain move_mouse didn't draw.
             self._keyboard.mouse_drag_to(screen_x, screen_y)
             LOGGER.debug("AnnotationPenTracker: drag to (%d, %d)", screen_x, screen_y)
+
+    @staticmethod
+    def _apply_pointer_gain(value: float, gain: float) -> float:
+        """Expand movement around the frame centre, then clamp to [0, 1]."""
+        centered = 0.5 + ((value - 0.5) * gain)
+        return max(0.0, min(1.0, centered))
