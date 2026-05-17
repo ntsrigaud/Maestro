@@ -127,14 +127,10 @@ def build_container(
     )
     activation_controller = GestureActivationController(
         command_map=command_map,
-        idle_timeout_ms=config.inference.idle_timeout_ms,
         command_cooldown_ms=config.inference.command_cooldown_ms,
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
         continuous_labels=continuous_labels,
         unknown_label="unknown",
-        # Gaze gating is removed; keep controller in active dispatch mode
-        # without auto-idle transitions that would require external rearming.
-        auto_idle_enabled=False,
     )
     dispatcher = _build_dispatcher(
         allowed_commands=frozenset(command_map.values()),
