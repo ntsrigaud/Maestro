@@ -152,10 +152,8 @@ def test_remap_swiping_left_dispatches_next_slide() -> None:
     command_map = {"swiping_right": "next_slide", "swiping_left": "previous_slide"}
     ctrl = GestureActivationController(
         command_map=command_map,
-        idle_timeout_ms=60_000,
         command_cooldown_ms=50,
     )
-    ctrl.rearm()
 
     # Simulate: model predicts swiping_left → apply remap → route.
     raw_pred = _pred("swiping_left")
@@ -183,10 +181,8 @@ def test_remap_swiping_right_dispatches_previous_slide() -> None:
     command_map = {"swiping_right": "next_slide", "swiping_left": "previous_slide"}
     ctrl = GestureActivationController(
         command_map=command_map,
-        idle_timeout_ms=60_000,
         command_cooldown_ms=50,
     )
-    ctrl.rearm()
 
     raw_pred = _pred("swiping_right")
     remapped_label = label_remap.get(raw_pred.label, raw_pred.label)
@@ -213,10 +209,8 @@ def test_non_swipe_labels_not_affected_by_remap() -> None:
     }
     ctrl = GestureActivationController(
         command_map=command_map,
-        idle_timeout_ms=60_000,
         command_cooldown_ms=50,
     )
-    ctrl.rearm()
 
     raw_pred = _pred("fist")
     remapped_label = label_remap.get(raw_pred.label, raw_pred.label)
