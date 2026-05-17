@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from collections import Counter, deque
 from collections.abc import Iterable
@@ -33,7 +34,7 @@ class SequenceSample:
     recording_id: str
     label: str
     label_id: int
-    sequence: list[list[float]]
+    sequence: np.ndarray | None
     start_timestamp_ms: int
     end_timestamp_ms: int
     valid_ratio: float
@@ -52,6 +53,7 @@ class SequenceDatasetBuilder:
         label_strategy: str = "last",
         enable_orientation_normalization: bool = False,
         min_trailing_label_purity: float = 0.9,
+        spill_sequences_to_disk: bool = False,
     ) -> None:
         if not vocabulary:
             raise ValueError("vocabulary must not be empty")
@@ -68,10 +70,17 @@ class SequenceDatasetBuilder:
         self._label_strategy = label_strategy
         self._enable_orientation_normalization = enable_orientation_normalization
         self._min_trailing_label_purity = min_trailing_label_purity
+        self._spill_sequences_to_disk = spill_sequences_to_disk
 
         self._sample_index = 0
         self._samples: list[SequenceSample] = []
         self._active_recording_id: str | None = None
+        self._sequence_store_dir: tempfile.TemporaryDirectory[str] | None = None
+        self._sequence_store: np.memmap | None = None
+        self._sequence_store_path: Path | None = None
+        self._sequence_store_capacity = 0
+        self._sequence_shape: tuple[int, int] | None = None
+        self._sequence_count = 0
 
         self._transformer = LandmarkFeatureTransformer(
             enable_orientation_normalization=enable_orientation_normalization
@@ -134,11 +143,13 @@ class SequenceDatasetBuilder:
                 recording_id=frame.recording_id,
                 label=selected_label,
                 label_id=self._label_to_id[selected_label],
-                sequence=window.features.tolist(),
+                sequence=None if self._spill_sequences_to_disk else np.asarray(window.features, dtype=np.float32).copy(),
                 start_timestamp_ms=window.start_timestamp_ms,
                 end_timestamp_ms=window.end_timestamp_ms,
                 valid_ratio=window.valid_ratio,
             )
+            if self._spill_sequences_to_disk:
+                self._store_sequence(window.features)
             self._sample_index += 1
             self._samples.append(sample)
             emitted.append(sample)
@@ -163,9 +174,16 @@ class SequenceDatasetBuilder:
             raise RuntimeError("No sequence samples have been generated")
 
         n_samples = len(self._samples)
-        first = self._samples[0]
-        window_length = len(first.sequence)
-        feature_dim = len(first.sequence[0]) if window_length > 0 else 0
+        if self._spill_sequences_to_disk:
+            if self._sequence_shape is None or self._sequence_store is None:
+                raise RuntimeError("Sequence spill store was not initialised")
+            window_length, feature_dim = self._sequence_shape
+        else:
+            first = self._samples[0]
+            if first.sequence is None:
+                raise RuntimeError("Sample sequence is missing")
+            window_length = len(first.sequence)
+            feature_dim = len(first.sequence[0]) if window_length > 0 else 0
 
         labels = np.empty(n_samples, dtype=object)
         label_ids = np.empty(n_samples, dtype=np.int64)
@@ -178,16 +196,23 @@ class SequenceDatasetBuilder:
         # Use a disk-backed buffer to avoid a second full in-memory copy of
         # sequences during save for large datasets.
         with tempfile.TemporaryDirectory(prefix="maestro_npz_") as tmpdir:
-            memmap_path = Path(tmpdir) / "sequences.float32.dat"
-            sequences = np.memmap(
-                memmap_path,
-                dtype=np.float32,
-                mode="w+",
-                shape=(n_samples, window_length, feature_dim),
-            )
+            if self._spill_sequences_to_disk:
+                sequences = self._sequence_store[:n_samples]
+            else:
+                memmap_path = Path(tmpdir) / "sequences.float32.dat"
+                sequences = np.memmap(
+                    memmap_path,
+                    dtype=np.float32,
+                    mode="w+",
+                    shape=(n_samples, window_length, feature_dim),
+                )
+
+                for i, sample in enumerate(self._samples):
+                    if sample.sequence is None:
+                        raise RuntimeError("Sample sequence is missing")
+                    sequences[i] = np.asarray(sample.sequence, dtype=np.float32)
 
             for i, sample in enumerate(self._samples):
-                sequences[i] = np.asarray(sample.sequence, dtype=np.float32)
                 labels[i] = sample.label
                 label_ids[i] = sample.label_id
                 recording_ids[i] = sample.recording_id
@@ -222,6 +247,56 @@ class SequenceDatasetBuilder:
                 metadata_json=np.asarray(json.dumps(metadata), dtype=object),
             )
         return path
+
+    def _store_sequence(self, sequence: np.ndarray) -> None:
+        if not self._spill_sequences_to_disk:
+            return
+
+        if sequence.ndim != 2:
+            raise ValueError(f"Expected a 2D sequence array, got shape {sequence.shape}")
+
+        if self._sequence_shape is None:
+            self._sequence_shape = (int(sequence.shape[0]), int(sequence.shape[1]))
+
+        if self._sequence_store_dir is None:
+            self._sequence_store_dir = tempfile.TemporaryDirectory(prefix="maestro_seq_")
+
+        if self._sequence_store is None:
+            self._sequence_store_capacity = max(1024, self._sequence_count + 1)
+            self._sequence_store_path = Path(self._sequence_store_dir.name) / "sequences.float32.dat"
+            self._sequence_store = np.memmap(
+                self._sequence_store_path,
+                dtype=np.float32,
+                mode="w+",
+                shape=(self._sequence_store_capacity, *self._sequence_shape),
+            )
+        elif self._sequence_count >= self._sequence_store_capacity:
+            old_store = self._sequence_store
+            old_path = self._sequence_store_path
+            old_capacity = self._sequence_store_capacity
+            self._sequence_store_capacity = max(old_capacity * 2, self._sequence_count + 1)
+            self._sequence_store_path = Path(self._sequence_store_dir.name) / (
+                f"sequences_{self._sequence_store_capacity}.dat"
+            )
+            self._sequence_store = np.memmap(
+                self._sequence_store_path,
+                dtype=np.float32,
+                mode="w+",
+                shape=(self._sequence_store_capacity, *self._sequence_shape),
+            )
+            self._sequence_store[: self._sequence_count] = old_store[: self._sequence_count]
+            old_mmap = getattr(old_store, "_mmap", None)
+            if old_mmap is not None:
+                old_mmap.close()
+            if old_path is not None:
+                try:
+                    os.remove(old_path)
+                except FileNotFoundError:
+                    pass
+
+        assert self._sequence_store is not None
+        self._sequence_store[self._sequence_count] = np.asarray(sequence, dtype=np.float32)
+        self._sequence_count += 1
 
     @staticmethod
     def load_npz(dataset_path: str | Path) -> dict[str, Any]:
