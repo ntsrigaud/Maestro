@@ -5,32 +5,6 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class GazeConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    # Master enable.  When False, a NullGazeDetector (always returns True) is
-    # substituted, restoring the pre-gaze behaviour without code changes.
-    enabled: bool = True
-    # Head-pose acceptance cone.  A face is considered camera-directed when
-    # both the absolute yaw and absolute pitch remain within these limits.
-    yaw_threshold_deg: float = Field(default=30.0, gt=0, le=90)
-    pitch_threshold_deg: float = Field(default=25.0, gt=0, le=90)
-    # Duration (ms) the head pose must remain within the acceptance cone
-    # continuously before the detector transitions to GAZE_ACTIVE.
-    arm_ms: int = Field(default=500, ge=100, le=5000)
-    # Grace period (ms) after the head pose leaves the acceptance cone before
-    # the system forces the activation controller back to IDLE.  Prevents
-    # false disarming during natural head movements.
-    grace_ms: int = Field(default=5000, ge=1000, le=60_000)
-    # Face Mesh is called every N frames; the cached result is returned for
-    # intermediate frames.  At 30 FPS and N=3, Face Mesh runs at ~10 Hz.
-    sample_interval_frames: int = Field(default=3, ge=1, le=30)
-    # Minimum BlazeFace detection confidence score [0, 1] required before a
-    # keypoint-based head-pose check is attempted.  Lower values accept more
-    # detections at range but increase false-positive cone membership.
-    min_detection_score: float = Field(default=0.5, gt=0.0, le=1.0)
-
-
 class PointerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -83,8 +57,6 @@ class InferenceConfig(BaseModel):
     # Shared pointer sensitivity used by both the laser pointer and the
     # annotation pen continuous trackers.
     pointer: PointerConfig = PointerConfig()
-    # Gaze-aware activation.  See GazeConfig for field documentation.
-    gaze: GazeConfig = GazeConfig()
 
 
 class FeaturePipelineConfig(BaseModel):
