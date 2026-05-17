@@ -135,7 +135,31 @@ class TestLaserPointerTrackerMouseTracking:
         lm = [[0.5, 0.25, 0.0]] * 21
         tracker.update("point_one", lm, valid=True)
         _, y = kb.move_mouse.call_args[0]
-        assert y == int(0.25 * 1080)
+        assert y == int((0.5 + ((0.25 - 0.5) * 1.6)) * 1080)
+
+    def test_center_point_remains_stable_after_gain(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        x, y = kb.move_mouse.call_args[0]
+        assert x == 500
+        assert y == 500
+
+    def test_horizontal_pointer_gain_expands_displacement(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        lm = [[0.6, 0.5, 0.0]] * 21
+        tracker.update("point_one", lm, valid=True)
+        x, _ = kb.move_mouse.call_args[0]
+        assert x == int((0.5 + ((0.6 - 0.5) * 1.8)) * 1000)
+
+    def test_vertical_pointer_gain_expands_displacement(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        lm = [[0.5, 0.6, 0.0]] * 21
+        tracker.update("point_one", lm, valid=True)
+        _, y = kb.move_mouse.call_args[0]
+        assert y == int((0.5 + ((0.6 - 0.5) * 1.6)) * 1000)
 
     def test_coordinates_clamped_to_screen_bounds(self):
         tracker, kb = _tracker(mirror_x=False)
