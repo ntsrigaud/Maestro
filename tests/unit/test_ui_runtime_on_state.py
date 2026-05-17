@@ -8,21 +8,13 @@ import numpy as np
 from maestro.app.runtime import Runtime
 from maestro.domain.entities import RuntimeState
 
-# ---------------------------------------------------------------------------
-# Minimal container factories
-# ---------------------------------------------------------------------------
 
-
-def _make_gaze_permitted_container() -> SimpleNamespace:
-    """Container whose gaze detector always permits and whose sequence buffer
-    is never ready — so no inference runs, just the full state path."""
+def _make_container() -> SimpleNamespace:
+    """Container whose sequence buffer is never ready — no inference path."""
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
     frame_source = MagicMock()
     frame_source.read.return_value = frame
-
-    gaze_detector = MagicMock()
-    gaze_detector.update.return_value = True
 
     landmark_packet = MagicMock()
     landmark_packet.valid = True
@@ -57,11 +49,14 @@ def _make_gaze_permitted_container() -> SimpleNamespace:
 
     return SimpleNamespace(
         config=SimpleNamespace(
-            app=SimpleNamespace(app_name="test-app", navigation_mode="workspace"),
-            inference=SimpleNamespace(gaze=SimpleNamespace(sample_interval_frames=1)),
+            app=SimpleNamespace(
+                app_name="test-app",
+                navigation_mode="workspace",
+                mirror_display=True,
+            ),
+            inference=SimpleNamespace(pointer=SimpleNamespace(gain_x=2.4, gain_y=2.2)),
         ),
         frame_source=frame_source,
-        gaze_detector=gaze_detector,
         landmark_extractor=landmark_extractor,
         hand_selector=hand_selector,
         feature_transformer=feature_transformer,
@@ -73,59 +68,15 @@ def _make_gaze_permitted_container() -> SimpleNamespace:
         overlay_renderer=overlay_renderer,
         benchmark=None,
         show_window=False,
+        label_remap={},
     )
-
-
-def _make_gaze_absent_container() -> SimpleNamespace:
-    """Container whose gaze detector always blocks — exercises the absent branch."""
-    frame = np.zeros((480, 640, 3), dtype=np.uint8)
-
-    frame_source = MagicMock()
-    frame_source.read.return_value = frame
-
-    gaze_detector = MagicMock()
-    gaze_detector.update.return_value = False
-
-    overlay_frame = MagicMock()
-    overlay_frame.frame = frame
-
-    overlay_renderer = MagicMock()
-    overlay_renderer.render.return_value = overlay_frame
-
-    activation_controller = MagicMock()
-    activation_controller.mode = "idle"
-
-    return SimpleNamespace(
-        config=SimpleNamespace(
-            app=SimpleNamespace(app_name="test-app", navigation_mode="workspace"),
-            inference=SimpleNamespace(gaze=SimpleNamespace(sample_interval_frames=1)),
-        ),
-        frame_source=frame_source,
-        gaze_detector=gaze_detector,
-        landmark_extractor=MagicMock(),
-        hand_selector=MagicMock(),
-        feature_transformer=MagicMock(),
-        sequence_buffer=MagicMock(),
-        model_artifact=MagicMock(),
-        stabilizer=MagicMock(),
-        activation_controller=activation_controller,
-        dispatcher=MagicMock(),
-        overlay_renderer=overlay_renderer,
-        benchmark=None,
-        show_window=False,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 
 class TestOnStateCallback:
-    def test_on_state_called_per_frame_when_gaze_permitted(self) -> None:
-        """on_state is called once per processed frame (gaze path)."""
+    def test_on_state_called_per_frame(self) -> None:
+        """on_state is called once per processed frame."""
         n = 5
-        container = _make_gaze_permitted_container()
+        container = _make_container()
         on_state = MagicMock()
 
         runtime = Runtime(container, on_state=on_state)
@@ -133,19 +84,9 @@ class TestOnStateCallback:
 
         assert on_state.call_count == n
 
-    def test_on_state_called_per_frame_when_gaze_absent(self) -> None:
-        """on_state is called once per processed frame even in the absent branch."""
-        on_state = MagicMock()
-        container = _make_gaze_absent_container()
-
-        runtime = Runtime(container, on_state=on_state)
-        runtime.run(max_frames=3)
-
-        assert on_state.call_count == 3
-
     def test_on_state_receives_runtime_state(self) -> None:
         """Each on_state call receives a RuntimeState instance."""
-        container = _make_gaze_permitted_container()
+        container = _make_container()
         states: list[RuntimeState] = []
 
         runtime = Runtime(container, on_state=states.append)
@@ -156,16 +97,6 @@ class TestOnStateCallback:
 
     def test_on_state_none_does_not_raise(self) -> None:
         """Runtime with on_state=None (default) behaves exactly as before."""
-        container = _make_gaze_permitted_container()
+        container = _make_container()
         runtime = Runtime(container)  # on_state defaults to None
         runtime.run(max_frames=1)  # must not raise
-
-    def test_gaze_absent_state_has_gaze_permitted_false(self) -> None:
-        """States produced in the gaze-absent branch carry gaze_permitted=False."""
-        container = _make_gaze_absent_container()
-        states: list[RuntimeState] = []
-
-        runtime = Runtime(container, on_state=states.append)
-        runtime.run(max_frames=2)
-
-        assert all(not s.gaze_permitted for s in states)

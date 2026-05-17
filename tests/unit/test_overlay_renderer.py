@@ -152,21 +152,20 @@ def test_render_does_not_mutate_original_frame() -> None:
 
 
 def test_minimal_preview_shows_border_hides_landmarks() -> None:
-    """Minimal preview draws the gaze border but NOT landmarks."""
+    """Minimal preview draws the status border but NOT landmarks."""
     renderer = OverlayRenderer(mirror_display=False, minimal_preview=True)
     state = RuntimeState(
         mode="armed",
         last_label="swipe_left",
         last_confidence=0.95,
-        gaze_permitted=True,
         info={"landmarks": [[0.5, 0.5, 0.0]]},
     )
 
     result = renderer.render(_make_frame(width=160, height=240), state)
 
-    # Gaze border IS drawn in minimal_preview mode (armed+gaze_permitted → green).
+    # Status border IS drawn in minimal_preview mode.
     assert tuple(int(v) for v in result.frame[1, 1]) != (0, 0, 0), (
-        "expected gaze border pixel to be coloured, got black"
+        "expected border pixel to be coloured, got black"
     )
     # Landmarks are NOT drawn — centre pixel stays dark.
     assert tuple(int(v) for v in result.frame[120, 80]) == (0, 0, 0)
@@ -237,12 +236,11 @@ def test_mirror_symmetry_of_two_landmarks() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Gaze-aware border colour tests
+# Border colour tests
 # ---------------------------------------------------------------------------
 
 # Border constants mirrored from the module under test so that the tests
 # remain self-contained and do not depend on module-level name access.
-_GREY = (128, 128, 128)
 _AMBER = (0, 165, 255)
 _GREEN = (0, 200, 0)
 _LASER = (255, 140, 0)
@@ -262,73 +260,48 @@ def _border_pixel(frame: object, *, corner: str = "top-left") -> tuple[int, int,
     return (int(a[row, col, 0]), int(a[row, col, 1]), int(a[row, col, 2]))
 
 
-def _make_state_with_gaze(mode: str, gaze_permitted: bool) -> RuntimeState:
+def _make_border_state(mode: str) -> RuntimeState:
     return RuntimeState(
         mode=mode,
         last_label="unknown",
         last_confidence=0.0,
-        gaze_permitted=gaze_permitted,
         info={},
     )
 
 
-class TestGazeBorder:
-    """Verify that the frame border reflects the gaze + activation state."""
+class TestBorderColours:
+    """Verify that the frame border reflects activation and tracker state."""
 
-    def _render(self, mode: str, gaze_permitted: bool) -> object:
+    def _render(self, mode: str) -> object:
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=100, height=100)
-        state = _make_state_with_gaze(mode, gaze_permitted)
+        state = _make_border_state(mode)
         return renderer.render(frame, state).frame
 
-    def _render_with_info(self, mode: str, gaze_permitted: bool, info: dict) -> object:
+    def _render_with_info(self, mode: str, info: dict) -> object:
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=100, height=100)
         state = RuntimeState(
             mode=mode,
             last_label="unknown",
-            gaze_permitted=gaze_permitted,
             info=info,
         )
         return renderer.render(frame, state).frame
 
-    # --- Absent state ---------------------------------------------------------
-
-    def test_gaze_absent_renders_grey_border_top(self) -> None:
-        """gaze_permitted=False → grey border regardless of mode."""
-        frame = self._render("idle", gaze_permitted=False)
-        assert _border_pixel(frame, corner="top-left") == _GREY
-
-    def test_gaze_absent_renders_grey_border_bottom(self) -> None:
-        frame = self._render("armed", gaze_permitted=False)
-        assert _border_pixel(frame, corner="bottom-right") == _GREY
-
-    def test_gaze_absent_overrides_armed_mode(self) -> None:
-        """Even in ARMED mode, absent gaze must produce grey — not green."""
-        frame = self._render("armed", gaze_permitted=False)
-        assert _border_pixel(frame, corner="top-left") == _GREY
-
-    # --- Acquiring / idle state -----------------------------------------------
-
-    def test_gaze_active_idle_mode_renders_amber_border(self) -> None:
-        """gaze_permitted=True + mode=idle → amber (gaze present, not yet armed)."""
-        frame = self._render("idle", gaze_permitted=True)
+    def test_idle_mode_renders_amber_border(self) -> None:
+        frame = self._render("idle")
         assert _border_pixel(frame, corner="top-left") == _AMBER
 
-    def test_gaze_active_cooldown_mode_renders_amber_border(self) -> None:
-        frame = self._render("cooldown", gaze_permitted=True)
+    def test_cooldown_mode_renders_amber_border(self) -> None:
+        frame = self._render("cooldown")
         assert _border_pixel(frame, corner="top-left") == _AMBER
 
-    # --- Armed state ----------------------------------------------------------
-
-    def test_gaze_active_armed_mode_renders_green_border(self) -> None:
-        """gaze_permitted=True + mode=armed → green (system ready)."""
-        frame = self._render("armed", gaze_permitted=True)
+    def test_armed_mode_renders_green_border(self) -> None:
+        frame = self._render("armed")
         assert _border_pixel(frame, corner="top-left") == _GREEN
 
-    def test_gaze_active_armed_border_on_all_edges(self) -> None:
-        """All four border edges must carry the colour (spot-check top and bottom)."""
-        frame = self._render("armed", gaze_permitted=True)
+    def test_armed_border_on_all_edges(self) -> None:
+        frame = self._render("armed")
         assert _border_pixel(frame, corner="top-left") == _GREEN
         assert _border_pixel(frame, corner="bottom-right") == _GREEN
 
@@ -345,16 +318,14 @@ class TestGazeBorder:
 
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=400, height=200)
-        state = _make_state_with_gaze("idle", gaze_permitted=True)
+        state = _make_border_state("idle")
         rendered = renderer.render(frame, state).frame
         # Rows just inside the top border, columns far to the right of all text.
         patch = np.asarray(rendered)[_THICKNESS + 2 : _THICKNESS + 12, 350:390]
         assert patch.sum() == 0, "Interior region far from text must remain unmodified"
 
-    # --- Default gaze_permitted=True is backward-compatible ------------------
-
     def test_default_state_renders_amber_border(self) -> None:
-        """RuntimeState with default gaze_permitted=True and mode='idle' → amber."""
+        """RuntimeState with mode='idle' renders amber border."""
         renderer = OverlayRenderer(mirror_display=False)
         frame = _make_frame(width=100, height=100)
         state = RuntimeState(mode="idle", last_label="unknown", last_confidence=0.0)
@@ -365,41 +336,23 @@ class TestGazeBorder:
 
     def test_laser_active_renders_sky_blue_border(self) -> None:
         """laser_active=True in info → sky blue border overrides mode."""
-        frame = self._render_with_info("idle", gaze_permitted=True, info={"laser_active": True})
+        frame = self._render_with_info("idle", info={"laser_active": True})
         assert _border_pixel(frame, corner="top-left") == _LASER
 
     def test_laser_active_overrides_armed_mode(self) -> None:
         """laser_active=True must override even armed mode → sky blue."""
-        frame = self._render_with_info("armed", gaze_permitted=True, info={"laser_active": True})
+        frame = self._render_with_info("armed", info={"laser_active": True})
         assert _border_pixel(frame, corner="top-left") == _LASER
 
     def test_pen_active_renders_violet_border(self) -> None:
         """pen_active=True in info → violet border overrides mode."""
-        frame = self._render_with_info("idle", gaze_permitted=True, info={"pen_active": True})
+        frame = self._render_with_info("idle", info={"pen_active": True})
         assert _border_pixel(frame, corner="top-left") == _PEN
 
     def test_pen_active_overrides_armed_mode(self) -> None:
         """pen_active=True must override even armed mode → violet."""
-        frame = self._render_with_info("armed", gaze_permitted=True, info={"pen_active": True})
+        frame = self._render_with_info("armed", info={"pen_active": True})
         assert _border_pixel(frame, corner="top-left") == _PEN
-
-    def test_gaze_absent_overrides_laser_active(self) -> None:
-        """gaze_permitted=False takes priority over laser_active."""
-        frame = self._render_with_info(
-            "armed",
-            gaze_permitted=False,
-            info={"laser_active": True},
-        )
-        assert _border_pixel(frame, corner="top-left") == _GREY
-
-    def test_gaze_absent_overrides_pen_active(self) -> None:
-        """gaze_permitted=False takes priority over pen_active."""
-        frame = self._render_with_info(
-            "armed",
-            gaze_permitted=False,
-            info={"pen_active": True},
-        )
-        assert _border_pixel(frame, corner="top-left") == _GREY
 
 
 # ---------------------------------------------------------------------------

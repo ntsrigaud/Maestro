@@ -20,7 +20,6 @@ from maestro.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 from maestro.infrastructure.feedback.overlay_renderer import OverlayRenderer
-from maestro.infrastructure.gaze import HeadPoseGazeDetector, NullGazeDetector
 from maestro.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
 )
@@ -36,7 +35,6 @@ from maestro.interfaces.command_dispatcher import ICommandDispatcher
 from maestro.interfaces.feature_transformer import IFeatureTransformer
 from maestro.interfaces.feedback_renderer import IFeedbackRenderer
 from maestro.interfaces.frame_source import IFrameSource
-from maestro.interfaces.gaze_detector import IGazeIntentDetector
 from maestro.interfaces.landmark_extractor import IHandLandmarkExtractor
 from maestro.interfaces.sequence_buffer import ISequenceBuffer
 from maestro.pipeline.activation import GestureActivationController
@@ -53,7 +51,6 @@ from maestro.utils.schema_validation import RuntimeConfig
 class AppContainer:
     config: RuntimeConfig
     frame_source: IFrameSource
-    gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
     hand_selector: HandSelector
     feature_transformer: IFeatureTransformer
@@ -135,7 +132,9 @@ def build_container(
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
         continuous_labels=continuous_labels,
         unknown_label="unknown",
-        auto_idle_enabled=bool(config.inference.gaze.enabled),
+        # Gaze gating is removed; keep controller in active dispatch mode
+        # without auto-idle transitions that would require external rearming.
+        auto_idle_enabled=False,
     )
     dispatcher = _build_dispatcher(
         allowed_commands=frozenset(command_map.values()),
@@ -151,18 +150,9 @@ def build_container(
     )
     benchmark = LatencyBenchmark()
 
-    gaze_cfg = config.inference.gaze
-    if gaze_cfg.enabled:
-        _hpd = HeadPoseGazeDetector(config=gaze_cfg)
-        _hpd.set_on_gaze_lost(activation_controller.force_idle)
-        gaze_detector: IGazeIntentDetector = _hpd
-    else:
-        gaze_detector = NullGazeDetector()
-
     return AppContainer(
         config=config,
         frame_source=frame_source,
-        gaze_detector=gaze_detector,
         landmark_extractor=landmark_extractor,
         hand_selector=hand_selector,
         feature_transformer=feature_transformer,
