@@ -7,9 +7,8 @@ import cv2
 from maestro.domain.entities import FramePacket, RuntimeState
 
 # Border colours (BGR).
-# Idle     — amber:  system not yet armed (IDLE or post-cooldown wait).
+# Cooldown — amber:  inter-command cooldown window active.
 # Armed    — green:  system ready and accepting gesture commands.
-# Cooldown — amber:  same as idle colour; command just dispatched.
 # Laser    — sky blue: laser pointer tracker actively driving cursor.
 # Pen      — violet: annotation pen tracker actively drawing.
 _BORDER_ACQUIRING: tuple[int, int, int] = (0, 165, 255)
@@ -47,7 +46,7 @@ class OverlayRenderer:
         A coloured border is drawn around the frame to give ambient feedback about
         runtime activation state:
 
-        - **Amber**     (``mode != "armed"``): system is in IDLE or COOLDOWN.
+        - **Amber**     (``mode == "cooldown"``): inter-command cooldown window active.
         - **Green**     (``mode == "armed"``): system armed; discrete gesture
             commands are accepted.
     - **Sky blue**  (``laser_active=True`` in ``state.info``): laser pointer

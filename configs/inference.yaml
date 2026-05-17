@@ -3,7 +3,6 @@ edge_trigger_enabled: true
 pointer:
   gain_x: 2.4
   gain_y: 2.2
-idle_timeout_ms: 100000
 min_valid_ratio: 0.8
 window_length: 16
 window_step: 3
