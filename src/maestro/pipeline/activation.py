@@ -115,7 +115,6 @@ class GestureActivationController:
         # ARMED -- dispatch command gestures.
         # ------------------------------------------------------------------
         if self._mode is RuntimeMode.ARMED:
-
             if is_unknown:
                 # Hand returned to neutral -- clear the dispatch memory so that
                 # performing the same gesture again (after a rest) fires normally.
