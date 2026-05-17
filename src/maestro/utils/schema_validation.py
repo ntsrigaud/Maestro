@@ -31,6 +31,13 @@ class GazeConfig(BaseModel):
     min_detection_score: float = Field(default=0.5, gt=0.0, le=1.0)
 
 
+class PointerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    gain_x: float = Field(default=2.4, ge=1.0, le=5.0)
+    gain_y: float = Field(default=2.2, ge=1.0, le=5.0)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -73,6 +80,9 @@ class InferenceConfig(BaseModel):
     # This prevents repeated commands from a single slow gesture that produces
     # many consecutive accepted predictions across overlapping inference windows.
     edge_trigger_enabled: bool = True
+    # Shared pointer sensitivity used by both the laser pointer and the
+    # annotation pen continuous trackers.
+    pointer: PointerConfig = PointerConfig()
     # Gaze-aware activation.  See GazeConfig for field documentation.
     gaze: GazeConfig = GazeConfig()
 
