@@ -195,16 +195,12 @@ def validate_container_dataset(
 
 
 def _select_device() -> torch.device:
-    """Select the best available compute device: CUDA → MPS → CPU."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        return torch.device("mps")
+    """Force CPU execution on all hardware for deterministic runtime behavior."""
     return torch.device("cpu")
 
 
 def _build_landmark_extractor(config_root: Path) -> IHandLandmarkExtractor:
-    """Build hand landmark extractor with Tasks GPU path when available.
+    """Build hand landmark extractor with CPU-only execution.
 
     Falls back to the classic MediaPipe solutions extractor if the task model
     file is unavailable or Tasks initialization fails.
@@ -215,12 +211,12 @@ def _build_landmark_extractor(config_root: Path) -> IHandLandmarkExtractor:
         try:
             return MediaPipeTasksHandsExtractor(
                 model_path=task_model,
-                use_gpu_delegate=True,
+                use_gpu_delegate=False,
                 min_detection_confidence=0.7,
                 min_tracking_confidence=0.5,
             )
         except Exception:
-            # Safe fallback for environments where the GPU delegate cannot be used.
+            # Safe fallback when Tasks initialization fails for any reason.
             pass
 
     return MediaPipeHandsExtractor(
