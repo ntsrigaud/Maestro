@@ -73,11 +73,14 @@ def build_container(
     *,
     model_artifact_path: str | None = None,
     hf_revision_override: str | None = None,
+    hand_preference_override: str | None = None,
     show_window: bool = False,
     minimal_preview: bool = False,
 ) -> AppContainer:
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
+    if hand_preference_override is not None:
+        config.app.hand_preference = hand_preference_override
     thresholds = _load_thresholds(config_root / "thresholds" / "production_hybrid.yaml")
     command_map, continuous_labels, label_remap = _load_command_map(
         config_root / "gestures" / config.app.command_map

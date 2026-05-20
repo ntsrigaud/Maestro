@@ -113,3 +113,40 @@ class TestSystemTray:
             assert window.windowIcon().isNull() is False
             assert window._menu_button.menu() is not None
             assert window._controls_menu.actions()[0].text() == "Active"
+
+    def test_hand_preference_submenu_defaults_to_right(self, qtbot) -> None:
+        with (
+            patch("maestro.app.ui.controller.build_container"),
+            patch("maestro.app.ui.controller.Runtime"),
+        ):
+            window = MainWindow(config_path="configs")
+            qtbot.addWidget(window)
+
+            # The hand submenu must be present in the controls menu.
+            hand_action = next(
+                (a for a in window._controls_menu.actions() if a.text() == "Hand"), None
+            )
+            assert hand_action is not None, "Hand submenu not found in controls menu"
+
+            hand_entries = window._hand_menu.actions()
+            assert len(hand_entries) == 3
+            assert [a.text() for a in hand_entries] == ["Right Hand", "Left Hand", "Both Hands"]
+            assert [a.data() for a in hand_entries] == ["right", "left", "both"]
+
+            # configs/app.yaml has hand_preference: right — so Right Hand is checked.
+            checked = [a for a in hand_entries if a.isChecked()]
+            assert len(checked) == 1
+            assert checked[0].data() == "right"
+
+    def test_hand_preference_change_updates_internal_state(self, qtbot) -> None:
+        with (
+            patch("maestro.app.ui.controller.build_container"),
+            patch("maestro.app.ui.controller.Runtime"),
+        ):
+            window = MainWindow(config_path="configs")
+            qtbot.addWidget(window)
+
+            left_action = next(a for a in window._hand_menu.actions() if a.data() == "left")
+            left_action.trigger()
+
+            assert window._hand_preference == "left"
