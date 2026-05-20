@@ -32,8 +32,18 @@ class GestureActivationController:
     When ``edge_trigger_enabled=True`` (the default), a command gesture is only
     dispatched when the accepted label differs from ``_last_dispatched_label``
     --- the label of the most recently executed command.
-    ``_last_dispatched_label`` is reset to ``unknown`` whenever the prediction
-    returns to the ``unknown`` class (the hand goes neutral between gestures).
+    ``_last_dispatched_label`` is reset to ``unknown`` on two occasions:
+
+    1. **Cooldown expiry** (primary reset): when the COOLDOWN window expires and
+       the controller transitions back to ARMED, ``_last_dispatched_label`` is
+       cleared immediately.  This means the same gesture can be re-dispatched
+       as soon as the cooldown ends, with no intermediate neutral hand pose
+       required.  The cooldown is the sole anti-bounce protection.
+
+    2. **Neutral prediction** (secondary reset): if the prediction returns to
+       the ``unknown`` class while ARMED, ``_last_dispatched_label`` is also
+       cleared.  This is now redundant with the cooldown reset in normal usage
+       but is kept as an explicit signal that the hand has returned to neutral.
 
     **Why not track the previous frame's label?**  An earlier implementation
     advanced a ``_prev_label`` counter on *every* call to ``route()``, including
@@ -47,13 +57,6 @@ class GestureActivationController:
     The ``_last_dispatched_label`` approach fixes this: unaccepted frames never
     advance the counter, so the first accepted prediction of a new gesture always
     sees a label change relative to the last dispatched command.
-
-    The same-gesture-twice case is handled by the ``unknown`` reset: after the
-    hand returns to neutral between two identical gestures,
-    ``_last_dispatched_label`` is cleared, allowing the second occurrence to fire.
-
-    The cooldown remains as a secondary guard against rapid re-triggering in
-    unusual conditions (e.g. alternating accepted/unaccepted despite short hold).
     """
 
     def __init__(
@@ -102,6 +105,9 @@ class GestureActivationController:
             ):
                 self._mode = RuntimeMode.ARMED
                 self._cooldown_started_ms = None
+                # Reset dispatch memory so the same gesture can fire again
+                # immediately without requiring a neutral hand pose first.
+                self._last_dispatched_label = self._unknown_label
                 LOGGER.debug(
                     "activation: COOLDOWN -> ARMED  (cooldown_ms=%d)",
                     self._command_cooldown_ms,

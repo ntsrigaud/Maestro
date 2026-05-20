@@ -369,10 +369,14 @@ class TestEdgeTriggerSingleDispatch:
         assert cmd2 is not None
         assert cmd2.command_id == "next_slide"
 
-    def test_repeated_swipe_through_expired_cooldown_still_suppressed(self):
-        """The most critical regression: after COOLDOWN expires, if the swipe
-        gesture is still recognized (slow swipe or EMA lag), the edge-trigger
-        prevents a second dispatch because the label has not changed."""
+    def test_same_swipe_redispatches_after_cooldown_expires(self):
+        """After COOLDOWN expires, the same gesture may re-dispatch immediately.
+
+        _last_dispatched_label is reset at the COOLDOWN→ARMED transition so the
+        user can repeat the same command (e.g. swipe right twice in a row) without
+        needing to return to a neutral hand pose first.  The cooldown window is
+        the sole anti-bounce guard.
+        """
         ctrl = self._make_armed_controller()
         t_base = _ACTIVATION_HOLD_MS + 50
 
@@ -382,16 +386,16 @@ class TestEdgeTriggerSingleDispatch:
         assert cmd1 is not None
         assert ctrl.mode is RuntimeMode.COOLDOWN
 
-        # Cooldown expires, back to ARMED.  Gesture is still recognized
-        # (slow swipe or EMA memory — the label has not changed).
+        # Cooldown expires.  _last_dispatched_label is reset → same gesture
+        # is allowed to fire again immediately (no neutral pose required).
         t_after_cool = t_base + _COOLDOWN_MS + 10
         with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: t_after_cool)):
             cmd2 = ctrl.route(_pred("swiping_right"))
-        assert ctrl.mode is RuntimeMode.ARMED
-        assert cmd2 is None, (
-            "Edge-trigger must suppress re-dispatch when the gesture label "
-            "has not changed since the previous prediction."
+        assert cmd2 is not None, (
+            "Same gesture must re-dispatch after cooldown expires without a neutral pose."
         )
+        assert cmd2.command_id == "next_slide"
+        assert ctrl.mode is RuntimeMode.COOLDOWN
 
     def test_different_gesture_after_cooldown_does_dispatch(self):
         """A *different* gesture after cooldown must fire normally — edge
