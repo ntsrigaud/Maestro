@@ -1,8 +1,8 @@
 command_cooldown_ms: 1500
 edge_trigger_enabled: true
 pointer:
-  gain_x: 3.4
-  gain_y: 3.2
+  gain_x: 3.0
+  gain_y: 2.8
 min_valid_ratio: 0.8
 window_length: 16
 window_step: 3
