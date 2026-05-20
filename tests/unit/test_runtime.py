@@ -3,8 +3,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
-
 from maestro.app.runtime import Runtime
 
 
@@ -24,11 +22,14 @@ def _container_with_runtime_error() -> SimpleNamespace:
 
 
 def test_runtime_closes_resources_when_read_raises() -> None:
+    """After _MAX_CONSECUTIVE_FRAME_ERRORS consecutive read failures the runtime
+    stops gracefully (no exception propagated) and still closes all resources."""
     container = _container_with_runtime_error()
     runtime = Runtime(container)
 
-    with pytest.raises(RuntimeError, match="camera read failure"):
-        runtime.run()
+    # Should exit cleanly — no RuntimeError propagates after the consecutive
+    # failure threshold is reached.
+    runtime.run()
 
     container.frame_source.close.assert_called_once()
     container.landmark_extractor.close.assert_called_once()

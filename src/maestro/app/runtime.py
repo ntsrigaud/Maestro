@@ -100,33 +100,36 @@ class _InferenceWorker:
                 continue
 
             infer_start = time.perf_counter()
-            features = sequence.features.astype(np.float32, copy=False)
-            tensor = torch.from_numpy(features).unsqueeze(0).to(self._device)
-            with torch.no_grad():
-                logits = self._model(tensor)
-                probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
-
-            labels = self._artifact.class_labels
-            class_probs = {label: float(probs[idx]) for idx, label in enumerate(labels)}
-            top_idx = int(np.argmax(probs))
-            prediction = Prediction(
-                class_probs=class_probs,
-                top_class=labels[top_idx],
-                confidence=float(probs[top_idx]),
-            )
-            infer_ms = (time.perf_counter() - infer_start) * 1000.0
-
             try:
-                self._out_queue.put_nowait((prediction, infer_ms))
-            except queue.Full:
-                try:
-                    self._out_queue.get_nowait()
-                except queue.Empty:
-                    pass
+                features = sequence.features.astype(np.float32, copy=False)
+                tensor = torch.from_numpy(features).unsqueeze(0).to(self._device)
+                with torch.no_grad():
+                    logits = self._model(tensor)
+                    probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
+
+                labels = self._artifact.class_labels
+                class_probs = {label: float(probs[idx]) for idx, label in enumerate(labels)}
+                top_idx = int(np.argmax(probs))
+                prediction = Prediction(
+                    class_probs=class_probs,
+                    top_class=labels[top_idx],
+                    confidence=float(probs[top_idx]),
+                )
+                infer_ms = (time.perf_counter() - infer_start) * 1000.0
+
                 try:
                     self._out_queue.put_nowait((prediction, infer_ms))
                 except queue.Full:
-                    pass
+                    try:
+                        self._out_queue.get_nowait()
+                    except queue.Empty:
+                        pass
+                    try:
+                        self._out_queue.put_nowait((prediction, infer_ms))
+                    except queue.Full:
+                        pass
+            except Exception:  # noqa: BLE001
+                LOGGER.exception("InferenceWorker: error during inference — skipping window")
 
 
 class RuntimeDependencies(Protocol):
@@ -213,13 +216,32 @@ class Runtime:
         inference_ms = 0.0
         latest_label = "unknown"
         latest_conf = 0.0
+        _consecutive_frame_errors = 0
+        _MAX_CONSECUTIVE_FRAME_ERRORS = 10
 
         try:
             while self._running:
                 loop_start = time.perf_counter()
 
                 t0 = time.perf_counter()
-                frame = self._container.frame_source.read()
+                try:
+                    frame = self._container.frame_source.read()
+                    _consecutive_frame_errors = 0
+                except RuntimeError as _frame_exc:
+                    _consecutive_frame_errors += 1
+                    if _consecutive_frame_errors >= _MAX_CONSECUTIVE_FRAME_ERRORS:
+                        LOGGER.error(
+                            "Camera failed %d consecutive times — stopping runtime",
+                            _MAX_CONSECUTIVE_FRAME_ERRORS,
+                        )
+                        break
+                    LOGGER.warning(
+                        "Frame capture failed (transient, %d/%d): %s",
+                        _consecutive_frame_errors,
+                        _MAX_CONSECUTIVE_FRAME_ERRORS,
+                        _frame_exc,
+                    )
+                    continue
                 if benchmark is not None:
                     benchmark.record_capture((time.perf_counter() - t0) * 1000.0)
 
