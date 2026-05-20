@@ -24,8 +24,8 @@ class GestureActivationController:
 
     Armed-state persistence
     -----------------------
-    ``_last_active_ms`` is refreshed whenever any *non-unknown* label is seen.
-    This ensures the system remains continuously responsive throughout the session.
+    The controller remains armed indefinitely and never times out due to
+    inactivity.  It is always ready to dispatch the next accepted gesture.
 
     Edge-trigger dispatch
     ---------------------
