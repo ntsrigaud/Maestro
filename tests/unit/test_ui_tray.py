@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -29,7 +30,9 @@ class TestSystemTray:
         ):
             window = MainWindow(config_path="configs")
             qtbot.addWidget(window)
-            assert window.isVisible()
+            # On macOS the widget window is hidden; the tray is the sole control surface.
+            expected_visible = sys.platform != "darwin"
+            assert window.isVisible() == expected_visible
 
     def test_window_icon_is_qicon(self, qtbot) -> None:
         with (
@@ -105,7 +108,7 @@ class TestSystemTray:
             window = MainWindow(config_path="configs")
             qtbot.addWidget(window)
 
-            assert window.isVisible()
+            assert window.isVisible() == (sys.platform != "darwin")
             assert window._tray is None
             assert window.windowIcon().isNull() is False
             assert window._menu_button.menu() is not None
