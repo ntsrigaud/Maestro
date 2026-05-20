@@ -10,6 +10,6 @@ def test_load_runtime_config(config_dir: Path) -> None:
     assert config.app.app_name == "presentation-controller"
     assert config.inference.window_length == 16
     assert config.inference.window_step == 3
-    assert config.inference.pointer.gain_x == 2.4
-    assert config.inference.pointer.gain_y == 2.2
+    assert config.inference.pointer.gain_x == 3.4
+    assert config.inference.pointer.gain_y == 3.2
     assert config.feature_pipeline.orientation_normalization is False

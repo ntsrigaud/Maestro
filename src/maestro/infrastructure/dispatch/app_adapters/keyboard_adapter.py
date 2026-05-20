@@ -80,14 +80,14 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
     }
 )
 
+# Scope restricted to Microsoft PowerPoint only.
+# Sending keystrokes to other presentation apps risks triggering unintended
+# OS-level shortcuts (e.g. 'E' in a macOS text field opens the emoji picker).
+# Override at runtime via the MAESTRO_PRESENTATION_SCOPE_ALLOWLIST env var.
 _DEFAULT_SCOPE_TOKENS: tuple[str, ...] = (
-    "microsoft powerpoint",
-    "powerpnt",
-    "keynote",
-    "libreoffice",
-    "soffice",
-    "impress",
-    "wps presentation",
+    "microsoft powerpoint",     # macOS localised app name / Windows window title
+    "powerpnt",                 # Windows process name (POWERPNT.EXE)
+    "com.microsoft.powerpoint", # macOS bundle ID
 )
 
 
@@ -192,11 +192,17 @@ class KeyboardAdapter:
     def _ensure_presentation_scope(self, action: str) -> bool:
         identity = _foreground_identity()
         if identity is None:
-            LOGGER.debug(
-                "Scope check unavailable for action=%s; allowing dispatch (best effort).",
+            # Fail-closed: if we cannot confirm the foreground application we
+            # must NOT dispatch.  Fail-open would send keystrokes to whatever
+            # window happens to have focus — on macOS this can open the system
+            # emoji picker (e.g. 'E' in a text field) or trigger other
+            # unintended OS shortcuts.
+            LOGGER.warning(
+                "Scope check failed for action=%s: foreground application could not be "
+                "identified. Blocking dispatch to prevent accidental key injection.",
                 action,
             )
-            return True
+            return False
 
         tokens = _scope_tokens()
         if any(token in identity for token in tokens):

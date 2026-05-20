@@ -1,10 +1,10 @@
 """Presentation controller adapter.
 
-Maps the eight IPN Hand gesture commands to universal input actions for
-presentation software (PowerPoint, Keynote, Google Slides, LibreOffice Impress).
-Input is delivered via OS-level keyboard and scroll simulation; no
-application-process detection is required — the action is delivered to whichever
-window holds focus.
+Maps gesture commands to keyboard shortcuts for Microsoft PowerPoint.
+Input is delivered via OS-level keyboard and scroll simulation to the
+application that currently holds focus; the scope guard in
+:class:`~maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.KeyboardAdapter`
+blocks dispatch whenever a non-PowerPoint window is in the foreground.
 
 All keyboard injection is delegated to :class:`KeyboardAdapter` so that every
 simulated keystroke is validated against the safe-key allowlist before dispatch.
@@ -13,17 +13,11 @@ Zoom implementation
 -------------------
 Zoom is implemented via modifier+scroll (Cmd+Scroll on macOS, Ctrl+Scroll on
 Windows and Linux) rather than keyboard shortcuts (Cmd/Ctrl+=/-).  This choice
-provides correct behaviour across all target presentation applications:
+provides correct behaviour across PowerPoint on all platforms:
 
 - **PowerPoint (Windows / macOS)**: Has no reliable zoom keyboard shortcut;
   Ctrl/Cmd+Scroll is the standard zoom input accepted by PowerPoint's slide
   canvas in editing view.
-- **Keynote (macOS)**: Accepts both Cmd+= and Cmd+Scroll; scroll is preferred
-  for consistency.
-- **Google Slides (browser)**: Ctrl/Cmd+Scroll triggers browser viewport zoom,
-  equivalent to Ctrl/Cmd+= but more consistent across browsers.
-- **LibreOffice Impress (all platforms)**: Has no Ctrl+= zoom shortcut;
-  Ctrl+Scroll is the only reliable zoom mechanism.
 """
 
 from __future__ import annotations
@@ -150,6 +144,10 @@ class PresentationAdapter:
             case "erase_annotations":
                 # Erase all pen / laser annotations on the current slide.
                 # PowerPoint slideshow shortcut: E key (Windows and macOS).
+                # The scope guard ensures this is only delivered while
+                # Microsoft PowerPoint is the foreground application, preventing
+                # accidental triggering of the macOS emoji picker that appears
+                # when 'E' reaches a text field in another app.
                 executed = self._keyboard.press_hotkey("e")
             case "toggle_black_screen":
                 # Blank the slide canvas to black — universal pause gesture.
