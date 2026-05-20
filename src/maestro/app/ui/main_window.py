@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from PySide6.QtCore import QCoreApplication, QSignalBlocker, Qt
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
@@ -129,13 +131,28 @@ class MainWindow(QWidget):
         layout.addWidget(hint)
 
         self.setWindowIcon(self._inactive_icon)
-        self.show()
+        # On macOS the system tray provides full control; the widget window
+        # adds no value and clutters the dock.  Show it only on other platforms.
+        if sys.platform != "darwin":
+            self.show()
 
         self._controller.runtime_started.connect(self._on_runtime_started)
         self._controller.runtime_stopped.connect(self._on_runtime_stopped)
         self._controller.error_occurred.connect(self._on_error)
         self._controller.state_updated.connect(self._preview_window.on_state)
         self._controller.state_updated.connect(self._on_tray_update)
+
+    def auto_start(self) -> None:
+        """Activate the runtime and preview immediately.
+
+        Called by :func:`~maestro.app.ui.app_ui.run_ui` via a zero-delay
+        ``QTimer`` so that the event loop is fully running before the
+        ``_RuntimeThread`` is spawned.  Not called during tests that
+        construct ``MainWindow`` directly, which prevents test-level patches
+        from expiring before the background thread executes.
+        """
+        self._active_action.setChecked(True)
+        self._preview_action.setChecked(True)
 
     def _on_active_toggled(self, active: bool) -> None:
         if active:
