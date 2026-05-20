@@ -11,6 +11,14 @@ LOGGER = logging.getLogger(__name__)
 
 try:
     import pyautogui as pyautogui  # noqa: PLC0414  (re-exported for patching)
+
+    # Disable PyAutoGUI's built-in fail-safe (raises FailSafeException when the
+    # cursor reaches a screen corner).  The fail-safe is designed as a developer
+    # escape hatch for automated scripts; in Maestro the cursor is driven by
+    # intentional hand gestures, and a corner position is a legitimate pointer
+    # destination during presentations.  Leaving it enabled causes the runtime
+    # worker thread to crash whenever the user points at a screen corner.
+    pyautogui.FAILSAFE = False
 except Exception:  # pragma: no cover
     pyautogui = None  # type: ignore[assignment]
 
