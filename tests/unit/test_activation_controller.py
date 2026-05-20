@@ -258,3 +258,99 @@ def test_continuous_label_returns_none_in_armed() -> None:
         cmd = ctrl.route(_pred("point_one"))
     assert cmd is None  # continuous gesture routed directly to laser pointer
     assert ctrl.mode is RuntimeMode.ARMED  # state must not change
+
+
+# ---------------------------------------------------------------------------
+# tick() — cooldown-clock advance independent of inference results
+#
+# tick() is the mechanism that allows the COOLDOWN → ARMED transition to fire
+# even when the camera stops delivering inference windows (e.g. the hand has
+# left the frame).  Without it the controller would remain stuck in COOLDOWN
+# indefinitely whenever the inference worker produces no output.
+# ---------------------------------------------------------------------------
+
+
+def test_tick_returns_false_when_armed() -> None:
+    """tick() in ARMED state is a no-op and returns False."""
+    ctrl = _make_controller()
+    assert ctrl.mode is RuntimeMode.ARMED
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 9999)):
+        result = ctrl.tick()
+    assert result is False
+    assert ctrl.mode is RuntimeMode.ARMED
+
+
+def test_tick_returns_false_during_active_cooldown() -> None:
+    """tick() before the cooldown window expires returns False, mode stays COOLDOWN."""
+    ctrl = _make_controller(command_cooldown_ms=500)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+    assert ctrl.mode is RuntimeMode.COOLDOWN
+
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 300)):
+        result = ctrl.tick()
+    assert result is False
+    assert ctrl.mode is RuntimeMode.COOLDOWN
+
+
+def test_tick_transitions_cooldown_to_armed_on_expiry() -> None:
+    """tick() after the cooldown window expires returns True and transitions COOLDOWN → ARMED."""
+    ctrl = _make_controller(command_cooldown_ms=500)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+    assert ctrl.mode is RuntimeMode.COOLDOWN
+
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
+        result = ctrl.tick()
+    assert result is True
+    assert ctrl.mode is RuntimeMode.ARMED
+
+
+def test_tick_resets_dispatch_memory_so_same_gesture_can_refire() -> None:
+    """tick() must clear dispatch memory on COOLDOWN → ARMED so the same gesture
+    re-dispatches immediately without requiring a neutral hand pose."""
+    ctrl = _make_controller(command_cooldown_ms=500, edge_trigger_enabled=True)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+
+    # Advance past cooldown via tick()
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
+        ctrl.tick()
+
+    # Same gesture must re-dispatch because tick() cleared the dispatch memory.
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 601)):
+        cmd = ctrl.route(_pred("swiping_right"))
+    assert cmd is not None
+    assert cmd.command_id == "next_slide"
+
+
+def test_tick_is_idempotent_after_transition() -> None:
+    """Calling tick() again after a COOLDOWN → ARMED transition is safe: returns False."""
+    ctrl = _make_controller(command_cooldown_ms=100)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 200)):
+        first = ctrl.tick()
+        second = ctrl.tick()
+    assert first is True
+    assert second is False
+    assert ctrl.mode is RuntimeMode.ARMED
+
+
+def test_tick_and_route_do_not_double_transition() -> None:
+    """tick() and route() may be called in the same frame; only one COOLDOWN → ARMED
+    transition should occur and a fresh accepted gesture should still dispatch."""
+    ctrl = _make_controller(command_cooldown_ms=500)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+    assert ctrl.mode is RuntimeMode.COOLDOWN
+
+    # Both tick() and route() called at t=600 (cooldown expired).
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
+        transitioned = ctrl.tick()                      # COOLDOWN → ARMED
+        cmd = ctrl.route(_pred("swiping_right"))        # ARMED → dispatch → COOLDOWN
+
+    assert transitioned is True
+    assert cmd is not None
+    assert cmd.command_id == "next_slide"
+    assert ctrl.mode is RuntimeMode.COOLDOWN            # re-entered cooldown after redispatch
