@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 
 from PySide6.QtCore import QCoreApplication, QSignalBlocker, Qt
-from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QAction, QActionGroup, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -18,6 +18,7 @@ from maestro.app._paths import get_app_icon, get_config_dir
 from maestro.app.ui.controller import RuntimeController
 from maestro.app.ui.floating_preview import FloatingPreviewWindow
 from maestro.domain.entities import RuntimeState
+from maestro.utils.config_loader import load_runtime_config
 
 
 def _make_tray_icon(colour: str) -> QIcon:
@@ -69,6 +70,18 @@ class MainWindow(QWidget):
         self._preview_window = FloatingPreviewWindow()
         self._controller = RuntimeController(parent=self)
 
+        # Read the initial hand preference from config; fall back to "right" if
+        # the config is unavailable (e.g. first run or path misconfigured).
+        try:
+            _cfg = load_runtime_config(self._config_path)
+            self._hand_preference: str = _cfg.app.hand_preference
+        except Exception:  # noqa: BLE001
+            self._hand_preference = "right"
+
+        # Flag used by _on_hand_preference_changed to restart the runtime
+        # automatically after it stops when the preference is changed mid-run.
+        self._restart_after_stop: bool = False
+
         self.setWindowTitle("Maestro")
         self.setMinimumSize(380, 180)
 
@@ -92,8 +105,22 @@ class MainWindow(QWidget):
         self._preview_action.setCheckable(True)
         self._preview_action.toggled.connect(self._on_preview_toggled)
 
+        # Hand preference submenu — exclusive radio-style selection.
+        self._hand_menu = QMenu("Hand", self)
+        self._hand_group = QActionGroup(self)
+        self._hand_group.setExclusive(True)
+        for label, value in (("Right Hand", "right"), ("Left Hand", "left"), ("Both Hands", "both")):
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setData(value)
+            action.setChecked(value == self._hand_preference)
+            self._hand_group.addAction(action)
+            self._hand_menu.addAction(action)
+        self._hand_group.triggered.connect(self._on_hand_preference_changed)
+
         self._controls_menu.addAction(self._active_action)
         self._controls_menu.addAction(self._preview_action)
+        self._controls_menu.addMenu(self._hand_menu)
         self._controls_menu.addSeparator()
         self._controls_menu.addAction("Quit", self.close)
 
@@ -154,6 +181,13 @@ class MainWindow(QWidget):
         self._active_action.setChecked(True)
         self._preview_action.setChecked(True)
 
+    def _on_hand_preference_changed(self, action: QAction) -> None:
+        """Store the new hand preference and restart the runtime if it is running."""
+        self._hand_preference = action.data()
+        if self._controller.is_running:
+            self._restart_after_stop = True
+            self._controller.stop()
+
     def _on_active_toggled(self, active: bool) -> None:
         if active:
             if self._controller.is_running:
@@ -161,6 +195,7 @@ class MainWindow(QWidget):
             self._set_runtime_message("Maestro: starting")
             self._controller.start(
                 self._config_path,
+                hand_preference_override=self._hand_preference,
                 show_window=True,
                 minimal_preview=True,
             )
@@ -185,8 +220,12 @@ class MainWindow(QWidget):
         self._preview_window.hide()
         with QSignalBlocker(self._active_action):
             self._active_action.setChecked(False)
+        if self._restart_after_stop:
+            self._restart_after_stop = False
+            self._active_action.setChecked(True)
 
     def _on_error(self, message: str) -> None:
+        self._restart_after_stop = False
         self._apply_state_icon(self._tray_icon_for_colour("#DC2626"))
         self._set_runtime_message("Maestro: error")
         self._preview_window.hide()
