@@ -90,10 +90,10 @@ def test_cooldown_expires_back_to_armed() -> None:
 
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 510)):
         cmd = ctrl.route(_pred("swiping_right", accepted=False))
-    # Just expired, should be ARMED now, but swiping_right is the same label.
-    # unknown resets edge trigger — verify ARMED at minimum.
+    # Cooldown expired → ARMED. _last_dispatched_label reset to unknown.
+    # cmd is None because the prediction is not accepted, not due to edge-trigger.
     assert ctrl.mode is RuntimeMode.ARMED
-    assert cmd is None  # edge-trigger: same label as last dispatch, unknown not yet seen
+    assert cmd is None  # not accepted
 
 
 # ---------------------------------------------------------------------------
@@ -166,13 +166,13 @@ def test_continuous_label_not_blocked_by_cooldown() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_held_discrete_gesture_dispatches_once_then_edge_blocked() -> None:
-    """A gesture held across many accepted windows must produce exactly one command.
+def test_held_discrete_gesture_dispatches_once_per_cooldown_period() -> None:
+    """A held gesture fires exactly once per cooldown period.
 
-    This is the primary regression guard for the 'repeated swipe' bug:
-    with edge_trigger_enabled=True (new production default), the second and
-    subsequent accepted windows of the same label are suppressed by the
-    _last_dispatched_label check.  The cooldown provides secondary protection.
+    After cooldown expires, _last_dispatched_label is reset, so the same gesture
+    held continuously re-dispatches as soon as ARMED is re-entered.  For a 2-second
+    window with a 1500 ms cooldown, exactly 2 dispatches are expected: one at the
+    start and one when the cooldown expires at ~t=1500.
     """
     ctrl = _make_controller(
         command_map={"stop_sign": "zoom_out_totally"},
@@ -187,14 +187,17 @@ def test_held_discrete_gesture_dispatches_once_then_edge_blocked() -> None:
         if cmd is not None:
             dispatch_count += 1
 
-    assert dispatch_count == 1, (
-        f"Expected exactly 1 dispatch for a held gesture, got {dispatch_count}"
+    assert dispatch_count == 2, (
+        f"Expected 2 dispatches (one per cooldown period) for a held gesture, got {dispatch_count}"
     )
 
 
-def test_held_gesture_redispatches_after_neutral_reset() -> None:
-    """After a held gesture → unknown → same gesture again, exactly one more
-    dispatch must occur (the unknown resets _last_dispatched_label)."""
+def test_held_gesture_redispatches_after_cooldown_without_neutral() -> None:
+    """Same gesture re-dispatches immediately after cooldown, no neutral pose needed.
+
+    _last_dispatched_label is reset at cooldown expiry (COOLDOWN → ARMED transition),
+    so the same accepted gesture fires again as soon as the controller re-enters ARMED.
+    """
     ctrl = _make_controller(
         command_map={"swiping_right": "next_slide"},
         command_cooldown_ms=100,
@@ -204,21 +207,47 @@ def test_held_gesture_redispatches_after_neutral_reset() -> None:
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
         cmd1 = ctrl.route(_pred("swiping_right"))
     assert cmd1 is not None
+    assert ctrl.mode is RuntimeMode.COOLDOWN
 
-    # Cooldown expires + hand goes neutral
+    # Cooldown expires — dispatch memory reset automatically, no neutral needed
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 200)):
-        ctrl.route(_pred("unknown", accepted=False))  # resets _last_dispatched_label
-
-    # Second occurrence of same gesture — must dispatch again
-    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 300)):
         cmd2 = ctrl.route(_pred("swiping_right"))
-    assert cmd2 is not None, "Second swipe after neutral reset must dispatch"
+    assert cmd2 is not None, "Same gesture must re-dispatch immediately after cooldown"
     assert cmd2.command_id == "next_slide"
 
 
 # ---------------------------------------------------------------------------
 # Continuous labels (laser pointer, etc.)
 # ---------------------------------------------------------------------------
+
+
+def test_same_gesture_dispatches_again_after_cooldown_without_neutral() -> None:
+    """Regression guard: same gesture must NOT require a neutral hand pose to re-arm.
+
+    The only requirement for same-gesture re-dispatch is that the cooldown window
+    has elapsed.  _last_dispatched_label is reset at cooldown expiry, not at
+    the next unknown prediction.
+    """
+    ctrl = _make_controller(
+        command_map={"swiping_right": "next_slide"},
+        command_cooldown_ms=500,
+        edge_trigger_enabled=True,
+    )
+    # Dispatch
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        cmd1 = ctrl.route(_pred("swiping_right"))
+    assert cmd1 is not None
+
+    # Before cooldown — blocked
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 400)):
+        cmd_blocked = ctrl.route(_pred("swiping_right"))
+    assert cmd_blocked is None
+
+    # After cooldown — dispatches again without any neutral frame
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
+        cmd2 = ctrl.route(_pred("swiping_right"))
+    assert cmd2 is not None, "Same gesture must re-dispatch after cooldown without neutral pose"
+    assert cmd2.command_id == "next_slide"
 
 
 def test_continuous_label_returns_none_in_armed() -> None:
