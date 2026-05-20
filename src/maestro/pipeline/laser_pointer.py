@@ -203,7 +203,18 @@ class LaserPointerTracker:
         try:
             self._keyboard.press_hotkey(*self._laser_on_keys)
             self._active = True
-            LOGGER.info("LaserPointerTracker: activated (gesture=%r)", label)
+            # Reset the cursor to the screen centre on every activation so the
+            # laser dot always starts from a consistent neutral position,
+            # regardless of where the OS cursor was left after the previous
+            # session.  The annotation pen deliberately does NOT do this because
+            # it must start the pen stroke exactly where the user's finger is.
+            screen_w, screen_h = self._keyboard.screen_size()
+            cx, cy = screen_w // 2, screen_h // 2
+            self._keyboard.move_mouse(cx, cy)
+            LOGGER.info(
+                "LaserPointerTracker: activated (gesture=%r) cursor→centre (%d, %d)",
+                label, cx, cy,
+            )
         except Exception:
             LOGGER.exception(
                 "LaserPointerTracker: failed to activate laser pointer (gesture=%r)", label
