@@ -12,12 +12,59 @@ def _container_with_runtime_error() -> SimpleNamespace:
 
     landmark_extractor = MagicMock()
     activation_controller = MagicMock()
+    activation_controller.tick.return_value = False
 
     return SimpleNamespace(
         config=SimpleNamespace(app=SimpleNamespace(app_name="test-app")),
         frame_source=frame_source,
         landmark_extractor=landmark_extractor,
         activation_controller=activation_controller,
+    )
+
+
+def _make_minimal_container() -> SimpleNamespace:
+    """Container for runtime loop tests: no inference worker, stops after one frame."""
+    frame_source = MagicMock()
+    # One successful frame, then consecutive errors to trigger graceful shutdown.
+    frame_source.read.side_effect = [MagicMock()] + [RuntimeError("stop")] * 10
+
+    landmark_extractor = MagicMock()
+    landmark_extractor.close = MagicMock()
+
+    hand_selector = MagicMock()
+    hand_selector.select.return_value = MagicMock(valid=False, landmarks=None)
+
+    feature_transformer = MagicMock()
+    feature_transformer.transform.return_value = MagicMock()
+
+    sequence_buffer = MagicMock()
+    sequence_buffer.ready.return_value = False
+    sequence_buffer.current_valid_ratio.return_value = 0.0
+
+    activation_controller = MagicMock()
+    activation_controller.tick.return_value = False
+    activation_controller.mode = "armed"
+
+    overlay_renderer = MagicMock()
+    overlay_renderer.render.return_value = MagicMock(frame=None)
+
+    return SimpleNamespace(
+        config=SimpleNamespace(
+            app=SimpleNamespace(app_name="test-app", mirror_display=True),
+            inference=SimpleNamespace(pointer=SimpleNamespace(gain_x=2.4, gain_y=2.2)),
+        ),
+        frame_source=frame_source,
+        landmark_extractor=landmark_extractor,
+        hand_selector=hand_selector,
+        feature_transformer=feature_transformer,
+        sequence_buffer=sequence_buffer,
+        model_artifact=None,
+        activation_controller=activation_controller,
+        dispatcher=MagicMock(),
+        overlay_renderer=overlay_renderer,
+        benchmark=None,
+        show_window=False,
+        label_remap={},
     )
 
 
@@ -33,3 +80,33 @@ def test_runtime_closes_resources_when_read_raises() -> None:
 
     container.frame_source.close.assert_called_once()
     container.landmark_extractor.close.assert_called_once()
+
+
+def test_runtime_calls_tick_on_activation_controller_each_frame() -> None:
+    """tick() must be called on the activation controller on every successful
+    frame iteration.  This guarantees the COOLDOWN → ARMED transition fires
+    even when no inference results are available (hand left the camera)."""
+    container = _make_minimal_container()
+    runtime = Runtime(container)
+    runtime.run()
+
+    # Exactly one frame was read successfully before consecutive errors triggered
+    # graceful shutdown.  tick() must have been called for that frame.
+    container.activation_controller.tick.assert_called_once()
+
+
+def test_runtime_resets_label_on_tick_transition() -> None:
+    """When tick() returns True the state emitted for that frame must have
+    last_label='unknown' (not the stale previous-gesture label)."""
+    container = _make_minimal_container()
+    # Simulate tick() returning True on the first (only) successful frame.
+    container.activation_controller.tick.return_value = True
+
+    states: list = []
+    runtime = Runtime(container, on_state=states.append)
+    runtime.run()
+
+    assert len(states) >= 1, "Expected at least one state emission"
+    assert states[0].last_label == "unknown", (
+        f"Label should be 'unknown' after tick() cooldown reset, got {states[0].last_label!r}"
+    )

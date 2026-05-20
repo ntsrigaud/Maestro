@@ -173,6 +173,35 @@ class GestureActivationController:
         self._last_dispatched_label = self._unknown_label
         self._cooldown_started_ms = None
 
+    def tick(self) -> bool:
+        """Advance the cooldown clock without requiring an inference result.
+
+        Must be called on every main-loop iteration so the COOLDOWN → ARMED
+        transition fires even when the inference worker produces no output
+        (e.g. the hand has left the camera frame and no new windows are being
+        submitted).  Without this, a dispatched command leaves the controller
+        in COOLDOWN indefinitely if the camera stops detecting landmarks.
+
+        Returns
+        -------
+        bool
+            ``True`` if the controller transitioned from COOLDOWN to ARMED
+            this call; ``False`` otherwise (already ARMED, or cooldown still
+            active).
+        """
+        if self._mode is not RuntimeMode.COOLDOWN or self._cooldown_started_ms is None:
+            return False
+        if self._now_ms() - self._cooldown_started_ms < self._command_cooldown_ms:
+            return False
+        self._mode = RuntimeMode.ARMED
+        self._cooldown_started_ms = None
+        self._last_dispatched_label = self._unknown_label
+        LOGGER.debug(
+            "activation: COOLDOWN -> ARMED  (tick, cooldown_ms=%d)",
+            self._command_cooldown_ms,
+        )
+        return True
+
     @staticmethod
     def _now_ms() -> int:
         return int(time.time() * 1000)

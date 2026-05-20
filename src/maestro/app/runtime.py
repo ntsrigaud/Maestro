@@ -269,6 +269,16 @@ class Runtime:
                     if self._inference_worker is not None:
                         self._inference_worker.submit(window)
 
+                # Advance the cooldown clock unconditionally, before polling the
+                # inference worker.  This ensures the COOLDOWN → ARMED transition
+                # fires even when no inference windows are available (e.g. the hand
+                # has left the camera frame).  The label is reset here so the UI
+                # immediately reflects the ARMED state; if a fresh inference result
+                # arrives in the same iteration it will overwrite the reset below.
+                if self._container.activation_controller.tick():
+                    latest_label = "unknown"
+                    latest_conf = 0.0
+
                 worker_result = self._inference_worker.poll() if self._inference_worker else None
                 if worker_result is not None:
                     prediction, inference_ms = worker_result
