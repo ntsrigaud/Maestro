@@ -6,3 +6,17 @@ pointer:
 min_valid_ratio: 0.8
 window_length: 16
 window_step: 3
+movement_range_presets:
+  - label: "Low"
+    key: low
+    gain_x: 2.4
+    gain_y: 2.2
+  - label: "Medium"
+    key: medium
+    gain_x: 2.7
+    gain_y: 2.5
+  - label: "High"
+    key: high
+    gain_x: 3.0
+    gain_y: 2.8
+default_movement_range: high
