@@ -192,6 +192,16 @@ class Runtime:
     def stop(self) -> None:
         self._running = False
 
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Update pointer/pen movement gain on both continuous trackers.
+
+        Safe to call from the main thread while the runtime loop runs in the
+        worker thread — Python's GIL makes the underlying float attribute
+        writes atomic (same guarantee as ``Runtime.stop()``).
+        """
+        self._laser_tracker.set_pointer_gain(gain_x, gain_y)
+        self._pen_tracker.set_pointer_gain(gain_x, gain_y)
+
     def run(
         self,
         benchmark_output: str | None = None,
