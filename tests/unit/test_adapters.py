@@ -219,9 +219,7 @@ class TestKeyboardAdapterScopeEnforcement:
         adapter = KeyboardAdapter()
         with patch(f"{self._KB_MOD}._foreground_identity", return_value=None):
             result = adapter._ensure_presentation_scope("hotkey:e")
-        assert result is False, (
-            "Scope check must fail-closed when foreground identity is unknown"
-        )
+        assert result is False, "Scope check must fail-closed when foreground identity is unknown"
 
     def test_scope_check_allows_powerpoint_foreground(self):
         """Dispatch is allowed when Microsoft PowerPoint is the foreground app."""
