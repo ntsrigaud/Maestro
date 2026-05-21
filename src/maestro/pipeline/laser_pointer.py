@@ -155,6 +155,15 @@ class LaserPointerTracker:
         """``True`` while the laser pointer is currently active."""
         return self._active
 
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Update the centre-relative gain applied to fingertip movement.
+
+        Safe to call from any thread while the tracker is active; Python's GIL
+        guarantees that the float attribute write is atomic.
+        """
+        self._pointer_gain_x = max(1.0, float(gain_x))
+        self._pointer_gain_y = max(1.0, float(gain_y))
+
     def update(
         self,
         label: str,
@@ -203,7 +212,20 @@ class LaserPointerTracker:
         try:
             self._keyboard.press_hotkey(*self._laser_on_keys)
             self._active = True
-            LOGGER.info("LaserPointerTracker: activated (gesture=%r)", label)
+            # Reset the cursor to the screen centre on every activation so the
+            # laser dot always starts from a consistent neutral position,
+            # regardless of where the OS cursor was left after the previous
+            # session.  The annotation pen deliberately does NOT do this because
+            # it must start the pen stroke exactly where the user's finger is.
+            screen_w, screen_h = self._keyboard.screen_size()
+            cx, cy = screen_w // 2, screen_h // 2
+            self._keyboard.move_mouse(cx, cy)
+            LOGGER.info(
+                "LaserPointerTracker: activated (gesture=%r) cursor→centre (%d, %d)",
+                label,
+                cx,
+                cy,
+            )
         except Exception:
             LOGGER.exception(
                 "LaserPointerTracker: failed to activate laser pointer (gesture=%r)", label

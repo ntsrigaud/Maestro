@@ -98,6 +98,21 @@ class TestAnnotationPenTrackerActivation:
         assert tracker.active is False
         kb.press_hotkey.assert_not_called()
 
+    def test_activation_does_not_reset_cursor_to_centre(self):
+        """Annotation pen must NOT move the cursor to screen centre on activation.
+
+        Unlike the laser pointer, the pen stroke must start exactly at the
+        user's fingertip position so that the drawn mark appears where the
+        user intends.  Positioning is done via mouse_down, not move_mouse.
+        """
+        tracker, kb = _tracker()
+        kb.screen_size.return_value = (1920, 1080)
+        lm_off_centre = [[0.8, 0.2, 0.0]] * 21
+        tracker.update("point_two", lm_off_centre, valid=True)
+        # move_mouse must never be called — only mouse_down for the pen.
+        kb.move_mouse.assert_not_called()
+        kb.mouse_down.assert_called_once()
+
 
 # ---------------------------------------------------------------------------
 # Tests: mouse tracking while active

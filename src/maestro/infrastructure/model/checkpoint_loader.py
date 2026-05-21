@@ -64,6 +64,8 @@ def load_inference_artifact(
     artifact_path: str | Path,
     device: torch.device,
 ) -> InferenceArtifact:
+    # Runtime inference is CPU-only by policy; ignore requested accelerator devices.
+    device = torch.device("cpu")
     path = Path(artifact_path)
     if not path.exists():
         raise FileNotFoundError(f"Inference artifact not found: {path}")

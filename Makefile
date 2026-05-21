@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-ci install-build test test-all lint typecheck format run-cli run-ui build build-onefile generate-icon clean
+.PHONY: help install install-dev install-ci install-build fix-omp test test-all lint typecheck format run-cli run-ui build build-onefile generate-icon clean
 
 help: ## Show this help message
 	@echo "Maestro — available targets:"
@@ -9,9 +9,11 @@ help: ## Show this help message
 
 install: ## Install UI extras for end-user use (editable)
 	pip install -e ".[ui]"
+	$(MAKE) fix-omp
 
 install-dev: ## Install UI + dev + training extras (editable)
 	pip install -e ".[ui,dev,training]"
+	$(MAKE) fix-omp
 
 install-ci: ## Install headless + dev + training extras for CI (no display)
 	pip install -e ".[headless,dev,training]"
@@ -40,7 +42,11 @@ run-cli: ## Launch headless inference pipeline
 	python scripts/run_realtime.py
 
 run-ui: ## Launch PySide6 GUI
+	@$(MAKE) --quiet fix-omp
 	python scripts/run_ui.py
+
+fix-omp: ## (macOS) Patch torch's libomp install name to prevent OMP Error #15
+	@bash tools/fix_omp.sh
 
 # ── Application bundling ──────────────────────────────────────────────────────
 
