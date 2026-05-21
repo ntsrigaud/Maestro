@@ -93,9 +93,9 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
 # OS-level shortcuts (e.g. 'E' in a macOS text field opens the emoji picker).
 # Override at runtime via the MAESTRO_PRESENTATION_SCOPE_ALLOWLIST env var.
 _DEFAULT_SCOPE_TOKENS: tuple[str, ...] = (
-    "microsoft powerpoint",     # macOS localised app name / Windows window title
-    "powerpnt",                 # Windows process name (POWERPNT.EXE)
-    "com.microsoft.powerpoint", # macOS bundle ID
+    "microsoft powerpoint",  # macOS localised app name / Windows window title
+    "powerpnt",  # Windows process name (POWERPNT.EXE)
+    "com.microsoft.powerpoint",  # macOS bundle ID
 )
 
 
