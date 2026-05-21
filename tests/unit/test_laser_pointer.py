@@ -96,6 +96,36 @@ class TestLaserPointerTrackerActivation:
         assert tracker.active is False
         kb.press_hotkey.assert_not_called()
 
+    def test_cursor_resets_to_screen_centre_on_activation(self):
+        """First move_mouse call on activation must land at screen centre.
+
+        Uses an off-centre landmark so the centre-reset and subsequent
+        fingertip moves produce different coordinates — making the assertion
+        unambiguous.
+        """
+        tracker, kb = _tracker()
+        kb.screen_size.return_value = (1920, 1080)
+        lm_off_centre = [[0.8, 0.2, 0.0]] * 21
+        tracker.update("point_one", lm_off_centre, valid=True)
+        first_move = kb.move_mouse.call_args_list[0]
+        assert first_move == call(960, 540), (
+            "Laser pointer must reset cursor to screen centre (960, 540) on activation"
+        )
+
+    def test_cursor_resets_to_centre_on_every_reactivation(self):
+        """Screen-centre reset fires each time the laser is re-activated."""
+        tracker, kb = _tracker()
+        kb.screen_size.return_value = (1920, 1080)
+        lm_off_centre = [[0.8, 0.2, 0.0]] * 21
+        # First activation then deactivation.
+        tracker.update("point_one", lm_off_centre, valid=True)
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)
+        kb.move_mouse.reset_mock()
+        # Second activation — centre-reset must fire again.
+        tracker.update("point_one", lm_off_centre, valid=True)
+        first_move_reactivation = kb.move_mouse.call_args_list[0]
+        assert first_move_reactivation == call(960, 540)
+
 
 # ---------------------------------------------------------------------------
 # Tests: mouse tracking while active

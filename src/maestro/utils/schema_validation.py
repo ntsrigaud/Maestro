@@ -5,6 +5,24 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class MovementRangePreset(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    key: str
+    gain_x: float = Field(ge=1.0, le=5.0)
+    gain_y: float = Field(ge=1.0, le=5.0)
+
+
+def _default_movement_range_presets() -> list[MovementRangePreset]:
+    """Built-in fallback presets used when inference.yaml omits the section."""
+    return [
+        MovementRangePreset(label="Low", key="low", gain_x=2.4, gain_y=2.2),
+        MovementRangePreset(label="Medium", key="medium", gain_x=2.7, gain_y=2.5),
+        MovementRangePreset(label="High", key="high", gain_x=3.0, gain_y=2.8),
+    ]
+
+
 class PointerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -53,6 +71,14 @@ class InferenceConfig(BaseModel):
     # Shared pointer sensitivity used by both the laser pointer and the
     # annotation pen continuous trackers.
     pointer: PointerConfig = PointerConfig()
+    # Selectable pointer/pen movement gain presets shown in the tray/window UI.
+    # Each preset has a display label, a unique key used as the selection token,
+    # and per-axis gain values (>= 1.0).  The key in default_movement_range must
+    # match one of the keys defined in movement_range_presets.
+    movement_range_presets: list[MovementRangePreset] = Field(
+        default_factory=_default_movement_range_presets
+    )
+    default_movement_range: str = "high"
 
 
 class FeaturePipelineConfig(BaseModel):

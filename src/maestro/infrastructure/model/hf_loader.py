@@ -62,7 +62,8 @@ def load_artifact_from_hub(
         Override the HF Hub cache directory.  ``None`` uses the default
         ``~/.cache/huggingface/hub``.
     device:
-        PyTorch device on which the model weights are loaded.
+        Kept for API compatibility. Runtime inference is CPU-only and model
+        weights are always loaded on CPU.
 
     Returns
     -------
@@ -81,4 +82,4 @@ def load_artifact_from_hub(
         revision=revision,
         cache_dir=str(cache_dir) if cache_dir else None,
     )
-    return load_inference_artifact(artifact_path=Path(local_path), device=device)
+    return load_inference_artifact(artifact_path=Path(local_path), device=torch.device("cpu"))

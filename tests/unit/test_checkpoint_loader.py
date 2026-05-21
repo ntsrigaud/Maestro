@@ -89,6 +89,18 @@ def test_load_inference_artifact(tmp_path: Path) -> None:
     assert artifact.class_labels[0] == "unknown"
 
 
+def test_load_inference_artifact_forces_cpu_even_if_accelerator_requested(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "model.pt"
+    _write_artifact(artifact_path)
+
+    artifact = load_inference_artifact(
+        artifact_path=artifact_path,
+        device=torch.device("cuda"),
+    )
+
+    assert next(artifact.model.parameters()).device.type == "cpu"
+
+
 def test_load_inference_artifact_rejects_legacy_two_stream_type(tmp_path: Path) -> None:
     """Legacy baseline runtime artifacts must raise ValueError."""
     artifact_path = tmp_path / "bad.pt"
