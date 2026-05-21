@@ -20,6 +20,7 @@ from maestro.app.ui.floating_preview import FloatingPreviewWindow
 from maestro.domain.entities import RuntimeState
 from maestro.utils.config_loader import load_runtime_config
 
+
 # Pointer / annotation-pen movement gain presets.
 # Low  = the code-level defaults in laser_pointer.py / annotation_pen.py.
 def _make_tray_icon(colour: str) -> QIcon:
@@ -114,7 +115,11 @@ class MainWindow(QWidget):
         self._hand_menu = QMenu("Hand", self)
         self._hand_group = QActionGroup(self)
         self._hand_group.setExclusive(True)
-        for label, value in (("Right Hand", "right"), ("Left Hand", "left"), ("Both Hands", "both")):
+        for label, value in (
+            ("Right Hand", "right"),
+            ("Left Hand", "left"),
+            ("Both Hands", "both"),
+        ):
             action = QAction(label, self)
             action.setCheckable(True)
             action.setData(value)

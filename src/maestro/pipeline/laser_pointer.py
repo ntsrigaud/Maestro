@@ -222,7 +222,9 @@ class LaserPointerTracker:
             self._keyboard.move_mouse(cx, cy)
             LOGGER.info(
                 "LaserPointerTracker: activated (gesture=%r) cursor→centre (%d, %d)",
-                label, cx, cy,
+                label,
+                cx,
+                cy,
             )
         except Exception:
             LOGGER.exception(

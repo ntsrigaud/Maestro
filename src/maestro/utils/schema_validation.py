@@ -17,9 +17,9 @@ class MovementRangePreset(BaseModel):
 def _default_movement_range_presets() -> list[MovementRangePreset]:
     """Built-in fallback presets used when inference.yaml omits the section."""
     return [
-        MovementRangePreset(label="Low",    key="low",    gain_x=2.4, gain_y=2.2),
+        MovementRangePreset(label="Low", key="low", gain_x=2.4, gain_y=2.2),
         MovementRangePreset(label="Medium", key="medium", gain_x=2.7, gain_y=2.5),
-        MovementRangePreset(label="High",   key="high",   gain_x=3.0, gain_y=2.8),
+        MovementRangePreset(label="High", key="high", gain_x=3.0, gain_y=2.8),
     ]
 
 

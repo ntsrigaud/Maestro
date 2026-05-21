@@ -357,10 +357,10 @@ def test_tick_and_route_do_not_double_transition() -> None:
 
     # Both tick() and route() called at t=600 (cooldown expired).
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
-        transitioned = ctrl.tick()                      # COOLDOWN → ARMED
-        cmd = ctrl.route(_pred("swiping_right"))        # ARMED → dispatch → COOLDOWN
+        transitioned = ctrl.tick()  # COOLDOWN → ARMED
+        cmd = ctrl.route(_pred("swiping_right"))  # ARMED → dispatch → COOLDOWN
 
     assert transitioned is True
     assert cmd is not None
     assert cmd.command_id == "next_slide"
-    assert ctrl.mode is RuntimeMode.COOLDOWN            # re-entered cooldown after redispatch
+    assert ctrl.mode is RuntimeMode.COOLDOWN  # re-entered cooldown after redispatch
