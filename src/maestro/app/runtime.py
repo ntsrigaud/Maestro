@@ -348,6 +348,23 @@ class Runtime:
                     valid=landmark_packet.valid,
                 )
 
+                # Continuous gesture labels bypass the COOLDOWN state machine so
+                # tick() never resets latest_label for them.  When both continuous
+                # trackers have deactivated (hand left frame or gesture ended) but
+                # the stabiliser is still emitting a stale continuous label from
+                # queued inference windows, the UI would keep showing that label
+                # indefinitely.  Override it to "unknown" immediately once neither
+                # tracker is active, mirroring the reset non-continuous gestures
+                # receive from tick() at the COOLDOWN → ARMED transition.
+                _continuous = self._container.activation_controller.continuous_labels
+                if (
+                    latest_label in _continuous
+                    and not self._laser_tracker.active
+                    and not self._pen_tracker.active
+                ):
+                    latest_label = "unknown"
+                    latest_conf = 0.0
+
                 elapsed = time.perf_counter() - start_time
                 fps = (processed_frames / elapsed) if elapsed > 0 else 0.0
                 mode = str(self._container.activation_controller.mode)

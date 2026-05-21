@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from maestro.app.runtime import Runtime
+from maestro.domain.entities import StabilizedPrediction
 
 
 def _container_with_runtime_error() -> SimpleNamespace:
@@ -109,4 +110,46 @@ def test_runtime_resets_label_on_tick_transition() -> None:
     assert len(states) >= 1, "Expected at least one state emission"
     assert states[0].last_label == "unknown", (
         f"Label should be 'unknown' after tick() cooldown reset, got {states[0].last_label!r}"
+    )
+
+
+def test_runtime_resets_continuous_label_when_both_trackers_inactive() -> None:
+    """When the inference worker still emits a stale continuous gesture label
+    (e.g. 'point_one') after the hand has left the frame, but neither the
+    laser tracker nor the pen tracker is active, the runtime must override
+    latest_label to 'unknown' before building the state payload."""
+    container = _make_minimal_container()
+
+    # Mark 'point_one' as a continuous label so the runtime knows to reset it.
+    container.activation_controller.continuous_labels = frozenset({"point_one"})
+    # route() must return None (continuous labels bypass dispatch).
+    container.activation_controller.route.return_value = None
+
+    # Provide a non-None artifact so the InferenceWorker is instantiated.
+    container.model_artifact = MagicMock()
+
+    # Stabiliser returns a stale 'point_one' prediction (hand just left frame).
+    container.stabilizer = MagicMock()
+    container.stabilizer.update.return_value = StabilizedPrediction(
+        label="point_one", confidence=0.95, accepted=False, reason="stale"
+    )
+
+    states: list = []
+    with patch("maestro.app.runtime._InferenceWorker") as MockWorker:
+        mock_worker = MagicMock()
+        MockWorker.return_value = mock_worker
+        # Worker polls a result so the stabiliser path is exercised.
+        mock_worker.poll.return_value = (MagicMock(), 5.0)
+
+        runtime = Runtime(container, on_state=states.append)
+
+        # Replace both continuous trackers with inactive mocks.
+        runtime._laser_tracker = MagicMock(active=False)
+        runtime._pen_tracker = MagicMock(active=False)
+
+        runtime.run()
+
+    assert len(states) >= 1, "Expected at least one state emission"
+    assert states[0].last_label == "unknown", (
+        f"Expected 'unknown' (continuous tracker inactive), got {states[0].last_label!r}"
     )
