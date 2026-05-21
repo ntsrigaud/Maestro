@@ -85,6 +85,11 @@ class GestureActivationController:
     def mode(self) -> RuntimeMode:
         return self._mode
 
+    @property
+    def continuous_labels(self) -> frozenset[str]:
+        """Gesture labels that are routed to continuous trackers, not the state machine."""
+        return self._continuous_labels
+
     def route(self, prediction: StabilizedPrediction) -> ExecutableCommand | None:
         # Continuous gestures (e.g. point_one, point_two) are owned exclusively
         # by LaserPointerTracker and must never enter the ARMED/COOLDOWN state

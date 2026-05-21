@@ -35,6 +35,16 @@ def test_controller_starts_in_armed_state() -> None:
     assert ctrl.mode is RuntimeMode.ARMED
 
 
+def test_continuous_labels_property_returns_configured_set() -> None:
+    ctrl = _make_controller(continuous_labels=frozenset({"point_one", "point_two"}))
+    assert ctrl.continuous_labels == frozenset({"point_one", "point_two"})
+
+
+def test_continuous_labels_property_defaults_to_empty_frozenset() -> None:
+    ctrl = _make_controller()
+    assert ctrl.continuous_labels == frozenset()
+
+
 # ---------------------------------------------------------------------------
 # ARMED → COOLDOWN: command dispatch
 # ---------------------------------------------------------------------------
