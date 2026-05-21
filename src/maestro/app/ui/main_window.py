@@ -22,16 +22,6 @@ from maestro.utils.config_loader import load_runtime_config
 
 # Pointer / annotation-pen movement gain presets.
 # Low  = the code-level defaults in laser_pointer.py / annotation_pen.py.
-# High = the current values in configs/inference.yaml (user-configured maximum).
-# Medium sits at the midpoint between the two extremes.
-_MOVEMENT_PRESETS: tuple[tuple[str, str, float, float], ...] = (
-    ("Low",    "low",    2.4, 2.2),
-    ("Medium", "medium", 2.7, 2.5),
-    ("High",   "high",   3.0, 2.8),
-)
-_DEFAULT_MOVEMENT_RANGE: str = "high"  # matches configs/inference.yaml
-
-
 def _make_tray_icon(colour: str) -> QIcon:
     """Create a 16×16 solid-colour tray icon."""
     px = QPixmap(16, 16)
@@ -86,8 +76,12 @@ class MainWindow(QWidget):
         try:
             _cfg = load_runtime_config(self._config_path)
             self._hand_preference: str = _cfg.app.hand_preference
+            self._movement_presets = _cfg.inference.movement_range_presets
+            self._movement_range: str = _cfg.inference.default_movement_range
         except Exception:  # noqa: BLE001
             self._hand_preference = "right"
+            self._movement_presets = []
+            self._movement_range = "high"
 
         # Flag used by _on_hand_preference_changed to restart the runtime
         # automatically after it stops when the preference is changed mid-run.
@@ -130,15 +124,15 @@ class MainWindow(QWidget):
         self._hand_group.triggered.connect(self._on_hand_preference_changed)
 
         # Movement range submenu — exclusive radio-style selection of pointer gain.
-        self._movement_range: str = _DEFAULT_MOVEMENT_RANGE
+        # Presets and the default key are read from configs/inference.yaml.
         self._range_menu = QMenu("Movement Range", self)
         self._range_group = QActionGroup(self)
         self._range_group.setExclusive(True)
-        for label, value, _, _ in _MOVEMENT_PRESETS:
-            action = QAction(label, self)
+        for preset in self._movement_presets:
+            action = QAction(preset.label, self)
             action.setCheckable(True)
-            action.setData(value)
-            action.setChecked(value == self._movement_range)
+            action.setData(preset.key)
+            action.setChecked(preset.key == self._movement_range)
             self._range_group.addAction(action)
             self._range_menu.addAction(action)
         self._range_group.triggered.connect(self._on_movement_range_changed)
@@ -221,9 +215,9 @@ class MainWindow(QWidget):
 
     def _apply_movement_range(self) -> None:
         """Push the currently selected gain preset to the live runtime trackers."""
-        for _, value, gain_x, gain_y in _MOVEMENT_PRESETS:
-            if value == self._movement_range:
-                self._controller.set_pointer_gain(gain_x, gain_y)
+        for preset in self._movement_presets:
+            if preset.key == self._movement_range:
+                self._controller.set_pointer_gain(preset.gain_x, preset.gain_y)
                 return
 
     def _on_active_toggled(self, active: bool) -> None:
