@@ -196,6 +196,91 @@ class TestKeyboardAdapter:
 
 
 # ---------------------------------------------------------------------------
+# Scope-check unit tests (no autouse fixture — tests the real check logic)
+# ---------------------------------------------------------------------------
+
+
+class TestKeyboardAdapterScopeEnforcement:
+    """Tests for _ensure_presentation_scope without the autouse fixture.
+
+    These tests exercise the real scope check logic by patching the lower-level
+    _foreground_identity helper so no OS calls are made.
+    """
+
+    _KB_MOD = "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter"
+
+    def test_scope_check_blocks_when_identity_is_none(self):
+        """Fail-closed: undetectable foreground app must block dispatch.
+
+        Previously the adapter was fail-open (allowed dispatch when identity
+        could not be determined).  This caused the 'E' key to reach any focused
+        window — including macOS text fields that open the emoji picker.
+        """
+        adapter = KeyboardAdapter()
+        with patch(f"{self._KB_MOD}._foreground_identity", return_value=None):
+            result = adapter._ensure_presentation_scope("hotkey:e")
+        assert result is False, "Scope check must fail-closed when foreground identity is unknown"
+
+    def test_scope_check_allows_powerpoint_foreground(self):
+        """Dispatch is allowed when Microsoft PowerPoint is the foreground app."""
+        adapter = KeyboardAdapter()
+        with patch(
+            f"{self._KB_MOD}._foreground_identity",
+            return_value="com.microsoft.powerpoint microsoft powerpoint",
+        ):
+            result = adapter._ensure_presentation_scope("hotkey:right")
+        assert result is True
+
+    def test_scope_check_blocks_keynote_foreground(self):
+        """Keynote is no longer in scope — dispatch must be blocked."""
+        adapter = KeyboardAdapter()
+        with patch(
+            f"{self._KB_MOD}._foreground_identity",
+            return_value="com.apple.keynote keynote",
+        ):
+            result = adapter._ensure_presentation_scope("hotkey:right")
+        assert result is False, "Keynote is outside the PowerPoint-only scope"
+
+    def test_scope_check_blocks_libreoffice_foreground(self):
+        """LibreOffice Impress is no longer in scope — dispatch must be blocked."""
+        adapter = KeyboardAdapter()
+        with patch(
+            f"{self._KB_MOD}._foreground_identity",
+            return_value="soffice libreoffice impress",
+        ):
+            result = adapter._ensure_presentation_scope("hotkey:right")
+        assert result is False
+
+    def test_scope_check_env_var_override_adds_custom_token(self):
+        """MAESTRO_PRESENTATION_SCOPE_ALLOWLIST can extend the allowed app list."""
+        import os
+
+        adapter = KeyboardAdapter()
+        env = {"MAESTRO_PRESENTATION_SCOPE_ALLOWLIST": "myslides"}
+        with (
+            patch(f"{self._KB_MOD}._foreground_identity", return_value="myslides app"),
+            patch.dict(os.environ, env, clear=False),
+        ):
+            result = adapter._ensure_presentation_scope("hotkey:right")
+        assert result is True
+
+    def test_erase_annotations_key_blocked_when_not_powerpoint(self):
+        """The 'E' key (erase annotations) must not fire outside PowerPoint.
+
+        This is the root cause of the macOS emoji keyboard bug: 'E' was sent to
+        whatever window had focus because the scope check was fail-open.
+        """
+        adapter = KeyboardAdapter()
+        with (
+            patch(f"{self._KB_MOD}._foreground_identity", return_value=None),
+            patch(f"{self._KB_MOD}.pyautogui") as mock_pya,
+        ):
+            ok = adapter.press_hotkey("e")
+        assert ok is False
+        mock_pya.hotkey.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # CommandDispatcher tests
 # ---------------------------------------------------------------------------
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -18,4 +19,7 @@ def run_ui(config_path: str | None = None) -> int:
     if icon_path is not None:
         app.setWindowIcon(QIcon(str(icon_path)))
     window = MainWindow(config_path=effective_path)  # noqa: F841  kept to prevent GC
+    # Auto-activate after the event loop starts so the _RuntimeThread is
+    # spawned while app.exec() is running, not during widget construction.
+    QTimer.singleShot(0, window.auto_start)
     return app.exec()
