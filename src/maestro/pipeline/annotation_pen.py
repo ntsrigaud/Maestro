@@ -157,6 +157,15 @@ class AnnotationPenTracker:
         """``True`` while the annotation pen is currently active."""
         return self._active
 
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Update the centre-relative gain applied to fingertip movement.
+
+        Safe to call from any thread while the tracker is active; Python's GIL
+        guarantees that the float attribute write is atomic.
+        """
+        self._pointer_gain_x = max(1.0, float(gain_x))
+        self._pointer_gain_y = max(1.0, float(gain_y))
+
     def update(
         self,
         label: str,

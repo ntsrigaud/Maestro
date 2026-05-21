@@ -100,6 +100,11 @@ class _RuntimeThread(QThread):
         if self._runtime is not None:
             self._runtime.stop()
 
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Forward a gain update to the live Runtime. Safe from the main thread."""
+        if self._runtime is not None:
+            self._runtime.set_pointer_gain(gain_x, gain_y)
+
 
 class RuntimeController(QObject):
     """
@@ -166,6 +171,11 @@ class RuntimeController(QObject):
         """Request a graceful shutdown. Returns immediately; does not block."""
         if self._thread is not None:
             self._thread.stop()
+
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Update pointer movement gain on the live runtime. No-op if not running."""
+        if self._thread is not None:
+            self._thread.set_pointer_gain(gain_x, gain_y)
 
     def wait(self, timeout_ms: int = 5_000) -> bool:
         """
