@@ -6,14 +6,12 @@ patched throughout.
 
 from __future__ import annotations
 
-import ctypes
 import sys
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from maestro.domain.entities import DispatchResult, ExecutableCommand
-import maestro.infrastructure.dispatch.app_adapters.keyboard_adapter as keyboard_module
 from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
 )
@@ -140,7 +138,9 @@ class TestKeyboardAdapter:
         with pytest.raises(ValueError, match="max_abs_clicks"):
             adapter.zoom(1, modifier="ctrl", max_abs_clicks=0)
 
-    @pytest.mark.skipif(sys.platform == "win32", reason="pyautogui drag path is Windows-only bypass")
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="pyautogui drag path is Windows-only bypass"
+    )
     def test_mouse_drag_to_uses_pyautogui_drag_on_non_windows(self):
         """On non-Windows platforms, mouse_drag_to must use pyautogui.dragTo
         so that kCGEventLeftMouseDragged (macOS) or the equivalent drag event
@@ -186,9 +186,7 @@ class TestKeyboardAdapter:
 
         # MOVE | ABSOLUTE = 0x0001 | 0x8000 = 0x8001
         # Normalised coords: 65536 * 960 // 1920 + 1 = 32769 (both axes)
-        mock_user32.mouse_event.assert_called_once_with(
-            0x8001, 32769, 32769, 0, 0
-        )
+        mock_user32.mouse_event.assert_called_once_with(0x8001, 32769, 32769, 0, 0)
 
     @pytest.mark.skipif(sys.platform != "win32", reason="Win32 mouse_event path is Windows-only")
     def test_mouse_down_sends_win32_move_then_leftdown_on_windows(self):
