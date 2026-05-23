@@ -12,8 +12,8 @@ def test_load_runtime_config(config_dir: Path) -> None:
     assert config.inference.window_step == 3
     assert config.inference.pointer.gain_x == 3.0
     assert config.inference.pointer.gain_y == 2.8
-    assert config.inference.zoom.macos.zoom_clicks == 3
-    assert config.inference.zoom.windows.zoom_clicks == 9
+    assert config.inference.zoom.macos.zoom_clicks == 6
+    assert config.inference.zoom.windows.zoom_clicks == 18
     assert len(config.inference.movement_range_presets) == 3
     assert config.inference.movement_range_presets[0].key == "low"
     assert config.inference.movement_range_presets[1].key == "medium"
