@@ -85,6 +85,7 @@ _PEN_OFF_KEYS: dict[str, tuple[str, ...]] = {
 
 _DEFAULT_POINTER_GAIN_X: float = 2.4
 _DEFAULT_POINTER_GAIN_Y: float = 2.2
+_STROKE_START_PRIME_PIXELS: int = 1
 
 
 def _platform_key() -> str:
@@ -212,7 +213,16 @@ class AnnotationPenTracker:
 
     def _activate(self, label: str) -> None:
         try:
-            self._keyboard.press_hotkey(*self._pen_on_keys)
+            if not self._keyboard.press_hotkey(*self._pen_on_keys):
+                # Scope check blocked the hotkey (e.g. PowerPoint not in foreground).
+                # Do not mark as active so the next frame retries activation.
+                LOGGER.warning(
+                    "AnnotationPenTracker: pen activation blocked by scope guard "
+                    "(gesture=%r). Ensure Microsoft PowerPoint is the foreground "
+                    "application.",
+                    label,
+                )
+                return
             self._active = True
             LOGGER.info("AnnotationPenTracker: activated (gesture=%r)", label)
         except Exception:
@@ -258,19 +268,45 @@ class AnnotationPenTracker:
         screen_y = max(0, min(screen_h - 1, screen_y))
 
         if not self._mouse_pressed:
-            # First active frame: move to position AND press the button so that
-            # PowerPoint registers the start of the pen stroke at the fingertip.
-            self._keyboard.mouse_down(screen_x, screen_y)
+            # First active frame: press the button at the fingertip to start
+            # the pen stroke.  Only mark the button as held if mouse_down
+            # actually succeeds — the scope guard may block it on the same
+            # frame as Ctrl+P while PowerPoint is still entering pen mode.
+            # Leaving _mouse_pressed False allows automatic retry on the next
+            # frame once PowerPoint has settled.
+            if not self._keyboard.mouse_down(screen_x, screen_y):
+                LOGGER.debug(
+                    "AnnotationPenTracker: mouse_down blocked, will retry next frame"
+                )
+                return
             self._mouse_pressed = True
+            # Emit a tiny drag-and-return immediately so that PowerPoint
+            # registers the start of the ink stroke on this activation frame
+            # rather than waiting for the pointer to move naturally.
+            self._prime_stroke(screen_x, screen_y, screen_w, screen_h)
             LOGGER.debug("AnnotationPenTracker: stroke start at (%d, %d)", screen_x, screen_y)
         else:
-            # Subsequent frames: send a drag event while the button is held.
-            # On macOS, pyautogui.dragTo posts kCGEventLeftMouseDragged which
-            # is what PowerPoint requires to actually draw the pen stroke.
-            # pyautogui.moveTo posts kCGEventMouseMoved, which PowerPoint's pen
-            # mode silently ignores — the reason plain move_mouse didn't draw.
+            # Subsequent frames: drag while the button is held so PowerPoint
+            # receives the correct event type to continue the ink stroke.
             self._keyboard.mouse_drag_to(screen_x, screen_y)
             LOGGER.debug("AnnotationPenTracker: drag to (%d, %d)", screen_x, screen_y)
+
+    def _prime_stroke(self, screen_x: int, screen_y: int, screen_w: int, screen_h: int) -> None:
+        """Emit a minimal drag on entry so pen mode starts writing immediately."""
+        prime_x = screen_x + _STROKE_START_PRIME_PIXELS
+        if prime_x >= screen_w:
+            prime_x = max(0, screen_x - _STROKE_START_PRIME_PIXELS)
+
+        prime_y = screen_y + _STROKE_START_PRIME_PIXELS
+        if prime_y >= screen_h:
+            prime_y = max(0, screen_y - _STROKE_START_PRIME_PIXELS)
+
+        if prime_x == screen_x and prime_y == screen_y:
+            self._keyboard.mouse_drag_to(screen_x, screen_y)
+            return
+
+        self._keyboard.mouse_drag_to(prime_x, prime_y)
+        self._keyboard.mouse_drag_to(screen_x, screen_y)
 
     @staticmethod
     def _apply_pointer_gain(value: float, gain: float) -> float:
