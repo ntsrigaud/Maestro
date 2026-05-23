@@ -6,11 +6,14 @@ patched throughout.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+import ctypes
+import sys
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from maestro.domain.entities import DispatchResult, ExecutableCommand
+import maestro.infrastructure.dispatch.app_adapters.keyboard_adapter as keyboard_module
 from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
 )
@@ -117,20 +120,102 @@ class TestKeyboardAdapter:
         with patch(
             "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
-            adapter.zoom(3, modifier="ctrl")
+            adapter.zoom(3, modifier="ctrl", max_abs_clicks=15)
             assert mock_pya.keyDown.call_count == 1
             assert mock_pya.scroll.call_count == 1
             assert mock_pya.keyUp.call_count == 1
             # Modifier must be released with the same key it was pressed with.
             assert mock_pya.keyDown.call_args[0][0] == mock_pya.keyUp.call_args[0][0]
 
-    def test_zoom_clamps_to_minus_5(self):
+    def test_zoom_clamps_to_configured_limit(self):
         adapter = KeyboardAdapter()
         with patch(
             "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
         ) as mock_pya:
-            adapter.zoom(-99, modifier="ctrl")
-            mock_pya.scroll.assert_called_once_with(-5)
+            adapter.zoom(-99, modifier="ctrl", max_abs_clicks=15)
+            mock_pya.scroll.assert_called_once_with(-15)
+
+    def test_zoom_rejects_non_positive_max_abs_clicks(self):
+        adapter = KeyboardAdapter()
+        with pytest.raises(ValueError, match="max_abs_clicks"):
+            adapter.zoom(1, modifier="ctrl", max_abs_clicks=0)
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="pyautogui drag path is Windows-only bypass")
+    def test_mouse_drag_to_uses_pyautogui_drag_on_non_windows(self):
+        """On non-Windows platforms, mouse_drag_to must use pyautogui.dragTo
+        so that kCGEventLeftMouseDragged (macOS) or the equivalent drag event
+        is generated rather than a plain cursor move.
+        """
+        adapter = KeyboardAdapter()
+        with (
+            patch(
+                "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.pyautogui"
+            ) as mock_pya,
+            patch.object(adapter, "_ensure_presentation_scope", return_value=True),
+        ):
+            adapter.mouse_drag_to(100, 200)
+            mock_pya.dragTo.assert_called_once_with(
+                100,
+                200,
+                duration=0.0,
+                button="left",
+                mouseDownUp=False,
+                _pause=False,
+            )
+            mock_pya.moveTo.assert_not_called()
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="Win32 mouse_event path is Windows-only")
+    def test_mouse_drag_to_sends_win32_move_event_on_windows(self):
+        """On Windows, mouse_drag_to must call mouse_event(MOVE|ABSOLUTE)
+        instead of pyautogui.dragTo.  SetCursorPos (used internally by
+        pyautogui) does not generate WM_MOUSEMOVE; without WM_MOUSEMOVE
+        PowerPoint's annotation pen does not extend the ink stroke.
+        """
+        adapter = KeyboardAdapter()
+        mock_user32 = MagicMock()
+        # Return physical dimensions 1920x1080 for the coordinate conversion.
+        mock_user32.GetSystemMetrics.side_effect = lambda m: 1920 if m == 0 else 1080
+        with (
+            patch.object(adapter, "_ensure_presentation_scope", return_value=True),
+            patch(
+                "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.ctypes"
+            ) as mock_ctypes,
+        ):
+            mock_ctypes.windll.user32 = mock_user32
+            adapter.mouse_drag_to(960, 540)
+
+        # MOVE | ABSOLUTE = 0x0001 | 0x8000 = 0x8001
+        # Normalised coords: 65536 * 960 // 1920 + 1 = 32769 (both axes)
+        mock_user32.mouse_event.assert_called_once_with(
+            0x8001, 32769, 32769, 0, 0
+        )
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="Win32 mouse_event path is Windows-only")
+    def test_mouse_down_sends_win32_move_then_leftdown_on_windows(self):
+        """On Windows, mouse_down must send two mouse_event calls:
+        1. MOVE | ABSOLUTE to generate WM_MOUSEMOVE at the target position.
+        2. LEFTDOWN to generate WM_LBUTTONDOWN and start the ink stroke.
+        pyautogui.mouseDown uses SetCursorPos which emits no WM_MOUSEMOVE.
+        """
+        adapter = KeyboardAdapter()
+        mock_user32 = MagicMock()
+        mock_user32.GetSystemMetrics.side_effect = lambda m: 1920 if m == 0 else 1080
+        with (
+            patch.object(adapter, "_ensure_presentation_scope", return_value=True),
+            patch(
+                "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.ctypes"
+            ) as mock_ctypes,
+        ):
+            mock_ctypes.windll.user32 = mock_user32
+            adapter.mouse_down(960, 540)
+
+        assert mock_user32.mouse_event.call_count == 2
+        first_call, second_call = mock_user32.mouse_event.call_args_list
+        # First call: MOVE | ABSOLUTE (0x8001) with normalised coordinates
+        assert first_call == call(0x8001, 32769, 32769, 0, 0)
+        # Second call: LEFTDOWN (0x0002) at position (0, 0) — button press at
+        # current cursor position, no additional movement.
+        assert second_call == call(0x0002, 0, 0, 0, 0)
 
     def test_zoom_releases_modifier_on_scroll_exception(self):
         """keyUp must be called even when pyautogui.scroll raises."""
@@ -140,7 +225,7 @@ class TestKeyboardAdapter:
         ) as mock_pya:
             mock_pya.scroll.side_effect = RuntimeError("display error")
             with pytest.raises(RuntimeError):
-                adapter.zoom(2, modifier="ctrl")
+                adapter.zoom(2, modifier="ctrl", max_abs_clicks=15)
             assert mock_pya.keyUp.call_count == 1
 
     def test_move_mouse_calls_pyautogui_moveto(self):
