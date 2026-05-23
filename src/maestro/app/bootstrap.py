@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -338,7 +339,7 @@ def _build_dispatcher(
     platform_zoom = {
         "darwin": zoom_cfg.macos,
         "win32": zoom_cfg.windows,
-    }.get(os.sys.platform, zoom_cfg.linux)
+    }.get(sys.platform, zoom_cfg.linux)
     adapter = PresentationAdapter(
         keyboard=KeyboardAdapter(),
         zoom_clicks=platform_zoom.zoom_clicks,
