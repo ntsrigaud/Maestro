@@ -94,11 +94,18 @@ class PresentationAdapter:
     def target_app(self) -> str:
         return _TARGET_APP
 
-    def __init__(self, keyboard: KeyboardAdapter | None = None) -> None:
+    def __init__(
+        self,
+        keyboard: KeyboardAdapter | None = None,
+        *,
+        zoom_clicks: int,
+    ) -> None:
         self._keyboard = keyboard or KeyboardAdapter()
         platform = sys.platform if sys.platform in ("darwin", "win32") else "linux"
         self._platform = platform
         self._zoom_modifier = _ZOOM_MODIFIER[platform]
+        self._zoom_clicks = max(1, int(zoom_clicks))
+        self._zoom_max_abs_clicks = self._zoom_clicks
         self._slideshow_keys_browser = _SLIDESHOW_KEYS_BROWSER[platform]
         self._slideshow_keys_native = _SLIDESHOW_KEYS_NATIVE[platform]
 
@@ -135,12 +142,24 @@ class PresentationAdapter:
             case "previous_slide":
                 executed = self._keyboard.press_hotkey("left")
             case "zoom_in_view":
-                executed = self._keyboard.zoom(3, modifier=self._zoom_modifier)
+                executed = self._keyboard.zoom(
+                    self._zoom_clicks,
+                    modifier=self._zoom_modifier,
+                    max_abs_clicks=self._zoom_max_abs_clicks,
+                )
             case "zoom_out_view":
-                executed = self._keyboard.zoom(-3, modifier=self._zoom_modifier)
+                executed = self._keyboard.zoom(
+                    -self._zoom_clicks,
+                    modifier=self._zoom_modifier,
+                    max_abs_clicks=self._zoom_max_abs_clicks,
+                )
             case "zoom_out_totally":
-                # Zoom out to the minimum by scrolling at maximum magnitude.
-                executed = self._keyboard.zoom(-5, modifier=self._zoom_modifier)
+                # Zoom out by the configured step (same magnitude as zoom_out_view).
+                executed = self._keyboard.zoom(
+                    -self._zoom_clicks,
+                    modifier=self._zoom_modifier,
+                    max_abs_clicks=self._zoom_max_abs_clicks,
+                )
             case "erase_annotations":
                 # Erase all pen / laser annotations on the current slide.
                 # PowerPoint slideshow shortcut: E key (Windows and macOS).
