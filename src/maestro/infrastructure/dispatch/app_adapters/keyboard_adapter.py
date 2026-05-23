@@ -298,11 +298,14 @@ class KeyboardAdapter:
         if not self._ensure_presentation_scope(action=f"zoom:{modifier}:{clicks}"):
             return False
 
+        # Validate configuration regardless of pyautogui availability so
+        # unit tests can assert input validation even in headless/CI
+        # environments where pyautogui is not installed.
+        if max_abs_clicks < 1:
+            raise ValueError("max_abs_clicks must be >= 1")
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — zoom skipped.")
             return False
-        if max_abs_clicks < 1:
-            raise ValueError("max_abs_clicks must be >= 1")
         clamped = max(-max_abs_clicks, min(max_abs_clicks, clicks))
         pyautogui.keyDown(modifier)
         try:
