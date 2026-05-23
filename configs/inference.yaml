@@ -5,11 +5,11 @@ pointer:
   gain_y: 2.8
 zoom:
   macos:
-    zoom_clicks: 3
-  windows:
-    zoom_clicks: 9
-  linux:
     zoom_clicks: 6
+  windows:
+    zoom_clicks: 18
+  linux:
+    zoom_clicks: 12
 min_valid_ratio: 0.8
 window_length: 16
 window_step: 3
