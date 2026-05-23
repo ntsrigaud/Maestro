@@ -275,9 +275,7 @@ class AnnotationPenTracker:
             # Leaving _mouse_pressed False allows automatic retry on the next
             # frame once PowerPoint has settled.
             if not self._keyboard.mouse_down(screen_x, screen_y):
-                LOGGER.debug(
-                    "AnnotationPenTracker: mouse_down blocked, will retry next frame"
-                )
+                LOGGER.debug("AnnotationPenTracker: mouse_down blocked, will retry next frame")
                 return
             self._mouse_pressed = True
             # Emit a tiny drag-and-return immediately so that PowerPoint

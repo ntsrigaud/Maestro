@@ -96,7 +96,7 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
 # draws ink when it receives WM_MOUSEMOVE (with MK_LBUTTON set in wParam).
 # Calling mouse_event(MOVE|ABSOLUTE, ...) directly generates the required
 # WM_MOUSEMOVE so PowerPoint can track the pen stroke.
-_W32_MOUSEEVENTF_MOVE: int = 0x0001      # synthesise a WM_MOUSEMOVE
+_W32_MOUSEEVENTF_MOVE: int = 0x0001  # synthesise a WM_MOUSEMOVE
 _W32_MOUSEEVENTF_LEFTDOWN: int = 0x0002  # WM_LBUTTONDOWN
 _W32_MOUSEEVENTF_ABSOLUTE: int = 0x8000  # dx/dy are normalised absolute (0-65535)
 
