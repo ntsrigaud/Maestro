@@ -28,6 +28,17 @@ def _mock_keyboard() -> KeyboardAdapter:
     return kb
 
 
+def _adapter(
+    kb: KeyboardAdapter | None = None,
+    *,
+    zoom_clicks: int = 3,
+) -> PresentationAdapter:
+    return PresentationAdapter(
+        keyboard=kb or _mock_keyboard(),
+        zoom_clicks=zoom_clicks,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tests: navigation commands
 # ---------------------------------------------------------------------------
@@ -36,7 +47,7 @@ def _mock_keyboard() -> KeyboardAdapter:
 class TestPresentationAdapterNavigation:
     def test_next_slide_presses_right(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("next_slide")
         kb.press_hotkey.assert_called_once_with("right")
         assert result.success is True
@@ -45,21 +56,21 @@ class TestPresentationAdapterNavigation:
 
     def test_previous_slide_presses_left(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("previous_slide")
         kb.press_hotkey.assert_called_once_with("left")
         assert result.success is True
 
     def test_scroll_forward_presses_down(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("scroll_forward")
         kb.press_hotkey.assert_called_once_with("down")
         assert result.success is True
 
     def test_scroll_back_presses_up(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("scroll_back")
         kb.press_hotkey.assert_called_once_with("up")
         assert result.success is True
@@ -73,7 +84,7 @@ class TestPresentationAdapterNavigation:
 class TestPresentationAdapterZoom:
     def test_zoom_in_view_calls_zoom_positive(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("zoom_in_view")
         kb.zoom.assert_called_once()
         (clicks,) = kb.zoom.call_args.args
@@ -82,7 +93,7 @@ class TestPresentationAdapterZoom:
 
     def test_zoom_out_view_calls_zoom_negative(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("zoom_out_view")
         kb.zoom.assert_called_once()
         (clicks,) = kb.zoom.call_args.args
@@ -92,36 +103,75 @@ class TestPresentationAdapterZoom:
     def test_zoom_in_view_passes_modifier(self):
         """Modifier key must be forwarded so the correct OS zoom is triggered."""
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         adapter.execute("zoom_in_view")
         _, kwargs = kb.zoom.call_args
         assert "modifier" in kwargs, "zoom() must receive the modifier kwarg"
         assert kwargs["modifier"] in {"command", "ctrl"}
+        assert "max_abs_clicks" in kwargs
 
     def test_zoom_out_view_passes_modifier(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         adapter.execute("zoom_out_view")
         _, kwargs = kb.zoom.call_args
         assert "modifier" in kwargs
         assert kwargs["modifier"] in {"command", "ctrl"}
+        assert "max_abs_clicks" in kwargs
 
     def test_zoom_out_totally_calls_zoom_negative_maximum(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("zoom_out_totally")
         kb.zoom.assert_called_once()
         (clicks,) = kb.zoom.call_args.args
-        assert clicks <= -5, "zoom_out_totally must zoom out at maximum magnitude"
+        assert clicks < 0, "zoom_out_totally must pass a negative click count"
         assert result.success is True
 
     def test_zoom_out_totally_passes_modifier(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         adapter.execute("zoom_out_totally")
         _, kwargs = kb.zoom.call_args
         assert "modifier" in kwargs
         assert kwargs["modifier"] in {"command", "ctrl"}
+        assert "max_abs_clicks" in kwargs
+
+    def test_zoom_in_view_uses_larger_windows_step(self):
+        kb = _mock_keyboard()
+        with patch.object(presentation_module.sys, "platform", "win32"):
+            adapter = _adapter(kb, zoom_clicks=9)
+            result = adapter.execute("zoom_in_view")
+
+        kb.zoom.assert_called_once_with(9, modifier="ctrl", max_abs_clicks=9)
+        assert result.success is True
+
+    def test_zoom_in_view_keeps_smaller_macos_step(self):
+        kb = _mock_keyboard()
+        with patch.object(presentation_module.sys, "platform", "darwin"):
+            adapter = _adapter(kb, zoom_clicks=3)
+            result = adapter.execute("zoom_in_view")
+
+        kb.zoom.assert_called_once_with(3, modifier="command", max_abs_clicks=3)
+        assert result.success is True
+
+    def test_zoom_out_view_uses_shared_configured_step(self):
+        kb = _mock_keyboard()
+        with patch.object(presentation_module.sys, "platform", "win32"):
+            adapter = _adapter(kb, zoom_clicks=9)
+            result = adapter.execute("zoom_out_view")
+
+        kb.zoom.assert_called_once_with(-9, modifier="ctrl", max_abs_clicks=9)
+        assert result.success is True
+
+    def test_zoom_out_totally_uses_windows_maximum_step(self):
+        kb = _mock_keyboard()
+        with patch.object(presentation_module.sys, "platform", "win32"):
+            adapter = _adapter(kb, zoom_clicks=9)
+            result = adapter.execute("zoom_out_totally")
+
+        kb.zoom.assert_called_once_with(-9, modifier="ctrl", max_abs_clicks=9)
+        assert result.success is True
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +182,7 @@ class TestPresentationAdapterZoom:
 class TestPresentationAdapterEraseAnnotations:
     def test_erase_annotations_presses_e(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("erase_annotations")
         kb.press_hotkey.assert_called_once_with("e")
         assert result.success is True
@@ -140,7 +190,7 @@ class TestPresentationAdapterEraseAnnotations:
     def test_erase_annotations_blocked_outside_presentation_scope(self):
         kb = _mock_keyboard()
         kb.press_hotkey.return_value = False
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("erase_annotations")
         kb.press_hotkey.assert_called_once_with("e")
         assert result.success is False
@@ -155,7 +205,7 @@ class TestPresentationAdapterEraseAnnotations:
 class TestPresentationAdapterSlideshow:
     def test_start_presentation_sends_slideshow_keys(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("start_presentation")
         # Platform-specific: Cmd+Shift+Return on macOS, F5 on Win/Linux.
         kb.press_hotkey.assert_called_once()
@@ -171,7 +221,7 @@ class TestPresentationAdapterSlideshow:
                 return_value="org.mozilla.firefox firefox my deck - google slides",
             ),
         ):
-            adapter = PresentationAdapter(keyboard=kb)
+            adapter = _adapter(kb)
             result = adapter.execute("start_presentation")
 
         kb.press_hotkey.assert_called_once_with("command", "shift", "enter")
@@ -187,7 +237,7 @@ class TestPresentationAdapterSlideshow:
                 return_value="com.microsoft.powerpoint microsoft powerpoint",
             ),
         ):
-            adapter = PresentationAdapter(keyboard=kb)
+            adapter = _adapter(kb)
             result = adapter.execute("start_presentation")
 
         kb.press_hotkey.assert_called_once_with("command", "enter")
@@ -203,7 +253,7 @@ class TestPresentationAdapterSlideshow:
                 return_value="chrome.exe google slides",
             ),
         ):
-            adapter = PresentationAdapter(keyboard=kb)
+            adapter = _adapter(kb)
             result = adapter.execute("start_presentation")
 
         kb.press_hotkey.assert_called_once_with("ctrl", "f5")
@@ -211,7 +261,7 @@ class TestPresentationAdapterSlideshow:
 
     def test_stop_presentation_sends_escape(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("stop_presentation")
         kb.press_hotkey.assert_called_once_with("escape")
         assert result.success is True
@@ -219,7 +269,7 @@ class TestPresentationAdapterSlideshow:
     def test_start_stop_presentation_sends_keys(self):
         # Legacy command kept for backward compat.
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("start_stop_presentation")
         kb.press_hotkey.assert_called_once()
         assert result.success is True
@@ -233,7 +283,7 @@ class TestPresentationAdapterSlideshow:
 class TestPresentationAdapterMousePointer:
     def test_mouse_pointer_presses_ctrl_a(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("mouse_pointer")
         kb.press_hotkey.assert_called_once_with("ctrl", "a")
         assert result.success is True
@@ -249,7 +299,7 @@ class TestPresentationAdapterMousePointer:
 class TestPresentationAdapterNoOp:
     def test_no_action_returns_not_executed(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("no_action")
         kb.press_hotkey.assert_not_called()
         assert result.success is False
@@ -257,7 +307,7 @@ class TestPresentationAdapterNoOp:
 
     def test_unknown_command_returns_not_executed(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("open_application")
         kb.press_hotkey.assert_not_called()
         assert result.success is False
@@ -265,7 +315,7 @@ class TestPresentationAdapterNoOp:
         assert "unknown_command" in result.detail
 
     def test_target_app_is_presentation(self):
-        adapter = PresentationAdapter(keyboard=_mock_keyboard())
+        adapter = _adapter(_mock_keyboard())
         assert adapter.target_app == "presentation"
 
     def test_all_commands_handled(self):
@@ -296,7 +346,7 @@ class TestPresentationAdapterNoOp:
             "deactivate_laser_pointer",
         ]
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         for cmd in commands:
             result = adapter.execute(cmd)
             assert isinstance(result, DispatchResult)
@@ -310,7 +360,7 @@ class TestPresentationAdapterNoOp:
 class TestPresentationAdapterLaserPointer:
     def test_activate_laser_pointer_presses_ctrl_l(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("activate_laser_pointer")
         kb.press_hotkey.assert_called_once_with("ctrl", "l")
         assert result.success is True
@@ -319,7 +369,7 @@ class TestPresentationAdapterLaserPointer:
 
     def test_deactivate_laser_pointer_presses_ctrl_a(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("deactivate_laser_pointer")
         kb.press_hotkey.assert_called_once_with("ctrl", "a")
         assert result.success is True
@@ -335,7 +385,7 @@ class TestPresentationAdapterLaserPointer:
 class TestPresentationAdapterScreenAndNavigation:
     def test_mouse_click_calls_mouse_click(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("mouse_click")
         kb.mouse_click.assert_called_once_with()
         assert result.success is True
@@ -344,7 +394,7 @@ class TestPresentationAdapterScreenAndNavigation:
 
     def test_toggle_black_screen_presses_b(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("toggle_black_screen")
         kb.press_hotkey.assert_called_once_with("b")
         assert result.success is True
@@ -353,7 +403,7 @@ class TestPresentationAdapterScreenAndNavigation:
 
     def test_toggle_white_screen_presses_w(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("toggle_white_screen")
         kb.press_hotkey.assert_called_once_with("w")
         assert result.success is True
@@ -362,7 +412,7 @@ class TestPresentationAdapterScreenAndNavigation:
 
     def test_go_to_last_slide_presses_end(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("go_to_last_slide")
         kb.press_hotkey.assert_called_once_with("end")
         assert result.success is True
@@ -371,7 +421,7 @@ class TestPresentationAdapterScreenAndNavigation:
 
     def test_go_to_first_slide_presses_home(self):
         kb = _mock_keyboard()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _adapter(kb)
         result = adapter.execute("go_to_first_slide")
         kb.press_hotkey.assert_called_once_with("home")
         assert result.success is True

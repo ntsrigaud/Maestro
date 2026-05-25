@@ -88,6 +88,18 @@ _SAFE_KEY_NAMES: frozenset[str] = frozenset(
     }
 )
 
+# Win32 mouse_event() dwFlags constants used in mouse_down() and
+# mouse_drag_to() on Windows.
+#
+# pyautogui's _moveTo() uses SetCursorPos() which moves the OS cursor
+# silently WITHOUT generating WM_MOUSEMOVE.  PowerPoint's annotation pen only
+# draws ink when it receives WM_MOUSEMOVE (with MK_LBUTTON set in wParam).
+# Calling mouse_event(MOVE|ABSOLUTE, ...) directly generates the required
+# WM_MOUSEMOVE so PowerPoint can track the pen stroke.
+_W32_MOUSEEVENTF_MOVE: int = 0x0001  # synthesise a WM_MOUSEMOVE
+_W32_MOUSEEVENTF_LEFTDOWN: int = 0x0002  # WM_LBUTTONDOWN
+_W32_MOUSEEVENTF_ABSOLUTE: int = 0x8000  # dx/dy are normalised absolute (0-65535)
+
 # Scope restricted to Microsoft PowerPoint only.
 # Sending keystrokes to other presentation apps risks triggering unintended
 # OS-level shortcuts (e.g. 'E' in a macOS text field opens the emoji picker).
@@ -274,21 +286,27 @@ class KeyboardAdapter:
         LOGGER.debug("Scrolled: clicks=%d", clicks)
         return True
 
-    def zoom(self, clicks: int, *, modifier: str) -> bool:
+    def zoom(self, clicks: int, *, modifier: str, max_abs_clicks: int) -> bool:
         """Inject a modifier+scroll zoom event at the current cursor position.
 
         Uses Cmd+scroll on macOS and Ctrl+scroll on Windows / Linux to trigger
         in-application view zoom without activating OS-level zoom overlays.
-        Positive clicks zoom in; negative zoom out.  Clamped to [-5, 5] to
-        prevent runaway zoom from rapid-fire command delivery.
+        Positive clicks zoom in; negative zoom out.  Callers provide
+        ``max_abs_clicks`` so the clamp policy lives in runtime configuration,
+        not in this low-level adapter.
         """
         if not self._ensure_presentation_scope(action=f"zoom:{modifier}:{clicks}"):
             return False
 
+        # Validate configuration regardless of pyautogui availability so
+        # unit tests can assert input validation even in headless/CI
+        # environments where pyautogui is not installed.
+        if max_abs_clicks < 1:
+            raise ValueError("max_abs_clicks must be >= 1")
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — zoom skipped.")
             return False
-        clamped = max(-5, min(5, clicks))
+        clamped = max(-max_abs_clicks, min(max_abs_clicks, clicks))
         pyautogui.keyDown(modifier)
         try:
             pyautogui.scroll(clamped)
@@ -319,15 +337,17 @@ class KeyboardAdapter:
     def mouse_drag_to(self, x: int, y: int) -> bool:
         """Drag the mouse cursor to (*x*, *y*) while the primary button is held.
 
-        On macOS, pyautogui uses ``kCGEventLeftMouseDragged`` for this call,
-        which is the correct event type required by drawing applications such
-        as PowerPoint.  A plain ``moveTo`` call (``kCGEventMouseMoved``) is
-        silently ignored by PowerPoint's pen mode even when the button is
-        already pressed.
+        On **macOS** this uses ``pyautogui.dragTo(mouseDownUp=False)`` which
+        posts a ``kCGEventLeftMouseDragged`` event — the event type PowerPoint
+        requires to extend an ink stroke.
 
-        On Windows/Linux, a drag event is equivalent to a move while the button
-        is held, so this delegates to the same underlying Quartz/Win32 drag
-        path via ``pyautogui.dragTo(mouseDownUp=False)``.
+        On **Windows** pyautogui's drag path uses ``SetCursorPos()`` for cursor
+        movement, which does NOT generate ``WM_MOUSEMOVE``.  PowerPoint's
+        annotation pen only draws ink when it receives ``WM_MOUSEMOVE`` with
+        ``MK_LBUTTON`` set in wParam.  To satisfy this requirement we call
+        ``mouse_event(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, ...)`` directly,
+        which the system translates into a ``WM_MOUSEMOVE`` delivered to the
+        window under the cursor with the current button state in wParam.
 
         Must only be called after :meth:`mouse_down` and before
         :meth:`mouse_up`.
@@ -338,7 +358,24 @@ class KeyboardAdapter:
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — mouse_drag_to skipped.")
             return False
-        pyautogui.dragTo(x, y, duration=0.0, button="left", mouseDownUp=False, _pause=False)
+
+        if sys.platform == "win32":
+            # Use mouse_event with MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE so
+            # the system generates WM_MOUSEMOVE.  When MK_LBUTTON is set in the
+            # key state (because mouse_down was called first), PowerPoint
+            # receives WM_MOUSEMOVE + MK_LBUTTON and extends the pen stroke.
+            user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+            sw = user32.GetSystemMetrics(0)
+            sh = user32.GetSystemMetrics(1)
+            user32.mouse_event(
+                _W32_MOUSEEVENTF_MOVE | _W32_MOUSEEVENTF_ABSOLUTE,
+                65536 * x // sw + 1,
+                65536 * y // sh + 1,
+                0,
+                0,
+            )
+        else:
+            pyautogui.dragTo(x, y, duration=0.0, button="left", mouseDownUp=False, _pause=False)
         LOGGER.debug("Mouse dragged to (%d, %d)", x, y)
         return True
 
@@ -346,9 +383,19 @@ class KeyboardAdapter:
         """Move the OS cursor to (*x*, *y*) and press the primary mouse button.
 
         Used by :class:`~maestro.pipeline.annotation_pen.AnnotationPenTracker`
-        to begin a pen stroke: the cursor is positioned at the fingertip before
-        the button is pressed so that PowerPoint registers the stroke origin at
-        the correct location.
+        to begin a pen stroke.
+
+        On **Windows** we send two ``mouse_event`` calls:
+        1. ``MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE`` — generates
+           ``WM_MOUSEMOVE`` so PowerPoint's pen cursor moves to the fingertip
+           before the stroke starts.
+        2. ``MOUSEEVENTF_LEFTDOWN`` — generates ``WM_LBUTTONDOWN`` at the
+           current cursor position, starting the ink stroke.
+
+        pyautogui's ``mouseDown`` uses ``SetCursorPos()`` for the initial
+        cursor placement, which does NOT generate ``WM_MOUSEMOVE``.  Sending
+        the explicit ``MOVE | ABSOLUTE`` event ensures the pen cursor lands at
+        the correct screen position before the button is pressed.
         """
         if not self._ensure_presentation_scope(action=f"mouse_down:{x}:{y}"):
             return False
@@ -356,7 +403,19 @@ class KeyboardAdapter:
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — mouse_down skipped.")
             return False
-        pyautogui.mouseDown(x, y, button="left")
+
+        if sys.platform == "win32":
+            user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+            sw = user32.GetSystemMetrics(0)
+            sh = user32.GetSystemMetrics(1)
+            dx = 65536 * x // sw + 1
+            dy = 65536 * y // sh + 1
+            # Move cursor with ABSOLUTE flag → WM_MOUSEMOVE at (x, y)
+            user32.mouse_event(_W32_MOUSEEVENTF_MOVE | _W32_MOUSEEVENTF_ABSOLUTE, dx, dy, 0, 0)
+            # Press button at current cursor position → WM_LBUTTONDOWN
+            user32.mouse_event(_W32_MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        else:
+            pyautogui.mouseDown(x, y, button="left")
         LOGGER.debug("Mouse down at (%d, %d)", x, y)
         return True
 
