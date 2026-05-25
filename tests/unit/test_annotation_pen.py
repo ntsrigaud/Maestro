@@ -98,6 +98,19 @@ class TestAnnotationPenTrackerActivation:
         assert tracker.active is False
         kb.press_hotkey.assert_not_called()
 
+    def test_activation_not_marked_when_hotkey_blocked(self):
+        """If the scope guard blocks Ctrl+P, the tracker must not mark itself
+        active so that the next frame retries the activation hotkey.
+        """
+        tracker, kb = _tracker()
+        kb.press_hotkey.return_value = False  # scope guard blocks dispatch
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        assert tracker.active is False
+        # Retry on the following frame once the scope guard passes.
+        kb.press_hotkey.return_value = True
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        assert tracker.active is True
+
     def test_activation_does_not_reset_cursor_to_centre(self):
         """Annotation pen must NOT move the cursor to screen centre on activation.
 
@@ -120,13 +133,36 @@ class TestAnnotationPenTrackerActivation:
 
 
 class TestAnnotationPenTrackerMouseTracking:
+    def test_mouse_pressed_not_set_when_mouse_down_fails(self):
+        """If mouse_down is blocked on the activation frame, _mouse_pressed must
+        remain False so the press is retried on the next frame rather than
+        permanently skipping to the drag-only branch with no button held.
+        """
+        tracker, kb = _tracker(mirror_x=False)
+        kb.mouse_down.return_value = False  # scope guard blocks on first frame
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        # Scope blocked: no drag should have been attempted yet.
+        kb.mouse_drag_to.assert_not_called()
+        # Next frame the scope guard passes.
+        kb.mouse_down.return_value = True
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        kb.mouse_down.assert_called()
+        # Prime stroke must fire now that mouse_down succeeded.
+        assert kb.mouse_drag_to.call_count == 2
+
     def test_mouse_down_called_on_first_active_frame(self):
-        """First frame: position and press — PowerPoint starts recording the stroke."""
+        """First frame: press and immediately prime a tiny drag so ink starts."""
         tracker, kb = _tracker(mirror_x=False)
         tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
         kb.mouse_down.assert_called_once()
-        kb.mouse_drag_to.assert_not_called()
+        assert kb.mouse_drag_to.call_count == 2
         kb.move_mouse.assert_not_called()
+
+    def test_first_active_frame_primes_drag_and_returns_to_fingertip(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1920, 1080)
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        assert kb.mouse_drag_to.call_args_list == [call(961, 541), call(960, 540)]
 
     def test_drag_called_on_subsequent_frames(self):
         """Sustained frames send kCGEventLeftMouseDragged (not kCGEventMouseMoved)."""
