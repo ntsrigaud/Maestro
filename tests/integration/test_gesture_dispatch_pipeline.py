@@ -58,6 +58,7 @@ _COOLDOWN_MS = 800
 # Legacy alias — used in TestEdgeTriggerSingleDispatch test bodies; kept to
 # avoid touching every timestamp expression in those tests.
 _ACTIVATION_HOLD_MS = _T_BASE_MS
+_ZOOM_CLICKS = 3
 
 
 def _pred(label: str, accepted: bool = True, confidence: float = 0.95) -> StabilizedPrediction:
@@ -71,6 +72,13 @@ def _make_controller() -> GestureActivationController:
     )
 
 
+def _make_adapter(kb: KeyboardAdapter) -> PresentationAdapter:
+    return PresentationAdapter(
+        keyboard=kb,
+        zoom_clicks=_ZOOM_CLICKS,
+    )
+
+
 def _make_dispatcher(
     allowed: set[str] | None = None,
     rate_limit: int = 10,
@@ -78,7 +86,7 @@ def _make_dispatcher(
 ) -> tuple[CommandDispatcher, MagicMock]:
     mock_pya = MagicMock()
     kb = KeyboardAdapter()
-    adapter = PresentationAdapter(keyboard=kb)
+    adapter = _make_adapter(kb)
     cmd_set = allowed if allowed is not None else frozenset(_COMMAND_MAP.values())
     dispatcher = CommandDispatcher(
         adapter=adapter,
@@ -149,7 +157,7 @@ class TestGestureDispatchPipeline:
     def setup_method(self):
         self.controller = _make_controller()
         self.kb = KeyboardAdapter()
-        self.adapter = PresentationAdapter(keyboard=self.kb)
+        self.adapter = _make_adapter(self.kb)
         self.dispatcher = CommandDispatcher(
             adapter=self.adapter,
             allowed_commands=frozenset(_COMMAND_MAP.values()),
@@ -263,7 +271,7 @@ class TestGestureDispatchPipeline:
 class TestIntegrationRateLimiting:
     def test_burst_commands_beyond_limit_are_dropped(self):
         kb = KeyboardAdapter()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _make_adapter(kb)
         dispatcher = CommandDispatcher(
             adapter=adapter,
             allowed_commands=frozenset(_COMMAND_MAP.values()),
@@ -445,7 +453,7 @@ class TestEdgeTriggerSingleDispatch:
         once."""
         ctrl = self._make_armed_controller()
         kb = KeyboardAdapter()
-        adapter = PresentationAdapter(keyboard=kb)
+        adapter = _make_adapter(kb)
         dispatcher = CommandDispatcher(
             adapter=adapter,
             allowed_commands=frozenset(_COMMAND_MAP.values()),

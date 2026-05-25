@@ -30,6 +30,20 @@ class PointerConfig(BaseModel):
     gain_y: float = Field(default=2.2, ge=1.0, le=5.0)
 
 
+class PlatformZoomConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    zoom_clicks: int = Field(ge=1, le=40)
+
+
+class ZoomConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    macos: PlatformZoomConfig = PlatformZoomConfig(zoom_clicks=3)
+    windows: PlatformZoomConfig = PlatformZoomConfig(zoom_clicks=9)
+    linux: PlatformZoomConfig = PlatformZoomConfig(zoom_clicks=6)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -71,6 +85,8 @@ class InferenceConfig(BaseModel):
     # Shared pointer sensitivity used by both the laser pointer and the
     # annotation pen continuous trackers.
     pointer: PointerConfig = PointerConfig()
+    # Platform-specific mouse-wheel deltas used for presentation zoom.
+    zoom: ZoomConfig = ZoomConfig()
     # Selectable pointer/pen movement gain presets shown in the tray/window UI.
     # Each preset has a display label, a unique key used as the selection token,
     # and per-axis gain values (>= 1.0).  The key in default_movement_range must
