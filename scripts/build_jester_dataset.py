@@ -76,7 +76,6 @@ except ImportError:  # graceful degradation if tqdm is not installed
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from maestro.pipeline import graph_schema  # noqa: E402
 from maestro.training.dataset_builder import (  # noqa: E402
     LabeledLandmarkFrame,
     SequenceDatasetBuilder,
