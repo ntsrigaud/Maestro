@@ -8,6 +8,5 @@ except ImportError:  # Python < 3.11
 
 
 class RuntimeMode(StrEnum):
-    IDLE = "idle"
     ARMED = "armed"
     COOLDOWN = "cooldown"

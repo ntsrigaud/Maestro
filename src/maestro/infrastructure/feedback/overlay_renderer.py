@@ -7,13 +7,10 @@ import cv2
 from maestro.domain.entities import FramePacket, RuntimeState
 
 # Border colours (BGR).
-# Absent   — grey:   gaze not directed toward camera; pipeline bypassed.
-# Idle     — amber:  system not yet armed (IDLE or post-cooldown wait).
+# Cooldown — amber:  inter-command cooldown window active.
 # Armed    — green:  system ready and accepting gesture commands.
-# Cooldown — amber:  same as idle colour; command just dispatched.
 # Laser    — sky blue: laser pointer tracker actively driving cursor.
 # Pen      — violet: annotation pen tracker actively drawing.
-_BORDER_ABSENT: tuple[int, int, int] = (128, 128, 128)
 _BORDER_ACQUIRING: tuple[int, int, int] = (0, 165, 255)
 _BORDER_ARMED: tuple[int, int, int] = (0, 200, 0)
 _BORDER_LASER: tuple[int, int, int] = (255, 140, 0)  # sky blue (BGR)
@@ -44,16 +41,14 @@ class OverlayRenderer:
     remain correctly positioned on the mirrored image.  Text overlays are drawn
     after the flip so they remain readable.  The ML pipeline is never affected.
 
-    Gaze border convention
-    ----------------------
-    A coloured border is drawn around the frame to give ambient feedback about
-    the gaze-aware activation state:
+        Border convention
+        -----------------
+        A coloured border is drawn around the frame to give ambient feedback about
+        runtime activation state:
 
-    - **Grey**      (``gaze_permitted=False``): gaze absent; pipeline bypassed.
-    - **Amber**     (``gaze_permitted=True``, ``mode != "armed"``): gaze active
-      but not yet armed; system is in IDLE or COOLDOWN.
-    - **Green**     (``gaze_permitted=True``, ``mode == "armed"``): system armed;
-      discrete gesture commands are accepted.
+        - **Amber**     (``mode == "cooldown"``): inter-command cooldown window active.
+        - **Green**     (``mode == "armed"``): system armed; discrete gesture
+            commands are accepted.
     - **Sky blue**  (``laser_active=True`` in ``state.info``): laser pointer
       tracker is actively driving the cursor.
     - **Violet**    (``pen_active=True`` in ``state.info``): annotation pen
@@ -92,9 +87,9 @@ class OverlayRenderer:
         info = state.info
 
         if self._minimal_preview:
-            self._draw_gaze_border(canvas, state)
+            self._draw_status_border(canvas, state)
         else:
-            self._draw_gaze_border(canvas, state)
+            self._draw_status_border(canvas, state)
             self._draw_landmarks(canvas, info.get("landmarks"), mirror=self._mirror_display)
 
             # --- Mode badge -------------------------------------------------
@@ -144,11 +139,9 @@ class OverlayRenderer:
 
         return FramePacket(frame=canvas, timestamp_ms=frame.timestamp_ms, frame_id=frame.frame_id)
 
-    def _draw_gaze_border(self, image: Any, state: RuntimeState) -> None:
-        """Draw a coloured border reflecting the current gaze + activation state."""
-        if not state.gaze_permitted:
-            colour = _BORDER_ABSENT
-        elif state.info.get("laser_active"):
+    def _draw_status_border(self, image: Any, state: RuntimeState) -> None:
+        """Draw a coloured border reflecting runtime activation state."""
+        if state.info.get("laser_active"):
             colour = _BORDER_LASER
         elif state.info.get("pen_active"):
             colour = _BORDER_PEN

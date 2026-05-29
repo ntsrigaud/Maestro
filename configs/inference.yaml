@@ -1,14 +1,29 @@
 command_cooldown_ms: 1500
 edge_trigger_enabled: true
-gaze:
-  arm_ms: 500
-  enabled: true
-  grace_ms: 5000
-  min_detection_score: 0.5
-  pitch_threshold_deg: 25.0
-  sample_interval_frames: 3
-  yaw_threshold_deg: 30.0
-idle_timeout_ms: 100000
+pointer:
+  gain_x: 3.0
+  gain_y: 2.8
+zoom:
+  macos:
+    zoom_clicks: 6
+  windows:
+    zoom_clicks: 18
+  linux:
+    zoom_clicks: 12
 min_valid_ratio: 0.8
 window_length: 16
 window_step: 3
+movement_range_presets:
+  - label: "Low"
+    key: low
+    gain_x: 2.4
+    gain_y: 2.2
+  - label: "Medium"
+    key: medium
+    gain_x: 2.7
+    gain_y: 2.5
+  - label: "High"
+    key: high
+    gain_x: 3.0
+    gain_y: 2.8
+default_movement_range: high

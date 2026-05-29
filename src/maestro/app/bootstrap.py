@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,6 @@ from maestro.infrastructure.dispatch.command_dispatcher import (
     CommandDispatcher,
 )
 from maestro.infrastructure.feedback.overlay_renderer import OverlayRenderer
-from maestro.infrastructure.gaze import HeadPoseGazeDetector, NullGazeDetector
 from maestro.infrastructure.mediapipe.hands_extractor import (
     MediaPipeHandsExtractor,
 )
@@ -36,7 +36,6 @@ from maestro.interfaces.command_dispatcher import ICommandDispatcher
 from maestro.interfaces.feature_transformer import IFeatureTransformer
 from maestro.interfaces.feedback_renderer import IFeedbackRenderer
 from maestro.interfaces.frame_source import IFrameSource
-from maestro.interfaces.gaze_detector import IGazeIntentDetector
 from maestro.interfaces.landmark_extractor import IHandLandmarkExtractor
 from maestro.interfaces.sequence_buffer import ISequenceBuffer
 from maestro.pipeline.activation import GestureActivationController
@@ -53,7 +52,6 @@ from maestro.utils.schema_validation import RuntimeConfig
 class AppContainer:
     config: RuntimeConfig
     frame_source: IFrameSource
-    gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
     hand_selector: HandSelector
     feature_transformer: IFeatureTransformer
@@ -76,11 +74,14 @@ def build_container(
     *,
     model_artifact_path: str | None = None,
     hf_revision_override: str | None = None,
+    hand_preference_override: str | None = None,
     show_window: bool = False,
     minimal_preview: bool = False,
 ) -> AppContainer:
     config_root = Path(config_path)
     config = load_runtime_config(config_root)
+    if hand_preference_override is not None:
+        config.app.hand_preference = hand_preference_override  # type: ignore[assignment]
     thresholds = _load_thresholds(config_root / "thresholds" / "production_hybrid.yaml")
     command_map, continuous_labels, label_remap = _load_command_map(
         config_root / "gestures" / config.app.command_map
@@ -130,13 +131,13 @@ def build_container(
     )
     activation_controller = GestureActivationController(
         command_map=command_map,
-        idle_timeout_ms=config.inference.idle_timeout_ms,
         command_cooldown_ms=config.inference.command_cooldown_ms,
         edge_trigger_enabled=config.inference.edge_trigger_enabled,
         continuous_labels=continuous_labels,
         unknown_label="unknown",
     )
     dispatcher = _build_dispatcher(
+        config=config,
         allowed_commands=frozenset(command_map.values()),
     )
     overlay_renderer = OverlayRenderer(
@@ -150,18 +151,9 @@ def build_container(
     )
     benchmark = LatencyBenchmark()
 
-    gaze_cfg = config.inference.gaze
-    if gaze_cfg.enabled:
-        _hpd = HeadPoseGazeDetector(config=gaze_cfg)
-        _hpd.set_on_gaze_lost(activation_controller.force_idle)
-        gaze_detector: IGazeIntentDetector = _hpd
-    else:
-        gaze_detector = NullGazeDetector()
-
     return AppContainer(
         config=config,
         frame_source=frame_source,
-        gaze_detector=gaze_detector,
         landmark_extractor=landmark_extractor,
         hand_selector=hand_selector,
         feature_transformer=feature_transformer,
@@ -208,16 +200,12 @@ def validate_container_dataset(
 
 
 def _select_device() -> torch.device:
-    """Select the best available compute device: CUDA → MPS → CPU."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        return torch.device("mps")
+    """Force CPU execution on all hardware for deterministic runtime behavior."""
     return torch.device("cpu")
 
 
 def _build_landmark_extractor(config_root: Path) -> IHandLandmarkExtractor:
-    """Build hand landmark extractor with Tasks GPU path when available.
+    """Build hand landmark extractor with CPU-only execution.
 
     Falls back to the classic MediaPipe solutions extractor if the task model
     file is unavailable or Tasks initialization fails.
@@ -228,12 +216,12 @@ def _build_landmark_extractor(config_root: Path) -> IHandLandmarkExtractor:
         try:
             return MediaPipeTasksHandsExtractor(
                 model_path=task_model,
-                use_gpu_delegate=True,
+                use_gpu_delegate=False,
                 min_detection_confidence=0.7,
                 min_tracking_confidence=0.5,
             )
         except Exception:
-            # Safe fallback for environments where the GPU delegate cannot be used.
+            # Safe fallback when Tasks initialization fails for any reason.
             pass
 
     return MediaPipeHandsExtractor(
@@ -343,11 +331,18 @@ def _load_command_map(path: Path) -> tuple[dict[str, str], frozenset[str], dict[
 
 
 def _build_dispatcher(
+    config: RuntimeConfig,
     allowed_commands: frozenset[str],
 ) -> CommandDispatcher:
     """Wrap a PresentationAdapter in a CommandDispatcher."""
+    zoom_cfg = config.inference.zoom
+    platform_zoom = {
+        "darwin": zoom_cfg.macos,
+        "win32": zoom_cfg.windows,
+    }.get(sys.platform, zoom_cfg.linux)
     adapter = PresentationAdapter(
         keyboard=KeyboardAdapter(),
+        zoom_clicks=platform_zoom.zoom_clicks,
     )
     return CommandDispatcher(
         adapter=adapter,

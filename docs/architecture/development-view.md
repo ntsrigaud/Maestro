@@ -45,6 +45,7 @@ Maestro/
 ### 3.1 Domain (`src/maestro/domain/`)
 
 Core dataclasses and enums used by pipeline and runtime:
+
 - `entities.py`: frame/landmark/feature/prediction/runtime state contracts
 - `enums.py`: runtime mode vocabulary
 - `events.py`: telemetry events
@@ -58,11 +59,12 @@ activation, dispatch, and feedback rendering.
 ### 3.3 Infrastructure (`src/maestro/infrastructure/`)
 
 Concrete adapters for OpenCV, MediaPipe, model artifact loading, dispatch targets,
-overlay rendering, and gaze detectors.
+and overlay rendering.
 
 ### 3.4 Pipeline (`src/maestro/pipeline/`)
 
 Active runtime pipeline modules:
+
 - `hand_selection.py` (`HandSelector`)
 - `feature_engineering.py` (`LandmarkFeatureTransformer`)
 - `buffering.py` (`SlidingWindowSequenceBuffer`)
@@ -73,6 +75,7 @@ Active runtime pipeline modules:
 ### 3.5 Training (`src/maestro/training/`)
 
 Current production training stack is feature-sequence based (no graph/STGCN modules):
+
 - `dataset_builder.py`: `SequenceDatasetBuilder`, `LabeledLandmarkFrame`
 - `datamodule.py`: `GestureDataModule`, tensor datasets, split logic
 - `augmentation.py`: data augmentation config + augmenter
@@ -91,6 +94,7 @@ Current production training stack is feature-sequence based (no graph/STGCN modu
 ### 3.7 App UI (`src/maestro/app/ui/`)
 
 The UI package currently contains:
+
 - `app_ui.py`: Qt app bootstrap
 - `controller.py`: runtime worker-thread orchestration
 - `main_window.py`: primary control window

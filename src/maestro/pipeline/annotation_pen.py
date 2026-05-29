@@ -29,7 +29,7 @@ Lifecycle
   The OS mouse cursor is dragged (button held) to the screen position of the
   index fingertip each frame.  PowerPoint draws the annotation path in
   real-time while the button is held.
-- **Exit** (gesture returns to ``unknown`` or gaze is lost):
+- **Exit** (gesture returns to ``unknown`` or runtime stops):
   The primary mouse button is released first (ending the current stroke), then
   the pen-off hotkey (``⌘+A`` or ``Ctrl+A``) is sent to revert the cursor to
   the default arrow pointer.
@@ -43,6 +43,11 @@ typically mirrored for user comfort (``mirror_display: true`` in
 x value in the raw image.  When ``mirror_x=True`` (the default), the tracker
 applies ``screen_x = (1 - x_norm) * screen_width`` so that the pen tip
 appears at the visually correct position on the presentation display.
+
+As with the laser pointer, users usually operate inside a narrower central
+region of the camera frame. The tracker therefore applies a centre-relative
+gain before mapping to screen pixels so smaller hand motions produce larger
+on-screen pen displacement while keeping the midpoint stable.
 """
 
 from __future__ import annotations
@@ -78,6 +83,10 @@ _PEN_OFF_KEYS: dict[str, tuple[str, ...]] = {
     "linux": ("ctrl", "a"),
 }
 
+_DEFAULT_POINTER_GAIN_X: float = 2.4
+_DEFAULT_POINTER_GAIN_Y: float = 2.2
+_STROKE_START_PRIME_PIXELS: int = 1
+
 
 def _platform_key() -> str:
     """Return a normalised platform key for the _PEN_* dicts."""
@@ -106,6 +115,12 @@ class AnnotationPenTracker:
     pen_off_keys:
         Hotkey tuple sent to deactivate the pen (e.g. ``("command", "a")`` on
         macOS or ``("ctrl", "a")`` on Windows).  Defaults to the current platform.
+    pointer_gain_x:
+        Centre-relative horizontal gain applied to fingertip movement before
+        mapping to the screen. Values > 1 expand cursor travel.
+    pointer_gain_y:
+        Centre-relative vertical gain applied to fingertip movement before
+        mapping to the screen. Values > 1 expand cursor travel.
     """
 
     def __init__(
@@ -116,12 +131,16 @@ class AnnotationPenTracker:
         mirror_x: bool = True,
         pen_on_keys: tuple[str, ...] | None = None,
         pen_off_keys: tuple[str, ...] | None = None,
+        pointer_gain_x: float = _DEFAULT_POINTER_GAIN_X,
+        pointer_gain_y: float = _DEFAULT_POINTER_GAIN_Y,
     ) -> None:
         self._keyboard = keyboard
         self._pointing_labels = pointing_labels
         self._mirror_x = mirror_x
         self._active: bool = False
         self._mouse_pressed: bool = False  # True while the primary button is held for drawing
+        self._pointer_gain_x = max(1.0, float(pointer_gain_x))
+        self._pointer_gain_y = max(1.0, float(pointer_gain_y))
         _p = _platform_key()
         self._pen_on_keys: tuple[str, ...] = (
             pen_on_keys if pen_on_keys is not None else _PEN_ON_KEYS[_p]
@@ -138,6 +157,15 @@ class AnnotationPenTracker:
     def active(self) -> bool:
         """``True`` while the annotation pen is currently active."""
         return self._active
+
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Update the centre-relative gain applied to fingertip movement.
+
+        Safe to call from any thread while the tracker is active; Python's GIL
+        guarantees that the float attribute write is atomic.
+        """
+        self._pointer_gain_x = max(1.0, float(gain_x))
+        self._pointer_gain_y = max(1.0, float(gain_y))
 
     def update(
         self,
@@ -174,7 +202,7 @@ class AnnotationPenTracker:
 
         Sends the pen-off hotkey to restore the arrow cursor if the pen is
         currently active.  Safe to call from the runtime ``finally`` block or
-        on gaze loss.
+        during control-state transitions.
         """
         if self._active:
             self._deactivate("shutdown")
@@ -185,7 +213,16 @@ class AnnotationPenTracker:
 
     def _activate(self, label: str) -> None:
         try:
-            self._keyboard.press_hotkey(*self._pen_on_keys)
+            if not self._keyboard.press_hotkey(*self._pen_on_keys):
+                # Scope check blocked the hotkey (e.g. PowerPoint not in foreground).
+                # Do not mark as active so the next frame retries activation.
+                LOGGER.warning(
+                    "AnnotationPenTracker: pen activation blocked by scope guard "
+                    "(gesture=%r). Ensure Microsoft PowerPoint is the foreground "
+                    "application.",
+                    label,
+                )
+                return
             self._active = True
             LOGGER.info("AnnotationPenTracker: activated (gesture=%r)", label)
         except Exception:
@@ -219,6 +256,9 @@ class AnnotationPenTracker:
         x_norm: float = landmarks[_INDEX_FINGERTIP][0]
         y_norm: float = landmarks[_INDEX_FINGERTIP][1]
 
+        x_norm = self._apply_pointer_gain(x_norm, self._pointer_gain_x)
+        y_norm = self._apply_pointer_gain(y_norm, self._pointer_gain_y)
+
         screen_w, screen_h = self._keyboard.screen_size()
         screen_x = int((1.0 - x_norm if self._mirror_x else x_norm) * screen_w)
         screen_y = int(y_norm * screen_h)
@@ -228,16 +268,46 @@ class AnnotationPenTracker:
         screen_y = max(0, min(screen_h - 1, screen_y))
 
         if not self._mouse_pressed:
-            # First active frame: move to position AND press the button so that
-            # PowerPoint registers the start of the pen stroke at the fingertip.
-            self._keyboard.mouse_down(screen_x, screen_y)
+            # First active frame: press the button at the fingertip to start
+            # the pen stroke.  Only mark the button as held if mouse_down
+            # actually succeeds — the scope guard may block it on the same
+            # frame as Ctrl+P while PowerPoint is still entering pen mode.
+            # Leaving _mouse_pressed False allows automatic retry on the next
+            # frame once PowerPoint has settled.
+            if not self._keyboard.mouse_down(screen_x, screen_y):
+                LOGGER.debug("AnnotationPenTracker: mouse_down blocked, will retry next frame")
+                return
             self._mouse_pressed = True
+            # Emit a tiny drag-and-return immediately so that PowerPoint
+            # registers the start of the ink stroke on this activation frame
+            # rather than waiting for the pointer to move naturally.
+            self._prime_stroke(screen_x, screen_y, screen_w, screen_h)
             LOGGER.debug("AnnotationPenTracker: stroke start at (%d, %d)", screen_x, screen_y)
         else:
-            # Subsequent frames: send a drag event while the button is held.
-            # On macOS, pyautogui.dragTo posts kCGEventLeftMouseDragged which
-            # is what PowerPoint requires to actually draw the pen stroke.
-            # pyautogui.moveTo posts kCGEventMouseMoved, which PowerPoint's pen
-            # mode silently ignores — the reason plain move_mouse didn't draw.
+            # Subsequent frames: drag while the button is held so PowerPoint
+            # receives the correct event type to continue the ink stroke.
             self._keyboard.mouse_drag_to(screen_x, screen_y)
             LOGGER.debug("AnnotationPenTracker: drag to (%d, %d)", screen_x, screen_y)
+
+    def _prime_stroke(self, screen_x: int, screen_y: int, screen_w: int, screen_h: int) -> None:
+        """Emit a minimal drag on entry so pen mode starts writing immediately."""
+        prime_x = screen_x + _STROKE_START_PRIME_PIXELS
+        if prime_x >= screen_w:
+            prime_x = max(0, screen_x - _STROKE_START_PRIME_PIXELS)
+
+        prime_y = screen_y + _STROKE_START_PRIME_PIXELS
+        if prime_y >= screen_h:
+            prime_y = max(0, screen_y - _STROKE_START_PRIME_PIXELS)
+
+        if prime_x == screen_x and prime_y == screen_y:
+            self._keyboard.mouse_drag_to(screen_x, screen_y)
+            return
+
+        self._keyboard.mouse_drag_to(prime_x, prime_y)
+        self._keyboard.mouse_drag_to(screen_x, screen_y)
+
+    @staticmethod
+    def _apply_pointer_gain(value: float, gain: float) -> float:
+        """Expand movement around the frame centre, then clamp to [0, 1]."""
+        centered = 0.5 + ((value - 0.5) * gain)
+        return max(0.0, min(1.0, centered))

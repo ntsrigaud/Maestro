@@ -96,6 +96,36 @@ class TestLaserPointerTrackerActivation:
         assert tracker.active is False
         kb.press_hotkey.assert_not_called()
 
+    def test_cursor_resets_to_screen_centre_on_activation(self):
+        """First move_mouse call on activation must land at screen centre.
+
+        Uses an off-centre landmark so the centre-reset and subsequent
+        fingertip moves produce different coordinates — making the assertion
+        unambiguous.
+        """
+        tracker, kb = _tracker()
+        kb.screen_size.return_value = (1920, 1080)
+        lm_off_centre = [[0.8, 0.2, 0.0]] * 21
+        tracker.update("point_one", lm_off_centre, valid=True)
+        first_move = kb.move_mouse.call_args_list[0]
+        assert first_move == call(960, 540), (
+            "Laser pointer must reset cursor to screen centre (960, 540) on activation"
+        )
+
+    def test_cursor_resets_to_centre_on_every_reactivation(self):
+        """Screen-centre reset fires each time the laser is re-activated."""
+        tracker, kb = _tracker()
+        kb.screen_size.return_value = (1920, 1080)
+        lm_off_centre = [[0.8, 0.2, 0.0]] * 21
+        # First activation then deactivation.
+        tracker.update("point_one", lm_off_centre, valid=True)
+        tracker.update("unknown", _LANDMARKS_CENTER, valid=True)
+        kb.move_mouse.reset_mock()
+        # Second activation — centre-reset must fire again.
+        tracker.update("point_one", lm_off_centre, valid=True)
+        first_move_reactivation = kb.move_mouse.call_args_list[0]
+        assert first_move_reactivation == call(960, 540)
+
 
 # ---------------------------------------------------------------------------
 # Tests: mouse tracking while active
@@ -135,7 +165,31 @@ class TestLaserPointerTrackerMouseTracking:
         lm = [[0.5, 0.25, 0.0]] * 21
         tracker.update("point_one", lm, valid=True)
         _, y = kb.move_mouse.call_args[0]
-        assert y == int(0.25 * 1080)
+        assert y == 0
+
+    def test_center_point_remains_stable_after_gain(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        tracker.update("point_one", _LANDMARKS_CENTER, valid=True)
+        x, y = kb.move_mouse.call_args[0]
+        assert x == 500
+        assert y == 500
+
+    def test_horizontal_pointer_gain_expands_displacement(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        lm = [[0.6, 0.5, 0.0]] * 21
+        tracker.update("point_one", lm, valid=True)
+        x, _ = kb.move_mouse.call_args[0]
+        assert x == int((0.5 + ((0.6 - 0.5) * 2.4)) * 1000)
+
+    def test_vertical_pointer_gain_expands_displacement(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        lm = [[0.5, 0.6, 0.0]] * 21
+        tracker.update("point_one", lm, valid=True)
+        _, y = kb.move_mouse.call_args[0]
+        assert y == int((0.5 + ((0.6 - 0.5) * 2.2)) * 1000)
 
     def test_coordinates_clamped_to_screen_bounds(self):
         tracker, kb = _tracker(mirror_x=False)
