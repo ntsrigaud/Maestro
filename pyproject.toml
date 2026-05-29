@@ -101,6 +101,21 @@ ignore_missing_imports = true
 module = ["sklearn", "sklearn.*"]
 ignore_missing_imports = true
 
+# The packages below are heavy runtime deps not installed in the lightweight lint
+# job.  ignore_missing_imports is a no-op when the package IS installed, so
+# these overrides are safe for local development too.
+[[tool.mypy.overrides]]
+module = ["torch", "torch.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["cv2", "cv2.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["PySide6", "PySide6.*"]
+ignore_missing_imports = true
+
 [[tool.mypy.overrides]]
 module = ["huggingface_hub", "huggingface_hub.*"]
 ignore_missing_imports = true
