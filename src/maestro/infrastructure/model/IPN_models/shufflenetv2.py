@@ -4,7 +4,6 @@ See the paper "ShuffleNet V2: Practical Guidelines for Efficient CNN Architectur
 for more details.
 """
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
