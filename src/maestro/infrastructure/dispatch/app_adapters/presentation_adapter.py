@@ -1,10 +1,10 @@
 """Presentation controller adapter.
 
-Maps the eight IPN Hand gesture commands to universal input actions for
-presentation software (PowerPoint, Keynote, Google Slides, LibreOffice Impress).
-Input is delivered via OS-level keyboard and scroll simulation; no
-application-process detection is required — the action is delivered to whichever
-window holds focus.
+Maps gesture commands to keyboard shortcuts for Microsoft PowerPoint.
+Input is delivered via OS-level keyboard and scroll simulation to the
+application that currently holds focus; the scope guard in
+:class:`~maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.KeyboardAdapter`
+blocks dispatch whenever a non-PowerPoint window is in the foreground.
 
 All keyboard injection is delegated to :class:`KeyboardAdapter` so that every
 simulated keystroke is validated against the safe-key allowlist before dispatch.
@@ -13,17 +13,11 @@ Zoom implementation
 -------------------
 Zoom is implemented via modifier+scroll (Cmd+Scroll on macOS, Ctrl+Scroll on
 Windows and Linux) rather than keyboard shortcuts (Cmd/Ctrl+=/-).  This choice
-provides correct behaviour across all target presentation applications:
+provides correct behaviour across PowerPoint on all platforms:
 
 - **PowerPoint (Windows / macOS)**: Has no reliable zoom keyboard shortcut;
   Ctrl/Cmd+Scroll is the standard zoom input accepted by PowerPoint's slide
   canvas in editing view.
-- **Keynote (macOS)**: Accepts both Cmd+= and Cmd+Scroll; scroll is preferred
-  for consistency.
-- **Google Slides (browser)**: Ctrl/Cmd+Scroll triggers browser viewport zoom,
-  equivalent to Ctrl/Cmd+= but more consistent across browsers.
-- **LibreOffice Impress (all platforms)**: Has no Ctrl+= zoom shortcut;
-  Ctrl+Scroll is the only reliable zoom mechanism.
 """
 
 from __future__ import annotations
@@ -34,6 +28,7 @@ import sys
 from maestro.domain.entities import DispatchResult
 from maestro.infrastructure.dispatch.app_adapters.keyboard_adapter import (
     KeyboardAdapter,
+    _foreground_identity,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -47,15 +42,29 @@ _ZOOM_MODIFIER: dict[str, str] = {
     "linux": "ctrl",
 }
 
-# Slideshow start / stop shortcut per platform.
-# PowerPoint macOS: Cmd+Return; Keynote: Cmd+Return; Google Slides: Ctrl+F5.
-# LibreOffice / PowerPoint Win/Linux: F5.
-# Using F5 universally on Win/Linux covers the majority of software.
-_SLIDESHOW_KEYS: dict[str, tuple[str, ...]] = {
+# Slideshow start shortcut per platform for browser-hosted presentations.
+# macOS uses Cmd+Shift+Return so Google Slides starts from beginning in
+# slideshow mode (not presenter view).
+_SLIDESHOW_KEYS_BROWSER: dict[str, tuple[str, ...]] = {
+    "darwin": ("command", "shift", "enter"),
+    "win32": ("ctrl", "f5"),
+    "linux": ("ctrl", "f5"),
+}
+
+# Slideshow start shortcut per platform for native presentation applications.
+_SLIDESHOW_KEYS_NATIVE: dict[str, tuple[str, ...]] = {
     "darwin": ("command", "enter"),
     "win32": ("f5",),
     "linux": ("f5",),
 }
+
+_BROWSER_IDENTITY_TOKENS: tuple[str, ...] = (
+    "chrome",
+    "firefox",
+    "safari",
+    "edge",
+    "brave",
+)
 
 
 class PresentationAdapter:
@@ -85,11 +94,28 @@ class PresentationAdapter:
     def target_app(self) -> str:
         return _TARGET_APP
 
-    def __init__(self, keyboard: KeyboardAdapter | None = None) -> None:
+    def __init__(
+        self,
+        keyboard: KeyboardAdapter | None = None,
+        *,
+        zoom_clicks: int,
+    ) -> None:
         self._keyboard = keyboard or KeyboardAdapter()
         platform = sys.platform if sys.platform in ("darwin", "win32") else "linux"
+        self._platform = platform
         self._zoom_modifier = _ZOOM_MODIFIER[platform]
-        self._slideshow_keys = _SLIDESHOW_KEYS[platform]
+        self._zoom_clicks = max(1, int(zoom_clicks))
+        self._zoom_max_abs_clicks = self._zoom_clicks
+        self._slideshow_keys_browser = _SLIDESHOW_KEYS_BROWSER[platform]
+        self._slideshow_keys_native = _SLIDESHOW_KEYS_NATIVE[platform]
+
+    def _start_slideshow_keys(self) -> tuple[str, ...]:
+        """Choose slideshow start keys by active app family (browser vs native)."""
+        identity = _foreground_identity() or ""
+        is_browser = any(token in identity for token in _BROWSER_IDENTITY_TOKENS)
+        if is_browser:
+            return self._slideshow_keys_browser
+        return self._slideshow_keys_native
 
     def execute(self, command_id: str) -> DispatchResult:
         """Translate *command_id* into an OS-level keyboard action.
@@ -101,68 +127,87 @@ class PresentationAdapter:
             :class:`DispatchResult` with ``success=True`` when a key was sent,
             ``success=False`` for ``no_action`` and unrecognised command IDs.
         """
+        executed = False
         match command_id:
             case "start_presentation":
-                # Start the slideshow: Cmd+Return (macOS) / F5 (Win/Linux).
-                self._keyboard.press_hotkey(*self._slideshow_keys)
+                # Start slideshow with context-aware shortcuts:
+                # - Browser (Google Slides): Cmd+Shift+Return (macOS) / Ctrl+F5 (Win/Linux)
+                # - Native apps (PowerPoint/Keynote/Impress): Cmd+Return (macOS) / F5
+                executed = self._keyboard.press_hotkey(*self._start_slideshow_keys())
             case "stop_presentation":
                 # Stop / exit the slideshow universally.
-                self._keyboard.press_hotkey("escape")
+                executed = self._keyboard.press_hotkey("escape")
             case "next_slide":
-                self._keyboard.press_hotkey("right")
+                executed = self._keyboard.press_hotkey("right")
             case "previous_slide":
-                self._keyboard.press_hotkey("left")
+                executed = self._keyboard.press_hotkey("left")
             case "zoom_in_view":
-                self._keyboard.zoom(3, modifier=self._zoom_modifier)
+                executed = self._keyboard.zoom(
+                    self._zoom_clicks,
+                    modifier=self._zoom_modifier,
+                    max_abs_clicks=self._zoom_max_abs_clicks,
+                )
             case "zoom_out_view":
-                self._keyboard.zoom(-3, modifier=self._zoom_modifier)
+                executed = self._keyboard.zoom(
+                    -self._zoom_clicks,
+                    modifier=self._zoom_modifier,
+                    max_abs_clicks=self._zoom_max_abs_clicks,
+                )
             case "zoom_out_totally":
-                # Zoom out to the minimum by scrolling at maximum magnitude.
-                self._keyboard.zoom(-5, modifier=self._zoom_modifier)
+                # Zoom out by the configured step (same magnitude as zoom_out_view).
+                executed = self._keyboard.zoom(
+                    -self._zoom_clicks,
+                    modifier=self._zoom_modifier,
+                    max_abs_clicks=self._zoom_max_abs_clicks,
+                )
             case "erase_annotations":
                 # Erase all pen / laser annotations on the current slide.
                 # PowerPoint slideshow shortcut: E key (Windows and macOS).
-                self._keyboard.press_hotkey("e")
+                # The scope guard ensures this is only delivered while
+                # Microsoft PowerPoint is the foreground application, preventing
+                # accidental triggering of the macOS emoji picker that appears
+                # when 'E' reaches a text field in another app.
+                executed = self._keyboard.press_hotkey("e")
             case "toggle_black_screen":
                 # Blank the slide canvas to black — universal pause gesture.
                 # B key is supported by PowerPoint, Keynote, Google Slides,
                 # and LibreOffice Impress during an active slideshow.
-                self._keyboard.press_hotkey("b")
+                executed = self._keyboard.press_hotkey("b")
             case "toggle_white_screen":
                 # Blank the slide canvas to white.
                 # W key is supported by PowerPoint, Keynote, Google Slides,
                 # and LibreOffice Impress during an active slideshow.
-                self._keyboard.press_hotkey("w")
+                executed = self._keyboard.press_hotkey("w")
             case "go_to_first_slide":
                 # Jump to the first slide of the presentation.
                 # Home key is universally accepted by all target applications.
-                self._keyboard.press_hotkey("home")
+                executed = self._keyboard.press_hotkey("home")
             case "go_to_last_slide":
                 # Jump to the last slide of the presentation.
                 # End key is universally accepted by all target applications.
-                self._keyboard.press_hotkey("end")
+                executed = self._keyboard.press_hotkey("end")
             case "mouse_click":
                 # Perform a left-click at the current cursor position.
                 # Used to activate hyperlinks and trigger animations on slides.
-                self._keyboard.mouse_click()
+                executed = self._keyboard.mouse_click()
             case "mouse_pointer":
                 # Revert cursor to the default arrow pointer (Ctrl+A in
                 # PowerPoint slideshow; no-op on apps without a laser mode).
-                self._keyboard.press_hotkey("ctrl", "a")
+                executed = self._keyboard.press_hotkey("ctrl", "a")
             # ── Legacy / extended commands (not in default gesture map) ────
             case "scroll_forward":
-                self._keyboard.press_hotkey("down")
+                executed = self._keyboard.press_hotkey("down")
             case "scroll_back":
-                self._keyboard.press_hotkey("up")
+                executed = self._keyboard.press_hotkey("up")
             case "start_stop_presentation":
-                self._keyboard.press_hotkey(*self._slideshow_keys)
+                executed = self._keyboard.press_hotkey(*self._start_slideshow_keys())
             case "activate_laser_pointer":
                 # Ctrl+L toggles the laser pointer on during a running slideshow.
                 # Universal across PowerPoint (Windows / macOS).
-                self._keyboard.press_hotkey("ctrl", "l")
+                executed = self._keyboard.press_hotkey("ctrl", "l")
             case "deactivate_laser_pointer":
                 # Ctrl+A reverts the pointer to the default arrow cursor.
-                self._keyboard.press_hotkey("ctrl", "a")
+                executed = self._keyboard.press_hotkey("ctrl", "a")
             case "no_action":
                 return DispatchResult(
                     success=False,
@@ -178,6 +223,14 @@ class PresentationAdapter:
                     target_app=_TARGET_APP,
                     detail=f"unknown_command:{command_id}",
                 )
+
+        if not executed:
+            return DispatchResult(
+                success=False,
+                command_id=command_id,
+                target_app=_TARGET_APP,
+                detail="blocked_outside_presentation_scope",
+            )
 
         LOGGER.debug("PresentationAdapter executed: %s", command_id)
         return DispatchResult(

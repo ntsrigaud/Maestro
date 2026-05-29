@@ -106,38 +106,27 @@ stateDiagram-v2
 
 ### 4.2 Gesture Activation State Machine
 
-The `GestureActivationController` implements a three-state finite state machine that governs command emission. It operates whenever `gaze_permitted=True` (detector in ACTIVE or LOSING grace state):
+The `GestureActivationController` implements a two-state finite state machine that governs command emission:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> IDLE
+    [*] --> ARMED
 
     ARMED --> COOLDOWN : Command dispatched (edge trigger)
-    ARMED --> IDLE : Idle timeout (300 s without gesture)
-    ARMED --> IDLE : Gaze lost beyond grace period
     COOLDOWN --> ARMED : Cooldown timer expires (1500 ms)
-    IDLE --> ARMED : Gaze restored — rearm() called
 ```
 
 ### State Descriptions
 
-**IDLE**:
-
-- The system is suspended — no commands are dispatched and gesture predictions are ignored.
-- The system enters IDLE when gaze is lost beyond the configured grace period, or when no non-no_gesture gesture is detected for `idle_timeout_ms`.
-- The system exits IDLE only via an explicit `rearm()` call, which is issued by the runtime when gaze is restored.
-- No commands are dispatched in this state.
-
 **ARMED**:
 
 - The system accepts command gestures and dispatches them to the target application.
+- The controller **starts in ARMED state** at session startup with no external trigger required.
 - **Edge-trigger logic**: A command is emitted only when:
   1. The stabilized prediction is `accepted` (temporal voting passed).
   2. The label differs from the last dispatched label (rising-edge detection).
   3. The label exists in the command map.
-- The `_last_dispatched_label` resets to `"no_gesture"` whenever the prediction returns to the no_gesture class (hand in neutral position), enabling the same gesture to be dispatched again after a neutral interval.
-- Any non-no_gesture prediction refreshes the idle timeout timer, keeping the system armed during active use.
-- If no non-no_gesture gesture is detected for `idle_timeout_ms` (default 100,000 ms in current config), the system returns to IDLE.
+- The `_last_dispatched_label` resets to `"unknown"` whenever the prediction returns to the unknown class (hand in neutral position), enabling the same gesture to be dispatched again after a neutral interval.
 
 **COOLDOWN**:
 

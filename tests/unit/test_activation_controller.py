@@ -13,36 +13,16 @@ def _pred(label: str, accepted: bool = True, confidence: float = 0.95) -> Stabil
 
 def _make_controller(
     command_map: dict[str, str] | None = None,
-    idle_timeout_ms: int = 60_000,
     command_cooldown_ms: int = 50,
     edge_trigger_enabled: bool = True,
     continuous_labels: frozenset[str] = frozenset(),
 ) -> GestureActivationController:
     return GestureActivationController(
         command_map=command_map or {"swiping_right": "next_slide"},
-        idle_timeout_ms=idle_timeout_ms,
         command_cooldown_ms=command_cooldown_ms,
         edge_trigger_enabled=edge_trigger_enabled,
         continuous_labels=continuous_labels,
     )
-
-
-def _make_armed_controller(
-    command_map: dict[str, str] | None = None,
-    idle_timeout_ms: int = 60_000,
-    command_cooldown_ms: int = 50,
-    edge_trigger_enabled: bool = True,
-    continuous_labels: frozenset[str] = frozenset(),
-) -> GestureActivationController:
-    ctrl = _make_controller(
-        command_map=command_map,
-        idle_timeout_ms=idle_timeout_ms,
-        command_cooldown_ms=command_cooldown_ms,
-        edge_trigger_enabled=edge_trigger_enabled,
-        continuous_labels=continuous_labels,
-    )
-    ctrl.rearm()
-    return ctrl
 
 
 # ---------------------------------------------------------------------------
@@ -50,9 +30,19 @@ def _make_armed_controller(
 # ---------------------------------------------------------------------------
 
 
-def test_controller_starts_in_idle_state() -> None:
+def test_controller_starts_in_armed_state() -> None:
     ctrl = _make_controller()
-    assert ctrl.mode is RuntimeMode.IDLE
+    assert ctrl.mode is RuntimeMode.ARMED
+
+
+def test_continuous_labels_property_returns_configured_set() -> None:
+    ctrl = _make_controller(continuous_labels=frozenset({"point_one", "point_two"}))
+    assert ctrl.continuous_labels == frozenset({"point_one", "point_two"})
+
+
+def test_continuous_labels_property_defaults_to_empty_frozenset() -> None:
+    ctrl = _make_controller()
+    assert ctrl.continuous_labels == frozenset()
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +51,7 @@ def test_controller_starts_in_idle_state() -> None:
 
 
 def test_armed_dispatches_known_gesture() -> None:
-    ctrl = _make_armed_controller()
+    ctrl = _make_controller()
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 1000)):
         cmd = ctrl.route(_pred("swiping_right"))
     assert cmd is not None
@@ -71,7 +61,7 @@ def test_armed_dispatches_known_gesture() -> None:
 
 
 def test_armed_does_not_dispatch_unknown_gesture() -> None:
-    ctrl = _make_armed_controller()
+    ctrl = _make_controller()
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 1000)):
         cmd = ctrl.route(_pred("unknown_xyz"))
     assert cmd is None
@@ -79,7 +69,7 @@ def test_armed_does_not_dispatch_unknown_gesture() -> None:
 
 
 def test_armed_does_not_dispatch_unaccepted_prediction() -> None:
-    ctrl = _make_armed_controller()
+    ctrl = _make_controller()
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 1000)):
         cmd = ctrl.route(_pred("swiping_right", accepted=False))
     assert cmd is None
@@ -92,7 +82,7 @@ def test_armed_does_not_dispatch_unaccepted_prediction() -> None:
 
 
 def test_cooldown_suppresses_commands_during_window() -> None:
-    ctrl = _make_armed_controller(command_cooldown_ms=500)
+    ctrl = _make_controller(command_cooldown_ms=500)
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
         ctrl.route(_pred("swiping_right"))
     assert ctrl.mode is RuntimeMode.COOLDOWN
@@ -104,146 +94,16 @@ def test_cooldown_suppresses_commands_during_window() -> None:
 
 
 def test_cooldown_expires_back_to_armed() -> None:
-    ctrl = _make_armed_controller(command_cooldown_ms=500)
+    ctrl = _make_controller(command_cooldown_ms=500)
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
         ctrl.route(_pred("swiping_right"))
 
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 510)):
         cmd = ctrl.route(_pred("swiping_right", accepted=False))
-    # Just expired, should be ARMED now, but swiping_right is the same label.
-    # unknown resets edge trigger — verify ARMED at minimum.
+    # Cooldown expired → ARMED. _last_dispatched_label reset to unknown.
+    # cmd is None because the prediction is not accepted, not due to edge-trigger.
     assert ctrl.mode is RuntimeMode.ARMED
-    assert cmd is None  # edge-trigger: same label as last dispatch, unknown not yet seen
-
-
-# ---------------------------------------------------------------------------
-# ARMED idle timeout → IDLE
-# ---------------------------------------------------------------------------
-
-
-def test_idle_timeout_transitions_to_idle() -> None:
-    # Patch _now_ms during construction AND rearm() so _last_active_ms starts at 0.
-    with patch.object(GestureActivationController, "_now_ms", staticmethod(lambda: 0)):
-        ctrl = _make_controller(idle_timeout_ms=1000)
-        ctrl.rearm()  # IDLE → ARMED; _last_active_ms = 0 while still patched
-    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 2000)):
-        cmd = ctrl.route(_pred("unknown", accepted=False))
-    assert cmd is None
-    assert ctrl.mode is RuntimeMode.IDLE
-
-
-# ---------------------------------------------------------------------------
-# force_idle
-# ---------------------------------------------------------------------------
-
-
-def test_force_idle_from_armed_resets_to_idle() -> None:
-    ctrl = _make_controller()
-    ctrl.rearm()  # IDLE → ARMED
-    assert ctrl.mode is RuntimeMode.ARMED
-    ctrl.force_idle()
-    assert ctrl.mode is RuntimeMode.IDLE
-
-
-def test_force_idle_from_cooldown_resets_to_idle() -> None:
-    ctrl = _make_armed_controller()
-    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
-        ctrl.route(_pred("swiping_right"))
-    assert ctrl.mode is RuntimeMode.COOLDOWN
-    ctrl.force_idle()
-    assert ctrl.mode is RuntimeMode.IDLE
-
-
-def test_force_idle_from_idle_is_idempotent() -> None:
-    ctrl = _make_controller()
-    ctrl.force_idle()
-    ctrl.force_idle()  # must not raise
-    assert ctrl.mode is RuntimeMode.IDLE
-
-
-def test_force_idle_prevents_dispatch_for_all_gestures() -> None:
-    """After force_idle(), route() returns None for all gesture labels."""
-    ctrl = GestureActivationController(
-        command_map={
-            "swiping_right": "next_slide",
-            "swiping_left": "previous_slide",
-            "swiping_up": "start_presentation",
-            "swiping_down": "exit_presentation",
-            "zooming_in_full_hand": "toggle_pointer_mode",
-            "zooming_out_full_hand": "raise_hand",
-        },
-        idle_timeout_ms=60_000,
-        command_cooldown_ms=50,
-    )
-    ctrl.force_idle()
-
-    t = 100
-    for gesture in (
-        "swiping_right",
-        "swiping_left",
-        "swiping_up",
-        "swiping_down",
-        "zooming_in_full_hand",
-        "zooming_out_full_hand",
-    ):
-        with patch.object(type(ctrl), "_now_ms", staticmethod(lambda _t=t: _t)):
-            cmd = ctrl.route(_pred(gesture))
-        assert cmd is None, f"Expected no command for {gesture} when IDLE"
-        t += 50
-
-
-# ---------------------------------------------------------------------------
-# rearm
-# ---------------------------------------------------------------------------
-
-
-def test_rearm_transitions_idle_to_armed() -> None:
-    ctrl = _make_controller()
-    ctrl.force_idle()
-    assert ctrl.mode is RuntimeMode.IDLE
-    ctrl.rearm()
-    assert ctrl.mode is RuntimeMode.ARMED
-
-
-def test_rearm_from_armed_is_noop() -> None:
-    ctrl = _make_controller()
-    ctrl.rearm()  # IDLE → ARMED
-    assert ctrl.mode is RuntimeMode.ARMED
-    ctrl.rearm()  # noop: already ARMED
-    assert ctrl.mode is RuntimeMode.ARMED
-
-
-def test_rearm_after_force_idle_restores_dispatch() -> None:
-    """After force_idle() + rearm(), commands dispatch normally."""
-    ctrl = _make_controller()
-    ctrl.force_idle()
-    ctrl.rearm()
-    assert ctrl.mode is RuntimeMode.ARMED
-
-    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 100)):
-        cmd = ctrl.route(_pred("swiping_right"))
-    assert cmd is not None
-    assert cmd.command_id == "next_slide"
-
-
-def test_force_idle_clears_cooldown_timer_so_rearm_starts_fresh() -> None:
-    """After dispatch + force_idle() + rearm(), commands dispatch immediately
-    (no stale cooldown timer blocking the pipeline)."""
-    ctrl = _make_armed_controller(command_cooldown_ms=500)
-    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
-        cmd1 = ctrl.route(_pred("swiping_right"))
-    assert cmd1 is not None
-    assert ctrl.mode is RuntimeMode.COOLDOWN
-
-    ctrl.force_idle()
-    ctrl.rearm()
-    assert ctrl.mode is RuntimeMode.ARMED
-
-    # After rearm, commands must dispatch immediately (no stale cooldown).
-    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 100)):
-        cmd2 = ctrl.route(_pred("swiping_right"))
-    assert cmd2 is not None, "Expected dispatch after force_idle+rearm; old cooldown must not block"
-    assert cmd2.command_id == "next_slide"
+    assert cmd is None  # not accepted
 
 
 # ---------------------------------------------------------------------------
@@ -251,21 +111,9 @@ def test_force_idle_clears_cooldown_timer_so_rearm_starts_fresh() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_continuous_label_returns_none_when_idle() -> None:
-    """A continuous gesture in IDLE state must never produce a command."""
-    ctrl = _make_controller(
-        command_map={"swiping_right": "next_slide"},
-        continuous_labels=frozenset({"point_one", "point_two"}),
-    )
-    assert ctrl.mode is RuntimeMode.IDLE
-    cmd = ctrl.route(_pred("point_one"))
-    assert cmd is None
-    assert ctrl.mode is RuntimeMode.IDLE  # state must not change
-
-
 def test_continuous_label_returns_none_when_armed() -> None:
     """A continuous gesture in ARMED state must bypass the state machine entirely."""
-    ctrl = _make_armed_controller(
+    ctrl = _make_controller(
         command_map={"swiping_right": "next_slide"},
         continuous_labels=frozenset({"point_one", "point_two"}),
     )
@@ -279,7 +127,7 @@ def test_continuous_label_returns_none_when_armed() -> None:
 
 def test_continuous_label_never_triggers_cooldown() -> None:
     """Repeated accepted continuous predictions must not consume the cooldown slot."""
-    ctrl = _make_armed_controller(
+    ctrl = _make_controller(
         command_map={"swiping_right": "next_slide"},
         continuous_labels=frozenset({"point_one"}),
     )
@@ -292,7 +140,7 @@ def test_continuous_label_never_triggers_cooldown() -> None:
 
 def test_discrete_gesture_still_dispatches_when_continuous_labels_set() -> None:
     """Continuous label bypass must not affect discrete gesture dispatch."""
-    ctrl = _make_armed_controller(
+    ctrl = _make_controller(
         command_map={"swiping_right": "next_slide"},
         continuous_labels=frozenset({"point_one", "point_two"}),
     )
@@ -306,7 +154,7 @@ def test_discrete_gesture_still_dispatches_when_continuous_labels_set() -> None:
 def test_continuous_label_not_blocked_by_cooldown() -> None:
     """Even in COOLDOWN state, continuous gesture route() returns None immediately
     (not blocked — it exits before the COOLDOWN check matters)."""
-    ctrl = _make_armed_controller(
+    ctrl = _make_controller(
         command_map={"swiping_right": "next_slide"},
         continuous_labels=frozenset({"point_one"}),
         command_cooldown_ms=5000,
@@ -328,15 +176,15 @@ def test_continuous_label_not_blocked_by_cooldown() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_held_discrete_gesture_dispatches_once_then_edge_blocked() -> None:
-    """A gesture held across many accepted windows must produce exactly one command.
+def test_held_discrete_gesture_dispatches_once_per_cooldown_period() -> None:
+    """A held gesture fires exactly once per cooldown period.
 
-    This is the primary regression guard for the 'repeated swipe' bug:
-    with edge_trigger_enabled=True (new production default), the second and
-    subsequent accepted windows of the same label are suppressed by the
-    _last_dispatched_label check.  The cooldown provides secondary protection.
+    After cooldown expires, _last_dispatched_label is reset, so the same gesture
+    held continuously re-dispatches as soon as ARMED is re-entered.  For a 2-second
+    window with a 1500 ms cooldown, exactly 2 dispatches are expected: one at the
+    start and one when the cooldown expires at ~t=1500.
     """
-    ctrl = _make_armed_controller(
+    ctrl = _make_controller(
         command_map={"stop_sign": "zoom_out_totally"},
         command_cooldown_ms=1500,
         edge_trigger_enabled=True,
@@ -349,15 +197,18 @@ def test_held_discrete_gesture_dispatches_once_then_edge_blocked() -> None:
         if cmd is not None:
             dispatch_count += 1
 
-    assert dispatch_count == 1, (
-        f"Expected exactly 1 dispatch for a held gesture, got {dispatch_count}"
+    assert dispatch_count == 2, (
+        f"Expected 2 dispatches (one per cooldown period) for a held gesture, got {dispatch_count}"
     )
 
 
-def test_held_gesture_redispatches_after_neutral_reset() -> None:
-    """After a held gesture → unknown → same gesture again, exactly one more
-    dispatch must occur (the unknown resets _last_dispatched_label)."""
-    ctrl = _make_armed_controller(
+def test_held_gesture_redispatches_after_cooldown_without_neutral() -> None:
+    """Same gesture re-dispatches immediately after cooldown, no neutral pose needed.
+
+    _last_dispatched_label is reset at cooldown expiry (COOLDOWN → ARMED transition),
+    so the same accepted gesture fires again as soon as the controller re-enters ARMED.
+    """
+    ctrl = _make_controller(
         command_map={"swiping_right": "next_slide"},
         command_cooldown_ms=100,
         edge_trigger_enabled=True,
@@ -366,13 +217,150 @@ def test_held_gesture_redispatches_after_neutral_reset() -> None:
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
         cmd1 = ctrl.route(_pred("swiping_right"))
     assert cmd1 is not None
+    assert ctrl.mode is RuntimeMode.COOLDOWN
 
-    # Cooldown expires + hand goes neutral
+    # Cooldown expires — dispatch memory reset automatically, no neutral needed
     with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 200)):
-        ctrl.route(_pred("unknown", accepted=False))  # resets _last_dispatched_label
-
-    # Second occurrence of same gesture — must dispatch again
-    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 300)):
         cmd2 = ctrl.route(_pred("swiping_right"))
-    assert cmd2 is not None, "Second swipe after neutral reset must dispatch"
+    assert cmd2 is not None, "Same gesture must re-dispatch immediately after cooldown"
     assert cmd2.command_id == "next_slide"
+
+
+# ---------------------------------------------------------------------------
+# Continuous labels (laser pointer, etc.)
+# ---------------------------------------------------------------------------
+
+
+def test_same_gesture_dispatches_again_after_cooldown_without_neutral() -> None:
+    """Regression guard: same gesture must NOT require a neutral hand pose to re-arm.
+
+    The only requirement for same-gesture re-dispatch is that the cooldown window
+    has elapsed.  _last_dispatched_label is reset at cooldown expiry, not at
+    the next unknown prediction.
+    """
+    ctrl = _make_controller(
+        command_map={"swiping_right": "next_slide"},
+        command_cooldown_ms=500,
+        edge_trigger_enabled=True,
+    )
+    # Dispatch
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        cmd1 = ctrl.route(_pred("swiping_right"))
+    assert cmd1 is not None
+
+    # Before cooldown — blocked
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 400)):
+        cmd_blocked = ctrl.route(_pred("swiping_right"))
+    assert cmd_blocked is None
+
+    # After cooldown — dispatches again without any neutral frame
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
+        cmd2 = ctrl.route(_pred("swiping_right"))
+    assert cmd2 is not None, "Same gesture must re-dispatch after cooldown without neutral pose"
+    assert cmd2.command_id == "next_slide"
+
+
+def test_continuous_label_returns_none_in_armed() -> None:
+    """A continuous gesture in ARMED state is excluded from routing."""
+    ctrl = _make_controller(continuous_labels=frozenset(["point_one"]))
+    assert ctrl.mode is RuntimeMode.ARMED
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        cmd = ctrl.route(_pred("point_one"))
+    assert cmd is None  # continuous gesture routed directly to laser pointer
+    assert ctrl.mode is RuntimeMode.ARMED  # state must not change
+
+
+# ---------------------------------------------------------------------------
+# tick() — cooldown-clock advance independent of inference results
+#
+# tick() is the mechanism that allows the COOLDOWN → ARMED transition to fire
+# even when the camera stops delivering inference windows (e.g. the hand has
+# left the frame).  Without it the controller would remain stuck in COOLDOWN
+# indefinitely whenever the inference worker produces no output.
+# ---------------------------------------------------------------------------
+
+
+def test_tick_returns_false_when_armed() -> None:
+    """tick() in ARMED state is a no-op and returns False."""
+    ctrl = _make_controller()
+    assert ctrl.mode is RuntimeMode.ARMED
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 9999)):
+        result = ctrl.tick()
+    assert result is False
+    assert ctrl.mode is RuntimeMode.ARMED
+
+
+def test_tick_returns_false_during_active_cooldown() -> None:
+    """tick() before the cooldown window expires returns False, mode stays COOLDOWN."""
+    ctrl = _make_controller(command_cooldown_ms=500)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+    assert ctrl.mode is RuntimeMode.COOLDOWN
+
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 300)):
+        result = ctrl.tick()
+    assert result is False
+    assert ctrl.mode is RuntimeMode.COOLDOWN
+
+
+def test_tick_transitions_cooldown_to_armed_on_expiry() -> None:
+    """tick() after the cooldown window expires returns True and transitions COOLDOWN → ARMED."""
+    ctrl = _make_controller(command_cooldown_ms=500)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+    assert ctrl.mode is RuntimeMode.COOLDOWN
+
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
+        result = ctrl.tick()
+    assert result is True
+    assert ctrl.mode is RuntimeMode.ARMED
+
+
+def test_tick_resets_dispatch_memory_so_same_gesture_can_refire() -> None:
+    """tick() must clear dispatch memory on COOLDOWN → ARMED so the same gesture
+    re-dispatches immediately without requiring a neutral hand pose."""
+    ctrl = _make_controller(command_cooldown_ms=500, edge_trigger_enabled=True)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+
+    # Advance past cooldown via tick()
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
+        ctrl.tick()
+
+    # Same gesture must re-dispatch because tick() cleared the dispatch memory.
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 601)):
+        cmd = ctrl.route(_pred("swiping_right"))
+    assert cmd is not None
+    assert cmd.command_id == "next_slide"
+
+
+def test_tick_is_idempotent_after_transition() -> None:
+    """Calling tick() again after a COOLDOWN → ARMED transition is safe: returns False."""
+    ctrl = _make_controller(command_cooldown_ms=100)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 200)):
+        first = ctrl.tick()
+        second = ctrl.tick()
+    assert first is True
+    assert second is False
+    assert ctrl.mode is RuntimeMode.ARMED
+
+
+def test_tick_and_route_do_not_double_transition() -> None:
+    """tick() and route() may be called in the same frame; only one COOLDOWN → ARMED
+    transition should occur and a fresh accepted gesture should still dispatch."""
+    ctrl = _make_controller(command_cooldown_ms=500)
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 0)):
+        ctrl.route(_pred("swiping_right"))
+    assert ctrl.mode is RuntimeMode.COOLDOWN
+
+    # Both tick() and route() called at t=600 (cooldown expired).
+    with patch.object(type(ctrl), "_now_ms", staticmethod(lambda: 600)):
+        transitioned = ctrl.tick()  # COOLDOWN → ARMED
+        cmd = ctrl.route(_pred("swiping_right"))  # ARMED → dispatch → COOLDOWN
+
+    assert transitioned is True
+    assert cmd is not None
+    assert cmd.command_id == "next_slide"
+    assert ctrl.mode is RuntimeMode.COOLDOWN  # re-entered cooldown after redispatch

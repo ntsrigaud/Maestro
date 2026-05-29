@@ -37,6 +37,7 @@ class _RuntimeThread(QThread):
         config_path: str,
         artifact_path: str | None,
         hf_revision_override: str | None,
+        hand_preference_override: str | None,
         show_window: bool,
         minimal_preview: bool,
         emit_every: int,
@@ -46,6 +47,7 @@ class _RuntimeThread(QThread):
         self._config_path = config_path
         self._artifact_path = artifact_path
         self._hf_revision_override = hf_revision_override
+        self._hand_preference_override = hand_preference_override
         self._show_window = show_window
         self._minimal_preview = minimal_preview
         self._emit_every = emit_every
@@ -64,6 +66,7 @@ class _RuntimeThread(QThread):
                 self._config_path,
                 model_artifact_path=self._artifact_path,
                 hf_revision_override=self._hf_revision_override,
+                hand_preference_override=self._hand_preference_override,
                 show_window=self._show_window,
                 minimal_preview=self._minimal_preview,
             )
@@ -96,6 +99,11 @@ class _RuntimeThread(QThread):
     def stop(self) -> None:
         if self._runtime is not None:
             self._runtime.stop()
+
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Forward a gain update to the live Runtime. Safe from the main thread."""
+        if self._runtime is not None:
+            self._runtime.set_pointer_gain(gain_x, gain_y)
 
 
 class RuntimeController(QObject):
@@ -133,6 +141,7 @@ class RuntimeController(QObject):
         *,
         artifact_path: str | None = None,
         hf_revision_override: str | None = None,
+        hand_preference_override: str | None = None,
         show_window: bool = False,
         minimal_preview: bool = False,
         emit_every: int = _EMIT_EVERY_DEFAULT,
@@ -146,6 +155,7 @@ class RuntimeController(QObject):
             config_path=config_path,
             artifact_path=artifact_path,
             hf_revision_override=hf_revision_override,
+            hand_preference_override=hand_preference_override,
             show_window=show_window,
             minimal_preview=minimal_preview,
             emit_every=emit_every,
@@ -161,6 +171,11 @@ class RuntimeController(QObject):
         """Request a graceful shutdown. Returns immediately; does not block."""
         if self._thread is not None:
             self._thread.stop()
+
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Update pointer movement gain on the live runtime. No-op if not running."""
+        if self._thread is not None:
+            self._thread.set_pointer_gain(gain_x, gain_y)
 
     def wait(self, timeout_ms: int = 5_000) -> bool:
         """
