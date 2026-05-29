@@ -51,6 +51,7 @@ import json
 import logging
 import os
 import random
+import gc
 import sys
 import tempfile
 import time
@@ -913,6 +914,7 @@ def _save_ipn_chunks_streaming(
             raise
         finally:
             del cls_builder
+            gc.collect()  # Force release before next class build (point_one/point_two are large)
 
         size_mb = out_path.stat().st_size / 1024**2
         logger.info("    → %s  %d samples  %.1f MB", out_path.name, n, size_mb)
