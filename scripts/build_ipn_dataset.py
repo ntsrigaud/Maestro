@@ -52,8 +52,10 @@ import logging
 import os
 import random
 import sys
+import tempfile
 import time
-from collections import defaultdict
+import zipfile
+from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -824,6 +826,207 @@ def _load_vocabulary(vocab_config_path: Path) -> list[str]:
     return [str(g) for g in gestures]
 
 
+# ---------------------------------------------------------------------------
+# Per-class chunk helpers (flat format)
+# ---------------------------------------------------------------------------
+
+
+def _save_ipn_chunks_streaming(
+    annotations: list[AnnotationRow],
+    cache_paths: dict[str, Path],
+    vocabulary: list[str],
+    chunk_dir: Path,
+    *,
+    window_length: int,
+    window_step: int,
+    min_valid_ratio: float,
+    label_strategy: str,
+    max_unknown_segments_per_source: int,
+    max_unknown_frames_per_segment: int,
+    seed: int,
+    skip_existing: bool = True,
+) -> dict[str, int]:
+    """Build one flat NPZ chunk per gesture class, processing one class at a time.
+
+    Mirrors ``_save_chunks_streaming`` from ``build_jester_dataset.py`` but
+    uses ``assemble_flat_dataset`` (right-hand 147-dim feature schema) and
+    IPN's annotation structure.  Processing one class at a time bounds peak
+    RAM to a single class rather than the full multi-class dataset.
+
+    Parameters
+    ----------
+    skip_existing:
+        If True (default), skip classes whose chunk file already exists and is
+        valid.  Pass False to force a full rebuild.
+
+    Returns
+    -------
+    dict mapping class_name → sample count for all saved chunks.
+    """
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    saved: dict[str, int] = {}
+
+    for cls in vocabulary:
+        out_path = chunk_dir / f"{cls}.npz"
+        if skip_existing and out_path.exists():
+            try:
+                with zipfile.ZipFile(out_path, "r") as _zf:
+                    _zf.namelist()
+                with np.load(out_path, allow_pickle=True) as raw:
+                    n_existing = len(raw["labels"])
+                logger.info("  ✓ %-25s (existing chunk, %d samples)", cls, n_existing)
+                saved[cls] = n_existing
+                continue
+            except Exception:
+                logger.warning("Corrupt chunk for %r — will rebuild: %s", cls, out_path.name)
+                out_path.unlink(missing_ok=True)
+
+        logger.info("  Building chunk: %-25s …", cls)
+        cls_builder = assemble_flat_dataset(
+            annotations=annotations,
+            cache_paths=cache_paths,
+            vocabulary=[cls],  # single-class vocabulary filters naturally
+            window_length=window_length,
+            window_step=window_step,
+            min_valid_ratio=min_valid_ratio,
+            label_strategy=label_strategy,
+            max_unknown_segments_per_source=max_unknown_segments_per_source,
+            max_unknown_frames_per_segment=max_unknown_frames_per_segment,
+            seed=seed,
+        )
+
+        n = len(cls_builder.samples)
+        if n == 0:
+            logger.warning("Class %r yielded 0 windows — chunk not saved.", cls)
+            del cls_builder
+            continue
+
+        # Write atomically via tempfile → os.replace.
+        _tmp_fd, _tmp_str = tempfile.mkstemp(dir=chunk_dir, suffix=".npz")
+        os.close(_tmp_fd)
+        _tmp_path = Path(_tmp_str)
+        try:
+            cls_builder.save_npz(_tmp_path, feature_schema_version="feature-schema-v5")
+            os.replace(_tmp_path, out_path)
+        except Exception:
+            _tmp_path.unlink(missing_ok=True)
+            raise
+        finally:
+            del cls_builder
+
+        size_mb = out_path.stat().st_size / 1024**2
+        logger.info("    → %s  %d samples  %.1f MB", out_path.name, n, size_mb)
+        saved[cls] = n
+
+    total = sum(saved.values())
+    logger.info(
+        "Chunk build complete: %d classes  %d total samples  → %s",
+        len(saved),
+        total,
+        chunk_dir,
+    )
+    return saved
+
+
+def _assemble_ipn_from_chunks(
+    chunk_dir: Path,
+    vocabulary: list[str],
+    output_path: Path,
+    seed: int = 42,
+) -> None:
+    """Assemble a single IPN NPZ from pre-built per-class chunk files (fast path).
+
+    Skips landmark extraction and dataset assembly entirely.  Loads the chunk
+    file for each vocabulary class, concatenates, shuffles, and writes a single
+    NPZ compatible with ``GestureDataModule``.
+
+    Parameters
+    ----------
+    chunk_dir:
+        Directory containing ``{class_name}.npz`` chunk files produced by a
+        previous ``--chunk-dir`` run.
+    vocabulary:
+        Target vocabulary list (defines which chunk files to load and the
+        canonical class ordering for ``label_ids``).
+    output_path:
+        Destination NPZ file.
+    """
+    logger.info(
+        "Assembling %d-class IPN NPZ from chunks in %s …",
+        len(vocabulary),
+        chunk_dir,
+    )
+    label_to_id = {cls: idx for idx, cls in enumerate(vocabulary)}
+
+    all_seqs: list[np.ndarray] = []
+    all_labels: list[np.ndarray] = []
+    all_label_ids: list[np.ndarray] = []
+    all_rec_ids: list[np.ndarray] = []
+
+    window_length: int | None = None
+
+    for cls in vocabulary:
+        chunk_path = chunk_dir / f"{cls}.npz"
+        if not chunk_path.exists():
+            logger.warning("Chunk missing for class %r: %s — skipped.", cls, chunk_path)
+            continue
+        with np.load(chunk_path, allow_pickle=True) as raw:
+            seqs = raw["sequences"].astype(np.float32)
+            if window_length is None:
+                window_length = seqs.shape[1]
+            all_seqs.append(seqs)
+            all_labels.append(raw["labels"].astype(str))
+            all_label_ids.append(np.full(len(seqs), label_to_id[cls], dtype=np.int64))
+            all_rec_ids.append(raw["recording_ids"].astype(str))
+        logger.info("  %-25s %6d samples", cls, len(seqs))
+
+    if not all_seqs:
+        logger.error("No chunk data loaded — aborting.")
+        sys.exit(1)
+
+    sequences = np.concatenate(all_seqs, axis=0)
+    labels = np.concatenate(all_labels, axis=0)
+    label_ids = np.concatenate(all_label_ids, axis=0)
+    rec_ids = np.concatenate(all_rec_ids, axis=0)
+
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(len(labels))
+    sequences = sequences[perm]
+    labels = labels[perm]
+    label_ids = label_ids[perm]
+    rec_ids = rec_ids[perm]
+
+    dist = dict(Counter(labels.tolist()))
+    logger.info(
+        "Assembly complete: %d samples  %d classes",
+        len(labels),
+        len({c for c in vocabulary if dist.get(c, 0) > 0}),
+    )
+    for cls in vocabulary:
+        logger.info("  %-25s %6d", cls, dist.get(cls, 0))
+
+    metadata = {
+        "feature_schema_version": "feature-schema-v5",
+        "vocabulary": vocabulary,
+        "num_classes": len(vocabulary),
+        "window_length": int(window_length or 32),
+        "assembled_from_chunks": str(chunk_dir),
+        "seed": seed,
+    }
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(
+        output_path,
+        sequences=sequences,
+        labels=labels,
+        label_ids=label_ids,
+        recording_ids=rec_ids,
+        metadata_json=np.asarray(json.dumps(metadata), dtype=object),
+    )
+    size_mb = output_path.stat().st_size / 1024**2
+    logger.info("Saved → %s  (%.1f MB)", output_path, size_mb)
+
+
 def _save_metadata(
     metadata_path: Path,
     annotations_used: int,
@@ -869,8 +1072,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--output-npz",
-        required=True,
-        help="Output path for the generated sequence dataset NPZ.",
+        required=False,
+        default=None,
+        help=(
+            "Output path for the generated sequence dataset NPZ.  "
+            "Required unless --chunk-dir is used without --output-npz."
+        ),
     )
     p.add_argument(
         "--annotation-file",
@@ -1032,6 +1239,28 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging verbosity (default: INFO).",
     )
+    p.add_argument(
+        "--chunk-dir",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help=(
+            "If set, save one NPZ per gesture class into this directory "
+            "(e.g. data/processed/ipn_chunks/).  "
+            "Can be combined with --output-npz to also write the full assembled NPZ."
+        ),
+    )
+    p.add_argument(
+        "--assemble-from-chunks",
+        type=Path,
+        default=None,
+        metavar="CHUNK_DIR",
+        help=(
+            "Fast assembly mode: skip landmark extraction and dataset assembly entirely. "
+            "Instead, load pre-built per-class chunk NPZs from CHUNK_DIR and write the "
+            "assembled result to --output-npz."
+        ),
+    )
     return p
 
 
@@ -1072,30 +1301,43 @@ def main() -> None:
             args.window_length = 8
             logger.info("Binary mode: using default window-length 8 (paper detector window)")
 
+    # ── Vocabulary (needed by all modes including fast assembly) ─────────────
+    vocab_config = Path(args.vocab_config)
+    if not vocab_config.is_file():
+        parser.error(f"Vocabulary config not found: {vocab_config}")
+    vocabulary = _load_vocabulary(vocab_config)
+    logger.info("Vocabulary (%d classes): %s", len(vocabulary), vocabulary)
+
+    # ── Fast path: assemble from pre-built per-class chunk files ─────────────
+    if args.assemble_from_chunks:
+        if not args.output_npz:
+            parser.error("--assemble-from-chunks requires --output-npz to be set.")
+        _assemble_ipn_from_chunks(
+            chunk_dir=args.assemble_from_chunks.resolve(),
+            vocabulary=vocabulary,
+            output_path=Path(args.output_npz),
+            seed=args.seed,
+        )
+        return
+
+    # ── Full build: paths needed for landmark extraction ─────────────────────
     ipn_root = Path(args.ipn_root)
     video_dir = ipn_root / "videos"
     annot_path = ipn_root / "annotations" / args.annotation_file
     cache_dir = ipn_root / "cache"
-    output_npz = Path(args.output_npz)
-    vocab_config = Path(args.vocab_config)
+    output_npz = Path(args.output_npz) if args.output_npz else None
 
     # Validate inputs.
     if not video_dir.is_dir():
         parser.error(f"Video directory not found: {video_dir}")
     if not annot_path.is_file():
         parser.error(f"Annotation file not found: {annot_path}")
-    if not vocab_config.is_file():
-        parser.error(f"Vocabulary config not found: {vocab_config}")
+    if output_npz is None and not args.chunk_dir:
+        parser.error("--output-npz is required unless --chunk-dir is set.")
 
     num_workers = args.num_workers
     if num_workers == 0:
         num_workers = os.cpu_count() or 1
-
-    # -----------------------------------------------------------------------
-    # Load vocabulary and annotations.
-    # -----------------------------------------------------------------------
-    vocabulary = _load_vocabulary(vocab_config)
-    logger.info("Vocabulary (%d classes): %s", len(vocabulary), vocabulary)
 
     annotations = parse_annotations(annot_path)
     logger.info("Loaded %d annotation rows from %s.", len(annotations), annot_path.name)
@@ -1137,6 +1379,24 @@ def main() -> None:
             cache_dir,
         )
         sys.exit(1)
+
+    # ── Per-class chunk build (optional, runs before full assembly) ───────────
+    if args.chunk_dir:
+        _save_ipn_chunks_streaming(
+            annotations=annotations,
+            cache_paths=cache_paths,
+            vocabulary=vocabulary,
+            chunk_dir=args.chunk_dir.resolve(),
+            window_length=args.window_length,
+            window_step=args.window_step,
+            min_valid_ratio=args.min_valid_ratio,
+            label_strategy=args.label_strategy,
+            max_unknown_segments_per_source=args.max_unknown_segments_per_source,
+            max_unknown_frames_per_segment=args.max_unknown_frames_per_segment,
+            seed=args.seed,
+        )
+        if output_npz is None:
+            return  # chunks-only mode; no full NPZ requested
 
     # -----------------------------------------------------------------------
     # Phase 2 — assemble sliding-window dataset.
@@ -1195,6 +1455,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Save NPZ and metadata.
     # -----------------------------------------------------------------------
+    assert output_npz is not None  # guaranteed: chunks-only path returned above
     output_npz.parent.mkdir(parents=True, exist_ok=True)
     if args.format == "flat":
         assert isinstance(builder, SequenceDatasetBuilder)
