@@ -42,14 +42,16 @@ notebooks = [
 ]
 ui = [
   "PySide6>=6.7.0",
+  # pytest-qt is here (not in dev) so UI tests can be toggled independently of CI.
+  "pytest-qt>=4.4.0",
   # Full OpenCV with display backend required for the preview window.
   # Mutually exclusive with the headless extra.
   "opencv-python>=4.10.0",
 ]
 dev = [
   "pytest>=8.0.0",
-  "pytest-qt>=4.4.0",
-  "PySide6>=6.7.0",
+  # PySide6 and pytest-qt live in [ui] — conftest.py already skips test_ui_* files
+  # when PySide6 is absent, so CI installs [dev] without pulling in 255 MB of Qt.
   "ruff>=0.3.0",
   "mypy>=1.8.0",
   "types-PyYAML>=6.0.12",
