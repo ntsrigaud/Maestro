@@ -36,7 +36,7 @@ model:
   hidden_size: 96         # per-direction per-stream; BiLSTM output = 2×96 = 192
   num_layers: 2
   dropout: 0.35
-  num_classes: 20         # Jester vocabulary (20BN-Jester-v1, 20 gesture classes)
+  num_classes: 27         # Full Jester vocabulary (20BN-Jester-v1, 27 gesture classes)
   num_heads: 8            # MHA heads; 192/8 = 24 dims per head ✓
   proj_dim: 96            # feature projection (73/74 → 96 before LSTM)
 
