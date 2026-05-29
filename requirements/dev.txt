@@ -1,3 +1,4 @@
 # Convenience file for local development.
-# Equivalent to: pip install -e ".[dev,training]"
--e ".[dev,training]"
+# Includes [ui] for PySide6 + pytest-qt (removed from [dev] to keep CI lean).
+# Equivalent to: pip install -e ".[dev,training,ui]"
+-e ".[dev,training,ui]"
