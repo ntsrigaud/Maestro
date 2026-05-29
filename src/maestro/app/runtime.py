@@ -23,7 +23,6 @@ from maestro.interfaces.command_dispatcher import ICommandDispatcher
 from maestro.interfaces.feature_transformer import IFeatureTransformer
 from maestro.interfaces.feedback_renderer import IFeedbackRenderer
 from maestro.interfaces.frame_source import IFrameSource
-from maestro.interfaces.gaze_detector import IGazeIntentDetector
 from maestro.interfaces.landmark_extractor import IHandLandmarkExtractor
 from maestro.interfaces.sequence_buffer import ISequenceBuffer
 from maestro.pipeline.activation import GestureActivationController
@@ -101,39 +100,41 @@ class _InferenceWorker:
                 continue
 
             infer_start = time.perf_counter()
-            features = sequence.features.astype(np.float32, copy=False)
-            tensor = torch.from_numpy(features).unsqueeze(0).to(self._device)
-            with torch.no_grad():
-                logits = self._model(tensor)
-                probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
-
-            labels = self._artifact.class_labels
-            class_probs = {label: float(probs[idx]) for idx, label in enumerate(labels)}
-            top_idx = int(np.argmax(probs))
-            prediction = Prediction(
-                class_probs=class_probs,
-                top_class=labels[top_idx],
-                confidence=float(probs[top_idx]),
-            )
-            infer_ms = (time.perf_counter() - infer_start) * 1000.0
-
             try:
-                self._out_queue.put_nowait((prediction, infer_ms))
-            except queue.Full:
-                try:
-                    self._out_queue.get_nowait()
-                except queue.Empty:
-                    pass
+                features = sequence.features.astype(np.float32, copy=False)
+                tensor = torch.from_numpy(features).unsqueeze(0).to(self._device)
+                with torch.no_grad():
+                    logits = self._model(tensor)
+                    probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()
+
+                labels = self._artifact.class_labels
+                class_probs = {label: float(probs[idx]) for idx, label in enumerate(labels)}
+                top_idx = int(np.argmax(probs))
+                prediction = Prediction(
+                    class_probs=class_probs,
+                    top_class=labels[top_idx],
+                    confidence=float(probs[top_idx]),
+                )
+                infer_ms = (time.perf_counter() - infer_start) * 1000.0
+
                 try:
                     self._out_queue.put_nowait((prediction, infer_ms))
                 except queue.Full:
-                    pass
+                    try:
+                        self._out_queue.get_nowait()
+                    except queue.Empty:
+                        pass
+                    try:
+                        self._out_queue.put_nowait((prediction, infer_ms))
+                    except queue.Full:
+                        pass
+            except Exception:  # noqa: BLE001
+                LOGGER.exception("InferenceWorker: error during inference — skipping window")
 
 
 class RuntimeDependencies(Protocol):
     config: RuntimeConfig
     frame_source: IFrameSource
-    gaze_detector: IGazeIntentDetector
     landmark_extractor: IHandLandmarkExtractor
     hand_selector: HandSelector
     feature_transformer: IFeatureTransformer
@@ -160,8 +161,6 @@ class Runtime:
         self._inference_worker: _InferenceWorker | None = None
         cfg = getattr(container, "config", None)
         infer_cfg = getattr(cfg, "inference", None)
-        gaze_cfg = getattr(infer_cfg, "gaze", None)
-        self._gaze_enabled = bool(getattr(gaze_cfg, "enabled", True))
         # Pre-compute the active mode display string from config.  This never
         # changes at runtime; storing it once avoids repeated attribute lookups
         # and getattr fallbacks in the hot loop.
@@ -174,17 +173,34 @@ class Runtime:
         #   point_one  → laser pointer (⌘+L / Ctrl+L)
         #   point_two  → annotation pen (⌘+P / Ctrl+P)
         mirror_x = getattr(app_cfg, "mirror_display", True)
+        pointer_cfg = getattr(infer_cfg, "pointer", None)
+        pointer_gain_x = getattr(pointer_cfg, "gain_x", 2.4)
+        pointer_gain_y = getattr(pointer_cfg, "gain_y", 2.2)
         self._laser_tracker = LaserPointerTracker(
             keyboard=KeyboardAdapter(),
             mirror_x=mirror_x,
+            pointer_gain_x=pointer_gain_x,
+            pointer_gain_y=pointer_gain_y,
         )
         self._pen_tracker = AnnotationPenTracker(
             keyboard=KeyboardAdapter(),
             mirror_x=mirror_x,
+            pointer_gain_x=pointer_gain_x,
+            pointer_gain_y=pointer_gain_y,
         )
 
     def stop(self) -> None:
         self._running = False
+
+    def set_pointer_gain(self, gain_x: float, gain_y: float) -> None:
+        """Update pointer/pen movement gain on both continuous trackers.
+
+        Safe to call from the main thread while the runtime loop runs in the
+        worker thread — Python's GIL makes the underlying float attribute
+        writes atomic (same guarantee as ``Runtime.stop()``).
+        """
+        self._laser_tracker.set_pointer_gain(gain_x, gain_y)
+        self._pen_tracker.set_pointer_gain(gain_x, gain_y)
 
     def run(
         self,
@@ -210,55 +226,34 @@ class Runtime:
         inference_ms = 0.0
         latest_label = "unknown"
         latest_conf = 0.0
-        _prev_gaze_permitted: bool = False
+        _consecutive_frame_errors = 0
+        _MAX_CONSECUTIVE_FRAME_ERRORS = 10
 
         try:
             while self._running:
                 loop_start = time.perf_counter()
 
                 t0 = time.perf_counter()
-                frame = self._container.frame_source.read()
+                try:
+                    frame = self._container.frame_source.read()
+                    _consecutive_frame_errors = 0
+                except RuntimeError as _frame_exc:
+                    _consecutive_frame_errors += 1
+                    if _consecutive_frame_errors >= _MAX_CONSECUTIVE_FRAME_ERRORS:
+                        LOGGER.error(
+                            "Camera failed %d consecutive times — stopping runtime",
+                            _MAX_CONSECUTIVE_FRAME_ERRORS,
+                        )
+                        break
+                    LOGGER.warning(
+                        "Frame capture failed (transient, %d/%d): %s",
+                        _consecutive_frame_errors,
+                        _MAX_CONSECUTIVE_FRAME_ERRORS,
+                        _frame_exc,
+                    )
+                    continue
                 if benchmark is not None:
                     benchmark.record_capture((time.perf_counter() - t0) * 1000.0)
-
-                # Stage 2 — gaze gate: bypass the downstream pipeline when
-                # the user is not directing attention toward the camera.
-                gaze_permitted = self._container.gaze_detector.update(frame)
-
-                # Rising edge: gaze just became permitted → transition IDLE → ARMED.
-                if gaze_permitted and not _prev_gaze_permitted:
-                    self._container.activation_controller.rearm()
-                # Falling edge: gaze lost → deactivate continuous trackers immediately.
-                if not gaze_permitted and _prev_gaze_permitted:
-                    self._laser_tracker.deactivate()
-                    self._pen_tracker.deactivate()
-                    if self._inference_worker is not None:
-                        self._inference_worker.clear()
-                _prev_gaze_permitted = gaze_permitted
-
-                if not gaze_permitted:
-                    absent_state = RuntimeState(
-                        mode=str(self._container.activation_controller.mode),
-                        gaze_permitted=False,
-                        active_mode=self._active_mode,
-                        info={
-                            "gaze_enabled": self._gaze_enabled,
-                        },
-                    )
-                    overlay_frame = self._container.overlay_renderer.render(frame, absent_state)
-                    # Attach the rendered frame so the caller (GUI widget or
-                    # CLI on_state callback) can display it in its own
-                    # thread-safe context.  overlay_frame.frame is a fresh
-                    # canvas copy produced by OverlayRenderer, so no
-                    # additional copy is needed.
-                    if self._container.show_window:
-                        absent_state.preview_frame = overlay_frame.frame
-                    processed_frames += 1
-                    if self._on_state is not None:
-                        self._on_state(absent_state)
-                    if max_frames > 0 and processed_frames >= max_frames:
-                        self.stop()
-                    continue
 
                 t1 = time.perf_counter()
                 multi_packet = self._container.landmark_extractor.extract(frame)
@@ -283,6 +278,16 @@ class Runtime:
                     emitted_windows += 1
                     if self._inference_worker is not None:
                         self._inference_worker.submit(window)
+
+                # Advance the cooldown clock unconditionally, before polling the
+                # inference worker.  This ensures the COOLDOWN → ARMED transition
+                # fires even when no inference windows are available (e.g. the hand
+                # has left the camera frame).  The label is reset here so the UI
+                # immediately reflects the ARMED state; if a fresh inference result
+                # arrives in the same iteration it will overwrite the reset below.
+                if self._container.activation_controller.tick():
+                    latest_label = "unknown"
+                    latest_conf = 0.0
 
                 worker_result = self._inference_worker.poll() if self._inference_worker else None
                 if worker_result is not None:
@@ -343,6 +348,23 @@ class Runtime:
                     valid=landmark_packet.valid,
                 )
 
+                # Continuous gesture labels bypass the COOLDOWN state machine so
+                # tick() never resets latest_label for them.  When both continuous
+                # trackers have deactivated (hand left frame or gesture ended) but
+                # the stabiliser is still emitting a stale continuous label from
+                # queued inference windows, the UI would keep showing that label
+                # indefinitely.  Override it to "unknown" immediately once neither
+                # tracker is active, mirroring the reset non-continuous gestures
+                # receive from tick() at the COOLDOWN → ARMED transition.
+                _continuous = self._container.activation_controller.continuous_labels
+                if (
+                    latest_label in _continuous
+                    and not self._laser_tracker.active
+                    and not self._pen_tracker.active
+                ):
+                    latest_label = "unknown"
+                    latest_conf = 0.0
+
                 elapsed = time.perf_counter() - start_time
                 fps = (processed_frames / elapsed) if elapsed > 0 else 0.0
                 mode = str(self._container.activation_controller.mode)
@@ -359,7 +381,6 @@ class Runtime:
                     mode=mode,
                     last_label=latest_label,
                     last_confidence=latest_conf,
-                    gaze_permitted=gaze_permitted,
                     active_mode=self._active_mode,
                     info={
                         "landmarks": landmarks_info,
@@ -368,7 +389,6 @@ class Runtime:
                         "latency_infer_ms": inference_ms,
                         "latency_e2e_ms": loop_e2e_ms,
                         "fps": fps,
-                        "gaze_enabled": self._gaze_enabled,
                         "accepted": (
                             bool(stabilized_prediction.accepted) if stabilized_prediction else False
                         ),
@@ -412,7 +432,6 @@ class Runtime:
                     LOGGER.info("Wrote latency benchmark report to %s", output_path)
 
             self._container.frame_source.close()
-            self._container.gaze_detector.close()
             self._container.landmark_extractor.close()
             if self._inference_worker is not None:
                 self._inference_worker.stop()

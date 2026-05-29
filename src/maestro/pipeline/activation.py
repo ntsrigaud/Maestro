@@ -15,32 +15,35 @@ class GestureActivationController:
     State machine
     -------------
     ARMED    -> COOLDOWN : command gesture recognised -> ExecutableCommand emitted.
-    ARMED    -> IDLE     : no recognised gesture for *idle_timeout_ms*.
     COOLDOWN -> ARMED    : cooldown window expires.
-    IDLE     -> ARMED    : explicit ``rearm()`` call (gaze re-established).
 
     Activation gate
     ---------------
-    The controller starts in IDLE state.  It transitions to ARMED only when
-    ``rearm()`` is called, which the runtime loop invokes on the gaze-permitted
-    rising edge (i.e. the first frame where ``gaze_permitted`` becomes ``True``
-    after having been ``False``).  When the gaze grace period expires, the
-    runtime calls ``force_idle()`` to transition the controller back to IDLE.
+    The controller starts in ARMED state and remains armed throughout the
+    session lifetime.
 
     Armed-state persistence
     -----------------------
-    ``_last_active_ms`` is refreshed whenever any *non-unknown* label is seen,
-    not only when an accepted command gesture is recognised.  Combined with a
-    generous default ``idle_timeout_ms`` (5 minutes), this prevents the system
-    from dropping back to IDLE between the natural pauses of a presentation.
+    The controller remains armed indefinitely and never times out due to
+    inactivity.  It is always ready to dispatch the next accepted gesture.
 
     Edge-trigger dispatch
     ---------------------
     When ``edge_trigger_enabled=True`` (the default), a command gesture is only
     dispatched when the accepted label differs from ``_last_dispatched_label``
     --- the label of the most recently executed command.
-    ``_last_dispatched_label`` is reset to ``unknown`` whenever the prediction
-    returns to the ``unknown`` class (the hand goes neutral between gestures).
+    ``_last_dispatched_label`` is reset to ``unknown`` on two occasions:
+
+    1. **Cooldown expiry** (primary reset): when the COOLDOWN window expires and
+       the controller transitions back to ARMED, ``_last_dispatched_label`` is
+       cleared immediately.  This means the same gesture can be re-dispatched
+       as soon as the cooldown ends, with no intermediate neutral hand pose
+       required.  The cooldown is the sole anti-bounce protection.
+
+    2. **Neutral prediction** (secondary reset): if the prediction returns to
+       the ``unknown`` class while ARMED, ``_last_dispatched_label`` is also
+       cleared.  This is now redundant with the cooldown reset in normal usage
+       but is kept as an explicit signal that the hand has returned to neutral.
 
     **Why not track the previous frame's label?**  An earlier implementation
     advanced a ``_prev_label`` counter on *every* call to ``route()``, including
@@ -54,34 +57,24 @@ class GestureActivationController:
     The ``_last_dispatched_label`` approach fixes this: unaccepted frames never
     advance the counter, so the first accepted prediction of a new gesture always
     sees a label change relative to the last dispatched command.
-
-    The same-gesture-twice case is handled by the ``unknown`` reset: after the
-    hand returns to neutral between two identical gestures,
-    ``_last_dispatched_label`` is cleared, allowing the second occurrence to fire.
-
-    The cooldown remains as a secondary guard against rapid re-triggering in
-    unusual conditions (e.g. alternating accepted/unaccepted despite short hold).
     """
 
     def __init__(
         self,
         *,
         command_map: dict[str, str],
-        idle_timeout_ms: int,
         command_cooldown_ms: int,
         edge_trigger_enabled: bool = True,
         continuous_labels: frozenset[str] = frozenset(),
         unknown_label: str = "unknown",
     ) -> None:
         self._command_map = dict(command_map)
-        self._idle_timeout_ms = idle_timeout_ms
         self._command_cooldown_ms = command_cooldown_ms
         self._edge_trigger_enabled = edge_trigger_enabled
         self._continuous_labels = continuous_labels
         self._unknown_label = unknown_label
 
-        self._mode: RuntimeMode = RuntimeMode.IDLE
-        self._last_active_ms: int = self._now_ms()
+        self._mode: RuntimeMode = RuntimeMode.ARMED
         self._cooldown_started_ms: int | None = None
         # Label of the most recently dispatched command.  Reset to unknown_label
         # whenever the prediction returns to unknown (hand goes neutral).
@@ -92,12 +85,17 @@ class GestureActivationController:
     def mode(self) -> RuntimeMode:
         return self._mode
 
+    @property
+    def continuous_labels(self) -> frozenset[str]:
+        """Gesture labels that are routed to continuous trackers, not the state machine."""
+        return self._continuous_labels
+
     def route(self, prediction: StabilizedPrediction) -> ExecutableCommand | None:
         # Continuous gestures (e.g. point_one, point_two) are owned exclusively
-        # by LaserPointerTracker and must never enter the IDLE/ARMED/COOLDOWN
-        # state machine.  Routing them here would cause CommandDispatcher to
-        # send a deactivation keystroke on every accepted window, fighting
-        # LaserPointerTracker's laser pointer activation.
+        # by LaserPointerTracker and must never enter the ARMED/COOLDOWN state
+        # machine.  Routing them here would cause CommandDispatcher to send a
+        # deactivation keystroke on every accepted window, fighting LaserPointerTracker's
+        # laser pointer activation.
         if prediction.label in self._continuous_labels:
             return None
 
@@ -112,6 +110,9 @@ class GestureActivationController:
             ):
                 self._mode = RuntimeMode.ARMED
                 self._cooldown_started_ms = None
+                # Reset dispatch memory so the same gesture can fire again
+                # immediately without requiring a neutral hand pose first.
+                self._last_dispatched_label = self._unknown_label
                 LOGGER.debug(
                     "activation: COOLDOWN -> ARMED  (cooldown_ms=%d)",
                     self._command_cooldown_ms,
@@ -119,39 +120,12 @@ class GestureActivationController:
             else:
                 return None
 
-        # ------------------------------------------------------------------
-        # IDLE -- do not dispatch; wait for rearm() to be called externally.
-        # ------------------------------------------------------------------
-        if self._mode is RuntimeMode.IDLE:
-            return None
-
         is_unknown = prediction.label == self._unknown_label
 
-        # Refresh activity timestamp on any recognisable (non-unknown) gesture.
-        # This keeps the ARMED idle timer alive during natural presentation pauses
-        # where the user's hand may be visible but not performing a command gesture.
-        if not is_unknown:
-            self._last_active_ms = now
-            LOGGER.debug(
-                "activation: gesture seen  label=%r  conf=%.2f  accepted=%s  mode=%s",
-                prediction.label,
-                prediction.confidence,
-                prediction.accepted,
-                self._mode.value,
-            )
-
         # ------------------------------------------------------------------
-        # ARMED -- check idle timeout, then dispatch command gestures.
+        # ARMED -- dispatch command gestures.
         # ------------------------------------------------------------------
         if self._mode is RuntimeMode.ARMED:
-            if now - self._last_active_ms > self._idle_timeout_ms:
-                self._mode = RuntimeMode.IDLE
-                LOGGER.info(
-                    "activation: ARMED -> IDLE  (no gesture for %d ms)",
-                    self._idle_timeout_ms,
-                )
-                return None
-
             if is_unknown:
                 # Hand returned to neutral -- clear the dispatch memory so that
                 # performing the same gesture again (after a rest) fires normally.
@@ -196,29 +170,42 @@ class GestureActivationController:
 
         return None
 
-    def rearm(self) -> None:
-        """Transition from IDLE to ARMED.
+    def reset_dispatch_memory(self) -> None:
+        """Reset dispatch memory without changing mode.
 
-        Called by the runtime when gaze is re-established after a
-        ``force_idle()`` call.  Clears dispatch memory so that re-arming
-        always starts fresh.
+        Called at session boundaries or when re-initializing dispatch state.
         """
-        if self._mode is RuntimeMode.IDLE:
-            self._mode = RuntimeMode.ARMED
-            self._last_dispatched_label = self._unknown_label
-            self._last_active_ms = self._now_ms()
-            LOGGER.info("activation: IDLE -> ARMED  (gaze restored)")
-
-    def force_idle(self) -> None:
-        """Reset the controller to IDLE unconditionally.
-
-        Called by the runtime loop when the gaze grace period expires while
-        the controller is not already in IDLE state.  Clears all in-progress
-        timers so that the next activation cycle starts from a clean state.
-        """
-        self._mode = RuntimeMode.IDLE
+        self._last_dispatched_label = self._unknown_label
         self._cooldown_started_ms = None
-        LOGGER.info("activation: forced -> IDLE  (gaze lost)")
+
+    def tick(self) -> bool:
+        """Advance the cooldown clock without requiring an inference result.
+
+        Must be called on every main-loop iteration so the COOLDOWN → ARMED
+        transition fires even when the inference worker produces no output
+        (e.g. the hand has left the camera frame and no new windows are being
+        submitted).  Without this, a dispatched command leaves the controller
+        in COOLDOWN indefinitely if the camera stops detecting landmarks.
+
+        Returns
+        -------
+        bool
+            ``True`` if the controller transitioned from COOLDOWN to ARMED
+            this call; ``False`` otherwise (already ARMED, or cooldown still
+            active).
+        """
+        if self._mode is not RuntimeMode.COOLDOWN or self._cooldown_started_ms is None:
+            return False
+        if self._now_ms() - self._cooldown_started_ms < self._command_cooldown_ms:
+            return False
+        self._mode = RuntimeMode.ARMED
+        self._cooldown_started_ms = None
+        self._last_dispatched_label = self._unknown_label
+        LOGGER.debug(
+            "activation: COOLDOWN -> ARMED  (tick, cooldown_ms=%d)",
+            self._command_cooldown_ms,
+        )
+        return True
 
     @staticmethod
     def _now_ms() -> int:

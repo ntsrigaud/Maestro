@@ -98,6 +98,34 @@ class TestAnnotationPenTrackerActivation:
         assert tracker.active is False
         kb.press_hotkey.assert_not_called()
 
+    def test_activation_not_marked_when_hotkey_blocked(self):
+        """If the scope guard blocks Ctrl+P, the tracker must not mark itself
+        active so that the next frame retries the activation hotkey.
+        """
+        tracker, kb = _tracker()
+        kb.press_hotkey.return_value = False  # scope guard blocks dispatch
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        assert tracker.active is False
+        # Retry on the following frame once the scope guard passes.
+        kb.press_hotkey.return_value = True
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        assert tracker.active is True
+
+    def test_activation_does_not_reset_cursor_to_centre(self):
+        """Annotation pen must NOT move the cursor to screen centre on activation.
+
+        Unlike the laser pointer, the pen stroke must start exactly at the
+        user's fingertip position so that the drawn mark appears where the
+        user intends.  Positioning is done via mouse_down, not move_mouse.
+        """
+        tracker, kb = _tracker()
+        kb.screen_size.return_value = (1920, 1080)
+        lm_off_centre = [[0.8, 0.2, 0.0]] * 21
+        tracker.update("point_two", lm_off_centre, valid=True)
+        # move_mouse must never be called — only mouse_down for the pen.
+        kb.move_mouse.assert_not_called()
+        kb.mouse_down.assert_called_once()
+
 
 # ---------------------------------------------------------------------------
 # Tests: mouse tracking while active
@@ -105,13 +133,36 @@ class TestAnnotationPenTrackerActivation:
 
 
 class TestAnnotationPenTrackerMouseTracking:
+    def test_mouse_pressed_not_set_when_mouse_down_fails(self):
+        """If mouse_down is blocked on the activation frame, _mouse_pressed must
+        remain False so the press is retried on the next frame rather than
+        permanently skipping to the drag-only branch with no button held.
+        """
+        tracker, kb = _tracker(mirror_x=False)
+        kb.mouse_down.return_value = False  # scope guard blocks on first frame
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        # Scope blocked: no drag should have been attempted yet.
+        kb.mouse_drag_to.assert_not_called()
+        # Next frame the scope guard passes.
+        kb.mouse_down.return_value = True
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        kb.mouse_down.assert_called()
+        # Prime stroke must fire now that mouse_down succeeded.
+        assert kb.mouse_drag_to.call_count == 2
+
     def test_mouse_down_called_on_first_active_frame(self):
-        """First frame: position and press — PowerPoint starts recording the stroke."""
+        """First frame: press and immediately prime a tiny drag so ink starts."""
         tracker, kb = _tracker(mirror_x=False)
         tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
         kb.mouse_down.assert_called_once()
-        kb.mouse_drag_to.assert_not_called()
+        assert kb.mouse_drag_to.call_count == 2
         kb.move_mouse.assert_not_called()
+
+    def test_first_active_frame_primes_drag_and_returns_to_fingertip(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1920, 1080)
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        assert kb.mouse_drag_to.call_args_list == [call(961, 541), call(960, 540)]
 
     def test_drag_called_on_subsequent_frames(self):
         """Sustained frames send kCGEventLeftMouseDragged (not kCGEventMouseMoved)."""
@@ -147,7 +198,31 @@ class TestAnnotationPenTrackerMouseTracking:
         tracker.update("point_two", lm, valid=True)
         # First frame: mouse_down(x, y)
         _, y = kb.mouse_down.call_args[0]
-        assert y == int(0.25 * 1080)
+        assert y == 0
+
+    def test_center_point_remains_stable_after_gain(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        tracker.update("point_two", _LANDMARKS_CENTER, valid=True)
+        x, y = kb.mouse_down.call_args[0]
+        assert x == 500
+        assert y == 500
+
+    def test_horizontal_pointer_gain_expands_displacement(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        lm = [[0.6, 0.5, 0.0]] * 21
+        tracker.update("point_two", lm, valid=True)
+        x, _ = kb.mouse_down.call_args[0]
+        assert x == int((0.5 + ((0.6 - 0.5) * 2.4)) * 1000)
+
+    def test_vertical_pointer_gain_expands_displacement(self):
+        tracker, kb = _tracker(mirror_x=False)
+        kb.screen_size.return_value = (1000, 1000)
+        lm = [[0.5, 0.6, 0.0]] * 21
+        tracker.update("point_two", lm, valid=True)
+        _, y = kb.mouse_down.call_args[0]
+        assert y == int((0.5 + ((0.6 - 0.5) * 2.2)) * 1000)
 
     def test_coordinates_clamped_to_screen_bounds(self):
         tracker, kb = _tracker(mirror_x=False)
