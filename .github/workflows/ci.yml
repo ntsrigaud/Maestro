@@ -6,31 +6,32 @@ on:
   pull_request:
 
 jobs:
-  runtime:
-    name: Runtime environment
+  # ---------------------------------------------------------------------------
+  # Lint — minimal install: only ruff, mypy, and type stubs.
+  # No torch, mediapipe, PySide6, or other heavy runtime deps are installed.
+  # mypy is configured to ignore_missing_imports for those packages so that
+  # style and type-checking still works correctly.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint & type check
     runs-on: ubuntu-latest
-    env:
-      QT_QPA_PLATFORM: offscreen
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install Qt system dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y libegl1 libopengl0
-
-      - name: Install runtime + dev dependencies
+      - name: Install lint dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          # Install lightweight type-checked packages first, then the source
+          # package without any of its heavy runtime deps.
+          pip install pydantic PyYAML numpy huggingface_hub \
+                      ruff mypy types-PyYAML types-PyAutoGUI
+          pip install -e . --no-deps
 
       - name: Lint
         run: ruff check .
