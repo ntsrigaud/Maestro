@@ -18,6 +18,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        # lfs: false (default) — model weights are in LFS but are not needed for lint.
+
+      - name: Pull notebook LFS objects
+        # ruff checks *.ipynb files; all notebooks are LFS-tracked (see .gitattributes).
+        # A selective pull fetches only the notebooks ruff needs, skipping large
+        # model-weight blobs (IPN/weights/*.pth).
+        run: git lfs pull --include="*.ipynb"
 
       - name: Set up Python
         uses: actions/setup-python@v5
