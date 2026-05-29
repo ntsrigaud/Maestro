@@ -33,7 +33,7 @@ training:
   label_smoothing: 0.05
   seed: 42
   num_workers: 0
-  class_weighting: true # IPN class imbalance (click/double-click are rare)
+  class_weighting: false # IPN class imbalance (click/double-click are rare)
   max_samples_per_class: 3000
 
 splits:
