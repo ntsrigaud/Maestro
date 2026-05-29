@@ -1,6 +1,7 @@
 """ShuffleNetV2 in PyTorch.
 
-See the paper "ShuffleNet V2: Practical Guidelines for Efficient CNN Architecture Design" for more details.
+See the paper "ShuffleNet V2: Practical Guidelines for Efficient CNN Architecture Design"
+for more details.
 """
 
 
@@ -123,7 +124,7 @@ class ShuffleNetV2(nn.Module):
             self.stage_out_channels = [-1, 24, 224, 488, 976, 2048]
         else:
             raise ValueError(
-                f"""{num_groups} groups is not supported for
+                f"""{width_mult} width_mult is not supported for
                        1x1 Grouped Convolutions"""
             )
 

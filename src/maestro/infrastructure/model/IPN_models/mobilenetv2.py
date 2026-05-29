@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-__all__ = ["MobilenetV2", "mob_v2"]
+__all__ = ["MobileNetV2", "mob_v2"]
 
 
 def conv_bn(inp, oup, stride):
