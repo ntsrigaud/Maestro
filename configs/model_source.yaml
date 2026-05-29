@@ -1,9 +1,9 @@
 # Model source configuration.
 #
 # Artifacts are loaded exclusively from Hugging Face Hub (cached after first use).
-# Auto-updated by 08_ldcong_finetune_from_jester_2layer_experiment.ipynb after HF publish.
+# Auto-updated by notebook 03 after HF publish.
 backend: huggingface
 cache_dir: null
-filename: two_stream_attn_v1_2layer_ld_cong_finetune_20260515T134706Z_inference.pt
+filename: two_stream_attn_finetune_hybrid_10class_finetune_20260529T122043Z_inference.pt
 repo_id: ntsrigaud/maestro-lstm-hybrid
 revision: main
