@@ -1,0 +1,22 @@
+{
+  "vocabulary": [
+    "point_one",
+    "point_two",
+    "click_one",
+    "click_two",
+    "swipe_up",
+    "swipe_down",
+    "swipe_left",
+    "swipe_right",
+    "open_palm_hold",
+    "double_click_one",
+    "double_click_two",
+    "zoom_in",
+    "zoom_out"
+  ],
+  "num_classes": 13,
+  "window_length": 32,
+  "feature_dim": 147,
+  "feature_schema_version": "feature-schema-v5",
+  "window_step": 1
+}
