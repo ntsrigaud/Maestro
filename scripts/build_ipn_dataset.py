@@ -76,7 +76,10 @@ except ImportError:  # graceful degradation if tqdm is not installed
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from maestro.training.dataset_builder import LabeledLandmarkFrame, SequenceDatasetBuilder  # noqa: E402
+from maestro.training.dataset_builder import (  # noqa: E402
+    LabeledLandmarkFrame,
+    SequenceDatasetBuilder,
+)
 
 try:  # noqa: E402
     from maestro.domain.entities import LabeledGraphFrame  # type: ignore
@@ -1036,7 +1039,9 @@ def main() -> None:
     parser = _build_arg_parser()
     args = parser.parse_args()
 
-    if args.format == "graph" and (GraphSequenceDatasetBuilder is None or LabeledGraphFrame is None):
+    if args.format == "graph" and (
+        GraphSequenceDatasetBuilder is None or LabeledGraphFrame is None
+    ):
         parser.error(
             "--format graph is unavailable because legacy graph classes are missing. "
             "Use '--format flat'."
