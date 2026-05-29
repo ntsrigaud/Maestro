@@ -39,34 +39,84 @@ jobs:
       - name: Type check
         run: mypy src/
 
-      - name: Runtime tests (no training extras)
-        run: pytest -m "not training"
-
-  training:
-    name: Training environment
+  # ---------------------------------------------------------------------------
+  # Test — runtime tests excluding training.
+  # Installs CPU-only torch to avoid pulling ~2 GB of NVIDIA CUDA packages
+  # that are useless on a CPU-only runner.
+  # PySide6 / pytest-qt are NOT installed; conftest.py already skips
+  # test_ui_* files when PySide6 is absent.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Runtime tests
     runs-on: ubuntu-latest
-    env:
-      QT_QPA_PLATFORM: offscreen
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           lfs: true
 
+      - name: Free disk space
+        run: |
+          # Remove large pre-installed tool-chains that are not needed here.
+          sudo rm -rf /usr/local/lib/android \
+                      /usr/share/dotnet \
+                      /opt/ghc \
+                      /usr/local/share/boost \
+                      "$AGENT_TOOLSDIRECTORY"
+          df -h
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install Qt system dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y libegl1 libopengl0
-
-      - name: Install runtime + dev + training dependencies
+      - name: Install CPU-only torch
+        # Pre-installing from the CPU index prevents pip from later pulling the
+        # default GPU wheel (532 MB) plus ~2 GB of nvidia-* CUDA packages.
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,training]"
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install runtime + dev + headless-OpenCV dependencies
+        run: pip install -e ".[dev,headless]"
+
+      - name: Runtime tests (no training extras)
+        run: pytest -m "not training"
+
+  # ---------------------------------------------------------------------------
+  # Training — full suite including scikit-learn tests.
+  # Same CPU-torch optimisation as the test job.
+  # ---------------------------------------------------------------------------
+  training:
+    name: Training tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android \
+                      /usr/share/dotnet \
+                      /opt/ghc \
+                      /usr/local/share/boost \
+                      "$AGENT_TOOLSDIRECTORY"
+          df -h
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU-only torch
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install runtime + dev + headless-OpenCV + training dependencies
+        run: pip install -e ".[dev,headless,training]"
 
       - name: Full test suite (including training tests)
         run: pytest
