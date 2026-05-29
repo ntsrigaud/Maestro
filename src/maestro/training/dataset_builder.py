@@ -143,7 +143,9 @@ class SequenceDatasetBuilder:
                 recording_id=frame.recording_id,
                 label=selected_label,
                 label_id=self._label_to_id[selected_label],
-                sequence=None if self._spill_sequences_to_disk else np.asarray(window.features, dtype=np.float32).copy(),
+                sequence=None
+                if self._spill_sequences_to_disk
+                else np.asarray(window.features, dtype=np.float32).copy(),
                 start_timestamp_ms=window.start_timestamp_ms,
                 end_timestamp_ms=window.end_timestamp_ms,
                 valid_ratio=window.valid_ratio,
@@ -197,6 +199,7 @@ class SequenceDatasetBuilder:
         # sequences during save for large datasets.
         with tempfile.TemporaryDirectory(prefix="maestro_npz_") as tmpdir:
             if self._spill_sequences_to_disk:
+                assert self._sequence_store is not None
                 sequences = self._sequence_store[:n_samples]
             else:
                 memmap_path = Path(tmpdir) / "sequences.float32.dat"
@@ -221,7 +224,7 @@ class SequenceDatasetBuilder:
                 end_ts[i] = sample.end_timestamp_ms
                 valid_ratio[i] = sample.valid_ratio
 
-            sequences.flush()
+            sequences.flush()  # type: ignore[attr-defined]
 
             metadata = {
                 "feature_schema_version": feature_schema_version,
@@ -263,7 +266,9 @@ class SequenceDatasetBuilder:
 
         if self._sequence_store is None:
             self._sequence_store_capacity = max(1024, self._sequence_count + 1)
-            self._sequence_store_path = Path(self._sequence_store_dir.name) / "sequences.float32.dat"
+            self._sequence_store_path = (
+                Path(self._sequence_store_dir.name) / "sequences.float32.dat"
+            )
             self._sequence_store = np.memmap(
                 self._sequence_store_path,
                 dtype=np.float32,

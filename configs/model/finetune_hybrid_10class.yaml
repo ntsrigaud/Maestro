@@ -1,0 +1,67 @@
+# ── EnhancedTwoStreamLSTM — Hybrid 10-class fine-tuning (production model) ──
+#
+# Phase 2 of the production model training pipeline.
+#
+# Fine-tunes the 25-class Jester-pretrained backbone on the 10-class production
+# hybrid dataset assembled from three data sources:
+#
+#   LD-CONGR  : fist, swiping_left, swiping_right, swiping_up, swiping_down
+#   Jester    : zooming_in_full_hand, zooming_out_full_hand
+#   IPN       : point_one, point_two, unknown
+#
+# No data leakage: Jester swipes (in 25-class pretrain) are replaced by
+# LD-CONGR swipes; Jester zoom classes were excluded from pretraining.
+#
+# Dataset: data/processed/hybrid_10class_dataset.npz
+#   Assembled in notebooks/01_dataset_preparation.ipynb
+#
+# Pretrained from: configs/model/pretrain_jester_25class.yaml checkpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_finetune_hybrid_10class
+  input_size: 147 # feature-schema-v5 (must match pretrained backbone)
+  hidden_size: 96 # must match pretrained checkpoint
+  num_layers: 2 # must match pretrained checkpoint
+  dropout: 0.40 # slightly higher than pretraining to reduce overfitting
+  num_classes: 10 # production vocabulary
+  num_heads: 8 # must match pretrained checkpoint
+  proj_dim: 96 # must match pretrained checkpoint
+
+training:
+  epochs: 80
+  batch_size: 128
+  learning_rate: 0.00003 # 3e-5 — low LR for fine-tuning
+  weight_decay: 0.001
+  grad_clip_norm: 1.0
+  early_stopping_patience: 20
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.05
+  seed: 42
+  num_workers: 0
+  class_weighting: true # multi-source imbalance (LD-CONGR vs Jester vs IPN)
+  max_samples_per_class: 3000
+
+splits:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 10
+  min_lr: 0.000001
+
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+
+augmentation:
+  enabled: true
+  temporal_scale_range: [0.75, 1.25]
+  spatial_jitter_sigma: 0.008
+  apply_prob: 0.6
+  mirror_flip_prob: 0.0 # disabled — directional swipes cannot be mirrored safely
