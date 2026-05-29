@@ -1,0 +1,60 @@
+# ── EnhancedTwoStreamLSTM — Jester 27-class pretraining (IPN baseline comparison) ──
+#
+# Phase 1 of the IPN baseline comparison pipeline.
+#
+# Trains EnhancedTwoStreamLSTM on the full 27-class Jester dataset to learn
+# general hand motion dynamics before fine-tuning on IPN 13-class.
+#
+# Dataset: data/processed/jester_27class_dataset.npz
+#   Assembled in notebooks/01_dataset_preparation.ipynb from jester_pretrain_dataset.npz
+#
+# Next step: configs/model/finetune_ipn_13class.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_pretrain_jester_27class
+  input_size: 147 # feature-schema-v5 (21 hand landmarks × 7 dims)
+  hidden_size: 96 # per-direction per-stream; BiLSTM output = 2×96 = 192
+  num_layers: 2
+  dropout: 0.35
+  num_classes: 27 # Full 27-class Jester vocabulary
+  num_heads: 8 # MHA heads; 192/8 = 24 dims per head
+  proj_dim: 96 # feature projection (73/74 → 96 before LSTM)
+
+training:
+  epochs: 80
+  batch_size: 256
+  learning_rate: 0.0001
+  weight_decay: 0.0005
+  grad_clip_norm: 1.0
+  early_stopping_patience: 15
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.05
+  seed: 42
+  num_workers: 0
+  class_weighting: true # balance rarer Jester classes
+  max_samples_per_class: 4000
+
+splits:
+  train_ratio: 0.85
+  val_ratio: 0.10
+  test_ratio: 0.05
+  stratified: true
+
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 8
+  min_lr: 0.000001
+
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+
+augmentation:
+  enabled: true
+  temporal_scale_range: [0.75, 1.25]
+  spatial_jitter_sigma: 0.008
+  apply_prob: 0.6
+  mirror_flip_prob: 0.5
