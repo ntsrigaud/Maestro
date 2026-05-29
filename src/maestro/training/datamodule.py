@@ -400,8 +400,16 @@ class GestureDataModule:
         #   New approach (streaming → compact 6.22 GB result):
         #     peak ≈ 6.3 GB  → fits in available RAM
         meta = metadata
-        T = int(meta.get("window_length", 16))
-        F = int(meta.get("feature_dim", 147))
+        # Peek at the actual sequences shape from the NPZ ZIP header (reads only
+        # a few hundred bytes — no decompression of the data array).  This guards
+        # against legacy NPZ files that omit 'window_length' / 'feature_dim' in
+        # their metadata_json, where a hardcoded fallback would silently
+        # misallocate the sequences buffer and cause a broadcast ValueError.
+        with _zipfile.ZipFile(str(self._dataset_path), "r") as _zf_peek:
+            with _zf_peek.open("sequences.npy", "r") as _hdr:
+                _, _actual_seq_shape = _parse_npy_header(_hdr)
+        T = int(meta.get("window_length", _actual_seq_shape[1]))
+        F = int(meta.get("feature_dim", _actual_seq_shape[2]))
 
         sequences = np.empty((N_kept, T, F), dtype=np.float32)
         write_pos = 0
