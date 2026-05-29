@@ -1,0 +1,48 @@
+version: ipn_13class_v1
+
+# 13-class IPN vocabulary for baseline comparison fine-tuning.
+#
+# Contains all 14 IPN gesture classes except "unknown" (D0X non-gesture
+# background).  The unknown class is excluded because the IPN baseline
+# comparison evaluates gesture recognition performance on active gestures only,
+# consistent with the evaluation protocol in published IPN Hand results.
+#
+# IPN source mapping (IPN code → vocabulary label):
+#   B0A  → point_one         (Pointing with index finger)
+#   B0B  → point_two         (Pointing with two fingers)
+#   G01  → click_one         (Click with index finger)
+#   G02  → click_two         (Click with two fingers)
+#   G03  → swipe_up          (Throw up)
+#   G04  → swipe_down        (Throw down)
+#   G05  → swipe_left        (Throw left)
+#   G06  → swipe_right       (Throw right)
+#   G07  → open_palm_hold    (Open palm / hold)
+#   G08  → double_click_one  (Double click with index finger)
+#   G09  → double_click_two  (Double click with two fingers)
+#   G10  → zoom_in           (Zoom in)
+#   G11  → zoom_out          (Zoom out)
+#
+# EXCLUDED:
+#   D0X  → unknown           (Non-gesture background — excluded for this split)
+#
+# Build the full 14-class IPN dataset first:
+#   python scripts/build_ipn_dataset.py \
+#       --ipn-root data/IPN \
+#       --output-npz data/processed/ipn_dataset_v5_full.npz \
+#       --vocab-config configs/gestures/vocabulary_ipn_13class.yaml \
+#       --window-length 32 --window-step 3
+
+gestures:
+  - point_one
+  - point_two
+  - click_one
+  - click_two
+  - swipe_up
+  - swipe_down
+  - swipe_left
+  - swipe_right
+  - open_palm_hold
+  - double_click_one
+  - double_click_two
+  - zoom_in
+  - zoom_out
