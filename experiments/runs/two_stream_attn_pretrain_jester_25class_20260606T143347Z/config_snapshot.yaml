@@ -1,0 +1,44 @@
+model:
+  model_name: two_stream_attn_pretrain_jester_25class
+  input_size: 147
+  hidden_size: 96
+  num_layers: 2
+  dropout: 0.35
+  num_classes: 25
+  num_heads: 8
+  proj_dim: 96
+  motion_temporal_conv: false
+  motion_attn_pool: false
+  baseline_backbone: resnet18
+  sample_size: 32
+  width_mult: 1.0
+  shortcut_type: B
+  cardinality: 32
+training:
+  epochs: 80
+  batch_size: 256
+  learning_rate: 0.0001
+  weight_decay: 0.0005
+  grad_clip_norm: 1.0
+  early_stopping_patience: 15
+  early_stopping_min_delta: 0.0001
+  seed: 42
+  num_workers: 0
+  class_weighting: true
+  label_smoothing: 0.05
+  max_samples_per_class: 4000
+  exclude_classes: null
+split:
+  train_ratio: 0.85
+  val_ratio: 0.1
+  test_ratio: 0.05
+  stratified: true
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 8
+  min_lr: 1.0e-06
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
