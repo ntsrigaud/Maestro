@@ -4,6 +4,6 @@
 # Auto-updated by notebook 03 after HF publish.
 backend: huggingface
 cache_dir: null
-filename: two_stream_attn_finetune_hybrid_10class_finetune_20260529T122043Z_inference.pt
+filename: two_stream_attn_finetune_hybrid_10class_finetune_20260606T150031Z_inference.pt
 repo_id: ntsrigaud/maestro-lstm-hybrid
 revision: main

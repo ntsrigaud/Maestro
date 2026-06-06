@@ -39,7 +39,7 @@ training:
   label_smoothing: 0.05
   seed: 42
   num_workers: 0
-  class_weighting: true # multi-source imbalance (LD-CONGR vs Jester vs IPN)
+  class_weighting: false # multi-source imbalance (LD-CONGR vs Jester vs IPN)
   max_samples_per_class: 3000
 
 splits:
