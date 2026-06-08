@@ -47,11 +47,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gc
 import json
 import logging
 import os
 import random
-import gc
 import sys
 import tempfile
 import time
