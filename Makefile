@@ -15,9 +15,6 @@ install-dev: ## Install UI + dev + training extras (editable)
 	pip install -e ".[ui,dev,training]"
 	$(MAKE) fix-omp
 
-install-ci: ## Install headless + dev + training extras for CI (no display)
-	pip install -e ".[headless,dev,training]"
-
 install-build: ## Install UI + PyInstaller extras (editable)
 	pip install -e ".[ui,build]"
 	@$(MAKE) --quiet fix-omp
@@ -38,9 +35,6 @@ typecheck: ## Type-check only
 format: ## Auto-format: ruff (replaces black + isort)
 	ruff format .
 	ruff check --fix .
-
-run-cli: ## Launch headless inference pipeline
-	python scripts/run_realtime.py
 
 run-ui: ## Launch PySide6 GUI
 	@$(MAKE) --quiet fix-omp
