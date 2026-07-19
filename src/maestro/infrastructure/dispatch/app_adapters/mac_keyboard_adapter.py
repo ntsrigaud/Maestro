@@ -9,7 +9,8 @@ LOGGER = logging.getLogger(__name__)
 
 _CG = None
 try:
-    _CG = ctypes.cdll.LoadLibrary(ctypes.util.find_library('CoreGraphics'))
+    cg_path = ctypes.util.find_library('CoreGraphics') or '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'
+    _CG = ctypes.cdll.LoadLibrary(cg_path)
 
     class CGPoint(ctypes.Structure):
         _fields_ = [("x", ctypes.c_double), ("y", ctypes.c_double)]
@@ -60,7 +61,8 @@ class MacKeyboardAdapter:
     @staticmethod
     def _foreground_identity_mac() -> str | None:
         try:
-            objc = ctypes.cdll.LoadLibrary(ctypes.util.find_library('objc'))
+            objc_path = ctypes.util.find_library('objc') or '/usr/lib/libobjc.A.dylib'
+            objc = ctypes.cdll.LoadLibrary(objc_path)
             objc.objc_getClass.restype = ctypes.c_void_p
             objc.sel_registerName.restype = ctypes.c_void_p
             objc_msgSend = objc.objc_msgSend
