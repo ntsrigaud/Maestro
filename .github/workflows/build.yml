@@ -77,6 +77,9 @@ jobs:
           pip uninstall -y opencv-python-headless || true
           pip install -e ".[ui,build]"
 
+      - name: Download offline model
+        run: python scripts/download_bundled_model.py
+
       - name: Build with PyInstaller
         run: pyinstaller --clean --noconfirm maestro.spec
 
@@ -119,6 +122,9 @@ jobs:
         run: |
           pip uninstall -y opencv-python-headless 2>NUL || echo "Not installed."
           pip install -e ".[ui,build]"
+
+      - name: Download offline model
+        run: python scripts/download_bundled_model.py
 
       - name: Build with PyInstaller
         run: pyinstaller --clean --noconfirm maestro.spec
