@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-ci install-build fix-omp test test-all lint typecheck format run-cli run-ui build build-onefile generate-icon clean
+.PHONY: help setup-build-env fix-omp test test-all lint typecheck format run-ui build build-onefile generate-icon clean
 
 help: ## Show this help message
 	@echo "Maestro — available targets:"
@@ -7,15 +7,7 @@ help: ## Show this help message
 	    | sort \
 	    | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-install: ## Install UI extras for end-user use (editable)
-	pip install -e ".[ui]"
-	$(MAKE) fix-omp
-
-install-dev: ## Install UI + dev + training extras (editable)
-	pip install -e ".[ui,dev,training]"
-	$(MAKE) fix-omp
-
-install-build: ## Install UI + PyInstaller extras (editable)
+setup-build-env: ## Install PyInstaller build dependencies (editable)
 	pip install -e ".[ui,build]"
 	@$(MAKE) --quiet fix-omp
 
@@ -45,7 +37,7 @@ fix-omp: ## (macOS) Patch torch's libomp install name to prevent OMP Error #15
 
 # ── Application bundling ──────────────────────────────────────────────────────
 
-build: install-build ## Build standalone app bundle via PyInstaller
+build: setup-build-env ## Build standalone app bundle via PyInstaller
 	@echo "Downloading offline model from Hugging Face Hub..."
 	python scripts/download_bundled_model.py
 	@echo "Building Maestro standalone application..."
@@ -63,7 +55,7 @@ build: install-build ## Build standalone app bundle via PyInstaller
 	    echo "✓ Executable: dist/Maestro/"; \
 	fi
 
-build-onefile: install-build ## Build a single-file executable (slower startup)
+build-onefile: setup-build-env ## Build a single-file executable (slower startup)
 	pyinstaller --noconfirm --onefile --windowed --name Maestro \
 	    src/maestro/app/ui/app_ui.py
 	@echo "✓ Output: dist/Maestro"

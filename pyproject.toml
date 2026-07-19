@@ -14,10 +14,9 @@ dependencies = [
   "numpy>=1.26.0,<2.0.0",
   "torch>=2.7.0",
   # opencv is intentionally NOT listed here.
-  # Install the [ui] extra which provides opencv-python:
   #   pip install -e '.[ui]'       → opencv-python       (full, for GUI)
   "mediapipe==0.10.14",
-  "pyautogui>=0.9.54",
+  "pyautogui>=0.9.54; sys_platform != 'darwin'",
   "huggingface_hub>=0.22.0",
 ]
 
@@ -49,9 +48,6 @@ dev = [
 build = [
   "pyinstaller>=6.0.0",
 ]
-
-[project.gui-scripts]
-maestro = "maestro.app.ui.app_ui:run_ui"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
