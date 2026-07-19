@@ -83,6 +83,9 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller --clean --noconfirm maestro.spec
 
+      - name: Ad-hoc code sign for Apple Silicon
+        run: codesign --force --deep --sign - dist/Maestro.app
+
       - name: Verify bundle
         run: test -d dist/Maestro.app
 
