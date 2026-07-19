@@ -137,17 +137,15 @@ jobs:
         run: Test-Path dist\Maestro\Maestro.exe
         shell: pwsh
 
-      - name: Archive output
-        run: |
-          Compress-Archive -Path dist\Maestro -DestinationPath dist\Maestro-windows.zip
-        shell: pwsh
+      - name: Create Windows Installer
+        run: iscc installer.iss
 
       - name: Upload Windows artifact
         if: ${{ github.event_name == 'push' || inputs.upload_artifacts }}
         uses: actions/upload-artifact@v4
         with:
           name: Maestro-windows
-          path: dist/Maestro-windows.zip
+          path: dist/Maestro_Setup.exe
           retention-days: 30
 
   # ── GitHub Release (on tag push only) ───────────────────────────────────
@@ -181,4 +179,4 @@ jobs:
           generate_release_notes: true
           files: |
             dist/Maestro-macos.dmg
-            dist/Maestro-windows.zip
+            dist/Maestro_Setup.exe
