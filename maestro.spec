@@ -73,6 +73,8 @@ hiddenimports = mp_hidden + [
     "maestro.pipeline.hand_selection",
     "maestro.infrastructure.dispatch.app_adapters.presentation_adapter",
     "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter",
+    "AppKit",
+    "pyautogui",
 ]
 
 # ---------------------------------------------------------------------------
