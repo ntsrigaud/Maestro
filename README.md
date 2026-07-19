@@ -45,24 +45,22 @@ Discrete commands are routed through `GestureActivationController` + `CommandDis
 
 ## Installation
 
-### Option A — Standalone application (recommended for end users)
+Download the pre-built installer for your platform from the [GitHub Releases](https://github.com/ntsrigaud/Maestro/releases) page. The application is completely standalone and does not require Python or internet access to run (the AI models are bundled directly into the app).
 
-Download the pre-built bundle for your platform from the [GitHub Releases](https://github.com/ntsrigaud/Maestro/releases) page:
+### macOS
+1. Download `Maestro-macos.dmg`.
+2. Open the DMG and drag Maestro to your Applications folder.
+3. **Important**: Because this application is not signed with a paid Apple Developer ID, macOS Gatekeeper will block it from running the first time. To fix this, open your `Terminal` and run the following command to remove the quarantine flag:
+   ```bash
+   xattr -cr /Applications/Maestro.app
+   ```
+4. You can now launch Maestro from your Applications folder.
 
-| Platform    | Download              | Action                                                             |
-| ----------- | --------------------- | ------------------------------------------------------------------ |
-| **macOS**   | `Maestro-macos.dmg`   | Open the DMG, drag Maestro to Applications, double-click to launch |
-| **Windows** | `Maestro-windows.zip` | Extract the archive, run `Maestro.exe` inside the folder           |
-
-No Python installation required. The model is downloaded from Hugging Face Hub on first launch and cached locally.
-
-### Option B — pip install (Python users)
-
-```bash
-pip install -e ".[ui]"   # installs PySide6, opencv-python, and all runtime deps
-maestro-ui               # launch the GUI
-maestro --no-display     # launch headless (CLI)
-```
+### Windows
+1. Download `Maestro_Setup.exe`.
+2. Double-click the setup file to install Maestro.
+3. **Important**: Because this application is not signed with an Authenticode certificate, Windows SmartScreen may show a "Windows protected your PC" warning. Click **More info** and then click **Run anyway**.
+4. Launch Maestro from your Start Menu.
 
 On first launch the application copies its factory-default configuration to:
 
