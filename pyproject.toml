@@ -14,21 +14,14 @@ dependencies = [
   "numpy>=1.26.0,<2.0.0",
   "torch>=2.7.0",
   # opencv is intentionally NOT listed here.
-  # opencv-python and opencv-python-headless both provide the cv2 namespace and
-  # conflict with each other.  Install exactly one via an extra:
+  # Install the [ui] extra which provides opencv-python:
   #   pip install -e '.[ui]'       → opencv-python       (full, for GUI)
-  #   pip install -e '.[headless]' → opencv-python-headless (for CI / scripts)
   "mediapipe==0.10.14",
   "pyautogui>=0.9.54",
   "huggingface_hub>=0.22.0",
 ]
 
 [project.optional-dependencies]
-headless = [
-  # Headless OpenCV for server-side scripts, training, and CI.
-  # Do NOT install alongside the ui extra — they conflict (both provide cv2).
-  "opencv-python-headless>=4.10.0",
-]
 training = [
   "scikit-learn>=1.5.0",
 ]
@@ -42,8 +35,6 @@ notebooks = [
 ]
 ui = [
   "PySide6>=6.7.0",
-  # Full OpenCV with display backend required for the preview window.
-  # Mutually exclusive with the headless extra.
   "opencv-python>=4.10.0",
 ]
 dev = [
@@ -59,11 +50,8 @@ build = [
   "pyinstaller>=6.0.0",
 ]
 
-[project.scripts]
-maestro = "maestro.app.main:main"
-
 [project.gui-scripts]
-maestro-ui = "maestro.app.ui.app_ui:run_ui"
+maestro = "maestro.app.ui.app_ui:run_ui"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
