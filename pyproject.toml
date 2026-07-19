@@ -11,7 +11,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
   "pydantic>=2.6.0",
   "PyYAML>=6.0.1",
-  "numpy>=1.26.0",
+  "numpy>=1.26.0,<2.0.0",
   "torch>=2.7.0",
   # opencv is intentionally NOT listed here.
   # opencv-python and opencv-python-headless both provide the cv2 namespace and
