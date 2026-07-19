@@ -20,6 +20,7 @@ install-ci: ## Install headless + dev + training extras for CI (no display)
 
 install-build: ## Install UI + PyInstaller extras (editable)
 	pip install -e ".[ui,build]"
+	@$(MAKE) --quiet fix-omp
 
 test: ## Run the non-training test suite
 	pytest -m "not training"
@@ -57,8 +58,13 @@ build: install-build ## Build standalone app bundle via PyInstaller
 	pyinstaller --clean --noconfirm maestro.spec
 	@echo ""
 	@if [ "$$(uname)" = "Darwin" ]; then \
-	    echo "✓ macOS bundle: dist/Maestro.app"; \
-	    echo "  Launch: open dist/Maestro.app"; \
+	    echo "Code signing application..."; \
+	    codesign --force --deep --sign - dist/Maestro.app; \
+	    echo "Creating DMG archive..."; \
+	    rm -f dist/*.dmg; \
+	    create-dmg --overwrite --no-code-sign dist/Maestro.app dist/ || true; \
+	    mv dist/Maestro\ *.dmg dist/Maestro-macos.dmg; \
+	    echo "✓ macOS bundle: dist/Maestro-macos.dmg"; \
 	else \
 	    echo "✓ Executable: dist/Maestro/"; \
 	fi
