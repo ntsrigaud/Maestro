@@ -82,7 +82,6 @@ class CLIPreviewWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def keyPressEvent(self, event: object) -> None:  # type: ignore[override]
-
         key = getattr(event, "key", lambda: None)()
         if key in (Qt.Key.Key_Q, Qt.Key.Key_Escape):
             self._controller.stop()
