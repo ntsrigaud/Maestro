@@ -85,7 +85,7 @@ binaries = mp_binaries
 # Analysis
 # ---------------------------------------------------------------------------
 a = Analysis(
-    [str(ROOT / "src" / "maestro" / "app" / "ui" / "app_ui.py")],
+    [str(ROOT / "scripts" / "run_ui.py")],
     pathex=[str(ROOT / "src")],
     binaries=binaries,
     datas=datas,
@@ -94,22 +94,56 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Exclude training / notebook extras to keep binary size down
-        # NOTE: matplotlib must NOT be excluded — mediapipe.python.solutions.drawing_utils
-        # imports matplotlib.pyplot at module level, which would cause a crash on startup.
+        # Web / Heavy UI frameworks not needed
+        "PySide6.QtWebEngine",
+        "PySide6.QtWebEngineCore",
+        "PySide6.QtWebEngineWidgets",
+        "PySide6.QtNetwork",
+        "PySide6.QtQml",
+        "PySide6.QtQuick",
+        # ML libraries statically analyzed but not used in inference
+        "tensorflow",
+        "tensorboard",
+        "jax",
+        "jaxlib",
+        "keras",
+        "flax",
+        "scipy",
+        "onnxruntime",
+        "polars",
+        "pyarrow",
+        "tokenizers",
+        # Test & Notebook infrastructure
         "sklearn",
         "seaborn",
         "pandas",
         "jupyter",
         "ipykernel",
         "notebook",
-        # Test infrastructure
+        "ipython",
         "pytest",
         "pytest_qt",
     ],
     noarchive=False,
     optimize=0,
 )
+
+# Strip massive unused Qt frameworks and plugins that PyInstaller hooks pull in
+def remove_unused(items):
+    exclusions = (
+        "QtWebEngine", "QtQml", "QtQuick", "QtDesigner", "QtNetwork",
+        "QtSql", "QtXml", "QtTest", "Qt3D", "QtPdf", "QtBluetooth",
+        "QtMultimedia", "QtNfc", "QtPositioning", "QtSensors", 
+        "QtSerialPort", "QtWebSockets", "QtDataVisualization",
+        "QtCharts", "QtSpatialAudio", "qmlls", "qmlformat", "qmllint"
+    )
+    return [
+        item for item in items
+        if not any(x in item[0] for x in exclusions)
+    ]
+
+a.binaries = remove_unused(a.binaries)
+a.datas = remove_unused(a.datas)
 
 pyz = PYZ(a.pure)  # noqa: F821
 
