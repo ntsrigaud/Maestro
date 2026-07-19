@@ -71,7 +71,6 @@ hiddenimports = mp_hidden + [
     "maestro._defaults",
     "maestro.app._paths",
     "maestro.pipeline.hand_selection",
-    "maestro.infrastructure.gaze",
     "maestro.infrastructure.dispatch.app_adapters.presentation_adapter",
     "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter",
 ]
