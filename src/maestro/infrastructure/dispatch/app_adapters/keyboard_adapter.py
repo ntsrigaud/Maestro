@@ -121,15 +121,8 @@ def _scope_tokens() -> tuple[str, ...]:
 
 def _foreground_identity_mac() -> str | None:
     try:
-        import AppKit  # type: ignore
-
-        ws = AppKit.NSWorkspace.sharedWorkspace()
-        app = ws.frontmostApplication()
-        if app is None:
-            return None
-        bundle_id = str(app.bundleIdentifier() or "")
-        app_name = str(app.localizedName() or "")
-        return f"{bundle_id} {app_name}".strip().lower()
+        from maestro.infrastructure.dispatch.app_adapters.mac_keyboard_adapter import MacKeyboardAdapter
+        return MacKeyboardAdapter._foreground_identity_mac()
     except Exception:
         return None
 
@@ -209,6 +202,12 @@ class KeyboardAdapter:
     headless / CI environments to run without OS-level side effects.
     """
 
+    def __init__(self):
+        self._mac_adapter = None
+        if sys.platform == "darwin":
+            from maestro.infrastructure.dispatch.app_adapters.mac_keyboard_adapter import MacKeyboardAdapter
+            self._mac_adapter = MacKeyboardAdapter()
+
     def _ensure_presentation_scope(self, action: str) -> bool:
         identity = _foreground_identity()
         if identity is None:
@@ -258,6 +257,12 @@ class KeyboardAdapter:
         if not self._ensure_presentation_scope(action=f"hotkey:{'+'.join(keys)}"):
             return False
 
+        if self._mac_adapter is not None:
+            result = self._mac_adapter.press_hotkey(*keys)
+            if result:
+                LOGGER.debug("Pressed hotkey (macOS): %s", "+".join(k.lower() for k in keys))
+            return result
+
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning(
                 "pyautogui is not installed — keyboard dispatch skipped. "
@@ -278,6 +283,12 @@ class KeyboardAdapter:
         """
         if not self._ensure_presentation_scope(action=f"scroll:{clicks}"):
             return False
+
+        if self._mac_adapter is not None:
+            result = self._mac_adapter.scroll(clicks)
+            if result:
+                LOGGER.debug("Scrolled (macOS): clicks=%d", clicks)
+            return result
 
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — scroll skipped.")
@@ -303,6 +314,15 @@ class KeyboardAdapter:
         # environments where pyautogui is not installed.
         if max_abs_clicks < 1:
             raise ValueError("max_abs_clicks must be >= 1")
+
+        clamped = max(-max_abs_clicks, min(max_abs_clicks, clicks))
+
+        if self._mac_adapter is not None:
+            result = self._mac_adapter.zoom(clicks, modifier=modifier, max_abs_clicks=max_abs_clicks)
+            if result:
+                LOGGER.debug("Zoomed (macOS): modifier=%s clicks=%d", modifier, clamped)
+            return result
+
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — zoom skipped.")
             return False
@@ -326,6 +346,12 @@ class KeyboardAdapter:
         """
         if not self._ensure_presentation_scope(action=f"move_mouse:{x}:{y}"):
             return False
+
+        if self._mac_adapter is not None:
+            result = self._mac_adapter.move_mouse(x, y)
+            if result:
+                LOGGER.debug("Mouse moved (macOS) to (%d, %d)", x, y)
+            return result
 
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — mouse move skipped.")
@@ -354,6 +380,12 @@ class KeyboardAdapter:
         """
         if not self._ensure_presentation_scope(action=f"mouse_drag_to:{x}:{y}"):
             return False
+
+        if self._mac_adapter is not None:
+            result = self._mac_adapter.mouse_drag_to(x, y)
+            if result:
+                LOGGER.debug("Mouse dragged (macOS) to (%d, %d)", x, y)
+            return result
 
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — mouse_drag_to skipped.")
@@ -400,6 +432,12 @@ class KeyboardAdapter:
         if not self._ensure_presentation_scope(action=f"mouse_down:{x}:{y}"):
             return False
 
+        if self._mac_adapter is not None:
+            result = self._mac_adapter.mouse_down(x, y)
+            if result:
+                LOGGER.debug("Mouse down (macOS) at (%d, %d)", x, y)
+            return result
+
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — mouse_down skipped.")
             return False
@@ -428,6 +466,12 @@ class KeyboardAdapter:
         if not self._ensure_presentation_scope(action="mouse_up"):
             return False
 
+        if self._mac_adapter is not None:
+            result = self._mac_adapter.mouse_up()
+            if result:
+                LOGGER.debug("Mouse up (macOS)")
+            return result
+
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — mouse_up skipped.")
             return False
@@ -446,6 +490,12 @@ class KeyboardAdapter:
         if not self._ensure_presentation_scope(action="mouse_click"):
             return False
 
+        if self._mac_adapter is not None:
+            result = self._mac_adapter.mouse_click()
+            if result:
+                LOGGER.debug("Mouse clicked (macOS)")
+            return result
+
         if pyautogui is None:  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — mouse_click skipped.")
             return False
@@ -459,6 +509,9 @@ class KeyboardAdapter:
         Falls back to a safe 1920×1080 default when pyautogui is unavailable
         so that coordinate calculations in headless environments do not crash.
         """
+        if self._mac_adapter is not None:
+            return self._mac_adapter.screen_size()
+
         if pyautogui is None:  # pragma: no cover
             return (1920, 1080)
         w, h = pyautogui.size()
