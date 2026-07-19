@@ -86,14 +86,15 @@ jobs:
       - name: Verify bundle
         run: test -d dist/Maestro.app
 
+      - name: Install create-dmg
+        run: npm install -g create-dmg
+
       - name: Create DMG archive
         run: |
-          hdiutil create \
-            -volname "Maestro" \
-            -srcfolder dist/Maestro.app \
-            -ov \
-            -format UDZO \
-            dist/Maestro-macos.dmg
+          create-dmg \
+            --overwrite \
+            dist/Maestro.app dist/ || true
+          mv dist/Maestro*.dmg dist/Maestro-macos.dmg
 
       - name: Upload macOS artifact
         if: ${{ github.event_name == 'push' || inputs.upload_artifacts }}
