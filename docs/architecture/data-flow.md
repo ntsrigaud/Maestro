@@ -360,12 +360,6 @@ the main (Qt event loop) thread via Qt's event queue. `RuntimeState` is a
 | `MainWindow` (tray) | `RuntimeController.state_updated` | `info["accepted"]`, `last_label`                            |
 | `MainWindow` (log)  | `RuntimeController.state_updated` | `mode`, `info["accepted"]`, `last_label`, `last_confidence` |
 
-### CLI Path
-
-When the system is launched via `scripts/run_realtime.py`, `on_state` is `None`. No
-`RuntimeState` objects are emitted to any callback; the inference loop is completely unmodified
-from its pre-UI implementation.
-
 ## 5. Data Volume Summary
 
 | Pipeline Point    | Data Size                            | Frequency             |

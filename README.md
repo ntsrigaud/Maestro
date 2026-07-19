@@ -16,14 +16,7 @@ Camera → MediaPipe Hands → Hand Selection → Feature Engineering → Slidin
 
 A **PySide6 graphical interface** provides runtime control, live telemetry monitoring, configuration editing, and model selection — all without interfering with the inference pipeline. The inference loop runs in a background `QThread`; the UI receives state updates through Qt signal-slot connections at approximately 10 Hz.
 
-**Two launch modes:**
-
-| Mode    | Entry point  | Description                                             |
-| ------- | ------------ | ------------------------------------------------------- |
-| **GUI** | `maestro-ui` | PySide6 control panel with monitoring and config editor |
-| **CLI** | `maestro`    | Headless inference only; no PySide6 dependency          |
-
-For developers who prefer script-based invocation, `scripts/run_ui.py` and `scripts/run_realtime.py` remain available as thin wrappers.
+For developers who prefer script-based invocation, `scripts/run_ui.py` is available as a thin wrapper.
 
 **Gesture vocabulary** (hybrid Jester+IPN, 10 classes):
 
@@ -55,6 +48,7 @@ Download the pre-built installer for your platform from the [GitHub Releases](ht
    xattr -cr /Applications/Maestro.app
    ```
 4. You can now launch Maestro from your Applications folder.
+5. **Important**: Maestro requires Accessibility permissions to control PowerPoint. When you first launch the app and try to execute a gesture, macOS may prompt you. If not, open **System Settings > Privacy & Security > Accessibility** and manually add/enable Maestro.
 
 ### Windows
 1. Download `Maestro_Setup.exe`.
@@ -82,7 +76,7 @@ Key directories:
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `src/maestro/` | Core package (domain, interfaces, infrastructure, pipeline, training, app/ui)                                                      |
 | `configs/`     | YAML configuration (app, inference, model, gestures, thresholds)                                                                   |
-| `scripts/`     | CLI entry points (`run_ui.py`, `run_realtime.py`, data, training)                                                                  |
+| `scripts/`     | UI entry point (`run_ui.py`), data generation, and training utilities                                                                  |
 | `models/`      | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/maestro-lstm) |
 | `tests/`       | Unit, integration, and system test suites                                                                                          |
 | `docs/`        | Architecture docs, guides, and decision records                                                                                    |

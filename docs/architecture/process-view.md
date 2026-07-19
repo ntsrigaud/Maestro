@@ -2,23 +2,11 @@
 
 ## 1. Overview
 
-The process view describes the runtime behavior of the system, including the real-time frame processing pipeline, concurrency model, state management, and timing characteristics. The system supports two execution modes: a **single-threaded CLI mode** (`scripts/run_realtime.py`) and a **dual-thread GUI mode** (`scripts/run_ui.py`). In both modes the core inference pipeline is identical; the only difference is lifecycle management and state observation.
+The process view describes the runtime behavior of the system, including the real-time frame processing pipeline, concurrency model, state management, and timing characteristics. The system uses a **dual-thread execution model** launched via `scripts/run_ui.py`.
 
 ## 2. Threading Model
 
-### 2.1 CLI Mode — Single-Threaded Execution
-
-When launched via `scripts/run_realtime.py`, the system uses a **single-threaded execution model**. All pipeline stages execute sequentially within the main thread of the `Runtime.run()` event loop. This design choice is deliberate:
-
-- **Determinism**: Sequential execution eliminates race conditions in stateful components (feature transformer velocity history, sliding window buffer, prediction stabilizer EMA state, activation controller state machine).
-- **Simplicity**: No synchronization primitives, thread pools, or message queues are required.
-- **Sufficient throughput**: The combined pipeline latency (~60–80 ms) sustains interactive frame rates (12–16 inferences per second) on consumer CPUs, which exceeds the temporal resolution required for gesture recognition.
-
-OpenCV's `VideoCapture.read()` blocks until a frame is available. The frame source enforces target FPS timing through sleep-based throttling, preventing CPU spinning.
-
-### 2.2 GUI Mode — Dual-Thread Execution
-
-When launched via `scripts/run_ui.py`, the system uses a **dual-thread execution model**:
+The system uses a **dual-thread execution model**:
 
 | Thread            | Runs                                         | Responsibility                            |
 | ----------------- | -------------------------------------------- | ----------------------------------------- |
@@ -27,7 +15,7 @@ When launched via `scripts/run_ui.py`, the system uses a **dual-thread execution
 
 Cross-thread communication uses Qt **queued signal connections** — the safe mechanism for passing data across thread boundaries in Qt. `_RuntimeThread._handle_state()` is called by `Runtime` every frame via the `on_state` callback. The worker increments a frame counter and emits the `state_ready` Qt signal every `emit_every` frames (default 3), capping UI traffic at approximately 10 Hz at 30 FPS. The queued connection delivers each `RuntimeState` (`dataclass(slots=True)`) to the main thread via Qt's event queue. No mutex, explicit lock, or shared mutable state is used.
 
-The inference pipeline is **unmodified between modes**: `on_state` is the only addition to `runtime.py`. When `on_state is None` (CLI mode), there is zero overhead.
+The inference pipeline is entirely decoupled from the UI thread; `on_state` is the only addition to `runtime.py`.
 
 ## 3. Main Event Loop
 
