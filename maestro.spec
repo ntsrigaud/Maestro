@@ -41,6 +41,8 @@ datas = [
     (str(CONFIGS_SRC), "configs"),
     # Application icon (used by get_app_icon() at runtime)
     (str(ROOT / "docs" / "assets" / "icon.png"), "docs/assets"),
+    # Offline bundled model
+    (str(ROOT / "models"), "models"),
 ]
 
 # MediaPipe ships its own model files and protobuf descriptors as data.
