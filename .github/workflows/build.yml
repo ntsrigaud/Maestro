@@ -96,6 +96,7 @@ jobs:
         run: |
           create-dmg \
             --overwrite \
+            --no-code-sign \
             dist/Maestro.app dist/ || true
           mv dist/Maestro*.dmg dist/Maestro-macos.dmg
 
