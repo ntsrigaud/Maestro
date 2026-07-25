@@ -37,7 +37,7 @@ fix-omp: ## (macOS) Patch torch's libomp install name to prevent OMP Error #15
 
 # ── Application bundling ──────────────────────────────────────────────────────
 
-build: setup-build-env ## Build standalone app bundle via PyInstaller
+build: clean setup-build-env ## Build standalone app bundle via PyInstaller
 	@echo "Downloading offline model from Hugging Face Hub..."
 	python scripts/download_bundled_model.py
 	@echo "Building Maestro standalone application..."
