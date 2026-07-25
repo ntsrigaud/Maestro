@@ -207,3 +207,15 @@ notebooks/best_lstm_model79.h5
 /results
 /docs/assets/icon_preview.png
 /deps
+
+# ── Dynamic Model Artifacts (Do Not Track) ──────────
+# All models are downloaded dynamically via scripts/download_bundled_model.py
+*.pt
+*.pth
+*.task
+
+# ── Notebook Outputs ─────────────────────────────────
+notebooks/*.png
+notebooks/*.pdf
+IPN/report_ipn/
+IPN/annotation_ipnGesture/
