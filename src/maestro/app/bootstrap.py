@@ -237,12 +237,18 @@ def _load_model_from_source(
     hf_revision_override: str | None,
     device: torch.device,
 ) -> InferenceArtifact:
-    """Load the enhanced two-stream attention artifact from Hugging Face Hub.
-
-    When *hf_revision_override* is provided it overrides ``model_source.revision``
-    (supports the ``--hf-revision`` CLI flag).
+    """Load the enhanced two-stream attention artifact.
+    First checks for a bundled offline model before falling back to Hugging Face Hub.
     """
     src = config.model_source
+
+    # 1. Try to load bundled offline model (if packaged via PyInstaller)
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        bundled_path = Path(sys._MEIPASS) / "models" / src.filename
+        if bundled_path.exists():
+            return load_inference_artifact(artifact_path=bundled_path, device=device)
+
+    # 2. Fallback to Hugging Face Hub download
     from maestro.infrastructure.model.hf_loader import (
         load_artifact_from_hub,
     )

@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-ci install-build fix-omp test test-all lint typecheck format run-cli run-ui build build-onefile generate-icon clean
+.PHONY: help setup-build-env fix-omp test test-all lint typecheck format run-ui build build-onefile generate-icon clean
 
 help: ## Show this help message
 	@echo "Maestro — available targets:"
@@ -7,19 +7,9 @@ help: ## Show this help message
 	    | sort \
 	    | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-install: ## Install UI extras for end-user use (editable)
-	pip install -e ".[ui]"
-	$(MAKE) fix-omp
-
-install-dev: ## Install UI + dev + training extras (editable)
-	pip install -e ".[ui,dev,training]"
-	$(MAKE) fix-omp
-
-install-ci: ## Install headless + dev + training extras for CI (no display)
-	pip install -e ".[headless,dev,training]"
-
-install-build: ## Install UI + PyInstaller extras (editable)
+setup-build-env: ## Install PyInstaller build dependencies (editable)
 	pip install -e ".[ui,build]"
+	@$(MAKE) --quiet fix-omp
 
 test: ## Run the non-training test suite
 	pytest -m "not training"
@@ -38,9 +28,6 @@ format: ## Auto-format: ruff (replaces black + isort)
 	ruff format .
 	ruff check --fix .
 
-run-cli: ## Launch headless inference pipeline
-	python scripts/run_realtime.py
-
 run-ui: ## Launch PySide6 GUI
 	@$(MAKE) --quiet fix-omp
 	python scripts/run_ui.py
@@ -50,18 +37,27 @@ fix-omp: ## (macOS) Patch torch's libomp install name to prevent OMP Error #15
 
 # ── Application bundling ──────────────────────────────────────────────────────
 
-build: install-build ## Build standalone app bundle via PyInstaller
+build: clean setup-build-env ## Build standalone app bundle via PyInstaller
+	@echo "Downloading offline model from Hugging Face Hub..."
+	python scripts/download_bundled_model.py
 	@echo "Building Maestro standalone application..."
 	pyinstaller --clean --noconfirm maestro.spec
 	@echo ""
 	@if [ "$$(uname)" = "Darwin" ]; then \
-	    echo "✓ macOS bundle: dist/Maestro.app"; \
-	    echo "  Launch: open dist/Maestro.app"; \
+	    echo "Code signing application..."; \
+	    codesign --force --deep --sign - dist/Maestro.app; \
+	    echo "Creating DMG archive..."; \
+	    rm -f dist/*.dmg; \
+	    create-dmg --overwrite --no-code-sign dist/Maestro.app dist/ || true; \
+	    mv dist/Maestro\ *.dmg dist/Maestro-macos.dmg; \
+	    echo "Cleaning up intermediate build directory..."; \
+	    rm -rf dist/Maestro dist/Maestro.app; \
+	    echo "✓ macOS bundle: dist/Maestro-macos.dmg"; \
 	else \
 	    echo "✓ Executable: dist/Maestro/"; \
 	fi
 
-build-onefile: install-build ## Build a single-file executable (slower startup)
+build-onefile: setup-build-env ## Build a single-file executable (slower startup)
 	pyinstaller --noconfirm --onefile --windowed --name Maestro \
 	    src/maestro/app/ui/app_ui.py
 	@echo "✓ Output: dist/Maestro"

@@ -31,7 +31,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install lint dependencies
+      - name: Install Qt system dependencies & Xvfb
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libegl1 libopengl0 xvfb
+
+      - name: Install runtime + dev dependencies
         run: |
           python -m pip install --upgrade pip
           # Install lightweight type-checked packages first, then the source
@@ -46,15 +51,11 @@ jobs:
       - name: Type check
         run: mypy src/
 
-  # ---------------------------------------------------------------------------
-  # Test — runtime tests excluding training.
-  # Installs CPU-only torch to avoid pulling ~2 GB of NVIDIA CUDA packages
-  # that are useless on a CPU-only runner.
-  # PySide6 / pytest-qt are NOT installed; conftest.py already skips
-  # test_ui_* files when PySide6 is absent.
-  # ---------------------------------------------------------------------------
-  test:
-    name: Runtime tests
+      - name: Runtime tests (no training extras)
+        run: xvfb-run -a pytest -m "not training"
+
+  training:
+    name: Training environment
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -77,9 +78,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install CPU-only torch
-        # Pre-installing from the CPU index prevents pip from later pulling the
-        # default GPU wheel (532 MB) plus ~2 GB of nvidia-* CUDA packages.
+      - name: Install Qt system dependencies & Xvfb
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libegl1 libopengl0 xvfb
+
+      - name: Install runtime + dev + training dependencies
         run: |
           python -m pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -126,4 +130,4 @@ jobs:
         run: pip install -e ".[dev,headless,training]"
 
       - name: Full test suite (including training tests)
-        run: pytest
+        run: xvfb-run -a pytest

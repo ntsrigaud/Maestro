@@ -66,7 +66,7 @@ The system is organized into four layers:
 
 **Pipeline Layer**: Stateful processing components that transform data between pipeline stages. Includes feature normalization, temporal windowing, prediction smoothing, and the activation state machine.
 
-**Application Layer**: Composition root (`bootstrap.py`) wires all dependencies from configuration. The runtime loop (`runtime.py`) orchestrates the sequential frame processing pipeline. The **PySide6 graphical interface** (`app/ui/`) provides start/stop control, live telemetry monitoring, configuration editing, and model selection without modifying the inference pipeline. Two launch modes are supported: `scripts/run_ui.py` (graphical) and `scripts/run_realtime.py` (CLI-only).
+**Application Layer**: Composition root (`bootstrap.py`) wires all dependencies from configuration. The runtime loop (`runtime.py`) orchestrates the sequential frame processing pipeline. The **PySide6 graphical interface** (`app/ui/`) provides start/stop control, live telemetry monitoring, configuration editing, and model selection without modifying the inference pipeline. The system is launched via `scripts/run_ui.py`.
 
 ## 5. End-to-End Pipeline Summary
 

@@ -164,9 +164,11 @@ def test_minimal_preview_shows_border_hides_landmarks() -> None:
     result = renderer.render(_make_frame(width=160, height=240), state)
 
     # Status border IS drawn in minimal_preview mode.
-    assert tuple(int(v) for v in result.frame[1, 1]) != (0, 0, 0), (
-        "expected border pixel to be coloured, got black"
-    )
+    assert tuple(int(v) for v in result.frame[1, 1]) != (
+        0,
+        0,
+        0,
+    ), "expected border pixel to be coloured, got black"
     # Landmarks are NOT drawn — centre pixel stays dark.
     assert tuple(int(v) for v in result.frame[120, 80]) == (0, 0, 0)
 
