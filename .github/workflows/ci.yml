@@ -22,10 +22,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Qt system dependencies
+      - name: Install Qt system dependencies & Xvfb
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y libegl1 libopengl0
+          sudo apt-get install -y libegl1 libopengl0 xvfb
 
       - name: Install runtime + dev dependencies
         run: |
@@ -39,7 +39,7 @@ jobs:
         run: mypy src/
 
       - name: Runtime tests (no training extras)
-        run: pytest -m "not training"
+        run: xvfb-run -a pytest -m "not training"
 
   training:
     name: Training environment
@@ -57,10 +57,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Qt system dependencies
+      - name: Install Qt system dependencies & Xvfb
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y libegl1 libopengl0
+          sudo apt-get install -y libegl1 libopengl0 xvfb
 
       - name: Install runtime + dev + training dependencies
         run: |
@@ -68,4 +68,4 @@ jobs:
           pip install -e ".[dev,training]"
 
       - name: Full test suite (including training tests)
-        run: pytest
+        run: xvfb-run -a pytest

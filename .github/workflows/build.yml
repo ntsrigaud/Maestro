@@ -40,7 +40,8 @@ jobs:
             libxcb-cursor0 \
             libxkbcommon-x11-0 \
             libdbus-1-3 \
-            libglib2.0-0
+            libglib2.0-0 \
+            xvfb
 
       - name: Install dev dependencies
         run: pip install -e ".[dev]"
@@ -55,7 +56,13 @@ jobs:
       - name: Run tests (non-training)
         env:
           QT_QPA_PLATFORM: ${{ runner.os == 'Linux' && 'offscreen' || '' }}
-        run: pytest -m "not training" -q
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a pytest -m "not training" -q
+          else
+            pytest -m "not training" -q
+          fi
+        shell: bash
 
   # ── macOS .app bundle ────────────────────────────────────────────────────
   build-macos:
