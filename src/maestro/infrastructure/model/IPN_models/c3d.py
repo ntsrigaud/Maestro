@@ -7,7 +7,6 @@ __all__ = ["C3D", "c3d_v1"]
 
 class C3D(nn.Module):
     def __init__(self, sample_size, sample_duration, num_classes=400):
-
         super().__init__()
         self.group1 = nn.Sequential(
             nn.Conv3d(3, 64, kernel_size=3, padding=1),
@@ -95,7 +94,6 @@ def get_fine_tuning_parameters(model, ft_begin_index):
 
 
 def c3d_v1(**kwargs):
-
     model = C3D(**kwargs)
     return model
 

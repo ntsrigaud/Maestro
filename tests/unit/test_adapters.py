@@ -262,7 +262,9 @@ class TestPyAutoGUIKeyboardAdapter:
 class TestWindowsKeyboardAdapter:
     @pytest.fixture
     def mock_ctypes(self):
-        with patch("maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.ctypes") as mock_c:
+        with patch(
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter.ctypes"
+        ) as mock_c:
             yield mock_c
 
     @pytest.fixture

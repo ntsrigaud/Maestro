@@ -42,7 +42,7 @@ def main():
     mp_filename = "hand_landmarker.task"
     mp_local_path = mp_dir / mp_filename
     mp_url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-    
+
     print(f"Downloading {mp_filename} from MediaPipe...")
     urllib.request.urlretrieve(mp_url, mp_local_path)
     print(f"MediaPipe model downloaded successfully to {mp_local_path}")

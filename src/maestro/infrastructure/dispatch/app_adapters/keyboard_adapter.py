@@ -122,7 +122,10 @@ def _scope_tokens() -> tuple[str, ...]:
 
 def _foreground_identity_mac() -> str | None:
     try:
-        from maestro.infrastructure.dispatch.app_adapters.mac_keyboard_adapter import MacKeyboardAdapter
+        from maestro.infrastructure.dispatch.app_adapters.mac_keyboard_adapter import (
+            MacKeyboardAdapter,
+        )
+
         return MacKeyboardAdapter._foreground_identity_mac()
     except Exception:
         return None
@@ -191,6 +194,7 @@ def _foreground_identity() -> str | None:
 
 class OSKeyboardBackend(typing.Protocol):
     """Protocol for OS-specific keyboard and mouse execution backends."""
+
     def press_hotkey(self, *keys: str) -> bool: ...
     def scroll(self, clicks: int) -> bool: ...
     def zoom(self, clicks: int, *, modifier: str, max_abs_clicks: int) -> bool: ...
@@ -204,18 +208,22 @@ class OSKeyboardBackend(typing.Protocol):
 
 class PyAutoGUIKeyboardAdapter:
     """Linux/Cross-platform backend using pyautogui exclusively."""
+
     def press_hotkey(self, *keys: str) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         pyautogui.hotkey(*[k.lower() for k in keys])
         return True
 
     def scroll(self, clicks: int) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         pyautogui.scroll(clicks)
         return True
 
     def zoom(self, clicks: int, *, modifier: str, max_abs_clicks: int) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         clamped = max(-max_abs_clicks, min(max_abs_clicks, clicks))
         pyautogui.keyDown(modifier)
         try:
@@ -225,40 +233,48 @@ class PyAutoGUIKeyboardAdapter:
         return True
 
     def move_mouse(self, x: int, y: int) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         pyautogui.moveTo(x, y, duration=0.0)
         return True
 
     def mouse_drag_to(self, x: int, y: int) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         pyautogui.dragTo(x, y, duration=0.0, button="left", mouseDownUp=False, _pause=False)
         return True
 
     def mouse_down(self, x: int, y: int) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         pyautogui.mouseDown(x, y, button="left")
         return True
 
     def mouse_up(self) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         pyautogui.mouseUp(button="left")
         return True
 
     def mouse_click(self) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         pyautogui.click()
         return True
 
     def screen_size(self) -> tuple[int, int]:
-        if pyautogui is None: return (1920, 1080)
+        if pyautogui is None:
+            return (1920, 1080)
         w, h = pyautogui.size()
         return int(w), int(h)
 
 
 class WindowsKeyboardAdapter(PyAutoGUIKeyboardAdapter):
     """Windows-specific backend using ctypes for mouse movement."""
+
     def mouse_drag_to(self, x: int, y: int) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         user32 = ctypes.windll.user32  # type: ignore[attr-defined]
         sw = user32.GetSystemMetrics(0)
         sh = user32.GetSystemMetrics(1)
@@ -272,7 +288,8 @@ class WindowsKeyboardAdapter(PyAutoGUIKeyboardAdapter):
         return True
 
     def mouse_down(self, x: int, y: int) -> bool:
-        if pyautogui is None: return False
+        if pyautogui is None:
+            return False
         user32 = ctypes.windll.user32  # type: ignore[attr-defined]
         sw = user32.GetSystemMetrics(0)
         sh = user32.GetSystemMetrics(1)
@@ -296,7 +313,10 @@ class KeyboardAdapter:
         if backend is not None:
             self._backend = backend
         elif sys.platform == "darwin":
-            from maestro.infrastructure.dispatch.app_adapters.mac_keyboard_adapter import MacKeyboardAdapter
+            from maestro.infrastructure.dispatch.app_adapters.mac_keyboard_adapter import (
+                MacKeyboardAdapter,
+            )
+
             self._backend = MacKeyboardAdapter()
         elif sys.platform == "win32":
             self._backend = WindowsKeyboardAdapter()
@@ -344,7 +364,9 @@ class KeyboardAdapter:
         result = self._backend.press_hotkey(*keys)
         if result:
             LOGGER.debug("Pressed hotkey: %s", "+".join(k.lower() for k in keys))
-        elif pyautogui is None and not isinstance(self._backend, WindowsKeyboardAdapter):  # pragma: no cover
+        elif pyautogui is None and not isinstance(
+            self._backend, WindowsKeyboardAdapter
+        ):  # pragma: no cover
             LOGGER.warning("pyautogui is not installed — keyboard dispatch skipped.")
         return result
 

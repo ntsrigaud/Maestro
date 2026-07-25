@@ -231,6 +231,7 @@ class TestGestureDispatchPipeline:
 # Test: Rate limiting across repeated commands
 # ---------------------------------------------------------------------------
 
+
 class TestIntegrationRateLimiting:
     def test_burst_commands_beyond_limit_are_dropped(self):
         kb = KeyboardAdapter(backend=MagicMock(spec=OSKeyboardBackend))
@@ -262,8 +263,11 @@ class TestIntegrationRateLimiting:
 # Test: Edge-trigger single-dispatch guarantee
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeTriggerSingleDispatch:
-    def _make_armed_controller(self, edge_trigger_enabled: bool = True) -> GestureActivationController:
+    def _make_armed_controller(
+        self, edge_trigger_enabled: bool = True
+    ) -> GestureActivationController:
         ctrl = GestureActivationController(
             command_map=_COMMAND_MAP,
             command_cooldown_ms=_COOLDOWN_MS,
