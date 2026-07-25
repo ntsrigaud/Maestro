@@ -51,11 +51,10 @@ jobs:
       - name: Type check
         run: mypy src/
 
-      - name: Runtime tests (no training extras)
-        run: xvfb-run -a pytest -m "not training"
 
-  training:
-    name: Training environment
+
+  test:
+    name: Test environment
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -92,7 +91,7 @@ jobs:
         run: pip install -e ".[dev,headless]"
 
       - name: Runtime tests (no training extras)
-        run: pytest -m "not training"
+        run: xvfb-run -a pytest -m "not training"
 
   # ---------------------------------------------------------------------------
   # Training — full suite including scikit-learn tests.
