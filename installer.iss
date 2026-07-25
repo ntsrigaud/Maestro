@@ -1,6 +1,10 @@
+#ifndef AppVersion
+#define AppVersion "1.0.0"
+#endif
+
 [Setup]
 AppName=Maestro
-AppVersion=1.0.0
+AppVersion={#AppVersion}
 DefaultDirName={autopf}\Maestro
 DefaultGroupName=Maestro
 UninstallDisplayIcon={app}\Maestro.exe

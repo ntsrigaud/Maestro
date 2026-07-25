@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -181,7 +182,7 @@ if sys.platform == "darwin":
         bundle_identifier="com.ntsrigaud.maestro",
         info_plist={
             "CFBundleDisplayName": "Maestro",
-            "CFBundleShortVersionString": "1.0.0",
+            "CFBundleShortVersionString": os.environ.get("MAESTRO_VERSION", "1.0.0"),
             "NSCameraUsageDescription": (
                 "Maestro requires camera access to detect hand gestures."
             ),
