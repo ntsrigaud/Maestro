@@ -61,6 +61,10 @@ class MacKeyboardAdapter:
     @staticmethod
     def _foreground_identity_mac() -> str | None:
         try:
+            # Must load AppKit before querying NSWorkspace, otherwise objc_getClass returns None
+            appkit_path = ctypes.util.find_library('AppKit') or '/System/Library/Frameworks/AppKit.framework/AppKit'
+            ctypes.cdll.LoadLibrary(appkit_path)
+
             objc_path = ctypes.util.find_library('objc') or '/usr/lib/libobjc.A.dylib'
             objc = ctypes.cdll.LoadLibrary(objc_path)
             objc.objc_getClass.restype = ctypes.c_void_p
