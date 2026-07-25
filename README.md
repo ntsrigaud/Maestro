@@ -41,14 +41,16 @@ Discrete commands are routed through `GestureActivationController` + `CommandDis
 Download the pre-built installer for your platform from the [GitHub Releases](https://github.com/ntsrigaud/Maestro/releases) page. The application is completely standalone and does not require Python or internet access to run (the AI models are bundled directly into the app).
 
 ### macOS
-1. Download `Maestro-macos.dmg`.
-2. Open the DMG and drag Maestro to your Applications folder.
-3. **Important**: Because this application is not signed with a paid Apple Developer ID, macOS Gatekeeper will block it from running the first time. To fix this, open your `Terminal` and run the following command to remove the quarantine flag:
-   ```bash
-   xattr -cr /Applications/Maestro.app
-   ```
-4. You can now launch Maestro from your Applications folder.
-5. **Important**: Maestro requires Accessibility permissions to control PowerPoint. When you first launch the app and try to execute a gesture, macOS may prompt you. If not, open **System Settings > Privacy & Security > Accessibility** and manually add/enable Maestro.
+1. Download `Maestro-macos.dmg` and double-click to mount it.
+2. Drag `Maestro.app` into your **Applications** folder.
+3. **Security Bypass (Gatekeeper)**: Because this application is not signed with a paid Apple Developer ID, macOS will show a "cannot be opened" or "malware" warning. To bypass this:
+   - **Method A (GUI):** Open **System Settings > Privacy & Security**, scroll down to the Security section, and click **Open Anyway** next to Maestro.
+   - **Method B (Terminal):** Open `Terminal` and run the following command to remove the quarantine flag:
+     ```bash
+     xattr -cr /Applications/Maestro.app
+     ```
+4. Launch Maestro from your Applications folder.
+5. **Accessibility Permissions**: Maestro requires Accessibility permissions to inject keystrokes into PowerPoint. When first executing a gesture, macOS may prompt you. If not, open **System Settings > Privacy & Security > Accessibility** and manually enable Maestro.
 
 ### Windows
 1. Download `Maestro_Setup.exe`.
