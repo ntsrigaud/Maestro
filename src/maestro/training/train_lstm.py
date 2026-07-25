@@ -36,6 +36,12 @@ class ModelConfig:
     proj_dim: int = 64
     motion_temporal_conv: bool = False
     motion_attn_pool: bool = False
+    # IPN baseline adapter-specific fields (only used for "ipn_baseline_*").
+    baseline_backbone: str = "resnet18"
+    sample_size: int = 32
+    width_mult: float = 1.0
+    shortcut_type: str = "B"
+    cardinality: int = 32
 
 
 @dataclass(slots=True)
@@ -127,6 +133,11 @@ def load_training_config(config_path: str | Path) -> TrainingPipelineConfig:
             proj_dim=int(model_data.get("proj_dim", 64)),
             motion_temporal_conv=bool(model_data.get("motion_temporal_conv", False)),
             motion_attn_pool=bool(model_data.get("motion_attn_pool", False)),
+            baseline_backbone=str(model_data.get("baseline_backbone", "resnet18")),
+            sample_size=int(model_data.get("sample_size", 32)),
+            width_mult=float(model_data.get("width_mult", 1.0)),
+            shortcut_type=str(model_data.get("shortcut_type", "B")),
+            cardinality=int(model_data.get("cardinality", 32)),
         ),
         training=TrainingConfig(
             epochs=int(train_data.get("epochs", 30)),
@@ -190,11 +201,17 @@ def _parse_augmentation_config(
     )
 
 
-def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
+def _build_model(
+    config: ModelConfig,
+    device: torch.device,
+    *,
+    sequence_length: int | None = None,
+) -> nn.Module:
     """Instantiate the appropriate model from *config*.
 
     Dispatches based on ``config.model_name``:
     * ``two_stream_attn_*`` → :class:`EnhancedTwoStreamLSTM`
+    * ``ipn_baseline_*``   → :class:`IPNFeatureToVideoAdapter`
     """
     if config.model_name.startswith("two_stream_attn"):
         from maestro.infrastructure.model.two_stream_attn_lstm import EnhancedTwoStreamLSTM
@@ -211,8 +228,31 @@ def _build_model(config: ModelConfig, device: torch.device) -> nn.Module:
             motion_attn_pool=config.motion_attn_pool,
         ).to(device)
 
+    if config.model_name.startswith("ipn_baseline"):
+        if sequence_length is None:
+            raise ValueError("sequence_length is required for ipn_baseline_* models")
+        from maestro.infrastructure.model.ipn_baseline_adapter import (
+            IPNBaselineAdapterConfig,
+            IPNFeatureToVideoAdapter,
+        )
+
+        adapter_cfg = IPNBaselineAdapterConfig(
+            input_size=config.input_size,
+            num_classes=config.num_classes,
+            sequence_length=sequence_length,
+            sample_size=config.sample_size,
+            width_mult=config.width_mult,
+            shortcut_type=config.shortcut_type,
+            cardinality=config.cardinality,
+        )
+        return IPNFeatureToVideoAdapter(
+            backbone_name=config.baseline_backbone,
+            config=adapter_cfg,
+        ).to(device)
+
     raise ValueError(
-        f"Unsupported model_name {config.model_name!r}. Supported prefix: 'two_stream_attn_'."
+        f"Unsupported model_name {config.model_name!r}. "
+        "Supported prefixes: 'two_stream_attn_', 'ipn_baseline_'."
     )
 
 
@@ -581,7 +621,7 @@ def train_lstm(
             f"num_classes={config.model.num_classes}, dataset_classes={datamodule.num_classes}"
         )
 
-    model = _build_model(config.model, device)
+    model = _build_model(config.model, device, sequence_length=datamodule.sequence_length)
 
     if config.training.class_weighting:
         class_weights = _build_class_weights(datamodule, device)

@@ -1,0 +1,61 @@
+# ── EnhancedTwoStreamLSTM — IPN 13-class fine-tuning (IPN baseline comparison) ──
+#
+# Phase 2 of the IPN baseline comparison pipeline.
+#
+# Fine-tunes the Jester-pretrained backbone on the IPN 13-class gesture dataset.
+# The 13-class split excludes the "unknown" (D0X) background class so evaluation
+# is directly comparable to published IPN Hand recognition benchmarks.
+#
+# Dataset: data/processed/ipn_13class_dataset.npz
+#   Assembled in notebooks/01_dataset_preparation.ipynb from the full IPN NPZ.
+#
+# Pretrained from: configs/model/pretrain_jester_27class.yaml checkpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+model:
+  model_name: two_stream_attn_finetune_ipn_13class
+  input_size: 147 # feature-schema-v5 (must match pretrained backbone)
+  hidden_size: 96 # must match pretrained checkpoint
+  num_layers: 2 # must match pretrained checkpoint
+  dropout: 0.40 # slightly higher than pretraining to reduce overfitting
+  num_classes: 13 # IPN gestures excluding unknown (D0X)
+  num_heads: 8 # must match pretrained checkpoint
+  proj_dim: 96 # must match pretrained checkpoint
+
+training:
+  epochs: 80
+  batch_size: 128
+  learning_rate: 0.00003 # 3e-5 — low LR for fine-tuning
+  weight_decay: 0.001
+  grad_clip_norm: 1.0
+  early_stopping_patience: 20
+  early_stopping_min_delta: 0.0001
+  label_smoothing: 0.05
+  seed: 42
+  num_workers: 0
+  class_weighting: true # inverse-frequency weighting to correct 5:1 background/gesture imbalance
+  max_samples_per_class: null # no cap — use full IPN dataset
+
+splits:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 10
+  min_lr: 0.000001
+
+export:
+  checkpoint_dir: models/checkpoints
+  exported_dir: models/exported
+  feature_schema_version: feature-schema-v5
+
+augmentation:
+  enabled: true
+  temporal_scale_range: [0.80, 1.20]
+  spatial_jitter_sigma: 0.008
+  apply_prob: 0.5
+  mirror_flip_prob: 0.0 # disabled — directional swipes cannot be mirrored

@@ -1,0 +1,70 @@
+version: jester_25class_v1
+
+# 25-class Jester vocabulary for production model pretraining.
+#
+# Derived from the full 27-class Jester vocabulary with two zooming classes
+# removed to prevent data leakage into the production fine-tuning stage:
+#
+#   EXCLUDED (appear in production hybrid fine-tuning dataset):
+#     zooming_in_full_hand   ← Zooming In With Full Hand
+#     zooming_out_full_hand  ← Zooming Out With Full Hand
+#
+# Two-finger zoom variants are retained because they are not used in the
+# production hybrid vocabulary and provide useful zoom motion priors.
+#
+# This vocabulary is used in Phase 1 of the production model pipeline
+# (Jester 25-class pretrain → Hybrid 10-class fine-tune).
+#
+# Source label mapping:
+#   swiping_left                 ← Swiping Left
+#   swiping_right                ← Swiping Right
+#   swiping_down                 ← Swiping Down
+#   swiping_up                   ← Swiping Up
+#   pushing_hand_away            ← Pushing Hand Away
+#   pulling_hand_in              ← Pulling Hand In
+#   sliding_two_fingers_left     ← Sliding Two Fingers Left
+#   sliding_two_fingers_right    ← Sliding Two Fingers Right
+#   sliding_two_fingers_down     ← Sliding Two Fingers Down
+#   sliding_two_fingers_up       ← Sliding Two Fingers Up
+#   pushing_two_fingers_away     ← Pushing Two Fingers Away
+#   pulling_two_fingers_in       ← Pulling Two Fingers In
+#   rolling_hand_forward         ← Rolling Hand Forward
+#   rolling_hand_backward        ← Rolling Hand Backward
+#   turning_hand_clockwise       ← Turning Hand Clockwise
+#   turning_hand_counterclockwise← Turning Hand Counterclockwise
+#   zooming_in_two_fingers       ← Zooming In With Two Fingers  (kept)
+#   zooming_out_two_fingers      ← Zooming Out With Two Fingers (kept)
+#   thumb_up                     ← Thumb Up
+#   thumb_down                   ← Thumb Down
+#   shaking_hand                 ← Shaking Hand
+#   stop_sign                    ← Stop Sign
+#   drumming_fingers             ← Drumming Fingers
+#   no_gesture                   ← No gesture
+#   doing_other_things           ← Doing other things
+
+gestures:
+  - swiping_left
+  - swiping_right
+  - swiping_down
+  - swiping_up
+  - pushing_hand_away
+  - pulling_hand_in
+  - sliding_two_fingers_left
+  - sliding_two_fingers_right
+  - sliding_two_fingers_down
+  - sliding_two_fingers_up
+  - pushing_two_fingers_away
+  - pulling_two_fingers_in
+  - rolling_hand_forward
+  - rolling_hand_backward
+  - turning_hand_clockwise
+  - turning_hand_counterclockwise
+  - zooming_in_two_fingers
+  - zooming_out_two_fingers
+  - thumb_up
+  - thumb_down
+  - shaking_hand
+  - stop_sign
+  - drumming_fingers
+  - no_gesture
+  - doing_other_things

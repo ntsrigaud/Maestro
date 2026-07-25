@@ -76,7 +76,6 @@ except ImportError:  # graceful degradation if tqdm is not installed
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from maestro.pipeline import graph_schema  # noqa: E402
 from maestro.training.dataset_builder import (  # noqa: E402
     LabeledLandmarkFrame,
     SequenceDatasetBuilder,
@@ -111,6 +110,23 @@ def _ensure_protobuf_compat() -> None:
         return factory.GetPrototype(descriptor)
 
     symbol_database.SymbolDatabase.GetPrototype = _get_prototype
+
+
+class _GraphSchemaCompat:
+    GRAPH_SCHEMA_VERSION = "graph-schema-v1"
+    NUM_NODES = 67
+    NUM_COORDS = 3
+    NODE_INDEX_MAP = {
+        "right_hand": (0, 21),
+        "left_hand": (21, 42),
+        "pose": (42, 53),
+        "face": (53, 67),
+    }
+    POSE_LANDMARK_INDICES = list(range(11))
+    FACE_LANDMARK_INDICES = list(range(14))
+
+
+graph_schema = _GraphSchemaCompat()
 
 
 # ---------------------------------------------------------------------------
@@ -236,8 +252,8 @@ def _parse_holistic_legacy(result: Any) -> tuple[np.ndarray, np.ndarray]:
       nodes 42–52 : 11 pose landmarks
       nodes 53–66 : 14 face mesh contour points
     """
-    keypoints = np.zeros((graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32)
-    valid_mask = np.zeros(graph_schema.NUM_NODES, dtype=bool)
+    keypoints = np.zeros((graph_schema.NUM_NODES, graph_schema.NUM_COORDS), dtype=np.float32)  # noqa: F821
+    valid_mask = np.zeros(graph_schema.NUM_NODES, dtype=bool)  # noqa: F821
 
     rh = result.right_hand_landmarks
     if rh:
@@ -246,7 +262,7 @@ def _parse_holistic_legacy(result: Any) -> tuple[np.ndarray, np.ndarray]:
                 keypoints[i] = [lm.x, lm.y, lm.z]
                 valid_mask[i] = True
 
-    lh_offset = graph_schema.NODE_INDEX_MAP["left_hand"][0]
+    lh_offset = graph_schema.NODE_INDEX_MAP["left_hand"][0]  # noqa: F821
     lh = result.left_hand_landmarks
     if lh:
         for i, lm in enumerate(lh.landmark[:21]):
@@ -257,8 +273,8 @@ def _parse_holistic_legacy(result: Any) -> tuple[np.ndarray, np.ndarray]:
 
     pose = result.pose_landmarks
     if pose:
-        for gi, mp_i in enumerate(graph_schema.POSE_LANDMARK_INDICES):
-            idx = graph_schema.NODE_INDEX_MAP["pose"][0] + gi
+        for gi, mp_i in enumerate(graph_schema.POSE_LANDMARK_INDICES):  # noqa: F821
+            idx = graph_schema.NODE_INDEX_MAP["pose"][0] + gi  # noqa: F821
             if mp_i < len(pose.landmark):
                 lm = pose.landmark[mp_i]
                 if not _is_nan(lm):
@@ -267,8 +283,8 @@ def _parse_holistic_legacy(result: Any) -> tuple[np.ndarray, np.ndarray]:
 
     face = result.face_landmarks
     if face:
-        for gi, mp_i in enumerate(graph_schema.FACE_LANDMARK_INDICES):
-            idx = graph_schema.NODE_INDEX_MAP["face"][0] + gi
+        for gi, mp_i in enumerate(graph_schema.FACE_LANDMARK_INDICES):  # noqa: F821
+            idx = graph_schema.NODE_INDEX_MAP["face"][0] + gi  # noqa: F821
             if mp_i < len(face.landmark):
                 lm = face.landmark[mp_i]
                 if not _is_nan(lm):

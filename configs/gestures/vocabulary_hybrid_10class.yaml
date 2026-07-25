@@ -1,0 +1,67 @@
+version: hybrid_10class_v1
+
+# 10-class production hybrid vocabulary for the production model fine-tuning stage.
+#
+# Combines three data sources into a unified production gesture vocabulary:
+#
+# ─────────────────────────────────────────────────────────────────────────
+#  Class                  Source    Rationale
+# ─────────────────────────────────────────────────────────────────────────
+#  fist                   LD-CONGR  Unique to LD-CONGR; no leakage risk
+#  swiping_left           LD-CONGR  LD-CONGR only — avoids Jester leakage
+#  swiping_right          LD-CONGR  LD-CONGR only — avoids Jester leakage
+#  swiping_up             LD-CONGR  LD-CONGR only — avoids Jester leakage
+#  swiping_down           LD-CONGR  LD-CONGR only — avoids Jester leakage
+#  zooming_in_full_hand   Jester    Excluded from 25-class Jester pretrain
+#  zooming_out_full_hand  Jester    Excluded from 25-class Jester pretrain
+#  point_one              IPN       Not in Jester or LD-CONGR
+#  point_two              IPN       Not in Jester or LD-CONGR
+#  unknown                IPN       Rich background class (IPN D0X)
+# ─────────────────────────────────────────────────────────────────────────
+#
+# Data leakage avoidance:
+#   - Swipes come from LD-CONGR only (Jester swipes are in the 25-class
+#     pretraining set and would constitute leakage if reused here).
+#   - Jester zooming gestures were excluded from the 25-class pretraining
+#     vocabulary specifically so they can be used here without leakage.
+#   - IPN classes (point_one, point_two, unknown) are not present in
+#     the Jester training set.
+#
+# LD-CONGR label remapping (applied in dataset prep notebook):
+#   right    → swiping_right
+#   left     → swiping_left
+#   downward → swiping_down
+#   upward   → swiping_up
+
+gestures:
+  - fist
+  - swiping_left
+  - swiping_right
+  - swiping_up
+  - swiping_down
+  - zooming_in_full_hand
+  - zooming_out_full_hand
+  - point_one
+  - point_two
+  - unknown
+
+# Source provenance — consumed by the dataset preparation notebook.
+sources:
+  fist: ld_cong
+  swiping_left: ld_cong
+  swiping_right: ld_cong
+  swiping_up: ld_cong
+  swiping_down: ld_cong
+  zooming_in_full_hand: jester
+  zooming_out_full_hand: jester
+  point_one: ipn
+  point_two: ipn
+  unknown: ipn
+
+# Rename LD-CONGR labels to canonical production names before merging.
+label_remap:
+  ld_cong:
+    right: swiping_right
+    left: swiping_left
+    downward: swiping_down
+    upward: swiping_up
