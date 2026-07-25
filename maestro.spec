@@ -181,7 +181,7 @@ if sys.platform == "darwin":
         bundle_identifier="com.ntsrigaud.maestro",
         info_plist={
             "CFBundleDisplayName": "Maestro",
-            "CFBundleShortVersionString": "0.1.0",
+            "CFBundleShortVersionString": "1.0.0",
             "NSCameraUsageDescription": (
                 "Maestro requires camera access to detect hand gestures."
             ),
