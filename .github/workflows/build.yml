@@ -84,28 +84,14 @@ jobs:
           pip uninstall -y opencv-python-headless || true
           pip install -e ".[ui,build]"
 
-      - name: Download offline model
-        run: python scripts/download_bundled_model.py
-
-      - name: Build with PyInstaller
-        run: pyinstaller --clean --noconfirm maestro.spec
-
-      - name: Ad-hoc code sign for Apple Silicon
-        run: codesign --force --deep --sign - dist/Maestro.app
-
-      - name: Verify bundle
-        run: test -d dist/Maestro.app
-
       - name: Install create-dmg
         run: npm install -g create-dmg
 
-      - name: Create DMG archive
-        run: |
-          create-dmg \
-            --overwrite \
-            --no-code-sign \
-            dist/Maestro.app dist/ || true
-          mv dist/Maestro*.dmg dist/Maestro-macos.dmg
+      - name: Build macOS bundle
+        run: make build
+
+      - name: Verify bundle
+        run: test -f dist/Maestro-macos.dmg
 
       - name: Upload macOS artifact
         if: ${{ github.event_name == 'push' || inputs.upload_artifacts }}
@@ -139,7 +125,11 @@ jobs:
         run: python scripts/download_bundled_model.py
 
       - name: Build with PyInstaller
-        run: pyinstaller --clean --noconfirm maestro.spec
+        run: |
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
+          pyinstaller --clean --noconfirm maestro.spec
+        shell: pwsh
 
       - name: Verify executable
         run: Test-Path dist\Maestro\Maestro.exe
