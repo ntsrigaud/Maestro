@@ -50,6 +50,8 @@ build: clean setup-build-env ## Build standalone app bundle via PyInstaller
 	    rm -f dist/*.dmg; \
 	    create-dmg --overwrite --no-code-sign dist/Maestro.app dist/ || true; \
 	    mv dist/Maestro\ *.dmg dist/Maestro-macos.dmg; \
+	    echo "Cleaning up intermediate build directory..."; \
+	    rm -rf dist/Maestro dist/Maestro.app; \
 	    echo "✓ macOS bundle: dist/Maestro-macos.dmg"; \
 	else \
 	    echo "✓ Executable: dist/Maestro/"; \
