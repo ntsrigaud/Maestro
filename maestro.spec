@@ -196,16 +196,22 @@ else:
     exe = EXE(  # noqa: F821
         pyz,
         a.scripts,
-        a.binaries,
-        a.datas,
         [],
+        exclude_binaries=True,
         name="Maestro",
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
         upx=True,
-        upx_exclude=[],
-        runtime_tmpdir=None,
         console=False,
         icon="docs/assets/icon.ico",
+    )
+    coll = COLLECT(  # noqa: F821
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name="Maestro",
     )

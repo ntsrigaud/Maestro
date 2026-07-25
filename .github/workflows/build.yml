@@ -152,7 +152,11 @@ jobs:
         shell: pwsh
 
       - name: Verify executable
-        run: Test-Path dist\Maestro\Maestro.exe
+        run: |
+          if (-Not (Test-Path "dist\Maestro\Maestro.exe")) {
+              Write-Error "Executable not found at dist\Maestro\Maestro.exe"
+              exit 1
+          }
         shell: pwsh
 
       - name: Create Windows Installer
