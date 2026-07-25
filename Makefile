@@ -1,4 +1,4 @@
-.PHONY: help setup-build-env fix-omp test test-all lint typecheck format run-ui build build-onefile generate-icon clean
+.PHONY: help setup-build-env test test-all lint typecheck format run-ui build build-onefile generate-icon clean
 
 help: ## Show this help message
 	@echo "Maestro — available targets:"
@@ -9,7 +9,6 @@ help: ## Show this help message
 
 setup-build-env: ## Install PyInstaller build dependencies (editable)
 	pip install -e ".[ui,build]"
-	@$(MAKE) --quiet fix-omp
 
 test: ## Run the non-training test suite
 	pytest -m "not training"
@@ -29,11 +28,7 @@ format: ## Auto-format: ruff (replaces black + isort)
 	ruff check --fix .
 
 run-ui: ## Launch PySide6 GUI
-	@$(MAKE) --quiet fix-omp
 	python scripts/run_ui.py
-
-fix-omp: ## (macOS) Patch torch's libomp install name to prevent OMP Error #15
-	@bash tools/fix_omp.sh
 
 # ── Application bundling ──────────────────────────────────────────────────────
 
