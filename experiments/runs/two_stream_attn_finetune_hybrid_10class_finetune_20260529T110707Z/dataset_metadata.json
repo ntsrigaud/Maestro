@@ -1,0 +1,19 @@
+{
+  "vocabulary": [
+    "fist",
+    "swiping_left",
+    "swiping_right",
+    "swiping_up",
+    "swiping_down",
+    "zooming_in_full_hand",
+    "zooming_out_full_hand",
+    "point_one",
+    "point_two",
+    "unknown"
+  ],
+  "num_classes": 10,
+  "window_length": 16,
+  "feature_dim": 147,
+  "feature_schema_version": "feature-schema-v5",
+  "window_step": 1
+}

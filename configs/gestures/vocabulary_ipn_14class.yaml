@@ -1,0 +1,20 @@
+version: ipn_14class_v1
+
+# Full 14-class IPN baseline vocabulary for non-binary training/evaluation.
+# Label names align with scripts/build_ipn_dataset.py IPN_TO_VOCAB mapping.
+
+gestures:
+  - unknown
+  - point_one
+  - point_two
+  - click_one
+  - click_two
+  - swipe_up
+  - swipe_down
+  - swipe_left
+  - swipe_right
+  - open_palm_hold
+  - double_click_one
+  - double_click_two
+  - zoom_in
+  - zoom_out

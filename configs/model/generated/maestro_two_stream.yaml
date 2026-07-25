@@ -1,0 +1,36 @@
+model:
+  model_name: two_stream_attn_ipn_compare
+  input_size: 147
+  hidden_size: 96
+  num_layers: 2
+  dropout: 0.3
+  num_classes: 14
+  num_heads: 8
+  proj_dim: 96
+  motion_temporal_conv: false
+  motion_attn_pool: false
+training:
+  epochs: 20
+  batch_size: 83
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  grad_clip_norm: 1.0
+  early_stopping_patience: 5
+  early_stopping_min_delta: 0.0001
+  seed: 42
+  num_workers: 0
+  class_weighting: true
+splits:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  stratified: true
+scheduler:
+  enabled: true
+  factor: 0.5
+  patience: 3
+  min_lr: 1.0e-06
+export:
+  checkpoint_dir: /home/divclab/.Neil/Maestro/models/checkpoints
+  exported_dir: /home/divclab/.Neil/Maestro/models/exported
+  feature_schema_version: feature-schema-v5

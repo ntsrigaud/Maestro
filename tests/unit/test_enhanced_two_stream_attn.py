@@ -305,3 +305,28 @@ def test_build_model_dispatches_two_stream_attn() -> None:
     with torch.no_grad():
         out = model(x)
     assert out.shape == (1, 10)
+
+
+def test_build_model_dispatches_ipn_baseline_adapter() -> None:
+    import torch
+
+    from maestro.infrastructure.model.ipn_baseline_adapter import IPNFeatureToVideoAdapter
+    from maestro.training.train_lstm import ModelConfig, _build_model
+
+    cfg = ModelConfig(
+        model_name="ipn_baseline_v1",
+        input_size=147,
+        hidden_size=64,
+        num_layers=2,
+        dropout=0.1,
+        num_classes=10,
+        baseline_backbone="resnetl10",
+        sample_size=32,
+    )
+    model = _build_model(cfg, torch.device("cpu"), sequence_length=16)
+    assert isinstance(model, IPNFeatureToVideoAdapter)
+    model.eval()
+    x = torch.zeros(1, 16, 147)
+    with torch.no_grad():
+        out = model(x)
+    assert out.shape == (1, 10)

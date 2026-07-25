@@ -858,6 +858,51 @@ def _build_training_strategy_section(
     ewc_weight = metrics.get("ewc_weight", "N/A")
     gpm_components = metrics.get("gpm_components", "N/A")
     forgetting_penalty_weight = metrics.get("forgetting_penalty_weight", "N/A")
+    stage_b_warmup_epochs = metrics.get("stage_b_warmup_epochs")
+    replay_dataset_path = metrics.get("replay_dataset_path")
+
+    # Determine whether all CL retention terms are disabled (weights=0, no replay).
+    def _is_zero(v: object) -> bool:
+        try:
+            return float(v) == 0.0  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return False
+
+    cl_disabled = (
+        _is_zero(distillation_weight)
+        and _is_zero(replay_ce_weight)
+        and _is_zero(forgetting_penalty_weight)
+        and _is_zero(gpm_components)
+        and not replay_dataset_path
+    )
+
+    if cl_disabled:
+        # Simplified description — emphasise warmup and regularisation instead of CL.
+        _blr = backbone_lr_multiplier if not isinstance(backbone_lr_multiplier, str) else "N/A"
+        if stage_b_warmup_epochs and int(stage_b_warmup_epochs) > 0:
+            warmup_str = (
+                f"{int(stage_b_warmup_epochs)}-epoch linear backbone LR ramp "
+                f"(0 → {_blr}× head LR) — eliminates the loss spike from cold AdamW state"
+            )
+        else:
+            warmup_str = "none (backbone LR set to target immediately)"
+        return (
+            "Two-phase transfer learning pipeline:\n"
+            f"- **Phase 1 (pretraining):** backbone pretrained on {source_desc} "
+            "to learn generic gesture dynamics.\n"
+            f"- **Phase 2 (fine-tuning):** head replaced and model adapted on {target_desc}.\n"
+            f"- **Stage A — frozen backbone** ({int(stage_a_epochs)} epoch(s)): "
+            "classification head trained alone; AdamW with lr=1e-3 for fast convergence.\n"
+            f"- **Stage B — full model** (up to {int(stage_b_epochs)} epoch(s)): "
+            "all layers jointly fine-tuned.\n"
+            f"  - **Backbone LR warmup:** {warmup_str}.\n"
+            "  - **Class weighting:** inverse-frequency weights balance rare and common gestures.\n"
+            "  - **Max samples per class:** capped to reduce majority-class dominance.\n"
+            "  - **Regularisation:** label smoothing, dropout, ReduceLROnPlateau scheduler, "
+            "early stopping.\n"
+            "  - Continual-learning retention terms (replay, distillation, GPM) were "
+            "not applied — the model trains directly on the target vocabulary."
+        )
 
     return (
         "Two-phase transfer learning pipeline:\n"

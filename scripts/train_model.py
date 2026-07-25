@@ -138,40 +138,45 @@ def main() -> None:
         device=device,
     )
 
-    exported_path = export_inference_artifact(
-        result=result,
-        config=train_cfg,
-        export_dir=args.export_dir,
-    )
-
-    training_data_version = dataset_path.stem
-    # Deprecated: update_model_registry() is retained for the local development
-    # workflow only.  Once backend: huggingface is validated end-to-end, remove
-    # this call together with the --registry CLI argument.
-    registry_entry = (
-        update_model_registry(
-            registry_path=args.registry,
-            model_version=result.model_version,
-            checkpoint_path=result.checkpoint_path,
-            exported_path=exported_path,
-            class_labels=result.class_labels,
-            dataset_metadata=result.dataset_metadata,
-            feature_schema_version=train_cfg.export.feature_schema_version,
-            training_data_version=training_data_version,
+    supports_runtime_export = train_cfg.model.model_name.startswith("two_stream_attn")
+    exported_path: Path | None = None
+    registry_entry = None
+    if supports_runtime_export:
+        exported_path = export_inference_artifact(
+            result=result,
+            config=train_cfg,
+            export_dir=args.export_dir,
         )
-        if args.registry
-        else None
-    )
+
+        training_data_version = dataset_path.stem
+        # Deprecated: update_model_registry() is retained for the local development
+        # workflow only.  Once backend: huggingface is validated end-to-end, remove
+        # this call together with the --registry CLI argument.
+        registry_entry = (
+            update_model_registry(
+                registry_path=args.registry,
+                model_version=result.model_version,
+                checkpoint_path=result.checkpoint_path,
+                exported_path=exported_path,
+                class_labels=result.class_labels,
+                dataset_metadata=result.dataset_metadata,
+                feature_schema_version=train_cfg.export.feature_schema_version,
+                training_data_version=training_data_version,
+            )
+            if args.registry
+            else None
+        )
 
     report = {
         "status": "success",
         "model_version": result.model_version,
         "checkpoint_path": str(result.checkpoint_path),
-        "exported_path": str(exported_path),
+        "exported_path": str(exported_path) if exported_path is not None else None,
         "run_dir": str(result.run_dir),
         "val_report": result.val_report.to_dict(),
         "test_report": result.test_report.to_dict(),
         "registry_entry": registry_entry,
+        "runtime_export_supported": supports_runtime_export,
     }
     print(json.dumps(report, indent=2))
 
