@@ -109,6 +109,10 @@ class PresentationAdapter:
         self._slideshow_keys_browser = _SLIDESHOW_KEYS_BROWSER[platform]
         self._slideshow_keys_native = _SLIDESHOW_KEYS_NATIVE[platform]
 
+    def is_target_app_focused(self) -> bool:
+        """Return True if the target presentation application is currently focused."""
+        return self._keyboard.is_target_app_focused()
+
     def _start_slideshow_keys(self) -> tuple[str, ...]:
         """Choose slideshow start keys by active app family (browser vs native)."""
         identity = _foreground_identity() or ""
