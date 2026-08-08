@@ -11,10 +11,12 @@ from maestro.domain.entities import FramePacket, RuntimeState
 # Armed    — green:  system ready and accepting gesture commands.
 # Laser    — sky blue: laser pointer tracker actively driving cursor.
 # Pen      — violet: annotation pen tracker actively drawing.
+# Unfocused — gray: target application (PowerPoint) is not in foreground.
 _BORDER_ACQUIRING: tuple[int, int, int] = (0, 165, 255)
 _BORDER_ARMED: tuple[int, int, int] = (0, 200, 0)
 _BORDER_LASER: tuple[int, int, int] = (255, 140, 0)  # sky blue (BGR)
 _BORDER_PEN: tuple[int, int, int] = (180, 0, 200)  # violet (BGR)
+_BORDER_UNFOCUSED: tuple[int, int, int] = (100, 100, 100)  # gray (BGR)
 _BORDER_THICKNESS = 4
 
 # Prediction ring — a coloured background rectangle drawn behind the
@@ -23,11 +25,13 @@ _RING_ARMED: tuple[int, int, int] = (0, 60, 0)  # dark green background
 _RING_COOLDOWN: tuple[int, int, int] = (0, 55, 90)  # dark amber background
 _RING_LASER: tuple[int, int, int] = (60, 30, 0)  # dark blue background
 _RING_PEN: tuple[int, int, int] = (55, 0, 60)  # dark violet background
+_RING_UNFOCUSED: tuple[int, int, int] = (40, 40, 40)  # dark gray background
 _RING_DEFAULT: tuple[int, int, int] = (30, 30, 30)  # dark grey background
 
 # Text colours (BGR).
 _TEXT_BADGE: tuple[int, int, int] = (255, 255, 255)  # white — mode badge
 _TEXT_OVERLAY: tuple[int, int, int] = (0, 255, 255)  # yellow — HUD lines
+_TEXT_WARN: tuple[int, int, int] = (0, 165, 255)  # amber — warning line
 
 
 class OverlayRenderer:
@@ -49,10 +53,11 @@ class OverlayRenderer:
         - **Amber**     (``mode == "cooldown"``): inter-command cooldown window active.
         - **Green**     (``mode == "armed"``): system armed; discrete gesture
             commands are accepted.
-    - **Sky blue**  (``laser_active=True`` in ``state.info``): laser pointer
-      tracker is actively driving the cursor.
-    - **Violet**    (``pen_active=True`` in ``state.info``): annotation pen
-      tracker is actively drawing.
+        - **Sky blue**  (``laser_active=True`` in ``state.info``): laser pointer
+          tracker is actively driving the cursor.
+        - **Violet**    (``pen_active=True`` in ``state.info``): annotation pen
+          tracker is actively drawing.
+        - **Gray**      (``app_focused=False``): target app (PowerPoint) not focused.
     """
 
     def __init__(
@@ -85,12 +90,20 @@ class OverlayRenderer:
             canvas = frame.frame.copy()
 
         info = state.info
+        is_focused = state.app_focused and bool(info.get("app_focused", True))
 
         if self._minimal_preview:
             self._draw_status_border(canvas, state)
+            if not is_focused:
+                self._draw_unfocused_banner(canvas)
         else:
             self._draw_status_border(canvas, state)
-            self._draw_landmarks(canvas, info.get("landmarks"), mirror=self._mirror_display)
+            self._draw_landmarks(
+                canvas,
+                info.get("landmarks"),
+                mirror=self._mirror_display,
+                focused=is_focused,
+            )
 
             # --- Mode badge -------------------------------------------------
             # Render "[active_mode]" at the very top of the frame when a mode has
@@ -114,9 +127,9 @@ class OverlayRenderer:
             # prediction line so the mode-state colour is immediately visible
             # without obscuring the rest of the frame content.
             pred_y = 48 + y_offset
-            self._draw_pred_ring(canvas, state.mode, y=pred_y, info=state.info)
+            self._draw_pred_ring(canvas, state.mode, y=pred_y, info=state.info, focused=is_focused)
 
-            line1 = f"mode={state.mode}"
+            line1 = f"mode={state.mode}" if is_focused else "mode=UNFOCUSED (paused)"
             line3 = (
                 "window="
                 f"{info.get('window_ready', False)} "
@@ -134,6 +147,9 @@ class OverlayRenderer:
             self._put(canvas, line4, 12, 96 + y_offset)
             self._put(canvas, line5, 12, 120 + y_offset)
 
+            if not is_focused:
+                self._draw_unfocused_banner(canvas)
+
         if self._output_rgb:
             canvas = canvas[..., ::-1]
 
@@ -141,7 +157,10 @@ class OverlayRenderer:
 
     def _draw_status_border(self, image: Any, state: RuntimeState) -> None:
         """Draw a coloured border reflecting runtime activation state."""
-        if state.info.get("laser_active"):
+        is_focused = state.app_focused and bool(state.info.get("app_focused", True))
+        if not is_focused:
+            colour = _BORDER_UNFOCUSED
+        elif state.info.get("laser_active"):
             colour = _BORDER_LASER
         elif state.info.get("pen_active"):
             colour = _BORDER_PEN
@@ -168,9 +187,12 @@ class OverlayRenderer:
         *,
         y: int,
         info: dict | None = None,
+        focused: bool = True,
     ) -> None:
         """Draw a coloured background rectangle behind the prediction text line."""
-        if info is not None and info.get("laser_active"):
+        if not focused:
+            bg = _RING_UNFOCUSED
+        elif info is not None and info.get("laser_active"):
             bg = _RING_LASER
         elif info is not None and info.get("pen_active"):
             bg = _RING_PEN
@@ -186,11 +208,37 @@ class OverlayRenderer:
         y1 = min(h, y + 6)
         image[y0:y1, 0:w] = bg
 
-    def _draw_landmarks(self, image: Any, landmarks: Any, *, mirror: bool = False) -> None:
+    def _draw_unfocused_banner(self, image: Any) -> None:
+        """Render a prominent visual warning banner when target app is unfocused."""
+        h, w = image.shape[:2]
+        banner_h = 36
+        banner_y = max(0, h - banner_h - 10)
+        # Dark overlay bar at bottom
+        image[banner_y : banner_y + banner_h, :] = (30, 30, 30)
+        cv2.putText(
+            image,
+            "UNFOCUSED: Open/Focus PowerPoint to enable gestures",
+            (16, banner_y + 24),
+            self._font,
+            0.55,
+            _TEXT_WARN,
+            2,
+            cv2.LINE_AA,
+        )
+
+    def _draw_landmarks(
+        self,
+        image: Any,
+        landmarks: Any,
+        *,
+        mirror: bool = False,
+        focused: bool = True,
+    ) -> None:
         if not isinstance(landmarks, list):
             return
 
         height, width = image.shape[:2]
+        dot_color = (0, 255, 0) if focused else (128, 128, 128)
         for point in landmarks:
             if not isinstance(point, list) or len(point) < 2:
                 continue
@@ -202,7 +250,7 @@ class OverlayRenderer:
             y = int(float(point[1]) * height)
             if x < 0 or y < 0 or x >= width or y >= height:
                 continue
-            cv2.circle(image, (x, y), 2, (0, 255, 0), -1)
+            cv2.circle(image, (x, y), 2, dot_color, -1)
 
     def _put(
         self,

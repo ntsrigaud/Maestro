@@ -155,6 +155,12 @@ class CommandDispatcher:
 
         return result
 
+    def is_target_app_focused(self) -> bool:
+        """Return True if the configured application adapter's target app is focused."""
+        if hasattr(self._adapter, "is_target_app_focused"):
+            return bool(self._adapter.is_target_app_focused())
+        return True
+
     # ------------------------------------------------------------------
     # Properties for introspection
     # ------------------------------------------------------------------

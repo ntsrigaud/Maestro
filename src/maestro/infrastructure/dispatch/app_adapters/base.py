@@ -27,3 +27,7 @@ class IApplicationAdapter(Protocol):
         internally.
         """
         ...
+
+    def is_target_app_focused(self) -> bool:
+        """Return True if the target application is currently in the foreground."""
+        ...

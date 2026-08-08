@@ -323,27 +323,31 @@ class KeyboardAdapter:
         else:
             self._backend = PyAutoGUIKeyboardAdapter()
 
-    def _ensure_presentation_scope(self, action: str) -> bool:
+    def is_target_app_focused(self) -> bool:
+        """Return True if a supported target application (e.g. PowerPoint) is currently focused."""
+        return self._ensure_presentation_scope(action="focus_check", silent=True)
+
+    def _ensure_presentation_scope(self, action: str, *, silent: bool = False) -> bool:
         identity = _foreground_identity()
         if identity is None:
-            # Fail-closed: if we cannot confirm the foreground application we
-            # must NOT dispatch.
-            LOGGER.warning(
-                "Scope check failed for action=%s: foreground application could not be "
-                "identified. Blocking dispatch to prevent accidental key injection.",
-                action,
-            )
+            if not silent:
+                LOGGER.warning(
+                    "Scope check failed for action=%s: foreground application could not be "
+                    "identified. Blocking dispatch to prevent accidental key injection.",
+                    action,
+                )
             return False
 
         tokens = _scope_tokens()
         if any(token in identity for token in tokens):
             return True
 
-        LOGGER.warning(
-            "Blocked action outside presentation scope: action=%s foreground=%r",
-            action,
-            identity,
-        )
+        if not silent:
+            LOGGER.warning(
+                "Blocked action outside presentation scope: action=%s foreground=%r",
+                action,
+                identity,
+            )
         return False
 
     def press_hotkey(self, *keys: str) -> bool:

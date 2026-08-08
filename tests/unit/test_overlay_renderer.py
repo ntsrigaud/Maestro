@@ -495,3 +495,20 @@ class TestPredRingColours:
         for mode in ("armed", "cooldown"):
             frame = self._render_ring(mode)
             assert frame.shape == (self.HEIGHT, self.WIDTH, 3)
+
+
+class TestUnfocusedOverlayRendering:
+    def test_unfocused_state_renders_gray_border_and_warning_banner(self) -> None:
+        renderer = OverlayRenderer(mirror_display=False)
+        frame = _make_frame(width=640, height=480)
+        state = RuntimeState(
+            mode="armed",
+            app_focused=False,
+            info={"app_focused": False},
+        )
+        rendered = renderer.render(frame, state).frame
+        # Gray border: top row BGR should be gray (100, 100, 100)
+        assert np.array_equal(rendered[0, 50], [100, 100, 100])
+        # Banner row near bottom should contain non-black pixels
+        banner_y = 480 - 20
+        assert rendered[banner_y, :, :].max() > 0
