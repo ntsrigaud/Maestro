@@ -286,6 +286,9 @@ class MainWindow(QWidget):
 
     def _tray_colour_for_state(self, state: RuntimeState) -> str:
         """Map runtime state to the same colour theme used by floating preview badge."""
+        app_focused = state.app_focused and bool(state.info.get("app_focused", True))
+        if not app_focused:
+            return "#6B7280"  # gray — unfocused (PowerPoint not active)
         laser_active = bool(state.info.get("laser_active", False))
         pen_active = bool(state.info.get("pen_active", False))
 
@@ -330,6 +333,9 @@ class MainWindow(QWidget):
             self._status_label.setText(message)
 
     def _state_text_for_state(self, state: RuntimeState) -> str:
+        app_focused = state.app_focused and bool(state.info.get("app_focused", True))
+        if not app_focused:
+            return "Unfocused (PowerPoint not active)"
         if bool(state.info.get("laser_active", False)):
             return "Laser pointer active"
         if bool(state.info.get("pen_active", False)):

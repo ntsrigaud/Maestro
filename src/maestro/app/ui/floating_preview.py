@@ -24,6 +24,7 @@ _BADGE_ACQUIRING = "rgba(217, 119, 6, 220)"
 _BADGE_ARMED = "rgba(5, 150, 105, 215)"
 _BADGE_LASER = "rgba(37, 99, 235, 225)"
 _BADGE_PEN = "rgba(124, 58, 237, 225)"
+_BADGE_UNFOCUSED = "rgba(75, 85, 99, 220)"
 
 # Delay (ms) after show() before resolving the NSWindow handle.
 # Qt requires a brief moment to register the OS-level window with NSApp.
@@ -197,13 +198,16 @@ class FloatingPreviewWindow(QWidget):
         self._state_badge.move(x, y)
 
     def _update_state_badge(self, state: RuntimeState) -> None:
+        app_focused = state.app_focused and bool(state.info.get("app_focused", True))
         laser_active = bool(state.info.get("laser_active", False))
         pen_active = bool(state.info.get("pen_active", False))
         label = state.last_label or "unknown"
         label_display = label.replace("_", " ").upper() if label != "unknown" else ""
         color = self._badge_theme_color(state)
 
-        if laser_active:
+        if not app_focused:
+            text = "UNFOCUSED | Open PowerPoint"
+        elif laser_active:
             text = "LASER POINTER ACTIVE"
         elif pen_active:
             text = "ANNOTATION PEN ACTIVE"
@@ -234,6 +238,9 @@ class FloatingPreviewWindow(QWidget):
 
     def _badge_theme_color(self, state: RuntimeState) -> str:
         """Return a badge background color matching overlay border state priority."""
+        app_focused = state.app_focused and bool(state.info.get("app_focused", True))
+        if not app_focused:
+            return _BADGE_UNFOCUSED
         if state.info.get("laser_active"):
             return _BADGE_LASER
         if state.info.get("pen_active"):
