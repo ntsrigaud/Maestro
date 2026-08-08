@@ -417,12 +417,18 @@ class TestCommandDispatcherAdapterExceptions:
 class TestFocusDetection:
     def test_keyboard_adapter_is_target_app_focused_true(self):
         adapter = KeyboardAdapter(backend=MagicMock())
-        with patch("maestro.infrastructure.dispatch.app_adapters.keyboard_adapter._foreground_identity", return_value="microsoft powerpoint"):
+        with patch(
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter._foreground_identity",
+            return_value="microsoft powerpoint",
+        ):
             assert adapter.is_target_app_focused() is True
 
     def test_keyboard_adapter_is_target_app_focused_false(self):
         adapter = KeyboardAdapter(backend=MagicMock())
-        with patch("maestro.infrastructure.dispatch.app_adapters.keyboard_adapter._foreground_identity", return_value="safari"):
+        with patch(
+            "maestro.infrastructure.dispatch.app_adapters.keyboard_adapter._foreground_identity",
+            return_value="safari",
+        ):
             assert adapter.is_target_app_focused() is False
 
     def test_command_dispatcher_is_target_app_focused(self):
