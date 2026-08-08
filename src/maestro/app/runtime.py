@@ -333,19 +333,24 @@ class Runtime:
                             result.detail,
                         )
 
+                app_focused = True
+                if hasattr(self._container.dispatcher, "is_target_app_focused"):
+                    app_focused = self._container.dispatcher.is_target_app_focused()
+
                 # Continuous gesture trackers — update every frame using the
                 # current landmarks and latest stable label.  These drive
                 # real-time cursor tracking independently of the edge-trigger
                 # cooldown: point_one → laser pointer, point_two → annotation pen.
+                tracker_valid = landmark_packet.valid and app_focused
                 self._laser_tracker.update(
                     label=latest_label,
-                    landmarks=landmark_packet.landmarks if landmark_packet.valid else None,
-                    valid=landmark_packet.valid,
+                    landmarks=landmark_packet.landmarks if tracker_valid else None,
+                    valid=tracker_valid,
                 )
                 self._pen_tracker.update(
                     label=latest_label,
-                    landmarks=landmark_packet.landmarks if landmark_packet.valid else None,
-                    valid=landmark_packet.valid,
+                    landmarks=landmark_packet.landmarks if tracker_valid else None,
+                    valid=tracker_valid,
                 )
 
                 # Continuous gesture labels bypass the COOLDOWN state machine so
@@ -382,6 +387,8 @@ class Runtime:
                     last_label=latest_label,
                     last_confidence=latest_conf,
                     active_mode=self._active_mode,
+                    app_focused=app_focused,
+                    target_app_name="PowerPoint",
                     info={
                         "landmarks": landmarks_info,
                         "window_ready": window_ready,
@@ -394,6 +401,7 @@ class Runtime:
                         ),
                         "laser_active": self._laser_tracker.active,
                         "pen_active": self._pen_tracker.active,
+                        "app_focused": app_focused,
                     },
                 )
 
