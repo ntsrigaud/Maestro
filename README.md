@@ -79,7 +79,7 @@ Key directories:
 | `src/maestro/` | Core package (domain, interfaces, infrastructure, pipeline, training, app/ui)                                                      |
 | `configs/`     | YAML configuration (app, inference, model, gestures, thresholds)                                                                   |
 | `scripts/`     | UI entry point (`run_ui.py`), data generation, and training utilities                                                                  |
-| `models/`      | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/maestro-lstm) |
+| `models/`      | Local training artifacts (`.gitignore`d); production model hosted on [Hugging Face](https://huggingface.co/ntsrigaud/maestro-lstm-hybrid) |
 | `tests/`       | Unit, integration, and system test suites                                                                                          |
 | `docs/`        | Architecture docs, guides, and decision records                                                                                    |
 
@@ -94,3 +94,19 @@ The PySide6 UI (`src/maestro/app/ui/`) is a non-blocking control surface:
 - The main UI window is the cross-platform control surface, and a `QSystemTrayIcon` supplements it with ambient gesture feedback (colour-coded: grey / green / amber) when available.
 
 The complete development history is recorded in [docs/architecture/](docs/architecture/) and [docs/archive/work-logs/](docs/archive/work-logs/).
+
+## License
+
+Maestro's source code is released under the [Apache License 2.0](LICENSE). Third-party
+components and their licenses are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+The pretrained model weights are licensed separately, for **academic and non-commercial
+research use only** (see [MODEL_LICENSE.md](MODEL_LICENSE.md)), because they were trained on
+LD-ConGR, Jester and IPN Hand, whose terms restrict commercial use. The installers bundle these
+weights and are subject to the same restriction.
+
+## Citation
+
+If you use Maestro in academic work, please cite it using [CITATION.cff](CITATION.cff)
+(GitHub's "Cite this repository" button). A reference to the accompanying paper will be added
+after publication.
