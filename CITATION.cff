@@ -3,7 +3,21 @@ message: "If you use Maestro in your research, please cite it as below."
 title: "Maestro: Real-Time Hand Gesture Recognition for Presentation Control"
 type: software
 authors:
-  - name: Maestro Team
+  - family-names: "Chang"
+    given-names: "I-Cheng"
+    affiliation: "Department of Computer Science and Information Engineering, National Dong Hwa University, Hualien, Taiwan"
+  - family-names: "Guerrero"
+    given-names: "Eder Jorvin"
+    affiliation: "Department of Computer Science and Information Engineering, National Dong Hwa University, Hualien, Taiwan"
+  - family-names: "Tuguldur"
+    given-names: "Khishig"
+    affiliation: "Department of Computer Science and Information Engineering, National Dong Hwa University, Hualien, Taiwan"
+  - family-names: "Rigaud"
+    given-names: "Neil Taison"
+    affiliation: "Department of Computer Science and Information Engineering, National Dong Hwa University, Hualien, Taiwan"
+  - family-names: "Hortès"
+    given-names: "Sley"
+    affiliation: "Department of Computer Science and Information Engineering, National Dong Hwa University, Hualien, Taiwan"
 repository-code: "https://github.com/ntsrigaud/Maestro"
 url: "https://ntsrigaud.github.io"
 license: Apache-2.0
