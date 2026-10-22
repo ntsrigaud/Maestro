@@ -1,7 +1,9 @@
 ---
 language:
 - en
-license: mit
+license: other
+license_name: maestro-weights-research-only
+license_link: https://github.com/ntsrigaud/Maestro/blob/main/MODEL_LICENSE.md
 tags:
 - gesture-recognition
 - hand-gesture
@@ -228,9 +230,16 @@ Two-phase transfer learning pipeline:
 | Cross-stream fusion | Concat only | **2-layer MLP gate** |
 | Parameters | ~182 K | ~2,099,434 |
 
+## License
+
+These weights are for academic and non-commercial research use only (see
+[MODEL_LICENSE.md](https://github.com/ntsrigaud/Maestro/blob/main/MODEL_LICENSE.md)), because
+they were trained on LD-ConGR (academic research only), Jester (research-use license) and
+IPN Hand (CC BY 4.0). The Maestro source code is Apache-2.0.
+
 ## Limitations and Risks
 
-- Trained on IPN Hand subjects only. Performance may degrade with unusual hand sizes,
+- Trained on a hybrid of Jester, IPN Hand and LD-ConGR, Jester and IPN Hand recordings. Performance may degrade with unusual hand sizes,
   skin tones, or lighting conditions not represented in training data.
 - The `unknown` class represents background/transition frames. At runtime, predictions
   are filtered through per-class confidence thresholds defined in `production_hybrid.yaml`.
