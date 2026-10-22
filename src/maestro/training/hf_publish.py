@@ -110,7 +110,9 @@ _DUAL_STGCN_MODEL_CARD_TEMPLATE = """\
 ---
 language:
 - en
-license: mit
+license: other
+license_name: maestro-weights-research-only
+license_link: https://github.com/ntsrigaud/Maestro/blob/main/MODEL_LICENSE.md
 tags:
 - gesture-recognition
 - hand-gesture
@@ -331,7 +333,9 @@ _ENHANCED_TWO_STREAM_MODEL_CARD_TEMPLATE = """\
 ---
 language:
 - en
-license: mit
+license: other
+license_name: maestro-weights-research-only
+license_link: https://github.com/ntsrigaud/Maestro/blob/main/MODEL_LICENSE.md
 tags:
 - gesture-recognition
 - hand-gesture
@@ -532,7 +536,9 @@ _TWO_STREAM_MODEL_CARD_TEMPLATE = """\
 ---
 language:
 - en
-license: mit
+license: other
+license_name: maestro-weights-research-only
+license_link: https://github.com/ntsrigaud/Maestro/blob/main/MODEL_LICENSE.md
 tags:
 - gesture-recognition
 - hand-gesture
