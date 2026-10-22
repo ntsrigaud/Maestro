@@ -3,8 +3,7 @@ message: "If you use Maestro in your research, please cite it as below."
 title: "Maestro: Real-Time Hand Gesture Recognition for Presentation Control"
 type: software
 authors:
-  - family-names: Rigaud
-    given-names: Neil Taïson
+  - name: Maestro Team
 repository-code: "https://github.com/ntsrigaud/Maestro"
 url: "https://ntsrigaud.github.io"
 license: Apache-2.0
