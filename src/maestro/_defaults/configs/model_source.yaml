@@ -4,5 +4,5 @@
 backend: huggingface
 repo_id: ntsrigaud/maestro-lstm-hybrid
 revision: main
-filename: two_stream_attn_v1_2layer_finetune_finetune_20260515T130435Z_inference.pt
+filename: two_stream_attn_v1_2layer_ld_cong_finetune_20260515T134706Z_inference.pt
 cache_dir: null # null = HF default (~/.cache/huggingface/hub)
