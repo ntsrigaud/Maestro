@@ -21,7 +21,7 @@ metrics:
 - accuracy
 - f1
 model-index:
-- name: two_stream_attn_finetune_hybrid_10class_finetune_20260606T150031Z
+- name: two_stream_attn_v1_2layer_ld_cong_finetune_20260515T134706Z
   results:
   - task:
       type: gesture-recognition
@@ -30,12 +30,12 @@ model-index:
       type: LDJI
     metrics:
     - type: accuracy
-      value: 0.9643
+      value: 0.9606
     - type: f1
-      value: 0.9660
+      value: 0.9587
 ---
 
-# two_stream_attn_finetune_hybrid_10class_finetune_20260606T150031Z
+# two_stream_attn_v1_2layer_ld_cong_finetune_20260515T134706Z
 
 A real-time hand gesture classifier trained on
 the LDJI hybrid gesture dataset (LD-ConGR swipes and fist, Jester zooms, IPN Hand pointing and background).
@@ -143,7 +143,7 @@ from maestro.infrastructure.model.checkpoint_loader import load_inference_artifa
 # Download the artifact (cached after first call)
 local_path = hf_hub_download(
     repo_id="ntsrigaud/maestro-lstm-hybrid",
-    filename="two_stream_attn_finetune_hybrid_10class_finetune_20260606T150031Z_inference.pt",
+    filename="two_stream_attn_v1_2layer_ld_cong_finetune_20260515T134706Z_inference.pt",
 )
 
 # Load the artifact (includes model, class labels, and feature schema)
@@ -166,16 +166,16 @@ with torch.no_grad():
 
 - **Source**: LDJI corpus of 28,882 windows pooled from LD-ConGR (fist and the four swipes), Jester (two zoom classes, center-cropped to 16 frames) and IPN Hand (`point_one`, `point_two`, `unknown`)
 - **Used classes**: 10 (9 active gestures + `unknown` background)
-- **Dataset split**: 70.7% train / 13.4% val / 15.9% test (by recording identifier)
+- **Dataset split**: 70% train / 15% val / 15% test (stratified by class)
 - **Augmentation**: temporal scale ±20%, spatial jitter σ=0.005
 
 ## Training Strategy
 
 Two-phase transfer learning pipeline:
-- **Phase 1 (pretraining):** backbone pretrained on the 25-class Jester corpus (zoom classes excluded).
+- **Phase 1 (pretraining):** backbone pretrained on Jester.
 - **Phase 2 (fine-tuning):** classification head replaced and model fine-tuned on the 10-class LDJI vocabulary.
 - **Stage A (frozen backbone):** 10 epochs of head-only warmup.
-- **Stage B (full model):** up to 80 epochs of joint fine-tuning with a 5-epoch backbone warmup.
+- **Stage B (full model):** up to 80 epochs of joint fine-tuning (early stopping selected epoch 46) with a 5-epoch backbone warmup.
 
 ## Training Configuration
 
@@ -201,23 +201,23 @@ Two-phase transfer learning pipeline:
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 96.4% |
-| Macro F1 | 96.6% |
+| Accuracy | 96.1% |
+| Macro F1 | 95.9% |
 
 ### Per-Class Recall
 
 | Class | Recall |
 |-------|--------|
-| `fist` | 100.0% |
-| `swiping_left` | 99.5% |
-| `swiping_right` | 99.8% |
+| `fist` | 97.3% |
+| `swiping_left` | 98.3% |
+| `swiping_right` | 97.1% |
 | `swiping_up` | 98.2% |
-| `swiping_down` | 98.8% |
-| `zooming_in_full_hand` | 94.7% |
-| `zooming_out_full_hand` | 95.6% |
-| `point_one` | 94.2% |
-| `point_two` | 95.5% |
-| `unknown` | 91.3% |
+| `swiping_down` | 98.0% |
+| `zooming_in_full_hand` | 97.0% |
+| `zooming_out_full_hand` | 95.1% |
+| `point_one` | 97.4% |
+| `point_two` | 95.1% |
+| `unknown` | 85.7% |
 
 ## Comparison with Previous Architecture
 
