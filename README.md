@@ -1,7 +1,7 @@
 # Maestro
 
 [![CI](https://github.com/ntsrigaud/Maestro/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ntsrigaud/Maestro/actions/workflows/ci.yml)
-[![Build](https://github.com/ntsrigaud/Maestro/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/ntsrigaud/Maestro/actions/workflows/build.yml)
+[![Build](https://github.com/ntsrigaud/Maestro/actions/workflows/build.yml/badge.svg?event=push)](https://github.com/ntsrigaud/Maestro/actions/workflows/build.yml)
 [![Latest release](https://img.shields.io/github/v/release/ntsrigaud/Maestro)](https://github.com/ntsrigaud/Maestro/releases/latest)
 [![Code license: Apache-2.0](https://img.shields.io/badge/code%20license-Apache--2.0-blue)](LICENSE)
 [![Model license: research only](https://img.shields.io/badge/model%20license-research%20only-orange)](MODEL_LICENSE.md)
