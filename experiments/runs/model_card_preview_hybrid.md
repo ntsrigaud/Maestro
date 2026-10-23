@@ -219,6 +219,18 @@ Two-phase transfer learning pipeline:
 | `point_two` | 95.1% |
 | `unknown` | 85.7% |
 
+## Model Versions
+
+| Version | Role | Test accuracy | Test macro F1 |
+|---------|------|---------------|---------------|
+| `two_stream_attn_v1_2layer_ld_cong_finetune_20260515T134706Z` | **Production**: default in the Maestro app and installers | 96.1% | 95.9% |
+| `two_stream_attn_finetune_hybrid_10class_finetune_20260606T150031Z` | **Reference**: the model whose results are reported in the ICKII 2026 manuscript | 96.4% | 96.6% |
+
+Both share the same architecture (1,208,554 parameters, 16-frame window) and the LDJI
+training corpus. The reference model scores slightly higher offline but one swipe gesture was
+less reliable in live testing, so the production model remains the default. Other
+artifacts in this repository are earlier experiments.
+
 ## Comparison with Previous Architecture
 
 | Feature | TwoStreamGestureLSTM | EnhancedTwoStreamLSTM |
