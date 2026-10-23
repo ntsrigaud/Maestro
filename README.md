@@ -1,5 +1,13 @@
 # Maestro
 
+[![CI](https://github.com/ntsrigaud/Maestro/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ntsrigaud/Maestro/actions/workflows/ci.yml)
+[![Build](https://github.com/ntsrigaud/Maestro/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/ntsrigaud/Maestro/actions/workflows/build.yml)
+[![Latest release](https://img.shields.io/github/v/release/ntsrigaud/Maestro)](https://github.com/ntsrigaud/Maestro/releases/latest)
+[![Code license: Apache-2.0](https://img.shields.io/badge/code%20license-Apache--2.0-blue)](LICENSE)
+[![Model license: research only](https://img.shields.io/badge/model%20license-research%20only-orange)](MODEL_LICENSE.md)
+[![Python 3.11 | 3.12](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](pyproject.toml)
+[![Platforms: macOS | Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)](https://github.com/ntsrigaud/Maestro/releases/latest)
+
 Production-grade webcam-based gesture recognition system for hands-free presentation control, powered by MediaPipe Hands and a two-stream LSTM classifier.
 
 ## System Overview
