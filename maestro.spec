@@ -44,6 +44,9 @@ datas = [
     (str(ROOT / "docs" / "assets" / "icon.png"), "docs/assets"),
     # Offline bundled model
     (str(ROOT / "models"), "models"),
+    # License texts and third-party notices (Apache-2.0, LGPL attribution)
+    *[(str(ROOT / f), "licenses") for f in (
+        "LICENSE", "NOTICE", "MODEL_LICENSE.md", "THIRD_PARTY_LICENSES.md")],
 ]
 
 # MediaPipe ships its own model files and protobuf descriptors as data.
