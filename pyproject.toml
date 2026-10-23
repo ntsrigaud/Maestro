@@ -7,6 +7,15 @@ name = "maestro"
 version = "1.0.0"
 description = "Maestro — real-time hand gesture recognition for presentation control"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+  { name = "I-Cheng Chang" },
+  { name = "Eder Jorvin Guerrero" },
+  { name = "Khishig Tuguldur" },
+  { name = "Neil Taison Rigaud" },
+  { name = "Sley Hortès" },
+]
 requires-python = ">=3.11,<3.13"
 dependencies = [
   "pydantic>=2.6.0",
